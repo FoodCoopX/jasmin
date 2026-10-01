@@ -83,7 +83,8 @@
       "effective_at_in_past": "The effective date cannot be in the past.",
       "effective_at_required": "An effective date is required."
     },
-    "confirmed_immutable": "A confirmed member can’t be deleted — end the membership via cancellation instead."
+    "confirmed_immutable": "A confirmed member can’t be deleted — end the membership via cancellation instead.",
+    "exit_before_transfer": "The exit date is before a coop share transfer of this member ({{transfer_date}}). A member can't leave before their own transfer: if the exit really is earlier, the transfer was recorded wrongly."
   },
   "coop_share": {
     "contract_agreement_required": "Please agree to the subscription contract to subscribe cooperative shares.",

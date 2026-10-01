@@ -4,6 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import ROUND_FLOOR, Decimal
+from itertools import accumulate
 from typing import TYPE_CHECKING, Any
 
 from django.db import models, transaction
@@ -379,15 +380,16 @@ class CoopShareService:
           ``confirm_member_cancellation`` has to confirm: those rows are closed
           (cancelled without a payback date, linked through
           ``settled_by_transfer``) and ``cancel_member_with_coop_shares`` cancels
-          the member effective on the transfer date. It refuses a member with
-          active subscriptions and sends the cancellation email, which then says
-          no settlement follows.
+          the member, both effective on the giver's latest transfer date. It
+          refuses a member with active subscriptions and sends the cancellation
+          email, which then says no settlement follows.
         - A trial receiver is converted to a full member, with the transfer date as
           entry date.
         """
         from apps.commissioning.models import CoopShare, CoopShareTransfer, Member
         from apps.commissioning.services.member_cancellation import (
             cancel_member_with_coop_shares,
+            latest_coop_share_transfer_date,
         )
         from apps.commissioning.services.trial_conversion import (
             convert_trial_member_on_first_coop_share,
@@ -469,11 +471,16 @@ class CoopShareService:
         if from_member_cancelled:
             if not confirm_member_cancellation:
                 raise CoopShareTransferCancellationNotConfirmed()
+            # The giver leaves with the last of their transfers, which isn't
+            # this one when it is backdated before another they already made.
+            # Dated by this one, the exit would end the giver's holding before
+            # the later transfer took those shares.
+            exit_date = latest_coop_share_transfer_date(from_member) or transfer_date
             for row in CoopShare.objects.filter(
                 member=from_member, admin_confirmed=True, cancelled_at__isnull=True
             ):
                 row.cancelled_at = now
-                row.cancelled_effective_at = transfer_date
+                row.cancelled_effective_at = exit_date
                 row.cancelled_by = actor
                 row.payback_due_date = None
                 row.settled_by_transfer = coop_share_transfer
@@ -489,7 +496,7 @@ class CoopShareService:
                 )
             cancel_member_with_coop_shares(
                 from_member,
-                cancelled_effective_at=transfer_date,
+                cancelled_effective_at=exit_date,
                 cancelled_by=actor,
                 shares_transferred=True,
             )
@@ -509,46 +516,15 @@ class CoopShareService:
     def _allocate_paid_shares(
         member: Member, amount: int, transfer_date: date
     ) -> dict[int, Decimal]:
-        """Split ``amount`` over the member's share values, in whole shares.
-
-        Per share value, counts confirmed, uncancelled rows paid by the transfer
-        date (negative rows of earlier transfers included), capped by what the
-        member holds of that value today, so a backdated transfer can't give shares
-        a transfer dated later already gave away. Share values with the most
-        recent payment are used first. Raises ``CoopShareTransferExceedsHeld`` when
-        the whole shares don't cover ``amount``.
+        """Split ``amount`` over the member's share values, in whole shares, as far
+        as ``_givable_by_value`` allows. Share values with the most recent payment
+        by the transfer date are used first. Raises
+        ``CoopShareTransferExceedsHeld`` when the whole shares don't cover
+        ``amount``.
         """
-        from apps.commissioning.models import CoopShare
-
-        rows = list(
-            CoopShare.objects.select_for_update().filter(
-                member=member,
-                admin_confirmed=True,
-                paid_at__isnull=False,
-                cancelled_at__isnull=True,
-            )
+        whole_by_value, latest_payment = CoopShareService._givable_by_value(
+            member, transfer_date
         )
-        held_today: defaultdict[int, Decimal] = defaultdict(Decimal)
-        held_on_transfer_date: defaultdict[int, Decimal] = defaultdict(Decimal)
-        latest_payment: dict[int, datetime] = {}
-        for row in rows:
-            value = row.value_one_coop_share
-            held_today[value] += row.amount_of_coop_shares
-            if (
-                row.paid_at is None
-                or timezone.localtime(row.paid_at).date() > transfer_date
-            ):
-                continue
-            held_on_transfer_date[value] += row.amount_of_coop_shares
-            latest_payment[value] = max(
-                latest_payment.get(value, row.paid_at), row.paid_at
-            )
-
-        whole_by_value: dict[int, Decimal] = {}
-        for value, held in held_on_transfer_date.items():
-            whole = min(held, held_today[value]).to_integral_value(rounding=ROUND_FLOOR)
-            if whole >= 1:
-                whole_by_value[value] = whole
         available = sum(whole_by_value.values(), Decimal(0))
         if amount > available:
             raise CoopShareTransferExceedsHeld(available=int(available))
@@ -564,6 +540,68 @@ class CoopShareService:
             given_by_value[value] = taken
             still_needed -= taken
         return given_by_value
+
+    @staticmethod
+    def _givable_by_value(
+        member: Member, transfer_date: date
+    ) -> tuple[dict[int, Decimal], dict[int, datetime]]:
+        """Per share value, the whole shares ``member`` can give on
+        ``transfer_date``, and their latest payment by then.
+
+        Counts confirmed, uncancelled rows by the local date they were paid on
+        (transfer rows on their transfer date), and caps each value at its lowest
+        balance on any day from the transfer date on. A backdated transfer can't
+        give shares that a transfer dated later already gave away, nor shares that
+        only come in after it.
+        """
+        from apps.commissioning.models import CoopShare, CoopShareTransfer
+
+        rows = list(
+            CoopShare.objects.select_for_update().filter(
+                member=member,
+                admin_confirmed=True,
+                paid_at__isnull=False,
+                cancelled_at__isnull=True,
+            )
+        )
+        # Transfer rows count from their transfer date, as in the member register;
+        # onboarding mode lets the office edit their paid_at.
+        transfer_dates = dict(
+            CoopShareTransfer.objects.filter(
+                pk__in={row.transfer_id for row in rows if row.transfer_id}
+            ).values_list("pk", "transfer_date")
+        )
+        held_on_transfer_date: defaultdict[int, Decimal] = defaultdict(Decimal)
+        later_changes: defaultdict[int, defaultdict[date, Decimal]] = defaultdict(
+            lambda: defaultdict(Decimal)
+        )
+        latest_payment: dict[int, datetime] = {}
+        for row in rows:
+            if row.paid_at is None:
+                continue
+            value = row.value_one_coop_share
+            if row.transfer_id is not None:
+                paid_on = transfer_dates[row.transfer_id]
+            else:
+                paid_on = timezone.localtime(row.paid_at).date()
+            if paid_on > transfer_date:
+                later_changes[value][paid_on] += row.amount_of_coop_shares
+                continue
+            held_on_transfer_date[value] += row.amount_of_coop_shares
+            latest_payment[value] = max(
+                latest_payment.get(value, row.paid_at), row.paid_at
+            )
+
+        whole_by_value: dict[int, Decimal] = {}
+        for value, held in held_on_transfer_date.items():
+            changes = later_changes[value]
+            lowest = min(
+                accumulate((changes[day] for day in sorted(changes)), initial=held)
+            )
+            whole = lowest.to_integral_value(rounding=ROUND_FLOOR)
+            if whole >= 1:
+                whole_by_value[value] = whole
+        return whole_by_value, latest_payment
 
     @staticmethod
     def _save_without_bounds_check(share: CoopShare, **kwargs: Any) -> None:

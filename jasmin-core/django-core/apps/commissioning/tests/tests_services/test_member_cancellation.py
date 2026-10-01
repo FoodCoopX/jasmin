@@ -31,7 +31,8 @@ import time_machine
 from django.db import DatabaseError
 from django.utils import timezone
 
-from apps.commissioning.models import CoopShare
+from apps.commissioning.errors import MemberAlreadyCancelled
+from apps.commissioning.models import CoopShare, Member
 from apps.commissioning.services.member_cancellation import (
     cancel_member_with_coop_shares,
 )
@@ -163,6 +164,21 @@ class TestCancelMemberWithShares:
 
         member.refresh_from_db()
         assert member.cancelled_at is not None
+
+    def test_an_already_cancelled_member_is_refused(self, tenant):
+        """A request that loaded the member before another cancellation
+        committed can't overwrite that exit."""
+        member = MemberFactory()
+        loaded_before = Member.objects.get(pk=member.pk)
+        cancel_member_with_coop_shares(member, notify=False)
+        member.refresh_from_db()
+
+        with pytest.raises(MemberAlreadyCancelled):
+            cancel_member_with_coop_shares(loaded_before, notify=False)
+
+        unchanged = Member.objects.get(pk=member.pk)
+        assert unchanged.cancelled_at == member.cancelled_at
+        assert unchanged.cancelled_effective_at == member.cancelled_effective_at
 
 
 @pytest.mark.django_db

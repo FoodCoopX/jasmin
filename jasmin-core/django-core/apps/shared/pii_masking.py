@@ -1,11 +1,14 @@
-"""Display-masking helpers for sensitive PII (IBAN, account-holder name).
+"""Masking helpers for sensitive PII (IBAN, account-holder name).
 
-Used by office/admin serializers that must show *enough* of a value for a
-human to recognize it (the last 4 of an IBAN) without echoing the full
-decrypted secret on every bulk read. Column encryption-at-rest protects the
-database; these helpers stop the API boundary from undoing that for casual
-reads. Full values are accepted only on WRITE (``write_only`` fields) or
-revealed through a dedicated, step-up-gated surface.
+The display helpers are used by office/admin serializers that must show
+*enough* of a value for a human to recognize it (the last 4 of an IBAN)
+without echoing the full decrypted secret on every bulk read. Column
+encryption-at-rest protects the database; these helpers stop the API boundary
+from undoing that for casual reads. Full values are accepted only on WRITE
+(``write_only`` fields) or revealed through a dedicated, step-up-gated surface.
+
+``mask_for_audit_log`` is the opposite case: audit-log diffs are kept
+indefinitely and nobody needs to recognize a value there, so it keeps nothing.
 
 These are standalone, domain-free utilities — safe to import from any app
 (including ``apps/commissioning``).
@@ -16,6 +19,22 @@ from __future__ import annotations
 # • — never appears in a real IBAN or a name, so the masked output is also
 # unambiguously NOT a value anyone should try to write back.
 _BULLET = "•"
+
+# What a masked value is stored as in the audit log: a constant, so neither the
+# value nor its length is recorded.
+AUDIT_LOG_MASK = "********"
+
+
+def mask_for_audit_log(value: str) -> str:
+    """django-auditlog's mask callable (``AUDITLOG_MASK_CALLABLE``).
+
+    auditlog hands over the string form of the old and the new value, so an
+    empty field arrives as ``"None"`` or ``""``. That stays as it is: an empty
+    field reveals nothing. Every other value is replaced whole.
+    """
+    if value in ("", "None"):
+        return value
+    return AUDIT_LOG_MASK
 
 
 def mask_iban(value: str | None) -> str:

@@ -29,15 +29,27 @@ import logging
 from datetime import date, datetime
 
 from django.db import DatabaseError, transaction
-from django.db.models import DateField, F, Value
+from django.db.models import DateField, F, Max, Q, Value
 from django.db.models.functions import Least
 from django.utils import timezone
 
 from core.tenant_db import connection
 
-from ..models import CoopShare, Member
+from ..errors import MemberAlreadyCancelled, MemberExitBeforeTransfer
+from ..models import CoopShare, CoopShareTransfer, Member
 
 logger = logging.getLogger(__name__)
+
+
+def latest_coop_share_transfer_date(member: Member) -> date | None:
+    """The date of the member's latest coop share transfer, given or received.
+
+    A member's exit can't come before it: the shares of a transfer stop counting
+    for one side on the date they start counting for the other.
+    """
+    return CoopShareTransfer.objects.filter(
+        Q(from_member=member) | Q(to_member=member)
+    ).aggregate(latest=Max("transfer_date"))["latest"]
 
 
 @transaction.atomic
@@ -67,6 +79,10 @@ def cancel_member_with_coop_shares(
     cascades and ends the subscriptions in the same transaction. Member
     self-service always runs with ``force=False`` (no force option for members).
 
+    A member already cancelled is refused with :class:`MemberAlreadyCancelled`,
+    and an exit dated before one of the member's coop share transfers, given or
+    received, with :class:`MemberExitBeforeTransfer`.
+
     Each cascaded ``CoopShare`` also gets its ``payback_due_date`` snapshotted
     to ``effective + TenantSettings.retention_period_…_months`` — the equity
     stays in the cooperative for the retention period after exit, then
@@ -82,11 +98,23 @@ def cancel_member_with_coop_shares(
     caller can surface to the office which subscriptions a force-cancel could
     NOT end (those keep an active mandate and need manual attention).
     """
+    # The row lock a coop share transfer of this member holds while it writes:
+    # the exit is checked against a transfer recorded concurrently, and a second
+    # cancellation of the same member waits for the first and is refused. Only
+    # the row: GDPR erasure has written it before it gets here, so taking the
+    # transfer's advisory lock now could deadlock with a transfer waiting for it.
+    locked = Member.objects.select_for_update().only("cancelled_at").get(pk=member.pk)
+    if locked.cancelled_at is not None:
+        raise MemberAlreadyCancelled("This membership is already cancelled.")
+
     now = cancelled_at or timezone.now()
     # Tenant-local date of the cancellation instant — NOT ``now.date()`` (UTC),
     # which would skew a day behind ``entry_date`` (stored tenant-local) near
     # the local/UTC midnight boundary and trip ``cancelled_effective_after_entry``.
     effective = cancelled_effective_at or timezone.localdate(now)
+    latest_transfer = latest_coop_share_transfer_date(member)
+    if latest_transfer is not None and effective < latest_transfer:
+        raise MemberExitBeforeTransfer(transfer_date=latest_transfer.isoformat())
     today = timezone.localdate()
 
     if not force:

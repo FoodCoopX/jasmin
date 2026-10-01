@@ -163,7 +163,7 @@ class SubjectAccessMixin:
           on erasure, but the raw internal audit diffs are an operational
           record whose disclosure is a legal judgement call and can embed
           third-party data inside a single diff; the substantive PII they hold
-          (old/new names, addresses, IBAN, consent IP/UA) is already surfaced
+          (old/new names, addresses, consent IP/UA) is already surfaced
           by the live-value sections above. If a supervisory authority requires
           it, add a capped ``_sar_audit_history`` keyed off the member/reseller
           FK chains that ``_scrub_auditlog_entries`` already walks.

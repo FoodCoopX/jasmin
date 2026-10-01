@@ -83,7 +83,8 @@
       "effective_at_in_past": "Das Kündigungsdatum darf nicht in der Vergangenheit liegen.",
       "effective_at_required": "Bitte ein Kündigungsdatum angeben."
     },
-    "confirmed_immutable": "Ein bestätigtes Mitglied kann nicht gelöscht werden — stattdessen über die Kündigung beenden."
+    "confirmed_immutable": "Ein bestätigtes Mitglied kann nicht gelöscht werden — stattdessen über die Kündigung beenden.",
+    "exit_before_transfer": "Das Austrittsdatum liegt vor einer Übertragung von Genossenschaftsanteilen dieses Mitglieds ({{transfer_date}}). Ein Mitglied kann nicht vor seiner eigenen Übertragung austreten: Liegt der Austritt wirklich davor, ist die Übertragung falsch erfasst."
   },
   "coop_share": {
     "contract_agreement_required": "Bitte stimme dem Zeichnungsvertrag zu, um Genossenschaftsanteile zu zeichnen.",

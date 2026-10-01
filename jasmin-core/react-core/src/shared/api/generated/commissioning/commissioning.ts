@@ -3865,8 +3865,9 @@ confirmed and paid on the transfer date. The min/max window is checked on
 the final state of both members: a giving member left above 0 but below
 the minimum is refused (``member.coop_shares_out_of_range``). A giving
 member left without confirmed shares has those rows closed without a
-payback date and is cancelled effective on the transfer date, which the
-request has to confirm with ``confirm_member_cancellation``.
+payback date and is cancelled effective on their latest transfer date —
+this one's, unless a later-dated transfer of theirs is already recorded —
+which the request has to confirm with ``confirm_member_cancellation``.
  */
 export const commissioningCoopSharesTransferCreate = (
     coopShareTransferRequest: CoopShareTransferRequest,

@@ -793,6 +793,24 @@ class MemberAlreadyCancelled(ConflictError):
     code = "member.already_cancelled"
 
 
+class MemberExitBeforeTransfer(BadRequestError):
+    """A member's exit is dated before one of their own coop share transfers,
+    given or received. Their shares would stop counting at the exit while the
+    other side's only start at the transfer, leaving them held by nobody in
+    the GenG member register in between. ``details.transfer_date`` is the
+    latest transfer."""
+
+    code = "member.exit_before_transfer"
+
+    def __init__(self, *, transfer_date: str) -> None:
+        super().__init__(
+            f"The exit date is before a coop share transfer of this member "
+            f"({transfer_date}).",
+            field="effective_at",
+            details={"transfer_date": transfer_date},
+        )
+
+
 class ConfirmationDateRequiresOnboardingMode(BadRequestError):
     """A member or coop share confirm request carried ``confirmed_at`` while the
     tenant's onboarding mode is off. Outside onboarding a confirmation is dated
@@ -2097,6 +2115,7 @@ __all__ = [
     # Membership / coop-share / document errors.
     "MemberHasActiveSubscriptions",
     "MemberAlreadyCancelled",
+    "MemberExitBeforeTransfer",
     "CoopShareContractAgreementRequired",
     "CoopShareValueNotConfigured",
     "MemberCoopSharesOutOfRange",

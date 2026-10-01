@@ -1,6 +1,6 @@
 Viewset Tests Overview
 ======================
-1015 tests | 190 test classes | 32 files
+1038 tests | 194 test classes | 33 files
 Run: poetry run pytest apps/commissioning/tests/tests_viewsets/ --no-header --tb=short -q
 
 Counts are collected cases, so a parametrized method counts once per case.
@@ -91,21 +91,27 @@ test_coop_share_amount_and_confirmed_lock.py (16 tests) — coop-share amount ru
   TestCoopShareUpdateBoundsLock            2   update takes the per-member coop_share_bounds advisory lock;
                                                reassignment locks both members in sorted order
 
-test_coop_share_transfer.py (30 tests) — office coop share transfer between members as ledger rows (frozen clock)
+test_coop_share_transfer.py (38 tests) — office coop share transfer between members as ledger rows (frozen clock)
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  TestCoopShareTransfer                   15   negative row for the giver + positive row for the receiver
+  TestCoopShareTransfer                   21   negative row for the giver + positive row for the receiver
                                                (confirmed, paid on the transfer date, notes, existing rows
                                                untouched); share value with the most recent payment first; a
                                                later transfer only gives what is left; a backdated transfer is
-                                               capped per share value by today's holding; giving every share
-                                               needs confirm_member_cancellation, then settles the giver's rows
-                                               and cancels them with a no-settlement email; member register
-                                               counts transfer rows from the transfer date
+                                               capped per share value by the lowest holding from its date on;
+                                               giving every share needs confirm_member_cancellation, then
+                                               settles the giver's rows and cancels them, effective on the
+                                               giver's latest transfer date, with a no-settlement email;
+                                               member register counts transfer rows from the transfer date,
+                                               each share once, and keeps a future exit's shares until the
+                                               exit; an exit before the member's own transfer → 400
+                                               member.exit_before_transfer
   TestCoopShareTransferValidation         15   more than the confirmed, paid shares → 400 exceeds_held; shares
                                                paid after the transfer date don't count; same member; giver not
                                                admitted; receiver pending / rejected; cancelled receiver → 400;
                                                cancelled giver → 409; future date; date before either entry date;
                                                amount 0 / -1 / 2.5 → 400; anonymous refused
+  TestDateTransferExitsByTheLatestTransfer 2   migration 0030 moves an emptied giver's exit and settled rows to
+                                               their latest transfer date; leaves an office-recorded exit alone
 
 test_crates_viewsets.py (45 tests)
 ──────────────────────────────────
@@ -230,11 +236,15 @@ test_member_onboarding_fields.py (23 tests) — onboarding mode: member_number /
                                                existing or new trial member → member.number_not_allowed_for_trial;
                                                trial row without a number still saves
 
-test_members_viewsets.py (71 tests)
+test_members_viewsets.py (75 tests)
 ───────────────────────────────────
   TestMemberViewSet                       24   list, payback-due and coop-share totals, filters (is_active,
                                                is_trial, exclude_trial_members incl. its =false case), confirm,
                                                reject, retrieve
+  TestMemberRegisterHoldings               4   register holdings as of date_to, by the exit's effective date: a
+                                               future exit keeps the shares, a late-recorded exit ends them at
+                                               the exit, none on the exit day, a row without an effective date
+                                               ends on the local day it was recorded (frozen clock)
   TestSubscriptionViewSet                  8   list, filter is_trial / member, joker fields and allowance,
                                                joker vs. donation joker mutually exclusive, confirm guards
   TestCoopShareViewSet                     7   list, filter by member, office create auto-confirms, confirm action

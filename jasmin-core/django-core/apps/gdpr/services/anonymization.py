@@ -177,11 +177,10 @@ class AnonymizationMixin:
         if member is not None:
             GDPRService._purge_member_sepa_exports(member)
 
-        # Phase 4.5: auditlog diffs. Historical ``LogEntry.changes``
-        # rows for the scrubbed records hold pre-anonymization values
-        # (name changes, address edits, consent IP/UA, ...) —
-        # ``mask_fields`` only covers a subset of columns and only
-        # from the moment it was configured.
+        # Phase 4.5: auditlog diffs. ``LogEntry.changes`` rows for the
+        # scrubbed records hold pre-anonymization values (name changes,
+        # invoice address snapshots, consent IP/UA, ...) —
+        # ``mask_fields`` only covers a subset of columns.
         GDPRService._scrub_auditlog_entries(user, member, reseller)
 
         # Phase 5: audit trail (for backup-replay + auditor proof).
@@ -570,13 +569,14 @@ class AnonymizationMixin:
 
         The ``LogEntry`` rows themselves stay — "column X changed at
         time T by actor Y" remains provable — but ``changes`` (the
-        old/new values: names, addresses, consent IP/UA, pre-mask IBAN
-        edits) and ``object_repr`` (``str()`` of the instance, which for
+        old/new values: names, invoice address snapshots, consent IP/UA,
+        notes) and ``object_repr`` (``str()`` of the instance, which for
         most of these models embeds the member's or reseller's name —
         e.g. ``"CoopShare 5 for Anna Müller"``, ``"Order #7 - Hof
         Müller - …"``) are wiped. ``mask_fields`` on the registrations
-        only covers a subset of columns and only from the moment it was
-        configured; this closes the historical tail.
+        only covers a subset of columns; this wipes the rest. Records are
+        found through their live rows, so the entries of a record deleted
+        before the erasure keep both.
 
         Coverage MUST track ``auditlog.register(...)`` across the apps
         (commissioning/apps.py, payments/apps.py): every registered

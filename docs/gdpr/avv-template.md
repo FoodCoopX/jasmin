@@ -152,8 +152,8 @@ measures, including:
   on the IBAN and account-holder columns. This is column-level, not
   database-wide: audit-log rows (`auditlog_logentry`) are stored
   unencrypted, with the sensitive fields declared in `mask_fields`
-  at registration so only a partially masked value reaches the
-  change diff
+  at registration so the change diff holds a fixed placeholder
+  instead of their values
 - **Pseudonymisation:** N/A in the application layer; data is
   identifiable by design (members must be reachable)
 - **Confidentiality:** role-based access; per-tenant schema

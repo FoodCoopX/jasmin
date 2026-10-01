@@ -253,8 +253,8 @@ class TestMemberAnonymization:
         """Historical auditlog entries hold pre-anonymization values
         in ``changes`` (e.g. a first_name edit stores old AND new
         name) and the person's name in ``object_repr``. Both must be
-        wiped by ``anonymize_user`` — ``mask_fields`` doesn't cover
-        name columns and never rewrites history."""
+        wiped by ``anonymize_user`` — Member's ``mask_fields`` don't
+        cover its name columns."""
         from auditlog.models import LogEntry
 
         user = JasminUserFactory(email="carla@example.com")

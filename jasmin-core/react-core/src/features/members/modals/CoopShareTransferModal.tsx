@@ -81,8 +81,8 @@ function ReceivingMemberField({
  * Transfers confirmed, paid coop shares of one member to another member
  * (``POST coop_shares/transfer/``). The backend enforces the rules; the form
  * mirrors the two outcomes the office should see before submitting: giving every
- * share cancels the member on the transfer date, and leaving between 0 and the
- * minimum is refused. Both sides get a note naming the other member.
+ * share cancels the member on the date of their latest transfer (usually this
+ * one), and leaving between 0 and the minimum is refused. Both sides get a note naming the other member.
  */
 export default function CoopShareTransferModal({
   open,

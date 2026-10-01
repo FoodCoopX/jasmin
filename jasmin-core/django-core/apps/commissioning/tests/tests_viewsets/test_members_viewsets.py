@@ -351,6 +351,132 @@ class TestMemberViewSet:
         assert resp.data["id"] == str(member.pk)
 
 
+@pytest.mark.django_db
+class TestMemberRegisterHoldings:
+    """The GenG register reports holdings as of the window end from the day a
+    cancellation takes effect, not the day the office recorded it."""
+
+    ENTRY = datetime.date(2024, 1, 8)
+
+    @pytest.fixture(autouse=True)
+    def _frozen_clock(self):
+        # The office records every cancellation here "today", 2026-03-30.
+        with time_machine.travel(datetime.datetime(2026, 3, 30, 12, 0), tick=False):
+            yield
+
+    def _member(self, number: int, **share_kwargs) -> Member:
+        # Shares are created while the member is pending, so the per-row bounds
+        # check doesn't apply.
+        member = MemberFactory(
+            admin_confirmed=False, entry_date=self.ENTRY, member_number=number
+        )
+        CoopShareFactory(
+            member=member,
+            admin_confirmed=True,
+            amount_of_coop_shares=Decimal("5"),
+            value_one_coop_share=100,
+            **share_kwargs,
+        )
+        Member.objects.filter(pk=member.pk).update(admin_confirmed=True)
+        member.refresh_from_db()
+        return member
+
+    def _counts(self, api_client, date_from, date_to) -> dict[str, str]:
+        """Share count per member number in the register for the window."""
+        import csv
+        import io
+
+        from apps.commissioning.services.member_register_export import (
+            get_csv_dialect,
+        )
+
+        resp = api_client.get(
+            reverse("member-export-csv"),
+            {"date_from": date_from.isoformat(), "date_to": date_to.isoformat()},
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        content = b"".join(resp.streaming_content).decode("utf-8").lstrip("\ufeff")
+        delimiter = get_csv_dialect().delimiter
+        rows = list(csv.reader(io.StringIO(content), delimiter=delimiter))
+        return {row[0]: row[7] for row in rows[1:] if row}
+
+    def _shares(self, count: str) -> str:
+        from apps.commissioning.services.member_register_export import (
+            get_csv_dialect,
+        )
+
+        return get_csv_dialect().format(Decimal(count))
+
+    def _cancel(self, member: Member, effective: datetime.date) -> None:
+        from apps.commissioning.services.member_cancellation import (
+            cancel_member_with_coop_shares,
+        )
+
+        cancel_member_with_coop_shares(
+            member, cancelled_effective_at=effective, force=True, notify=False
+        )
+
+    def test_notice_for_a_future_exit_keeps_the_shares_until_the_exit(
+        self, api_client, tenant
+    ):
+        member = self._member(8101)
+        self._cancel(member, datetime.date(2026, 12, 31))
+
+        counts = self._counts(
+            api_client, datetime.date(2026, 1, 1), datetime.date(2026, 6, 30)
+        )
+
+        assert counts["8101"] == self._shares("5.00")
+
+    def test_an_exit_recorded_late_ends_the_holding_at_the_exit(
+        self, api_client, tenant
+    ):
+        member = self._member(8102)
+        # Left at the end of 2024, recorded only now.
+        self._cancel(member, datetime.date(2024, 12, 31))
+
+        counts = self._counts(
+            api_client, datetime.date(2024, 7, 1), datetime.date(2025, 6, 30)
+        )
+
+        assert counts["8102"] == self._shares("0")
+
+    def test_the_exit_day_already_shows_no_shares(self, api_client, tenant):
+        member = self._member(8103)
+        self._cancel(member, datetime.date(2026, 12, 31))
+
+        day_before = self._counts(
+            api_client, datetime.date(2026, 1, 1), datetime.date(2026, 12, 30)
+        )
+        on_exit = self._counts(
+            api_client, datetime.date(2026, 1, 1), datetime.date(2026, 12, 31)
+        )
+
+        assert day_before["8103"] == self._shares("5.00")
+        # Still listed on the exit date, holding nothing.
+        assert on_exit["8103"] == self._shares("0")
+
+    def test_a_row_without_an_effective_date_ends_on_the_local_day_recorded(
+        self, api_client, tenant, settings
+    ):
+        settings.TIME_ZONE = "Europe/Berlin"
+        # 23:30 UTC on 27 February is already 28 February in Berlin.
+        self._member(
+            8104,
+            cancelled_at=datetime.datetime(2026, 2, 27, 23, 30, tzinfo=datetime.UTC),
+        )
+
+        day_before = self._counts(
+            api_client, datetime.date(2026, 1, 1), datetime.date(2026, 2, 27)
+        )
+        on_the_day = self._counts(
+            api_client, datetime.date(2026, 1, 1), datetime.date(2026, 2, 28)
+        )
+
+        assert day_before["8104"] == self._shares("5.00")
+        assert on_the_day["8104"] == self._shares("0")
+
+
 # ---------------------------------------------------------------------------
 # SubscriptionViewSet
 # ---------------------------------------------------------------------------

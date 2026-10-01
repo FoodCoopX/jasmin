@@ -744,6 +744,11 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
+# django-auditlog masks every field registered with ``mask_fields`` through
+# this callable, in full. Its default keeps the second half of each value — most
+# of an IBAN — in change diffs that are retained indefinitely.
+AUDITLOG_MASK_CALLABLE = "apps.shared.pii_masking.mask_for_audit_log"
+
 # django-axes — account-level lockout against credential stuffing.
 AXES_ENABLED = not DEBUG  # Don't get locked out during development.
 AXES_FAILURE_LIMIT = 5  # Lock after 5 failed attempts.

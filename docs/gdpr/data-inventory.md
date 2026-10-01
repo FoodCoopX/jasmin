@@ -164,13 +164,14 @@ can be reconstructed.
 
 Lives in each **tenant** schema. Captures every change to the
 registered models — the `auditlog.register(...)` calls in
-`apps/commissioning/apps.py` and `apps/payments/apps.py`.
+`apps/commissioning/apps.py`, `apps/payments/apps.py` and `apps/accounts/apps.py`.
 
 | Field | Category | Purpose | Legal basis | Retention | Notes |
 |---|---|---|---|---|---|
 | `actor_id` (FK to JasminUser) | Audit | Who made the change | Legitimate interest | Forever | Survives Member deletion via NULLing (the user's display value goes; the change record stays) |
 | `remote_addr` | Auth / security | Forensic value | Legitimate interest | Forever | `GenericIPAddressField` |
-| `changes` (JSON) | Audit | Field-level before/after | Legitimate interest | Forever | Sensitive fields are listed in `mask_fields` on the registration call (e.g. `Member.iban`, `email`, `address` — see `apps/commissioning/apps.py`). Note that django-auditlog's default mask asterisks only the **first half** of a value, so a partially masked remainder does reach `LogEntry.changes`; set `AUDITLOG_MASK_CALLABLE` to mask in full |
+| `changes` (JSON) | Audit | Field-level before/after | Legitimate interest | Forever | Sensitive fields are listed in `mask_fields` on the registration call (e.g. `Member.iban`, `email`, `address` — see `apps/commissioning/apps.py`). `AUDITLOG_MASK_CALLABLE` (`apps.shared.pii_masking.mask_for_audit_log`) replaces each of their values with a fixed placeholder, so neither the value nor its length is stored; only an empty value stays visible as empty. Entries written before were rewritten the same way by the `gdpr` migration `0003_mask_audit_log_values_in_full`, except that, in an update, an empty value of a field whose format isn't checked (a note, an address, a name, a phone number, a postcode) reads as the placeholder too. Other fields keep their values. On erasure, wiped for the erased person's records that still exist; the entries of records deleted earlier, such as cancelled future deliveries, keep theirs |
+| `object_repr` | Identity | Display value of the changed record | Legitimate interest | Forever | `str()` of the record, unmasked: a member's or contact's name, a user's username — by default their email address. On erasure, wiped for the erased person's records that still exist; the entries of records deleted earlier keep it |
 | `timestamp` | Audit | When | Legitimate interest | Forever | |
 
 ### `axes.AccessAttempt` (django-axes)
