@@ -19,9 +19,11 @@ Contract:
   * Short-circuit cases that MUST return False without sending:
       - No ``reseller.invoice_email``  (reseller-side)
       - No ``TenantEmailConfig.accounting_email``  (accounting-side)
-      - No ``invoice.file``  (PDF hasn't been uploaded yet — should
-        never happen because ``upload_pdf`` is the only auto-trigger,
-        but the helper is robust regardless)
+      - No ``invoice.file``  (PDF hasn't been uploaded yet)
+  * ``upload_pdf`` stamps only the sends that will happen, and a send that
+    fails releases its stamp, so an invoice never reads as sent when it
+    wasn't. The office sends again through the ``send_to_reseller`` /
+    ``send_to_accounting`` actions.
 
 We patch ``EmailService.send_email`` with ``autospec=True`` so the
 mock keeps the same ``self`` binding as the real method — a plain
@@ -33,6 +35,7 @@ instance (same protection as
 from __future__ import annotations
 
 import datetime
+import smtplib
 from unittest import mock
 
 import pytest
@@ -354,7 +357,7 @@ class TestUploadPdfAutoSend:
         return api_client.post(url, {"file": upload}, format="multipart")
 
     def test_first_upload_triggers_both_sends(
-        self, api_client, tenant, reseller_with_email
+        self, api_client, tenant, reseller_with_email, accounting_email_config
     ):
         from django.test import TestCase
 
@@ -385,7 +388,7 @@ class TestUploadPdfAutoSend:
         assert send_accounting.call_count == 1
 
     def test_second_upload_does_not_re_trigger_sends(
-        self, api_client, tenant, reseller_with_email
+        self, api_client, tenant, reseller_with_email, accounting_email_config
     ):
         """Idempotency on the auto-send side. Once
         ``has_been_sent_to_reseller_at`` is set, subsequent
@@ -425,3 +428,322 @@ class TestUploadPdfAutoSend:
         assert resp.status_code == status.HTTP_200_OK
         assert send_reseller.call_count == 0
         assert send_accounting.call_count == 0
+
+    @pytest.mark.parametrize(
+        "reseller_kwargs",
+        [
+            {"invoice_email": None},
+            # Paper only: an address is on file, but invoice email is off.
+            {"invoice_email": "reseller@example.org", "invoice_via_email": False},
+        ],
+        ids=["no-address", "paper-only"],
+    )
+    def test_no_reseller_send_is_claimed_without_a_recipient(
+        self, api_client, tenant, accounting_email_config, reseller_kwargs
+    ):
+        from django.test import TestCase
+
+        invoice = InvoiceResellerFactory(
+            reseller=ResellerFactory(**reseller_kwargs), is_finalized=True
+        )
+
+        with (
+            mock.patch(
+                "apps.commissioning.services.invoice_service."
+                "InvoiceService.send_to_reseller",
+            ) as send_reseller,
+            mock.patch(
+                "apps.commissioning.services.invoice_service."
+                "InvoiceService.send_to_accounting",
+                return_value=True,
+            ),
+            TestCase.captureOnCommitCallbacks(execute=True),
+        ):
+            resp = self._upload(api_client, invoice)
+
+        assert resp.status_code == 200
+        assert send_reseller.call_count == 0
+        invoice.refresh_from_db()
+        assert invoice.has_been_sent_to_reseller_at is None
+
+    def test_no_accounting_send_is_claimed_without_an_accounting_address(
+        self, api_client, tenant, reseller_with_email
+    ):
+        from django.test import TestCase
+
+        invoice = InvoiceResellerFactory(
+            reseller=reseller_with_email, is_finalized=True
+        )
+
+        with (
+            mock.patch(
+                "apps.commissioning.services.invoice_service."
+                "InvoiceService.send_to_reseller",
+                return_value=True,
+            ),
+            mock.patch(
+                "apps.commissioning.services.invoice_service."
+                "InvoiceService.send_to_accounting",
+            ) as send_accounting,
+            TestCase.captureOnCommitCallbacks(execute=True),
+        ):
+            resp = self._upload(api_client, invoice)
+
+        assert resp.status_code == 200
+        assert send_accounting.call_count == 0
+        invoice.refresh_from_db()
+        assert invoice.has_been_sent_to_accounting_at is None
+
+    def test_failed_sends_release_their_claims(
+        self, api_client, tenant, reseller_with_email, accounting_email_config
+    ):
+        from django.test import TestCase
+
+        invoice = InvoiceResellerFactory(
+            reseller=reseller_with_email, is_finalized=True
+        )
+
+        with (
+            mock.patch.object(
+                EmailService,
+                "send_email",
+                autospec=True,
+                side_effect=smtplib.SMTPException("simulated SMTP outage"),
+            ),
+            TestCase.captureOnCommitCallbacks(execute=True),
+        ):
+            resp = self._upload(api_client, invoice)
+
+        # The upload itself succeeded; only the emails didn't go out.
+        assert resp.status_code == 200
+        invoice.refresh_from_db()
+        assert invoice.file
+        assert invoice.has_been_sent_to_reseller_at is None
+        assert invoice.has_been_sent_to_accounting_at is None
+        # The release is on the invoice's audit record, like the claim.
+        from auditlog.models import LogEntry
+
+        reseller_changes = [
+            entry.changes_dict["has_been_sent_to_reseller_at"]
+            for entry in LogEntry.objects.get_for_object(invoice)
+            if "has_been_sent_to_reseller_at" in entry.changes_dict
+        ]
+        assert any(old != "None" and new == "None" for old, new in reseller_changes)
+
+    def test_a_send_that_raises_releases_its_claim_and_the_other_still_runs(
+        self, api_client, tenant, reseller_with_email, accounting_email_config
+    ):
+        from django.test import TestCase
+
+        invoice = InvoiceResellerFactory(
+            reseller=reseller_with_email, is_finalized=True
+        )
+
+        # Outside the failures the send helpers catch themselves.
+        with (
+            mock.patch.object(
+                EmailService,
+                "send_email",
+                autospec=True,
+                side_effect=RuntimeError("unexpected"),
+            ) as send_email,
+            TestCase.captureOnCommitCallbacks(execute=True),
+        ):
+            resp = self._upload(api_client, invoice)
+
+        assert resp.status_code == 200
+        assert send_email.call_count == 2
+        invoice.refresh_from_db()
+        assert invoice.has_been_sent_to_reseller_at is None
+        assert invoice.has_been_sent_to_accounting_at is None
+
+    def test_successful_sends_keep_their_stamps(
+        self, api_client, tenant, reseller_with_email, accounting_email_config
+    ):
+        from django.test import TestCase
+
+        invoice = InvoiceResellerFactory(
+            reseller=reseller_with_email, is_finalized=True
+        )
+
+        with (
+            mock.patch.object(
+                EmailService, "send_email", autospec=True, return_value=True
+            ) as send_email,
+            TestCase.captureOnCommitCallbacks(execute=True),
+        ):
+            resp = self._upload(api_client, invoice)
+
+        assert resp.status_code == 200
+        assert send_email.call_count == 2
+        invoice.refresh_from_db()
+        assert invoice.has_been_sent_to_reseller_at is not None
+        assert invoice.has_been_sent_to_accounting_at is not None
+
+
+@pytest.mark.django_db
+class TestSendClaimed:
+    CLAIMED_AT = datetime.datetime(2026, 6, 2, 10, 0, tzinfo=datetime.UTC)
+
+    def _stamp(self, invoice, value):
+        invoice.has_been_sent_to_reseller_at = value
+        invoice.save(update_fields=["has_been_sent_to_reseller_at"])
+
+    def _fail(self, invoice):
+        return InvoiceService.send_claimed(
+            invoice,
+            lambda _invoice: False,
+            timestamp_field="has_been_sent_to_reseller_at",
+            claimed_at=self.CLAIMED_AT,
+        )
+
+    def test_a_failed_send_releases_its_own_claim(
+        self, tenant, finalized_invoice_with_pdf
+    ):
+        self._stamp(finalized_invoice_with_pdf, self.CLAIMED_AT)
+
+        assert self._fail(finalized_invoice_with_pdf) is False
+
+        finalized_invoice_with_pdf.refresh_from_db()
+        assert finalized_invoice_with_pdf.has_been_sent_to_reseller_at is None
+
+    def test_a_newer_stamp_survives_the_release(
+        self, tenant, finalized_invoice_with_pdf
+    ):
+        # A send that succeeded meanwhile stamped its own time.
+        newer = datetime.datetime(2026, 6, 2, 10, 5, tzinfo=datetime.UTC)
+        self._stamp(finalized_invoice_with_pdf, newer)
+
+        self._fail(finalized_invoice_with_pdf)
+
+        finalized_invoice_with_pdf.refresh_from_db()
+        assert finalized_invoice_with_pdf.has_been_sent_to_reseller_at == newer
+
+
+# ---------------------------------------------------------------------------
+# The office's send / send-again actions
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestInvoiceSendActions:
+    @staticmethod
+    def _post(client, invoice, action: str):
+        from django.urls import reverse
+
+        return client.post(reverse(f"invoices-{action}", kwargs={"pk": invoice.pk}))
+
+    def test_sends_to_the_reseller(
+        self, api_client, tenant, finalized_invoice_with_pdf
+    ):
+        with mock.patch.object(
+            EmailService, "send_email", autospec=True, return_value=True
+        ):
+            resp = self._post(
+                api_client, finalized_invoice_with_pdf, "send-to-reseller"
+            )
+
+        assert resp.status_code == 200
+        assert resp.data["sent"] is True
+        assert resp.data["has_been_sent_to_reseller_at"] is not None
+
+    def test_reports_a_refused_send_without_stamping(
+        self, api_client, tenant, finalized_invoice_with_pdf
+    ):
+        with mock.patch.object(
+            EmailService, "send_email", autospec=True, return_value=False
+        ):
+            resp = self._post(
+                api_client, finalized_invoice_with_pdf, "send-to-reseller"
+            )
+
+        assert resp.status_code == 200
+        assert resp.data == {"sent": False, "has_been_sent_to_reseller_at": None}
+
+    def test_sends_to_accounting(
+        self, api_client, tenant, finalized_invoice_with_pdf, accounting_email_config
+    ):
+        with mock.patch.object(
+            EmailService, "send_email", autospec=True, return_value=True
+        ) as send_email:
+            resp = self._post(
+                api_client, finalized_invoice_with_pdf, "send-to-accounting"
+            )
+
+        assert resp.status_code == 200
+        assert resp.data["sent"] is True
+        assert resp.data["has_been_sent_to_accounting_at"] is not None
+        assert send_email.call_args.kwargs["to_emails"] == ["datev@coop.de"]
+
+    def test_refuses_an_unfinalized_invoice(
+        self, api_client, tenant, reseller_with_email
+    ):
+        invoice = InvoiceResellerFactory(
+            reseller=reseller_with_email, is_finalized=False
+        )
+
+        resp = self._post(api_client, invoice, "send-to-reseller")
+
+        assert resp.status_code == 400
+        assert resp.data["code"] == "document.not_finalized"
+
+    def test_refuses_without_a_pdf(self, api_client, tenant, reseller_with_email):
+        invoice = InvoiceResellerFactory(
+            reseller=reseller_with_email, is_finalized=True
+        )
+
+        resp = self._post(api_client, invoice, "send-to-accounting")
+
+        assert resp.status_code == 400
+        assert resp.data["code"] == "document.pdf_missing"
+
+    @pytest.mark.parametrize(
+        ("reseller_kwargs", "code"),
+        [
+            ({"invoice_email": None}, "reseller.email_missing"),
+            (
+                {"invoice_email": "reseller@example.org", "invoice_via_email": False},
+                "reseller.invoice_email_disabled",
+            ),
+        ],
+        ids=["no-address", "paper-only"],
+    )
+    def test_refuses_a_reseller_it_cannot_email(
+        self, api_client, tenant, reseller_kwargs, code
+    ):
+        invoice = InvoiceResellerFactory(
+            reseller=ResellerFactory(**reseller_kwargs), is_finalized=True
+        )
+        _attach_pdf(invoice)
+
+        with mock.patch.object(
+            EmailService, "send_email", autospec=True, return_value=True
+        ) as send_email:
+            resp = self._post(api_client, invoice, "send-to-reseller")
+
+        assert resp.status_code == 400
+        assert resp.data["code"] == code
+        assert not send_email.called
+
+    def test_refuses_accounting_without_an_address(
+        self, api_client, tenant, finalized_invoice_with_pdf
+    ):
+        resp = self._post(api_client, finalized_invoice_with_pdf, "send-to-accounting")
+
+        assert resp.status_code == 400
+        assert resp.data["code"] == "accounting.email_missing"
+
+    def test_is_office_only(self, tenant, member_user, finalized_invoice_with_pdf):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(user=member_user)
+
+        with mock.patch.object(
+            EmailService, "send_email", autospec=True, return_value=True
+        ) as send_email:
+            for action in ("send-to-reseller", "send-to-accounting"):
+                resp = self._post(client, finalized_invoice_with_pdf, action)
+                assert resp.status_code == 403
+
+        assert not send_email.called

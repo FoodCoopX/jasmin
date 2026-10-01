@@ -217,6 +217,8 @@ import type {
   InventoryEntry,
   InvoiceReseller,
   InvoiceResellerContent,
+  InvoiceSentToAccounting,
+  InvoiceSentToReseller,
   InvoiceUploadPdfResponse,
   Member,
   MemberCancelResult,
@@ -14607,6 +14609,136 @@ const {mutation: mutationOptions} = options ?
       > => {
 
       const mutationOptions = getCommissioningInvoicesCreateStornoCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Send the invoice PDF (and its XML) to the tenant's
+``accounting_email``, the first time or again.
+
+400 when it can't be sent: not finalized, no PDF, or no accounting
+address configured. 200 with ``sent: false`` when the email did not go
+out, for the reasons ``send_to_reseller`` lists.
+ */
+export const commissioningInvoicesSendToAccountingCreate = (
+    id: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<InvoiceSentToAccounting>(
+      {url: `/api/commissioning/invoices/${id}/send_to_accounting/`, method: 'POST', signal
+    },
+      );
+    }
+  
+
+
+export const getCommissioningInvoicesSendToAccountingCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningInvoicesSendToAccountingCreate>>, TError,{id: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof commissioningInvoicesSendToAccountingCreate>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['commissioningInvoicesSendToAccountingCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commissioningInvoicesSendToAccountingCreate>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  commissioningInvoicesSendToAccountingCreate(id,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommissioningInvoicesSendToAccountingCreateMutationResult = NonNullable<Awaited<ReturnType<typeof commissioningInvoicesSendToAccountingCreate>>>
+    
+    export type CommissioningInvoicesSendToAccountingCreateMutationError = ErrorResponse
+
+    export const useCommissioningInvoicesSendToAccountingCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningInvoicesSendToAccountingCreate>>, TError,{id: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof commissioningInvoicesSendToAccountingCreate>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getCommissioningInvoicesSendToAccountingCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Send the invoice PDF to the reseller's ``invoice_email``, the first
+time or again.
+
+400 when it can't be sent: not finalized, no PDF, no address, or the
+reseller takes invoices on paper only. 200 with ``sent: false`` when
+the email did not go out: the mail server refused it (its EmailLog row
+has the error), or the tenant has no SMTP host, or the PDF or template
+could not be loaded (logged server-side).
+ */
+export const commissioningInvoicesSendToResellerCreate = (
+    id: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<InvoiceSentToReseller>(
+      {url: `/api/commissioning/invoices/${id}/send_to_reseller/`, method: 'POST', signal
+    },
+      );
+    }
+  
+
+
+export const getCommissioningInvoicesSendToResellerCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningInvoicesSendToResellerCreate>>, TError,{id: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof commissioningInvoicesSendToResellerCreate>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['commissioningInvoicesSendToResellerCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commissioningInvoicesSendToResellerCreate>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  commissioningInvoicesSendToResellerCreate(id,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommissioningInvoicesSendToResellerCreateMutationResult = NonNullable<Awaited<ReturnType<typeof commissioningInvoicesSendToResellerCreate>>>
+    
+    export type CommissioningInvoicesSendToResellerCreateMutationError = ErrorResponse
+
+    export const useCommissioningInvoicesSendToResellerCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningInvoicesSendToResellerCreate>>, TError,{id: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof commissioningInvoicesSendToResellerCreate>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getCommissioningInvoicesSendToResellerCreateMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

@@ -225,7 +225,8 @@
     "invalid": "Invalid reseller input — please check the data.",
     "already_linked": "This reseller is already linked to a different user.",
     "customer_role_required": "Reseller link is only available for the 'customer' role.",
-    "email_missing": "This reseller has no billing email address configured."
+    "email_missing": "This reseller has no billing email address configured.",
+    "invoice_email_disabled": "This reseller receives invoices on paper only — invoice email is turned off."
   },
   "storage": {
     "not_found": "Storage not found."
@@ -543,5 +544,8 @@
     "backup_script_missing": "The backup script was not found on the server. Please check the server configuration.",
     "backup_failed": "The backup failed. Please check the server log and try again.",
     "backup_timed_out": "The backup took too long and was aborted. Please try again later."
+  },
+  "accounting": {
+    "email_missing": "No accounting email is configured — please add one in the email configuration."
   }
 }

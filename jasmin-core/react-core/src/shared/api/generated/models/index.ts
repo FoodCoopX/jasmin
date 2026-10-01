@@ -326,6 +326,8 @@ export * from './invoiceReseller';
 export * from './invoiceResellerContent';
 export * from './invoiceResellerRecipientSnapshot';
 export * from './invoiceResellerTaxBreakdownItem';
+export * from './invoiceSentToAccounting';
+export * from './invoiceSentToReseller';
 export * from './invoiceUploadPdfResponse';
 export * from './lockedSettingsResponse';
 export * from './loginOrChallengeResponse';

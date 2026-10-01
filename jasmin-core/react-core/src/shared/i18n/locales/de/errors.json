@@ -225,7 +225,8 @@
     "invalid": "Wiederverkäufer-Eingabe ungültig — bitte die Daten prüfen.",
     "already_linked": "Dieser Wiederverkäufer ist bereits mit einem anderen User verknüpft.",
     "customer_role_required": "Eine Wiederverkäufer-Verknüpfung ist nur für die Rolle 'Kunde' möglich.",
-    "email_missing": "Für diesen Wiederverkäufer ist keine Rechnungs-E-Mail-Adresse hinterlegt."
+    "email_missing": "Für diesen Wiederverkäufer ist keine Rechnungs-E-Mail-Adresse hinterlegt.",
+    "invoice_email_disabled": "Dieser Wiederverkäufer erhält Rechnungen nur auf Papier — der Rechnungsversand per E-Mail ist ausgeschaltet."
   },
   "storage": {
     "not_found": "Lager nicht gefunden."
@@ -543,5 +544,8 @@
     "backup_script_missing": "Das Backup-Skript wurde auf dem Server nicht gefunden. Bitte die Server-Konfiguration prüfen.",
     "backup_failed": "Das Backup ist fehlgeschlagen. Bitte das Server-Log prüfen und erneut versuchen.",
     "backup_timed_out": "Das Backup hat zu lange gedauert und wurde abgebrochen. Bitte es später erneut versuchen."
+  },
+  "accounting": {
+    "email_missing": "Es ist keine Buchhaltungs-E-Mail hinterlegt — bitte in der E-Mail-Konfiguration eintragen."
   }
 }

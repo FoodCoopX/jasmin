@@ -115,6 +115,8 @@ from .resellers_serializer import (
     DeliveryNoteResellerSerializer,
     InvoiceResellerContentSerializer,
     InvoiceResellerSerializer,
+    InvoiceSentToAccountingSerializer,
+    InvoiceSentToResellerSerializer,
     OfferGroupSerializer,
     OfferSerializer,
     OrderContentItemSerializer,

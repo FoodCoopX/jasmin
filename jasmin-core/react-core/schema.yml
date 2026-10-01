@@ -11958,6 +11958,112 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Error response.
+  /api/commissioning/invoices/{id}/send_to_accounting/:
+    post:
+      operationId: commissioning_invoices_send_to_accounting_create
+      description: |-
+        Send the invoice PDF (and its XML) to the tenant's
+        ``accounting_email``, the first time or again.
+
+        400 when it can't be sent: not finalized, no PDF, or no accounting
+        address configured. 200 with ``sent: false`` when the email did not go
+        out, for the reasons ``send_to_reseller`` lists.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Ein eindeutiger Wert, der invoice reseller identifiziert.
+        required: true
+      tags:
+      - commissioning
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceSentToAccounting'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+  /api/commissioning/invoices/{id}/send_to_reseller/:
+    post:
+      operationId: commissioning_invoices_send_to_reseller_create
+      description: |-
+        Send the invoice PDF to the reseller's ``invoice_email``, the first
+        time or again.
+
+        400 when it can't be sent: not finalized, no PDF, no address, or the
+        reseller takes invoices on paper only. 200 with ``sent: false`` when
+        the email did not go out: the mail server refused it (its EmailLog row
+        has the error), or the tenant has no SMTP host, or the PDF or template
+        could not be loaded (logged server-side).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Ein eindeutiger Wert, der invoice reseller identifiziert.
+        required: true
+      tags:
+      - commissioning
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceSentToReseller'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
   /api/commissioning/invoices/{id}/upload_pdf/:
     post:
       operationId: commissioning_invoices_upload_pdf_create
@@ -35120,6 +35226,38 @@ components:
       - invoice
       - tax_rate
       - unit
+    InvoiceSentToAccounting:
+      type: object
+      description: |-
+        Response of the invoice ``send_to_accounting`` action, shaped like
+        :class:`InvoiceSentToResellerSerializer`.
+      properties:
+        sent:
+          type: boolean
+        has_been_sent_to_accounting_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - has_been_sent_to_accounting_at
+      - sent
+    InvoiceSentToReseller:
+      type: object
+      description: |-
+        Response of the invoice ``send_to_reseller`` action. ``sent`` is False
+        when the email did not go out: the mail server refused it (its EmailLog
+        row holds the error), or the tenant has no SMTP host, or the PDF or
+        template could not be loaded (logged server-side).
+      properties:
+        sent:
+          type: boolean
+        has_been_sent_to_reseller_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - has_been_sent_to_reseller_at
+      - sent
     InvoiceUploadPdfResponse:
       type: object
       properties:

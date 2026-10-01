@@ -1268,6 +1268,25 @@ class CreateStornoRequestSerializer(serializers.Serializer):
     reason = serializers.CharField(help_text="Reason for the storno")
 
 
+class InvoiceSentToResellerSerializer(serializers.Serializer):
+    """Response of the invoice ``send_to_reseller`` action. ``sent`` is False
+    when the email did not go out: the mail server refused it (its EmailLog
+    row holds the error), or the tenant has no SMTP host, or the PDF or
+    template could not be loaded (logged server-side)."""
+
+    sent = serializers.BooleanField()
+    # The last successful send; null while the invoice has never gone out.
+    has_been_sent_to_reseller_at = serializers.DateTimeField(allow_null=True)
+
+
+class InvoiceSentToAccountingSerializer(serializers.Serializer):
+    """Response of the invoice ``send_to_accounting`` action, shaped like
+    :class:`InvoiceSentToResellerSerializer`."""
+
+    sent = serializers.BooleanField()
+    has_been_sent_to_accounting_at = serializers.DateTimeField(allow_null=True)
+
+
 # --- Commissioning List for RESELLERS (grouped by reseller, per week + day) ---
 #
 # The reseller pick list — distinct from the commissioning-list PACKING view

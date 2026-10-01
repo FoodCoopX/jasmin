@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import date, timedelta
+from collections.abc import Callable
+from datetime import date, datetime, timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -883,9 +884,77 @@ class InvoiceService:
     # best-effort: a transient SMTP failure must not propagate into the
     # upload-PDF response, because the invoice was already legally
     # finalized in a prior transaction and rolling that back over an
-    # email error is wrong. Resend uses the same helpers via an
-    # explicit office-triggered action (TODO when product needs it).
+    # email error is wrong. The office sends again through the viewset's
+    # ``send_to_reseller`` / ``send_to_accounting`` actions, which call
+    # the same helpers.
     # -------------------------------------------------------------------
+
+    @staticmethod
+    def reseller_recipient(invoice: InvoiceReseller) -> str | None:
+        """The address an invoice email to the reseller goes to, or ``None``
+        when there is none or the reseller takes invoices on paper only
+        (``invoice_via_email`` off)."""
+        reseller = invoice.reseller
+        if not reseller.invoice_email or not reseller.invoice_via_email:
+            return None
+        return reseller.invoice_email
+
+    @staticmethod
+    def accounting_recipient() -> str | None:
+        """The tenant's accounting inbox (typically a DATEV import address),
+        or ``None`` when none is configured — a fine setup for a tenant
+        without such a pipeline."""
+        from django.db import connection
+
+        from apps.shared.tenants.models import TenantEmailConfig
+
+        schema_name = getattr(getattr(connection, "tenant", None), "schema_name", None)
+        if not schema_name:
+            return None
+        config = TenantEmailConfig.get_active_for_schema(schema_name)
+        return (config.accounting_email or None) if config else None
+
+    @staticmethod
+    def send_claimed(
+        invoice: InvoiceReseller,
+        send: Callable[[InvoiceReseller], bool],
+        *,
+        timestamp_field: str,
+        claimed_at: datetime,
+    ) -> bool:
+        """Run ``send`` for a send ``upload_pdf`` has claimed by stamping
+        ``timestamp_field`` with ``claimed_at``, and release the claim if the
+        send fails or raises, so the invoice reads as unsent and can be sent
+        again. Only a process that dies mid-send leaves a claim behind; the
+        office's send-again recovers it.
+        """
+        try:
+            sent = send(invoice)
+        except Exception:
+            # The send helpers catch the failures they expect. Anything else
+            # must not leave the claim standing either.
+            logger.exception(
+                "Sending invoice %s (%s) raised", invoice.pk, timestamp_field
+            )
+            sent = False
+        if not sent:
+            InvoiceService._release_claim(
+                invoice, timestamp_field=timestamp_field, claimed_at=claimed_at
+            )
+        return sent
+
+    @staticmethod
+    @transaction.atomic
+    def _release_claim(
+        invoice: InvoiceReseller, *, timestamp_field: str, claimed_at: datetime
+    ) -> None:
+        # Only while the field still holds this claim: a send that succeeded
+        # meanwhile stamped its own time, and that stays. A save rather than
+        # ``.update()``, so auditlog records the release as it did the claim.
+        row = InvoiceReseller.objects.select_for_update().get(pk=invoice.pk)
+        if getattr(row, timestamp_field) == claimed_at:
+            setattr(row, timestamp_field, None)
+            row.save(update_fields=[timestamp_field])
 
     @staticmethod
     def _build_invoice_email_context(invoice: InvoiceReseller) -> dict:
@@ -956,17 +1025,16 @@ class InvoiceService:
         email configured, no PDF yet, SMTP error, template error).
         Never raises.
         """
-        reseller = invoice.reseller
-        # Honour the reseller's channel preference. invoice_via_email
-        # (default True) is the explicit opt-out for paper-only resellers;
-        # gating here protects every caller (auto-send on upload + any future
-        # re-send/bulk path), not just upload_pdf.
-        if not reseller or not reseller.invoice_email or not reseller.invoice_via_email:
+        # Gating here, on the reseller's address and channel preference
+        # (``invoice_via_email`` off means paper only), protects every caller:
+        # the auto-send on upload and the office's re-send alike.
+        to_email = InvoiceService.reseller_recipient(invoice)
+        if to_email is None:
             logger.info(
                 "Skipping invoice-to-reseller send for invoice %s: reseller %s "
                 "has no invoice_email or opted out of invoice email",
                 invoice.pk,
-                getattr(reseller, "pk", "<none>"),
+                invoice.reseller_id,
             )
             return False
 
@@ -979,7 +1047,7 @@ class InvoiceService:
         return send_document_email(
             invoice,
             slug="commissioning.invoice",
-            to_email=reseller.invoice_email,
+            to_email=to_email,
             context_builder=lambda: InvoiceService._build_invoice_email_context(
                 invoice
             ),
@@ -999,20 +1067,8 @@ class InvoiceService:
         ``accounting_email`` isn't configured — many early-stage
         tenants don't have a DATEV pipeline, and that's a fine
         configuration."""
-        from django.db import connection
-
-        from apps.shared.tenants.models import TenantEmailConfig
-
-        schema_name = getattr(getattr(connection, "tenant", None), "schema_name", None)
-        if not schema_name:
-            return False
-        try:
-            cfg = TenantEmailConfig.objects.get(
-                tenant__schema_name=schema_name, is_active=True
-            )
-        except TenantEmailConfig.DoesNotExist:
-            return False
-        if not cfg.accounting_email:
+        to_email = InvoiceService.accounting_recipient()
+        if to_email is None:
             return False
 
         attachments = load_pdf_attachments(
@@ -1024,7 +1080,7 @@ class InvoiceService:
         return send_document_email(
             invoice,
             slug="commissioning.invoice",
-            to_email=cfg.accounting_email,
+            to_email=to_email,
             context_builder=lambda: InvoiceService._build_invoice_email_context(
                 invoice
             ),

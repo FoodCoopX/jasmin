@@ -445,6 +445,20 @@ class ResellerEmailMissing(BadRequestError):
     code = "reseller.email_missing"
 
 
+class ResellerInvoiceEmailDisabled(BadRequestError):
+    """An invoice could not be sent to the reseller because the reseller takes
+    invoices on paper only (``invoice_via_email`` is off)."""
+
+    code = "reseller.invoice_email_disabled"
+
+
+class AccountingEmailMissing(BadRequestError):
+    """An invoice could not be sent to accounting because the tenant has no
+    ``accounting_email`` configured."""
+
+    code = "accounting.email_missing"
+
+
 class OfferGroupCannotDeleteDefault(ConflictError):
     """The tenant's default offer group is protected — it is seeded per tenant,
     pre-selected for new resellers, and must always persist."""
@@ -1993,6 +2007,8 @@ __all__ = [
     "ResellerNotFound",
     "ResellerError",
     "ResellerEmailMissing",
+    "ResellerInvoiceEmailDisabled",
+    "AccountingEmailMissing",
     "DocumentPdfMissing",
     "OrderNotFound",
     "OrderContentNotFound",

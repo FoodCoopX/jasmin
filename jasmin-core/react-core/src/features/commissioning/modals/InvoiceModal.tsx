@@ -23,9 +23,9 @@ import {
 } from "@shared/utils/lineNetto";
 import { formatAmountForUnit } from "@shared/utils";
 import { makeContentCustomEdit, makeFkCustomSave } from "./resellerContentTableCallbacks";
-import { useCurrency, useDateFormat, useDefaultTaxRates, useNumberFormat, useTenant, useTimeFormat, useUnitOptions } from '@hooks/index';
+import { useCurrency, useDateFormat, useDefaultTaxRates, useNumberFormat, useTenant, useUnitOptions } from '@hooks/index';
 import { useAmountUnitSizeColumns, useCratesColumns, useOfferTiers, useShareArticleColumn } from '@features/commissioning/hooks';
-import { FinalizedNotice } from '@features/commissioning/components';
+import { FinalizedNotice, InvoiceSendStatus } from '@features/commissioning/components';
 // InvoicePDFGenerator statically imports @react-pdf/renderer (it
 // renders ``<PDFViewer>`` for inline preview). Lazy-loading it here
 // means the modal-bearing pages (Invoices.tsx, Orders.tsx via
@@ -77,7 +77,6 @@ export default function InvoiceModal({
     getSetting("crates_should_be_on_documents", true),
   );
   const queryClient = useQueryClient();
-  const { formatDateTime } = useTimeFormat();
   const { formatDate } = useDateFormat();
   const { articles: defaultTaxRateArticles } = useDefaultTaxRates();
 
@@ -477,18 +476,11 @@ export default function InvoiceModal({
               <strong>{t("commissioning.corresponding_delivery_notes")}</strong>{" "}
               {invoiceData.corresponding_delivery_notes}
             </p>
-            <p>
-              <strong>{t("commissioning.sent_to_resellers_at")}</strong>{" "}
-              {invoiceData?.has_been_sent_to_reseller_at
-                ? formatDateTime(invoiceData.has_been_sent_to_reseller_at)
-                : ""}
-            </p>
-            <p>
-              <strong>{t("commissioning.sent_to_accounting_at")}</strong>{" "}
-              {invoiceData?.has_been_sent_to_accounting_at
-                ? formatDateTime(invoiceData.has_been_sent_to_accounting_at)
-                : ""}
-            </p>
+            <InvoiceSendStatus
+              invoiceId={invoiceId!}
+              invoice={invoiceData}
+              canSend={isOffice}
+            />
           </div>
           {isFinalized && (
             <FinalizedNotice

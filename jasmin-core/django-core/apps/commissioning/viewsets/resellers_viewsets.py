@@ -35,6 +35,7 @@ from core.pagination import OptionalLimitOffsetPagination
 from core.serializers import ErrorResponseSerializer
 
 from ..errors import (
+    AccountingEmailMissing,
     DocumentNotFinalized,
     DocumentPdfMissing,
     InvalidUploadedDocument,
@@ -44,6 +45,7 @@ from ..errors import (
     OrderContentOfferRequired,
     RequiredFieldMissing,
     ResellerEmailMissing,
+    ResellerInvoiceEmailDisabled,
     ResellerNotFound,
 )
 from ..models import (
@@ -92,6 +94,8 @@ from ..serializers import (
     DeliveryNoteResellerSerializer,
     InvoiceResellerContentSerializer,
     InvoiceResellerSerializer,
+    InvoiceSentToAccountingSerializer,
+    InvoiceSentToResellerSerializer,
     OfferGroupSerializer,
     OfferSerializer,
     OrderContentItemSerializer,
@@ -1364,21 +1368,21 @@ class InvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # ONE transaction, so two concurrent upload_pdf calls (double-click / retry
         # storm) can't both observe "not yet sent" and both fire — the second
         # blocks on the lock, then reads the marker as already set and skips. The
-        # auto-send still fires exactly once, on the first successful upload;
-        # re-send is a separate explicit action. Trade-off: if the SMTP send later
-        # fails the marker is already set (no auto-retry on re-upload) — acceptable,
-        # it converts a user-visible double-send into a recoverable missed send.
+        # stamp is a claim: only a send that will happen is claimed (there is a
+        # recipient address), and a send that fails or raises releases it, so a
+        # failed send doesn't leave the invoice marked as sent. The office sends
+        # again through ``send_to_reseller`` / ``send_to_accounting``.
         with transaction.atomic():
             locked = InvoiceReseller.objects.select_for_update().get(pk=invoice.pk)
 
-            # Only stamp + schedule the reseller send when the
-            # reseller actually wants invoice email — else we'd mark a paper-only
-            # invoice "sent" without sending. send_to_reseller re-checks the flag.
-            channel_on = bool(getattr(locked.reseller, "invoice_via_email", True))
             should_send_to_reseller = (
-                not locked.has_been_sent_to_reseller and channel_on
+                not locked.has_been_sent_to_reseller
+                and _InvoiceServiceForSend.reseller_recipient(locked) is not None
             )
-            should_send_to_accounting = not locked.has_been_sent_to_accounting
+            should_send_to_accounting = (
+                not locked.has_been_sent_to_accounting
+                and _InvoiceServiceForSend.accounting_recipient() is not None
+            )
 
             locked.file = uploaded_file
             update_fields = ["file"]
@@ -1386,29 +1390,126 @@ class InvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 locked.xml_file = uploaded_xml
                 update_fields.append("xml_file")
 
-            now = timezone.now()
+            claimed_at = timezone.now()
             if should_send_to_reseller:
-                locked.has_been_sent_to_reseller_at = now
+                locked.has_been_sent_to_reseller_at = claimed_at
                 update_fields.append("has_been_sent_to_reseller_at")
             if should_send_to_accounting:
-                locked.has_been_sent_to_accounting_at = now
+                locked.has_been_sent_to_accounting_at = claimed_at
                 update_fields.append("has_been_sent_to_accounting_at")
             locked.save(update_fields=update_fields)
 
             # ``on_commit`` so the SMTP send fires only after the save lands.
+            # ``robust``: a failure in one send must neither skip the other nor
+            # turn the committed upload into an error response.
             if should_send_to_reseller:
                 transaction.on_commit(
-                    lambda inv=locked: _InvoiceServiceForSend.send_to_reseller(inv)
+                    lambda inv=locked: _InvoiceServiceForSend.send_claimed(
+                        inv,
+                        _InvoiceServiceForSend.send_to_reseller,
+                        timestamp_field="has_been_sent_to_reseller_at",
+                        claimed_at=claimed_at,
+                    ),
+                    robust=True,
                 )
             if should_send_to_accounting:
                 transaction.on_commit(
-                    lambda inv=locked: _InvoiceServiceForSend.send_to_accounting(inv)
+                    lambda inv=locked: _InvoiceServiceForSend.send_claimed(
+                        inv,
+                        _InvoiceServiceForSend.send_to_accounting,
+                        timestamp_field="has_been_sent_to_accounting_at",
+                        claimed_at=claimed_at,
+                    ),
+                    robust=True,
                 )
 
         result = {"file": locked.file.url}
         if locked.xml_file:
             result["xml_file"] = locked.xml_file.url
         return Response(result, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _require_sendable(invoice: InvoiceReseller) -> None:
+        """An invoice email carries the finalized PDF, so both must exist."""
+        if not invoice.is_finalized:
+            raise DocumentNotFinalized("Invoice must be finalized before sending.")
+        if not invoice.file:
+            raise DocumentPdfMissing(
+                "PDF not yet uploaded — finalize and upload first."
+            )
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: InvoiceSentToResellerSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="send_to_reseller")
+    def send_to_reseller(self, request: Request, pk: str | None = None) -> Response:
+        """Send the invoice PDF to the reseller's ``invoice_email``, the first
+        time or again.
+
+        400 when it can't be sent: not finalized, no PDF, no address, or the
+        reseller takes invoices on paper only. 200 with ``sent: false`` when
+        the email did not go out: the mail server refused it (its EmailLog row
+        has the error), or the tenant has no SMTP host, or the PDF or template
+        could not be loaded (logged server-side).
+        """
+        invoice = self.get_object()
+        self._require_sendable(invoice)
+        reseller = invoice.reseller
+        if not reseller.invoice_email:
+            raise ResellerEmailMissing("Reseller has no invoice_email configured.")
+        if not reseller.invoice_via_email:
+            raise ResellerInvoiceEmailDisabled("Reseller takes invoices on paper only.")
+
+        sent = InvoiceService.send_to_reseller(invoice)
+        invoice.refresh_from_db(fields=["has_been_sent_to_reseller_at"])
+        return Response(
+            InvoiceSentToResellerSerializer(
+                {
+                    "sent": sent,
+                    "has_been_sent_to_reseller_at": (
+                        invoice.has_been_sent_to_reseller_at
+                    ),
+                }
+            ).data
+        )
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: InvoiceSentToAccountingSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="send_to_accounting")
+    def send_to_accounting(self, request: Request, pk: str | None = None) -> Response:
+        """Send the invoice PDF (and its XML) to the tenant's
+        ``accounting_email``, the first time or again.
+
+        400 when it can't be sent: not finalized, no PDF, or no accounting
+        address configured. 200 with ``sent: false`` when the email did not go
+        out, for the reasons ``send_to_reseller`` lists.
+        """
+        invoice = self.get_object()
+        self._require_sendable(invoice)
+        if InvoiceService.accounting_recipient() is None:
+            raise AccountingEmailMissing("No accounting_email configured.")
+
+        sent = InvoiceService.send_to_accounting(invoice)
+        invoice.refresh_from_db(fields=["has_been_sent_to_accounting_at"])
+        return Response(
+            InvoiceSentToAccountingSerializer(
+                {
+                    "sent": sent,
+                    "has_been_sent_to_accounting_at": (
+                        invoice.has_been_sent_to_accounting_at
+                    ),
+                }
+            ).data
+        )
 
     @extend_schema(
         request=CreateStornoRequestSerializer,
