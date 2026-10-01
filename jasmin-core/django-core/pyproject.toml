@@ -37,8 +37,12 @@ django-auditlog = "^3.4.1"
 ruff = ">=0.15.13,<0.17.0"
 jwcrypto = ">=1.5.7"
 # Transitive (pulled in by djangorestframework-simplejwt + redis[jwt]).
-# Pinned explicitly to dodge PYSEC-2026-{175,177,178,179} on 2.12.x.
-pyjwt = ">=2.13"
+# Pinned to the security floor that fixes CVE-2026-101918 present on 2.14.0
+# (2.13 already fixed PYSEC-2026-{175,177,178,179} on 2.12.x).
+pyjwt = ">=2.15.0"
+# Transitive (pulled in by requests and sentry-sdk). Pinned to the security
+# floor that fixes CVE-2026-{97687,97688,97689} present on 2.7.0.
+urllib3 = ">=2.8.0"
 # Transitive (pulled in by weasyprint). Pinned to the security floor that
 # fixes PYSEC-2026-{2253,2254,2255,2256,2257} present on 12.2.0.
 pillow = ">=12.3.0"
@@ -94,6 +98,9 @@ factory-boy = "^3.3"
 ruff = ">=0.15.13,<0.17.0"
 pip-audit = "^2.10.0"
 pre-commit = "^4.6.0"
+# Transitive (pulled in by pre-commit). Pinned to the security floor that
+# fixes PYSEC-2026-{4011,4012,4013,4014} present on 21.3.3.
+virtualenv = ">=21.7.13"
 # Per-request query-count summary printed to the runserver console.
 # Surfaces N+1s during development as you click through pages.
 # Middleware is wired in ``config/settings.py`` only when ``DEBUG=True``,
