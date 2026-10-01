@@ -18,10 +18,14 @@ from sepaxml import SepaDD
 from sepaxml.validation import ValidationError as SepaXmlValidationError
 
 from apps.commissioning.models import (
+    ConsentDocument,
+    ConsentKind,
+    Member,
     ShareDelivery,
     Subscription,
 )
 from apps.commissioning.models.choices import PaymentCycleOptions
+from apps.commissioning.services.consent_service import ConsentService
 from apps.commissioning.utils.iso_week_utils import share_delivery_date
 from apps.shared.money import round_money as _money
 from apps.shared.tenants.models import RateLimitedAction, Tenant, TenantSettings
@@ -38,8 +42,12 @@ from .errors import (
     NoEligibleCharges,
     NoValidSepaMandates,
     SepaExportInvalid,
+    SepaMandateAlreadyUsed,
+    SepaMandateDeactivated,
+    SepaMandateTextNotCurrent,
 )
 from .models import BillingProfile, BillingRun, ChargeSchedule
+from .serializers import normalized_iban
 
 logger = logging.getLogger(__name__)
 
@@ -740,6 +748,16 @@ def _render_remittance(
 # --------------------------------------------------------------------------- #
 
 
+@dataclass(frozen=True)
+class SepaMandateSignature:
+    """What a member submits when signing their own SEPA mandate: the account,
+    and the mandate text they agreed to (a SEPA ``ConsentDocument``)."""
+
+    iban: str
+    account_holder: str
+    consent_document_id: str
+
+
 class BillingProfileService:
     """Mandate-lifecycle operations on a member's ``BillingProfile``."""
 
@@ -792,6 +810,92 @@ class BillingProfileService:
         locked.is_active = True
         locked.save()
         return locked
+
+    @staticmethod
+    @transaction.atomic
+    def sign_member_mandate(
+        member: Member,
+        signature: SepaMandateSignature,
+        *,
+        ip_address: str | None = None,
+        user_agent: str = "",
+    ) -> tuple[BillingProfile, bool]:
+        """The member signs a SEPA mandate for their own account (self-service).
+
+        Covers a first mandate and a re-signed one that has never been collected
+        against. Two states stay with the office and are refused here: a mandate
+        already used for a collection, which is pinned to the account it
+        authorised (see ``replace_mandate``), and a profile the office has
+        deactivated.
+
+        Everything that makes the signature authoritative is set here, not taken
+        from the caller: the signature date is today, the reference is minted
+        server-side, and the consent is recorded against the mandate text the
+        member agreed to, replacing their earlier SEPA consent. Mandate and
+        consent commit together or not at all.
+
+        Signing puts the profile on the SEPA path, which undoes the switch to
+        bank transfer that withdrawing SEPA consent makes.
+
+        Returns the profile and whether it was created.
+        """
+        # One calendar date in ``TIME_ZONE`` both dates the signature and decides
+        # which mandate text is in force, as it does for the consent block that
+        # showed the text.
+        today = timezone.localdate()
+        document = ConsentDocument.objects.filter(
+            pk=signature.consent_document_id, kind=ConsentKind.SEPA
+        ).first()
+        if document is None or not document.is_active_at(today):
+            raise SepaMandateTextNotCurrent(
+                "Agree to the SEPA mandate text currently in force."
+            )
+
+        # Without a profile there is no row to lock, so two concurrent first
+        # signatures would both create one and collide on the one-profile-per-
+        # member constraint. The member row serialises them.
+        Member.objects.select_for_update().filter(pk=member.pk).first()
+        profile = (
+            BillingProfile.objects.select_for_update().filter(member=member).first()
+        )
+        if profile is not None and not profile.is_active:
+            raise SepaMandateDeactivated(
+                "The office has deactivated this SEPA mandate. "
+                "Ask the office to reactivate it."
+            )
+        if profile is not None and profile.sepa_mandate_first_use_at is not None:
+            raise SepaMandateAlreadyUsed(
+                "This SEPA mandate has already been used for a collection. "
+                "Ask the office to set up a mandate for another account."
+            )
+
+        created = profile is None
+        if profile is None:
+            profile = BillingProfile(member=member)
+        iban = normalized_iban(signature.iban)
+        # A reference the bank may already hold (an imported mandate, one the
+        # office typed in) is never re-pointed at another account: a new account
+        # gets a new reference. With the account unchanged, the reference stays.
+        if normalized_iban(profile.iban) != iban:
+            profile.sepa_mandate_reference = (
+                BillingProfile._generate_sepa_mandate_reference()
+            )
+        profile.iban = iban
+        profile.account_holder = signature.account_holder
+        profile.sepa_mandate_signed_at = today
+        # A paper signature on file was given for the mandate as it stood
+        # before, possibly for another account; this signature needs its own.
+        profile.sepa_mandate_paper_received_at = None
+        profile.payment_method = PaymentMethodOptions.SEPA_DIRECT_DEBIT
+        profile.save()
+        ConsentService.supersede(member=member, kind=ConsentKind.SEPA)
+        ConsentService.record(
+            member=member,
+            document=document,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        return profile, created
 
 
 class BillingRunService:

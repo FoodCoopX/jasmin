@@ -22,6 +22,7 @@ import {
   useCommissioningConsentsRevokeCreate,
 } from "@shared/api/generated/commissioning/commissioning";
 import { CommissioningConsentDocumentsCurrentRetrieveKind } from "@shared/api/generated/models";
+import { isSupersededConsent } from "@shared/consent/supersededConsent";
 import { useLocale } from "@shared/contexts/LocaleContext";
 import { useDateFormat } from "@hooks/index";
 import { notify } from "@shared/utils";
@@ -46,9 +47,9 @@ type ConsentDocKind =
  * {@link ConsentDocumentModal} for the four kinds the backend can
  * serve (``privacy`` / ``sepa`` / ``withdrawal`` / ``terms``).
  *
- * The modal renders the *current* document for that kind in the
- * active locale — not necessarily the exact historical version the
- * user clicked. The SAR bundle exposes ``document_version`` if/when
+ * The modal renders the *current* document for that kind, in the locale
+ * the member consented in — not necessarily the exact historical version
+ * the user clicked. The SAR bundle exposes ``document_version`` if/when
  * we want to pin to that specific revision later.
  */
 export default function ConsentsSection() {
@@ -59,7 +60,10 @@ export default function ConsentsSection() {
   const { data: myData } = useGdprMyDataRetrieve();
   const consents = myData?.consents ?? [];
 
-  const [viewingKind, setViewingKind] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<{
+    kind: string;
+    locale: string;
+  } | null>(null);
   // Art. 7(3): a member must be able to withdraw consent as easily as giving
   // it. The backend scopes revoke to the caller's own records.
   const [revokeTargetId, setRevokeTargetId] = useState<string | null>(null);
@@ -96,7 +100,9 @@ export default function ConsentsSection() {
                       size="small"
                       type="link"
                       icon={<EyeOutlined />}
-                      onClick={() => setViewingKind(c.kind)}
+                      onClick={() =>
+                        setViewing({ kind: c.kind, locale: c.document_locale })
+                      }
                     >
                       {t("gdpr.view_consent_text")}
                     </Button>
@@ -107,8 +113,12 @@ export default function ConsentsSection() {
               {c.revoked_at ? (
                 <Space direction="vertical" size={0}>
                   <Text>
-                    {t("gdpr.consent_revoked_at")}:{" "}
-                    {formatDateWithFallback(c.revoked_at)}
+                    {t(
+                      isSupersededConsent(c)
+                        ? "gdpr.consent_superseded_at"
+                        : "gdpr.consent_revoked_at",
+                    )}
+                    : {formatDateWithFallback(c.revoked_at)}
                   </Text>
                   <Text type="secondary">
                     {t("gdpr.consent_given_at")}:{" "}
@@ -167,11 +177,13 @@ export default function ConsentsSection() {
         </Space>
       </Modal>
 
-      {viewingKind && (
+      {viewing && (
         <ConsentDocumentModal
-          kind={viewingKind as ConsentDocKind}
-          locale={language || "de"}
-          onClose={() => setViewingKind(null)}
+          kind={viewing.kind as ConsentDocKind}
+          // The member may have consented in another language than the page's:
+          // consent blocks fall back to the tenant's when theirs has no text.
+          locale={viewing.locale || language || "de"}
+          onClose={() => setViewing(null)}
         />
       )}
     </div>
@@ -192,7 +204,8 @@ function ConsentDocumentModal({
   const { data, isLoading, error } =
     useCommissioningConsentDocumentsCurrentRetrieve(
       { kind, locale },
-      { query: { retry: false } },
+      // Silent: the modal renders its own error alert.
+      { query: { retry: false, meta: { silent: true } } },
     );
 
   return (

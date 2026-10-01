@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from .views import MySepaMandateView
 from .viewsets import BillingProfileViewSet, BillingRunViewSet, ChargeScheduleViewSet
 
 router = DefaultRouter()
@@ -9,5 +10,6 @@ router.register(r"charge_schedules", ChargeScheduleViewSet, basename="charge_sch
 router.register(r"billing_runs", BillingRunViewSet, basename="billing_run")
 
 urlpatterns = [
+    path("my_sepa_mandate/", MySepaMandateView.as_view(), name="my_sepa_mandate"),
     path("", include(router.urls)),
 ]

@@ -1,10 +1,11 @@
 /**
- * Seam test for ``SepaSetupModal`` — a financial flow that upserts a
- * BillingProfile (SEPA mandate) and records the matching ConsentRecord.
+ * Seam test for ``SepaSetupModal`` — a financial flow that sets up a SEPA
+ * mandate. A member signs their own through one self-service call (the server
+ * records the consent with it); the office upserts the BillingProfile.
  *
- * Boundary mocked: the generated billing-profile + consent API hooks/fns,
- * ``ConsentBlock`` (stubbed to a checkbox-button that reports an accepted
- * doc id), ``ModalCancelSaveFooter`` (plain primary button), ``notify`` and
+ * Boundary mocked: the generated billing-profile API hooks, ``ConsentBlock``
+ * (stubbed to a checkbox-button that reports an accepted doc id),
+ * ``ModalCancelSaveFooter`` (plain buttons), ``notify`` and
  * ``getErrorMessage``. The real AntD ``Form`` runs so ``validateFields`` and
  * the IBAN rule are exercised for real.
  */
@@ -26,6 +27,7 @@ const listMock = vi.fn((..._args: unknown[]) => ({ data: [] as unknown[] }));
 const createMutateMock = vi.fn();
 const patchMutateMock = vi.fn();
 const replaceMutateMock = vi.fn();
+const signOwnMutateMock = vi.fn();
 vi.mock(
   "@shared/api/generated/payments-—-billing-profiles/payments-—-billing-profiles",
   () => ({
@@ -38,6 +40,9 @@ vi.mock(
     }),
     usePaymentsBillingProfilesReplaceMandateCreate: () => ({
       mutateAsync: replaceMutateMock,
+    }),
+    usePaymentsMySepaMandateCreate: () => ({
+      mutateAsync: signOwnMutateMock,
     }),
     getPaymentsBillingProfilesListQueryKey: () => ["billing-profiles"],
   }),
@@ -59,10 +64,7 @@ vi.mock("@hooks/configuration/useDateFormat", () => ({
   }),
 }));
 
-const consentCreateMock = vi.fn();
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
-  commissioningConsentsCreate: (...args: unknown[]) =>
-    consentCreateMock(...args),
   getCommissioningConsentsListQueryKey: () => ["consents"],
 }));
 
@@ -87,12 +89,18 @@ vi.mock("@shared/modals/shared", () => ({
   ModalCancelSaveFooter: ({
     onPrimary,
     onCancel,
+    primaryDisabled,
   }: {
     onPrimary: () => void;
     onCancel: () => void;
+    primaryDisabled?: boolean;
   }) => (
     <div>
-      <button data-testid="primary" onClick={onPrimary}>
+      <button
+        data-testid="primary"
+        onClick={onPrimary}
+        disabled={primaryDisabled}
+      >
         primary
       </button>
       <button data-testid="footer-cancel" onClick={onCancel}>
@@ -153,50 +161,44 @@ beforeEach(() => {
   createMutateMock.mockReset().mockResolvedValue(undefined);
   patchMutateMock.mockReset().mockResolvedValue(undefined);
   replaceMutateMock.mockReset().mockResolvedValue(undefined);
-  consentCreateMock.mockReset().mockResolvedValue(undefined);
+  signOwnMutateMock.mockReset().mockResolvedValue(undefined);
   notifySuccessMock.mockReset();
   notifyErrorMock.mockReset();
 });
 
 describe("SepaSetupModal", () => {
-  it("creates a BillingProfile + ConsentRecord and closes on success (no existing profile)", async () => {
+  it("signs the member's own mandate in one call and closes on success", async () => {
     const { onClose } = renderModal();
 
     fillForm();
     fireEvent.click(screen.getByTestId("accept-consent"));
     fireEvent.click(screen.getByTestId("primary"));
 
-    await waitFor(() => expect(createMutateMock).toHaveBeenCalledTimes(1));
-    expect(patchMutateMock).not.toHaveBeenCalled();
-    expect(createMutateMock).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        member: MEMBER_ID,
+    await waitFor(() => expect(signOwnMutateMock).toHaveBeenCalledTimes(1));
+    // The account plus the exact document the member accepted, and nothing
+    // else: the server takes the member from the session, dates the signature
+    // and mints the reference.
+    expect(signOwnMutateMock).toHaveBeenCalledWith({
+      data: {
         iban: "DE89370400440532013000",
         account_holder: "Mara Beispiel",
-        is_active: true,
-        // The mandate signature date is load-bearing for SEPA compliance —
-        // pin its presence + YYYY-MM-DD shape so a regression dropping it
-        // (or sending a full ISO timestamp) is caught.
-        sepa_mandate_signed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      }),
+        consent_document_id: "sepa-doc-1",
+      },
     });
-    // The consent is pinned to the exact document the member accepted.
-    expect(consentCreateMock).toHaveBeenCalledWith({
-      document_id: "sepa-doc-1",
-      member: MEMBER_ID,
-    });
+    // The office endpoints refuse a member.
+    expect(createMutateMock).not.toHaveBeenCalled();
+    expect(patchMutateMock).not.toHaveBeenCalled();
     expect(notifySuccessMock).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("PATCHes the existing profile instead of creating a new one", async () => {
+  it("re-signs an existing unused mandate through the same call", async () => {
     listMock.mockReturnValue({
       data: [
         {
           id: "bp-1",
           member: MEMBER_ID,
-          iban: "DE00000000000000000000",
-          account_holder: "Old Name",
+          sepa_mandate_first_use_at: null,
         },
       ],
     });
@@ -206,24 +208,14 @@ describe("SepaSetupModal", () => {
     fireEvent.click(screen.getByTestId("accept-consent"));
     fireEvent.click(screen.getByTestId("primary"));
 
-    await waitFor(() => expect(patchMutateMock).toHaveBeenCalledTimes(1));
-    expect(createMutateMock).not.toHaveBeenCalled();
-    expect(patchMutateMock).toHaveBeenCalledWith({
-      id: "bp-1",
+    await waitFor(() => expect(signOwnMutateMock).toHaveBeenCalledTimes(1));
+    expect(signOwnMutateMock).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        // Re-arm SEPA on re-setup: a prior consent-revoke switches the profile
-        // to BANK_TRANSFER, so the PATCH must reset payment_method + is_active
-        // or the "new" mandate never activates (is_sepa_ready stays false).
-        payment_method: "SEPA_DD",
-        is_active: true,
         iban: "DE89370400440532013000",
-        account_holder: "Mara Beispiel",
-        // Re-signing a mandate re-stamps the signature date — same
-        // compliance requirement as the create branch.
-        sepa_mandate_signed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        consent_document_id: "sepa-doc-1",
       }),
     });
-    expect(consentCreateMock).toHaveBeenCalledTimes(1);
+    expect(patchMutateMock).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid IBAN via the form rule — no API call", async () => {
@@ -240,8 +232,7 @@ describe("SepaSetupModal", () => {
     fireEvent.click(screen.getByTestId("primary"));
 
     expect(await screen.findByText("sepa.iban_invalid")).toBeInTheDocument();
-    expect(createMutateMock).not.toHaveBeenCalled();
-    expect(consentCreateMock).not.toHaveBeenCalled();
+    expect(signOwnMutateMock).not.toHaveBeenCalled();
   });
 
   it("requires IBAN and account holder before any API call", async () => {
@@ -255,8 +246,7 @@ describe("SepaSetupModal", () => {
     expect(
       screen.getByText("sepa.account_holder_required"),
     ).toBeInTheDocument();
-    expect(createMutateMock).not.toHaveBeenCalled();
-    expect(consentCreateMock).not.toHaveBeenCalled();
+    expect(signOwnMutateMock).not.toHaveBeenCalled();
   });
 
   it("refuses to submit until the mandate is accepted", async () => {
@@ -269,11 +259,10 @@ describe("SepaSetupModal", () => {
     expect(
       await screen.findByText("sepa.must_accept_mandate"),
     ).toBeInTheDocument();
-    expect(createMutateMock).not.toHaveBeenCalled();
-    expect(consentCreateMock).not.toHaveBeenCalled();
+    expect(signOwnMutateMock).not.toHaveBeenCalled();
   });
 
-  it("office mode: attestation checkbox creates the mandate with a manual reference and records NO consent", async () => {
+  it("office mode: attestation checkbox creates the mandate with a manual reference and takes no self-service path", async () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
@@ -298,12 +287,18 @@ describe("SepaSetupModal", () => {
       data: expect.objectContaining({
         member: MEMBER_ID,
         iban: "DE89370400440532013000",
+        is_active: true,
+        // The mandate signature date is load-bearing for SEPA compliance —
+        // pin its presence + YYYY-MM-DD shape so a regression dropping it
+        // (or sending a full ISO timestamp) is caught.
+        sepa_mandate_signed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
         // The office's manually-entered reference overrides auto-generation.
         sepa_mandate_reference: "MND-2026-001",
       }),
     });
-    // A paper mandate is its own consent artifact — no digital ConsentRecord.
-    expect(consentCreateMock).not.toHaveBeenCalled();
+    // A paper mandate is its own consent artifact — no digital ConsentRecord,
+    // and the office never signs through the member's own endpoint.
+    expect(signOwnMutateMock).not.toHaveBeenCalled();
   });
 
   it("office mode: refuses to submit until the attestation checkbox is ticked", async () => {
@@ -327,7 +322,7 @@ describe("SepaSetupModal", () => {
   });
 
   it("surfaces the API failure as an inline error and does not close", async () => {
-    createMutateMock.mockRejectedValueOnce(new Error("boom"));
+    signOwnMutateMock.mockRejectedValueOnce(new Error("boom"));
     const { onClose } = renderModal();
 
     fillForm();
@@ -337,7 +332,6 @@ describe("SepaSetupModal", () => {
     expect(
       await screen.findByText("translated error message"),
     ).toBeInTheDocument();
-    expect(consentCreateMock).not.toHaveBeenCalled();
     expect(notifySuccessMock).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -414,6 +408,7 @@ describe("SepaSetupModal — mandate already in use", () => {
     expect(patched.data).toMatchObject({
       account_holder: "Mara Beispiel",
       payment_method: "SEPA_DD",
+      is_active: true,
       // Seeded from the profile and resent verbatim — the backend compares it
       // against the stored value and refuses anything that differs.
       sepa_mandate_reference: "MND-2025-014",
@@ -471,43 +466,58 @@ describe("SepaSetupModal — mandate already in use", () => {
     expect(replaceMutateMock).not.toHaveBeenCalled();
     expect(patchMutateMock).toHaveBeenCalledWith({
       id: "bp-2",
-      data: expect.objectContaining({ iban: "DE89370400440532013000" }),
+      data: expect.objectContaining({
+        iban: "DE89370400440532013000",
+        // Re-arm SEPA on re-setup: a prior consent-revoke switches the profile
+        // to BANK_TRANSFER, so the PATCH resets payment_method + is_active or
+        // the "new" mandate never activates (is_sepa_ready stays false).
+        payment_method: "SEPA_DD",
+        is_active: true,
+        // Re-signing re-stamps the signature date — same compliance
+        // requirement as the create branch.
+        sepa_mandate_signed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      }),
     });
   });
 
-  it("member self-service is unaffected — no opt-in offered, iban still PATCHed", async () => {
+  it("tells the member to contact the office and disables the save", () => {
     listMock.mockReturnValue({ data: [PROFILE_IN_USE] });
     renderModal();
 
-    // Replacement is office-only; the member flow keeps today's behaviour.
-    expect(
-      screen.queryByRole("checkbox", { name: "sepa.replace_mandate_confirm" }),
-    ).toBeNull();
-    expect(screen.getByLabelText("IBAN")).toBeEnabled();
-    fillForm();
-    fireEvent.click(screen.getByTestId("accept-consent"));
-    fireEvent.click(screen.getByTestId("primary"));
-
-    await waitFor(() => expect(patchMutateMock).toHaveBeenCalledTimes(1));
-    expect(replaceMutateMock).not.toHaveBeenCalled();
-    expect(patchMutateMock).toHaveBeenCalledWith({
-      id: "bp-1",
-      data: expect.objectContaining({ iban: "DE89370400440532013000" }),
-    });
-  });
-
-  it("tells the member to contact the office instead of offering a replacement", () => {
-    listMock.mockReturnValue({ data: [PROFILE_IN_USE] });
-    renderModal();
-
-    // Issuing a new mandate is office-only, so the member flow names the way
-    // out rather than leaving the backend lock as the only feedback.
+    // Issuing a new mandate is office-only and the server refuses to re-sign a
+    // used one, so the member flow names the way out and offers no save.
     expect(
       screen.getByText("sepa.mandate_in_use_member_notice"),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("checkbox", { name: "sepa.replace_mandate_confirm" }),
     ).toBeNull();
+    expect(screen.getByTestId("primary")).toBeDisabled();
+
+    fillForm();
+    fireEvent.click(screen.getByTestId("accept-consent"));
+    fireEvent.click(screen.getByTestId("primary"));
+    expect(signOwnMutateMock).not.toHaveBeenCalled();
+    expect(patchMutateMock).not.toHaveBeenCalled();
+    expect(replaceMutateMock).not.toHaveBeenCalled();
+  });
+
+  it("tells the member the office deactivated the mandate and disables the save", () => {
+    listMock.mockReturnValue({
+      data: [{ id: "bp-3", member: MEMBER_ID, is_active: false }],
+    });
+    renderModal();
+
+    // Lifting a deactivation is the office's decision; the server refuses it.
+    expect(
+      screen.getByText("sepa.mandate_deactivated_member_notice"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("primary")).toBeDisabled();
+
+    fillForm();
+    fireEvent.click(screen.getByTestId("accept-consent"));
+    fireEvent.click(screen.getByTestId("primary"));
+    expect(signOwnMutateMock).not.toHaveBeenCalled();
   });
 
   it("paper-signature tenant: replacing retires the filed signature and the reference stays locked", () => {

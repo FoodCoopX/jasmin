@@ -10,6 +10,8 @@ Covers the contract the rest of the consent system depends on:
     locale) pair -- at most one can be in force, since overlapping
     windows are refused by the DB -- and raises a clean 404 when none
     are.
+  - ``supersede`` closes a member's earlier records of a kind without
+    any of ``revoke``'s withdrawal side effects.
 
 These are audit-critical paths — a silent regression here is a
 DSGVO finding that compounds with every new signup until someone
@@ -21,12 +23,14 @@ from __future__ import annotations
 import datetime
 
 import pytest
+import time_machine
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.commissioning.errors import (
     ConsentAlreadyRevoked,
     ConsentDocumentNotFound,
+    ConsentRevokeReasonReserved,
 )
 from apps.commissioning.models import (
     ConsentDocument,
@@ -35,6 +39,7 @@ from apps.commissioning.models import (
     Member,
 )
 from apps.commissioning.services import ConsentService
+from apps.commissioning.services.consent_service import SUPERSEDED_REASON
 from apps.commissioning.tests.factories import MemberFactory
 
 # --------------------------------------------------------------------------- #
@@ -168,6 +173,30 @@ class TestGetCurrentDocument:
         _make_document(kind=ConsentKind.PRIVACY, locale="de")
         with pytest.raises(ConsentDocumentNotFound):
             ConsentService.get_current_document(kind=ConsentKind.PRIVACY, locale="en")
+
+    def test_defaults_to_the_local_date(self, tenant, settings):
+        settings.TIME_ZONE = "Europe/Berlin"
+        _make_document(
+            kind=ConsentKind.PRIVACY,
+            version="old",
+            valid_from=datetime.date(2026, 1, 1),
+            valid_until=datetime.date(2026, 11, 1),
+        )
+        newer = _make_document(
+            kind=ConsentKind.PRIVACY,
+            version="new",
+            valid_from=datetime.date(2026, 11, 2),
+        )
+
+        # 23:30 UTC on 1 November is already 2 November in Berlin.
+        with time_machine.travel(
+            datetime.datetime(2026, 11, 1, 23, 30, tzinfo=datetime.UTC), tick=False
+        ):
+            found = ConsentService.get_current_document(
+                kind=ConsentKind.PRIVACY, locale="de"
+            )
+
+        assert found.pk == newer.pk
 
 
 # --------------------------------------------------------------------------- #
@@ -370,6 +399,98 @@ class TestRevoke:
         revoked = ConsentService.revoke(record, reason="x" * 500)
 
         assert len(revoked.revoked_reason) == 200
+
+    def test_refuses_the_superseded_token_as_a_reason(self, tenant):
+        member = MemberFactory()
+        doc = _make_document(kind=ConsentKind.SEPA)
+        record = ConsentService.record(member=member, document=doc)
+
+        with pytest.raises(ConsentRevokeReasonReserved):
+            ConsentService.revoke(record, reason=" Superseded ")
+
+        record.refresh_from_db()
+        assert record.revoked_at is None
+
+
+# --------------------------------------------------------------------------- #
+# supersede                                                                   #
+# --------------------------------------------------------------------------- #
+
+
+class TestSupersede:
+    def test_a_superseded_consent_cannot_be_withdrawn_from_a_stale_copy(self, tenant):
+        member = MemberFactory()
+        record = ConsentService.record(
+            member=member, document=_make_document(kind=ConsentKind.SEPA)
+        )
+        # Superseded meanwhile; ``record`` in hand still reads unrevoked.
+        ConsentService.supersede(member=member, kind=ConsentKind.SEPA)
+
+        with pytest.raises(ConsentAlreadyRevoked):
+            ConsentService.revoke(record, reason="withdrawn")
+
+        record.refresh_from_db()
+        assert record.revoked_reason == SUPERSEDED_REASON
+
+    def test_reason_token_is_the_one_the_frontend_reads(self):
+        # src/shared/consent/supersededConsent.ts matches this exact value to
+        # label a record as replaced rather than withdrawn.
+        assert SUPERSEDED_REASON == "superseded"
+
+    def test_closes_the_members_active_records_of_the_kind(self, tenant):
+        member = MemberFactory()
+        doc = _make_document(kind=ConsentKind.SEPA)
+        record = ConsentService.record(member=member, document=doc)
+
+        closed = ConsentService.supersede(member=member, kind=ConsentKind.SEPA)
+
+        assert closed == 1
+        record.refresh_from_db()
+        assert record.revoked_at is not None
+        assert record.revoked_reason == SUPERSEDED_REASON
+        member.refresh_from_db()
+        assert member.sepa_consent is None
+
+    def test_leaves_other_kinds_and_other_members_alone(self, tenant):
+        member = MemberFactory()
+        other_member = MemberFactory()
+        sepa = _make_document(kind=ConsentKind.SEPA)
+        privacy = _make_document(kind=ConsentKind.PRIVACY)
+        privacy_record = ConsentService.record(member=member, document=privacy)
+        other_record = ConsentService.record(member=other_member, document=sepa)
+
+        closed = ConsentService.supersede(member=member, kind=ConsentKind.SEPA)
+
+        assert closed == 0
+        privacy_record.refresh_from_db()
+        other_record.refresh_from_db()
+        assert privacy_record.revoked_at is None
+        assert other_record.revoked_at is None
+
+    def test_is_not_a_withdrawal(self, tenant):
+        """Superseding the SEPA consent keeps the mandate armed, unlike
+        ``revoke``, which switches the profile to bank transfer."""
+        from apps.payments.constants import PaymentMethodOptions
+        from apps.payments.models import BillingProfile
+
+        member = MemberFactory()
+        profile = BillingProfile.objects.create(
+            member=member,
+            payment_method=PaymentMethodOptions.SEPA_DIRECT_DEBIT,
+            iban="DE89370400440532013000",
+            account_holder="Anna Member",
+            sepa_mandate_reference="MND-SUPERSEDE-1",
+            sepa_mandate_signed_at=datetime.date(2026, 1, 5),
+            is_active=True,
+        )
+        ConsentService.record(
+            member=member, document=_make_document(kind=ConsentKind.SEPA)
+        )
+
+        ConsentService.supersede(member=member, kind=ConsentKind.SEPA)
+
+        profile.refresh_from_db()
+        assert profile.payment_method == PaymentMethodOptions.SEPA_DIRECT_DEBIT
 
 
 # --------------------------------------------------------------------------- #

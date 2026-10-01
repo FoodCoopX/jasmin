@@ -164,8 +164,9 @@ class BillingProfileMemberSerializer(BillingProfileSerializer):
     Identical to the office :class:`BillingProfileSerializer` but WITHOUT the
     office-internal free-text ``notes``. ``read_only_fields`` guards writes,
     not read exposure, so the office serializer would otherwise leak the
-    office's billing annotations to the member. Writes stay office-only, so
-    this only narrows the incidental member read."""
+    office's billing annotations to the member. It shapes what the member reads
+    back; the member's own mandate is written through ``MySepaMandateView``,
+    never through this serializer."""
 
     class Meta(BillingProfileSerializer.Meta):
         fields = [f for f in BillingProfileSerializer.Meta.fields if f != "notes"]
@@ -194,6 +195,21 @@ class ReplaceMandateSerializer(serializers.Serializer):
 
     def validate_sepa_mandate_signed_at(self, value):
         return validate_mandate_signature_date(value)
+
+
+class MySepaMandateSerializer(serializers.Serializer):
+    """Request body for a member signing their own SEPA mandate.
+
+    Carries only what the member decides: the account, and which mandate text
+    they agreed to. The member, the signature date and the mandate reference are
+    set server-side.
+    """
+
+    iban = serializers.CharField(validators=[validate_iban_format])
+    account_holder = serializers.CharField(max_length=200)
+    # The SEPA ConsentDocument the member was shown and agreed to. It has to be
+    # the text in force today; the consent is recorded against it.
+    consent_document_id = serializers.CharField()
 
 
 class SepaMandateStatusSerializer(serializers.Serializer):

@@ -4,6 +4,7 @@
   "load_error": "Could not load consents.",
   "consented_at": "Consented",
   "revoked_at": "Revoked",
+  "superseded_at": "Replaced by a new signature",
   "revoke": "Revoke",
   "download": "PDF",
   "revoke_title": "Revoke consent",

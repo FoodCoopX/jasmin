@@ -82,6 +82,13 @@ function renderBlock(opts: {
   };
 }
 
+// The canonical Jasmin error body the backend sends when no document is in
+// force for the requested (kind, locale).
+const NOT_FOUND_BODY = {
+  code: "consent.document_not_found",
+  message: "No consent document.",
+};
+
 const SAMPLE_DOC = {
   id: "doc-1",
   kind: "privacy",
@@ -146,7 +153,7 @@ describe("ConsentBlock", () => {
   it("renders the missing-document error when the backend returns 404", async () => {
     server.use(
       http.get("/api/commissioning/consent_documents/current/", () =>
-        HttpResponse.json({ detail: "not found" }, { status: 404 }),
+        HttpResponse.json(NOT_FOUND_BODY, { status: 404 }),
       ),
     );
 
@@ -157,6 +164,59 @@ describe("ConsentBlock", () => {
     expect(
       await screen.findByText("consent.block.missing_document_title"),
     ).toBeInTheDocument();
+  });
+
+  it("falls back to the tenant language when the requested locale has no document", async () => {
+    // The office publishes in the tenant's language ("de" in the tenant mock);
+    // a reader on "en" would otherwise be stuck at the missing-document alert.
+    const requestedLocales: (string | null)[] = [];
+    server.use(
+      http.get(
+        "/api/commissioning/consent_documents/current/",
+        ({ request }) => {
+          const locale = new URL(request.url).searchParams.get("locale");
+          requestedLocales.push(locale);
+          return locale === "de"
+            ? HttpResponse.json({ ...SAMPLE_DOC, kind: "sepa" })
+            : HttpResponse.json(NOT_FOUND_BODY, { status: 404 });
+        },
+      ),
+    );
+
+    const { onChange } = renderBlock({
+      kind: ConsentDocumentKind.sepa,
+      locale: "en",
+    });
+
+    expect(await screen.findByText(SAMPLE_DOC.body)).toBeInTheDocument();
+    expect(requestedLocales).toEqual(["en", "de"]);
+    // The document actually shown is the one reported for the consent.
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(false, SAMPLE_DOC.id),
+    );
+  });
+
+  it("falls back only for a missing document, not for other failures", async () => {
+    const requestedLocales: (string | null)[] = [];
+    server.use(
+      http.get(
+        "/api/commissioning/consent_documents/current/",
+        ({ request }) => {
+          requestedLocales.push(new URL(request.url).searchParams.get("locale"));
+          return HttpResponse.json(
+            { code: "server.error", message: "Boom." },
+            { status: 500 },
+          );
+        },
+      ),
+    );
+
+    renderBlock({ kind: ConsentDocumentKind.sepa, locale: "en" });
+
+    expect(
+      await screen.findByText("consent.block.missing_document_title"),
+    ).toBeInTheDocument();
+    expect(requestedLocales).toEqual(["en"]);
   });
 
   it("requests the right (kind, locale) query params", async () => {

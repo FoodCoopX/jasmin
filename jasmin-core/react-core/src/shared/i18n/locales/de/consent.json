@@ -4,6 +4,7 @@
   "load_error": "Einwilligungen konnten nicht geladen werden.",
   "consented_at": "Zugestimmt",
   "revoked_at": "Widerrufen",
+  "superseded_at": "Durch neue Unterschrift ersetzt",
   "revoke": "Widerrufen",
   "download": "PDF",
   "revoke_title": "Einwilligung widerrufen",

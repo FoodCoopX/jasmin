@@ -111,6 +111,7 @@ _EXPECTED_VIEW_MODULES = frozenset(
         "apps.commissioning.viewsets.shares_viewsets",
         "apps.gdpr.views",
         "apps.notifications.viewsets",
+        "apps.payments.views",
         "apps.payments.viewsets",
         "apps.shared.super_admin.views",
         "apps.shared.super_admin.views.auth_views",

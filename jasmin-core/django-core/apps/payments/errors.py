@@ -104,6 +104,35 @@ class SepaMandateSignedInFuture(BadRequestError):
     code = "sepa.mandate_signed_in_future"
 
 
+class SepaMandateAlreadyUsed(ConflictError):
+    """A member tried to sign a new SEPA mandate over one that has already been
+    used for a collection (``sepa_mandate_first_use_at`` is stamped). The bank
+    holds that mandate's reference against the account the member authorised,
+    so a different account needs a new mandate, and the office issues it
+    (``replace_mandate``). Self-service covers only a mandate that has never
+    been collected against."""
+
+    code = "billing_profile.mandate_already_used"
+
+
+class SepaMandateDeactivated(ConflictError):
+    """A member tried to sign a SEPA mandate on a billing profile the office
+    has deactivated (``is_active`` is False). Deactivating stops direct-debit
+    collection, and lifting that is the office's decision, so self-service
+    refuses rather than switch collection back on."""
+
+    code = "billing_profile.mandate_deactivated"
+
+
+class SepaMandateTextNotCurrent(BadRequestError):
+    """The consent document sent with a self-service mandate is not the SEPA
+    mandate text in force today: unknown, of another kind, superseded, or not
+    yet effective. The consent record must name the text the member agreed to,
+    and only the current text can authorise a new mandate."""
+
+    code = "billing_profile.sepa_mandate_text_not_current"
+
+
 __all__ = [
     "BillingRunInvalidPeriod",
     "BillingRunInvalidCollectionDate",
@@ -116,4 +145,7 @@ __all__ = [
     "MandateReferenceLocked",
     "IbanLocked",
     "SepaMandateSignedInFuture",
+    "SepaMandateAlreadyUsed",
+    "SepaMandateDeactivated",
+    "SepaMandateTextNotCurrent",
 ]

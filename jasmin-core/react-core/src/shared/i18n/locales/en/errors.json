@@ -334,7 +334,10 @@
   },
   "billing_profile": {
     "iban_locked": "The SEPA mandate has already been used — its IBAN can no longer be changed. To use a different account, replace the mandate (a new mandate with a new mandate reference); the account must not be swapped silently.",
-    "mandate_reference_locked": "The SEPA mandate has already been used — its mandate reference can no longer be changed. Set up a new mandate if a different reference is needed."
+    "mandate_already_used": "This SEPA mandate has already been collected against. The bank details can no longer be changed here — that requires a new mandate. Please contact the office.",
+    "mandate_deactivated": "The office has deactivated this SEPA mandate. It can't be reactivated here — please contact the office.",
+    "mandate_reference_locked": "The SEPA mandate has already been used — its mandate reference can no longer be changed. Set up a new mandate if a different reference is needed.",
+    "sepa_mandate_text_not_current": "The SEPA mandate text has been updated in the meantime. Please reload the page and accept the current text."
   },
   "billing_run": {
     "invalid_period": "The end date must be on or after the start date.",
@@ -374,6 +377,7 @@
   },
   "consent": {
     "already_revoked": "This consent has already been revoked.",
+    "revoke_reason_reserved": "This reason is reserved for consents replaced by a new signature. Please enter a different reason.",
     "document_in_use": "This consent document is already in use and cannot be deleted — publish a new version instead.",
     "document_not_found": "Consent document not found.",
     "target_member_unresolved": "No target member could be inferred from the request.",

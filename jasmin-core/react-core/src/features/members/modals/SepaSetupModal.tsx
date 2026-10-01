@@ -14,14 +14,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDateFormat } from "@hooks/configuration/useDateFormat";
 import { useTenant } from "@hooks/configuration/useTenant";
-import {
-  commissioningConsentsCreate,
-  getCommissioningConsentsListQueryKey,
-} from "@shared/api/generated/commissioning/commissioning";
-import type {
-  BillingProfile,
-  ConsentRecordCreate,
-} from "@shared/api/generated/models";
+import { getCommissioningConsentsListQueryKey } from "@shared/api/generated/commissioning/commissioning";
+import type { BillingProfile } from "@shared/api/generated/models";
 import { PaymentMethodEnum } from "@shared/api/generated/models";
 import {
   getPaymentsBillingProfilesListQueryKey,
@@ -29,6 +23,7 @@ import {
   usePaymentsBillingProfilesList,
   usePaymentsBillingProfilesPartialUpdate,
   usePaymentsBillingProfilesReplaceMandateCreate,
+  usePaymentsMySepaMandateCreate,
 } from "@shared/api/generated/payments-—-billing-profiles/payments-—-billing-profiles";
 import ConsentBlock, {
   ConsentDocumentKind,
@@ -46,8 +41,10 @@ interface SepaSetupModalProps {
   /** Office mode: expose the office-only fields — an editable signed date
    *  (default today) and, when the tenant requires a paper signature, a
    *  "paper signature received" checkbox that records
-   *  ``sepa_mandate_paper_received_at``. Off (member self-service) signs
-   *  "now" (the signed date is today). */
+   *  ``sepa_mandate_paper_received_at``. Off (member self-service), the
+   *  signed-in member signs for their own account and the server dates the
+   *  signature today. The server takes that member from the session, so
+   *  ``memberId`` then only selects the profile shown. */
   officeMode?: boolean;
   /** Called after a successful upsert (before ``onClose``). Lets callers that
    *  read a DIFFERENT query than the billing-profiles list — e.g. the Abos SEPA
@@ -79,21 +76,45 @@ function mandateReferenceHintKey(
 }
 
 /**
+ * Why a member can't sign here, if they can't. A mandate the bank has already
+ * collected against, and a profile the office deactivated, are the office's to
+ * change; the server refuses both, and this says so before the member tries.
+ */
+function memberMandateLock(
+  profile: BillingProfile | undefined,
+): { titleKey: string; noticeKey: string } | null {
+  if (profile?.is_active === false) {
+    return {
+      titleKey: "sepa.mandate_deactivated_title",
+      noticeKey: "sepa.mandate_deactivated_member_notice",
+    };
+  }
+  if (profile?.sepa_mandate_first_use_at) {
+    return {
+      titleKey: "sepa.mandate_in_use_title",
+      noticeKey: "sepa.mandate_in_use_member_notice",
+    };
+  }
+  return null;
+}
+
+/**
  * One-shot SEPA mandate setup for a member.
  *
- * Workflow:
+ * Member self-service:
  *   1. Show the current SEPA mandate text via ``<ConsentBlock kind="sepa">``.
- *   2. Collect IBAN / BIC / account holder name.
- *   3. On submit:
- *       a. Create or update the BillingProfile.
- *       b. POST a ConsentRecord referencing the same SEPA document the
- *          member just saw, so the audit trail captures *which* version
- *          of the mandate text they accepted.
+ *   2. Collect IBAN and account holder.
+ *   3. On submit, one call signs the mandate for the member's own account. The
+ *      server stamps today's signature date, mints the reference and records
+ *      the consent against the exact mandate text accepted in step 1, all in
+ *      one transaction, so the audit trail captures *which* version the member
+ *      accepted. Re-signing (changed IBAN, new bank) is a new event and
+ *      records a new consent. A mandate already used for a collection can't
+ *      be re-signed here: another account needs a new mandate from the office.
  *
- * If a BillingProfile already exists for this member the form
- * pre-fills + uses PATCH on submit. A previous SEPA consent on file
- * does NOT block re-recording — re-signing a mandate (changed IBAN,
- * new bank) is a new event and deserves a new ConsentRecord.
+ * Office mode records a mandate FOR the member from the signed paper form,
+ * attested by a checkbox instead of the click-through. An existing profile is
+ * PATCHed, and a mandate already in use can be replaced by a new one.
  */
 export default function SepaSetupModal({
   open,
@@ -169,123 +190,110 @@ export default function SepaSetupModal({
   // to, so re-pointing it at a different IBAN would emit an RCUR quoting a
   // reference held against the old account. The backend refuses an ``iban``
   // change on such a profile; replacing it is a separate, office-only action.
-  const mandateAlreadyUsed = Boolean(existing?.sepa_mandate_first_use_at);
-  const mandateInUse = officeMode && mandateAlreadyUsed;
+  const mandateInUse =
+    officeMode && Boolean(existing?.sepa_mandate_first_use_at);
   // The submitted IBAN can't be compared against the stored one (the API only
   // ever returns it masked), so the account is held still until the office
   // explicitly opts into a replacement. Everything else stays editable.
   const ibanLocked = mandateInUse && !replacingMandate;
+  const memberLock = officeMode ? null : memberMandateLock(existing);
 
   const createMutation = usePaymentsBillingProfilesCreate();
   const patchMutation = usePaymentsBillingProfilesPartialUpdate();
   const replaceMandateMutation = usePaymentsBillingProfilesReplaceMandateCreate();
+  const signOwnMandateMutation = usePaymentsMySepaMandateCreate();
 
-  const handleSubmit = async () => {
-    setSubmitError(null);
-    let values: FormValues;
-    try {
-      values = await form.validateFields();
-    } catch {
-      return;
+  // The office records the mandate FOR the member, from the signed paper form.
+  const saveOfficeMandate = async (values: FormValues) => {
+    const today = dayjs().format("YYYY-MM-DD");
+    // The office may backdate the signature (paper mandate).
+    const signedAt = signedDate.format("YYYY-MM-DD");
+    // Paper-signature confirmation: only relevant with the tenant setting on.
+    // Checked → record the received date (keep an existing one, else today);
+    // unchecked → clear it.
+    const paperFields = requiresPaperSignature
+      ? {
+          sepa_mandate_paper_received_at: paperReceived
+            ? (existing?.sepa_mandate_paper_received_at ?? today)
+            : null,
+        }
+      : {};
+    // A manually-entered mandate reference overrides the backend's
+    // auto-generated one. Blank → omit (backend generates it).
+    const referenceField = values.sepa_mandate_reference?.trim()
+      ? { sepa_mandate_reference: values.sepa_mandate_reference.trim() }
+      : {};
+    if (existing?.id && replacingMandate) {
+      // Replacing is its own server-side operation: it mints the new mandate
+      // reference (never accepted from here — it is what the bank matches
+      // collections against), clears the first-use stamp so the next export
+      // announces the account as FRST, drops the paper stamp filed against
+      // the retired mandate, and re-arms the SEPA path.
+      await replaceMandateMutation.mutateAsync({
+        id: existing.id,
+        data: {
+          iban: values.iban,
+          account_holder: values.account_holder,
+          sepa_mandate_signed_at: signedAt,
+        },
+      });
+    } else if (existing?.id) {
+      await patchMutation.mutateAsync({
+        id: existing.id,
+        data: {
+          // Re-arm SEPA: a prior consent-revoke switches the profile to
+          // BANK_TRANSFER (keeping the mandate columns). Without resetting
+          // payment_method + is_active here, re-doing the setup would update
+          // the IBAN/signed date but leave the profile on BANK_TRANSFER, so
+          // is_sepa_ready stays false and the "new" mandate never activates.
+          // (payment_method into SEPA is step-up gated — the api.ts
+          // interceptor handles the challenge transparently.)
+          payment_method: PaymentMethodEnum.SEPA_DD,
+          is_active: true,
+          // A mandate already in use keeps its account: the IBAN is left out
+          // of the payload entirely, so re-saving the account holder, the
+          // signed date or the paper confirmation still works.
+          ...(ibanLocked ? {} : { iban: values.iban }),
+          account_holder: values.account_holder,
+          sepa_mandate_signed_at: signedAt,
+          ...paperFields,
+          ...referenceField,
+        } as BillingProfile,
+      });
+    } else {
+      await createMutation.mutateAsync({
+        data: {
+          member: memberId,
+          iban: values.iban,
+          account_holder: values.account_holder,
+          sepa_mandate_signed_at: signedAt,
+          is_active: true,
+          ...paperFields,
+          ...referenceField,
+        } as BillingProfile,
+      });
     }
-    // Member mode needs the accepted consent DOCUMENT (recorded below); office
-    // mode replaces the click-through document with a plain attestation
-    // checkbox (the office holds the signed PAPER mandate), so it only needs
-    // the checkbox — no ConsentRecord is created for a paper mandate.
-    if (!sepaAccepted || (!officeMode && !sepaDocId)) {
-      setSubmitError(t("sepa.must_accept_mandate"));
-      return;
-    }
+  };
 
+  // Self-service: one call signs the mandate for the member's own account. The
+  // server stamps today's signature date, mints the reference and records the
+  // consent against the mandate text accepted in the ConsentBlock, in one
+  // transaction.
+  const signOwnMandate = (values: FormValues, consentDocumentId: string) =>
+    signOwnMandateMutation.mutateAsync({
+      data: {
+        iban: values.iban,
+        account_holder: values.account_holder,
+        consent_document_id: consentDocumentId,
+      },
+    });
+
+  // Both modes finish a save the same way: refresh, confirm and close, or keep
+  // the modal open with the error inline.
+  const runSave = async (save: () => Promise<unknown>) => {
     setSubmitting(true);
     try {
-      // Step 1: upsert BillingProfile.
-      const today = dayjs().format("YYYY-MM-DD");
-      // Office mode lets the office backdate the signature (paper mandate);
-      // member self-service always signs "now".
-      const signedAt = officeMode ? signedDate.format("YYYY-MM-DD") : today;
-      // Paper-signature confirmation: only relevant in office mode with the
-      // tenant setting on. Checked → record the received date (keep an existing
-      // one, else today); unchecked → clear it.
-      const paperFields =
-        officeMode && requiresPaperSignature
-          ? {
-              sepa_mandate_paper_received_at: paperReceived
-                ? (existing?.sepa_mandate_paper_received_at ?? today)
-                : null,
-            }
-          : {};
-      // Office-only: a manually-entered mandate reference overrides the
-      // backend's auto-generated one. Blank → omit (backend generates it).
-      const referenceField =
-        officeMode && values.sepa_mandate_reference?.trim()
-          ? { sepa_mandate_reference: values.sepa_mandate_reference.trim() }
-          : {};
-      if (existing?.id && replacingMandate) {
-        // Replacing is its own server-side operation: it mints the new mandate
-        // reference (never accepted from here — it is what the bank matches
-        // collections against), clears the first-use stamp so the next export
-        // announces the account as FRST, drops the paper stamp filed against
-        // the retired mandate, and re-arms the SEPA path.
-        await replaceMandateMutation.mutateAsync({
-          id: existing.id,
-          data: {
-            iban: values.iban,
-            account_holder: values.account_holder,
-            sepa_mandate_signed_at: signedAt,
-          },
-        });
-      } else if (existing?.id) {
-        await patchMutation.mutateAsync({
-          id: existing.id,
-          data: {
-            // Re-arm SEPA: a prior consent-revoke switches the profile to
-            // BANK_TRANSFER (keeping the mandate columns). Without resetting
-            // payment_method + is_active here, re-doing the setup would update
-            // the IBAN/signed date but leave the profile on BANK_TRANSFER, so
-            // is_sepa_ready stays false and the "new" mandate never activates.
-            // (payment_method into SEPA is step-up gated — the api.ts
-            // interceptor handles the challenge transparently.)
-            payment_method: PaymentMethodEnum.SEPA_DD,
-            is_active: true,
-            // A mandate already in use keeps its account: the IBAN is left out
-            // of the payload entirely, so re-saving the account holder, the
-            // signed date or the paper confirmation still works.
-            ...(ibanLocked ? {} : { iban: values.iban }),
-            account_holder: values.account_holder,
-            sepa_mandate_signed_at: signedAt,
-            ...paperFields,
-            ...referenceField,
-          } as BillingProfile,
-        });
-      } else {
-        await createMutation.mutateAsync({
-          data: {
-            member: memberId,
-            iban: values.iban,
-            account_holder: values.account_holder,
-            sepa_mandate_signed_at: signedAt,
-            is_active: true,
-            ...paperFields,
-            ...referenceField,
-          } as BillingProfile,
-        });
-      }
-
-      // Step 2 (member self-service only): record the SEPA consent against the
-      // exact document version the member just accepted via the ConsentBlock.
-      // Office mode holds a PAPER mandate instead — the paper is the consent
-      // artifact (captured by ``sepa_mandate_paper_received_at``), so no
-      // digital ConsentRecord is created (a fake click-through would misrepresent
-      // how consent was actually given). ``member`` pins the target for office
-      // callers; member-role callers are pinned server-side regardless.
-      if (!officeMode && sepaDocId) {
-        await commissioningConsentsCreate({
-          document_id: sepaDocId,
-          member: memberId,
-        } as ConsentRecordCreate & { member: string });
-      }
-
+      await save();
       void queryClient.invalidateQueries({
         queryKey: getPaymentsBillingProfilesListQueryKey(),
       });
@@ -307,6 +315,35 @@ export default function SepaSetupModal({
     }
   };
 
+  const handleSubmit = async () => {
+    setSubmitError(null);
+    let values: FormValues;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
+    }
+    if (!sepaAccepted) {
+      setSubmitError(t("sepa.must_accept_mandate"));
+      return;
+    }
+    // Office mode replaces the click-through document with a plain attestation
+    // checkbox: the office holds the signed PAPER mandate, which is the consent
+    // artifact, so no digital ConsentRecord is created (a fake click-through
+    // would misrepresent how consent was actually given).
+    if (officeMode) {
+      await runSave(() => saveOfficeMandate(values));
+      return;
+    }
+    // Member mode needs the accepted consent DOCUMENT: the consent is recorded
+    // against it.
+    if (!sepaDocId) {
+      setSubmitError(t("sepa.must_accept_mandate"));
+      return;
+    }
+    await runSave(() => signOwnMandate(values, sepaDocId));
+  };
+
   return (
     <Modal
       open={open}
@@ -317,6 +354,7 @@ export default function SepaSetupModal({
           onCancel={onClose}
           onPrimary={handleSubmit}
           loading={submitting}
+          primaryDisabled={Boolean(memberLock)}
           primaryLabel={t("sepa.save")}
         />
       }
@@ -358,15 +396,14 @@ export default function SepaSetupModal({
             }
           />
         )}
-        {!officeMode && mandateAlreadyUsed && (
-          // Issuing a new mandate is office-only, so self-service has no route
-          // to a different account: say where to go instead of letting the save
-          // run into the backend lock.
+        {memberLock && (
+          // Self-service has no route past either state: the save is disabled,
+          // and this says where to go instead.
           <Alert
             type="warning"
             showIcon
-            message={t("sepa.mandate_in_use_title")}
-            description={t("sepa.mandate_in_use_member_notice")}
+            message={t(memberLock.titleKey)}
+            description={t(memberLock.noticeKey)}
           />
         )}
         <Paragraph type="secondary">

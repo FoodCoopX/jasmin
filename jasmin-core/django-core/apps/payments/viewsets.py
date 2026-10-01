@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
 from drf_spectacular.utils import (
@@ -125,7 +126,8 @@ class BillingProfileViewSet(
     PIIReadLoggingMixin, RolePermissionsMixin, viewsets.ModelViewSet
 ):
     """Members read their own profile; office, admin and management read every
-    profile. Writes are office-only.
+    profile. Writes here are office-only: a member signs their own mandate
+    through ``MySepaMandateView``.
 
     Edits that touch any of the SEPA-mandate fields require step-up
     auth, because rewriting IBAN / mandate-reference could redirect a
@@ -234,7 +236,20 @@ class BillingProfileViewSet(
             # stays the defense-in-depth backstop.
             enforce_owner(self.request, member_id, user_attr="member_profile")
             qs = qs.filter(member_id=member_id)
+        if self.action in {"update", "partial_update"}:
+            # Read under the row lock the export and the member's own signing
+            # take; see ``update``.
+            qs = qs.select_for_update(of=("self",))
         return qs
+
+    def update(self, request, *args, **kwargs):
+        # The serializer saves every column of the instance it is handed. Read
+        # unlocked, an edit made while an export runs would write the row back
+        # as it was before the export stamped ``sepa_mandate_first_use_at`` —
+        # the stamp that locks a used mandate's IBAN and reference, here and in
+        # self-service. ``partial_update`` comes through here too.
+        with transaction.atomic():
+            return super().update(request, *args, **kwargs)
 
     @extend_schema(
         summary="Per-member SEPA mandate status (no bank identifiers)",

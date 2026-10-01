@@ -1,12 +1,17 @@
 import { useEffect, useRef } from "react";
 import { PrinterOutlined } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
 import { Alert, Button, Card, Checkbox, Skeleton, Space, Typography } from "antd";
 import dayjs from "dayjs";
 import DOMPurify from "dompurify";
 import { useTranslation } from "react-i18next";
-import { useCommissioningConsentDocumentsCurrentRetrieve } from "@shared/api/generated/commissioning/commissioning";
+import {
+  commissioningConsentDocumentsCurrentRetrieve,
+  getCommissioningConsentDocumentsCurrentRetrieveQueryKey,
+} from "@shared/api/generated/commissioning/commissioning";
 import { CommissioningConsentDocumentsCurrentRetrieveKind } from "@shared/api/generated/models/commissioningConsentDocumentsCurrentRetrieveKind";
 import { useDateFormat, useTenant } from "@hooks/index";
+import { getErrorCode } from "@shared/utils/apiError";
 
 type ConsentKind = CommissioningConsentDocumentsCurrentRetrieveKind;
 
@@ -20,10 +25,11 @@ interface ConsentBlockProps {
   /** Whether the user has ticked the checkbox. Controlled by the parent. */
   checked: boolean;
   /**
-   * Notify the parent: ``(checked, documentId)``. The parent must
-   * remember the ``documentId`` and POST it via
-   * ``useCommissioningConsentsCreate`` after the Member exists.
-   * ``documentId`` may be undefined while the document is still loading.
+   * Notify the parent: ``(checked, documentId)``. ``documentId`` is the
+   * document actually shown, and is undefined while it is still loading. The
+   * parent hands it to whatever records the consent — best the domain
+   * endpoint that writes the ConsentRecord in the same transaction as its own
+   * change, as ``my_sepa_mandate`` does with ``consent_document_id``.
    */
   onChange: (checked: boolean, documentId: string | undefined) => void;
 }
@@ -32,15 +38,13 @@ interface ConsentBlockProps {
  * Renders the current ConsentDocument for ``(kind, locale)``, with a
  * scrollable body and an "I agree" checkbox.
  *
- * Controlled component — does NOT POST anything on its own. The
- * parent collects accepted document IDs and calls
- * ``commissioningConsentsCreate({ document_id })`` *after* the
- * Member it should attach to exists. (Posting before the member
- * exists would 400 — no target.)
+ * Controlled component — it records nothing itself, it only reports what was
+ * accepted (see ``onChange``).
  *
- * If no document exists for the requested kind+locale, renders a
- * blocking error so the form can't silently send a "consent to
- * nothing" record.
+ * The office publishes documents in the tenant's language, so a reader whose
+ * locale has none is shown the tenant-language document instead. If neither
+ * exists, renders a blocking error so the form can't silently send a
+ * "consent to nothing" record.
  */
 export default function ConsentBlock({
   kind,
@@ -70,10 +74,45 @@ export default function ConsentBlock({
     [tenant?.zip_code, tenant?.city].filter(Boolean).join(" ").trim(),
   ].filter((line): line is string => Boolean(line && line.trim()));
 
-  const { data: document, isLoading, error } = useCommissioningConsentDocumentsCurrentRetrieve(
-    { kind, locale: effectiveLocale },
-    { query: { retry: false } },
-  );
+  // One query for both lookups, so a document once found stays shown through
+  // background refetches. Only "no document in this locale" falls back, never
+  // another failure. Silent: the block renders its own error alert.
+  const fallbackLocale = tenant?.tenant_language;
+  const {
+    data: document,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: [
+      ...getCommissioningConsentDocumentsCurrentRetrieveQueryKey({
+        kind,
+        locale: effectiveLocale,
+      }),
+      { fallbackLocale },
+    ],
+    queryFn: async ({ signal }) => {
+      try {
+        return await commissioningConsentDocumentsCurrentRetrieve(
+          { kind, locale: effectiveLocale },
+          signal,
+        );
+      } catch (err) {
+        if (
+          !fallbackLocale ||
+          fallbackLocale === effectiveLocale ||
+          getErrorCode(err) !== "consent.document_not_found"
+        ) {
+          throw err;
+        }
+        return commissioningConsentDocumentsCurrentRetrieve(
+          { kind, locale: fallbackLocale },
+          signal,
+        );
+      }
+    },
+    retry: false,
+    meta: { silent: true },
+  });
 
   // Read ``checked``/``onChange`` through refs so the document-load
   // effect below emits the CURRENT values, not whatever it closed over
@@ -113,7 +152,7 @@ export default function ConsentBlock({
       .map((line) => `<div>${escape(line)}</div>`)
       .join("");
     printWindow.document.write(
-      `<!doctype html><html lang="${escape(effectiveLocale)}"><head>` +
+      `<!doctype html><html lang="${escape(document.locale || effectiveLocale)}"><head>` +
         `<meta charset="utf-8" /><title>${escape(document.title || "")}</title>` +
         `<style>` +
         `body{font-family:system-ui,-apple-system,sans-serif;color:#1a1a1a;margin:40px;line-height:1.5}` +
@@ -159,9 +198,23 @@ export default function ConsentBlock({
     );
   }
 
+  // Shown in the tenant's language when the reader's has none, so the text can
+  // differ from the page language that assistive tech would otherwise apply.
+  const documentLanguage = document.locale || effectiveLocale;
+
   return (
-    <Card size="small" title={document.title || t(`consent.kind.${kind}`, kind)}>
+    <Card
+      size="small"
+      title={
+        document.title ? (
+          <span lang={documentLanguage}>{document.title}</span>
+        ) : (
+          t(`consent.kind.${kind}`, kind)
+        )
+      }
+    >
       <div
+        lang={documentLanguage}
         style={{
           maxHeight: 200,
           overflowY: "auto",

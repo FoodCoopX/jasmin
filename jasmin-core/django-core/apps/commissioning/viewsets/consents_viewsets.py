@@ -400,6 +400,8 @@ class ConsentRecordViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         request=ConsentRecordRevokeSerializer,
         responses={
             200: ConsentRecordSerializer,
+            # ``ConsentRevokeReasonReserved``.
+            400: ErrorResponseSerializer,
             # ``ConsentAlreadyRevoked``.
             409: ErrorResponseSerializer,
         },

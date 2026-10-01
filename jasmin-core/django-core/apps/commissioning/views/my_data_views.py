@@ -346,7 +346,7 @@ class MyCoopShareSubscribeView(APIView):
 
             from ..models import ConsentDocument
 
-            _today = _timezone.now().date()
+            _today = _timezone.localdate()
             contract_doc = (
                 ConsentDocument.objects.filter(
                     kind=ConsentKind.COOP_CONTRACT, valid_from__lte=_today

@@ -57,5 +57,7 @@
   "iban_locked_hint": "Locked while the existing mandate stays in force. To change it, select \"Issue a new mandate\" above.",
   "mandate_reference_replaced_hint": "A new mandate reference is minted automatically for the new mandate.",
   "mandate_reference_locked_hint": "Locked while the existing mandate stays in force — the bank matches collections to this reference. To change it, select \"Issue a new mandate\" above.",
-  "mandate_in_use_member_notice": "This mandate has already been collected against. The bank details can no longer be changed here — that requires a new mandate. Please contact the office."
+  "mandate_in_use_member_notice": "This mandate has already been collected against. The bank details can no longer be changed here — that requires a new mandate. Please contact the office.",
+  "mandate_deactivated_title": "Mandate deactivated",
+  "mandate_deactivated_member_notice": "The office has deactivated this mandate. The bank details can't be changed here — please contact the office."
 }

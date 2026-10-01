@@ -1089,6 +1089,14 @@ class ConsentAlreadyRevoked(ConflictError):
     code = "consent.already_revoked"
 
 
+class ConsentRevokeReasonReserved(BadRequestError):
+    """A withdrawal's reason is exactly the token ``ConsentService.supersede``
+    stores on a consent replaced by a newer one. Kept for that case alone, so
+    a withdrawal can never be read as a re-signing."""
+
+    code = "consent.revoke_reason_reserved"
+
+
 class ConsentDocumentInUse(ConflictError):
     """Caller tried to delete a ConsentDocument that has at least one
     ConsentRecord pointing at it. Documents that members have agreed
@@ -2032,6 +2040,7 @@ __all__ = [
     "ConsentDocumentNotFound",
     "ConsentTargetMemberUnresolved",
     "ConsentAlreadyRevoked",
+    "ConsentRevokeReasonReserved",
     "ConsentDocumentInUse",
     "ConsentDocumentImmutable",
     "TrialMembersNotAllowed",

@@ -334,7 +334,10 @@
   },
   "billing_profile": {
     "iban_locked": "Das SEPA-Mandat wurde bereits eingesetzt — die IBAN kann nicht mehr geändert werden. Für ein anderes Konto bitte das Mandat ersetzen (neues Mandat mit neuer Mandatsreferenz); ein stilles Austauschen des Kontos ist nicht zulässig.",
-    "mandate_reference_locked": "Das SEPA-Mandat wurde bereits eingesetzt — die Mandatsreferenz kann nicht mehr geändert werden. Für eine andere Referenz bitte ein neues Mandat anlegen."
+    "mandate_already_used": "Über dieses SEPA-Mandat wurde bereits eingezogen. Die Bankverbindung kann hier nicht mehr geändert werden – dafür muss ein neues Mandat erteilt werden. Bitte wende dich dafür an das Büro.",
+    "mandate_deactivated": "Das Büro hat dieses SEPA-Mandat deaktiviert. Es kann hier nicht wieder aktiviert werden – bitte wende dich dafür an das Büro.",
+    "mandate_reference_locked": "Das SEPA-Mandat wurde bereits eingesetzt — die Mandatsreferenz kann nicht mehr geändert werden. Für eine andere Referenz bitte ein neues Mandat anlegen.",
+    "sepa_mandate_text_not_current": "Der SEPA-Mandatstext wurde inzwischen aktualisiert. Bitte lade die Seite neu und bestätige den aktuellen Text."
   },
   "billing_run": {
     "invalid_period": "Das End-Datum muss nach dem Start-Datum liegen.",
@@ -374,6 +377,7 @@
   },
   "consent": {
     "already_revoked": "Diese Einwilligung wurde bereits widerrufen.",
+    "revoke_reason_reserved": "Dieser Grund ist für Einwilligungen reserviert, die durch eine neue Unterschrift ersetzt wurden. Bitte gib einen anderen Grund an.",
     "document_in_use": "Dieses Einwilligungsdokument wird bereits verwendet und kann nicht gelöscht werden — stattdessen eine neue Version veröffentlichen.",
     "document_not_found": "Einwilligungsdokument nicht gefunden.",
     "target_member_unresolved": "Es konnte kein Ziel-Mitglied aus der Anfrage ermittelt werden.",

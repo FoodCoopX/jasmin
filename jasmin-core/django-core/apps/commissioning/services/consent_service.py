@@ -20,7 +20,11 @@ from django.core.mail import mail_admins
 from django.db import models, transaction
 from django.utils import timezone
 
-from ..errors import ConsentAlreadyRevoked, ConsentDocumentNotFound
+from ..errors import (
+    ConsentAlreadyRevoked,
+    ConsentDocumentNotFound,
+    ConsentRevokeReasonReserved,
+)
 from ..models import ConsentDocument, ConsentKind, ConsentRecord, Member
 
 # Map ``ConsentKind`` → the cache column on ``Member`` that the record
@@ -41,6 +45,12 @@ _CACHE_FIELD_BY_KIND: dict[str, str] = {
 _FLAG_ON_REVOKE: frozenset[str] = frozenset(
     {ConsentKind.PRIVACY, ConsentKind.WITHDRAWAL}
 )
+
+# ``revoked_reason`` of a record closed by ``supersede`` rather than withdrawn.
+# A stable token, not prose: the frontend recognises it and shows its own
+# translated label (``src/shared/consent/supersededConsent.ts``), and
+# ``revoke`` refuses it as a withdrawal reason so the two never mix.
+SUPERSEDED_REASON = "superseded"
 
 
 class ConsentService:
@@ -67,8 +77,12 @@ class ConsentService:
         Raises ``ConsentDocumentNotFound`` if no row matches, so the
         caller can render a clear "no policy uploaded yet" message
         instead of silently consenting the user to nothing.
+
+        ``as_of`` defaults to today's local date: validity windows are
+        calendar dates in ``TIME_ZONE``, and the payments app dates mandate
+        signatures with the same ``localdate``.
         """
-        as_of = as_of or timezone.now().date()
+        as_of = as_of or timezone.localdate()
         doc = (
             ConsentDocument.objects.filter(
                 kind=kind,
@@ -124,6 +138,37 @@ class ConsentService:
         return record
 
     # ------------------------------------------------------------------ #
+    # Supersede (a newer consent replaces the member's earlier ones)     #
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    @transaction.atomic
+    def supersede(*, member: Member, kind: str) -> int:
+        """Close the member's active records of ``kind`` ahead of a new one.
+
+        For kinds where only the latest consent means anything, like the SEPA
+        mandate: re-signing it records a new consent, and the earlier one no
+        longer authorises anything. Left active it would read as a second,
+        separate consent, and revoking it would switch off the current mandate.
+
+        Not a withdrawal: the records get ``SUPERSEDED_REASON``, and none of
+        ``revoke``'s side effects run (the SEPA hook, the office review flag).
+        Call it right before ``record``, in the same transaction. Returns how
+        many records were closed.
+        """
+        now = timezone.now()
+        active = ConsentRecord.objects.select_for_update(of=("self",)).filter(
+            member=member, document__kind=kind, revoked_at__isnull=True
+        )
+        closed = 0
+        for consent in active:
+            consent.revoked_at = now
+            consent.revoked_reason = SUPERSEDED_REASON
+            consent.save(update_fields=["revoked_at", "revoked_reason"])
+            closed += 1
+        ConsentService._sync_member_cache(member, kind)
+        return closed
+
+    # ------------------------------------------------------------------ #
     # Revoke (Art. 7(3) — withdraw consent)                              #
     # ------------------------------------------------------------------ #
     @staticmethod
@@ -137,6 +182,16 @@ class ConsentService:
         """Mark a consent revoked. Refreshes the Member cache to the
         next-latest unrevoked record (or NULL if no consent remains).
         """
+        if reason.strip().casefold() == SUPERSEDED_REASON:
+            raise ConsentRevokeReasonReserved(
+                "This reason is reserved for consents replaced by a new signature."
+            )
+        # The member row first, as when a SEPA mandate is signed (which
+        # supersedes this member's consents), so the two can't deadlock. Then
+        # the record as it stands now, not as the caller read it: a consent
+        # superseded meanwhile must not be withdrawn on top.
+        Member.objects.select_for_update().filter(pk=consent.member_id).first()
+        consent = ConsentRecord.objects.select_for_update().get(pk=consent.pk)
         if consent.revoked_at is not None:
             raise ConsentAlreadyRevoked(
                 f"ConsentRecord {consent.pk} was already revoked at "

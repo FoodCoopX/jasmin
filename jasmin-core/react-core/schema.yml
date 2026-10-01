@@ -3297,6 +3297,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConsentRecord'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
         '409':
           content:
             application/json:
@@ -3304,12 +3310,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Error response.
-        '400':
           content:
             application/json:
               schema:
@@ -26529,7 +26529,8 @@ paths:
       operationId: payments_billing_profiles_create
       description: |-
         Members read their own profile; office, admin and management read every
-        profile. Writes are office-only.
+        profile. Writes here are office-only: a member signs their own mandate
+        through ``MySepaMandateView``.
 
         Edits that touch any of the SEPA-mandate fields require step-up
         auth, because rewriting IBAN / mandate-reference could redirect a
@@ -26585,7 +26586,8 @@ paths:
       operationId: payments_billing_profiles_retrieve
       description: |-
         Members read their own profile; office, admin and management read every
-        profile. Writes are office-only.
+        profile. Writes here are office-only: a member signs their own mandate
+        through ``MySepaMandateView``.
 
         Edits that touch any of the SEPA-mandate fields require step-up
         auth, because rewriting IBAN / mandate-reference could redirect a
@@ -26629,7 +26631,8 @@ paths:
       operationId: payments_billing_profiles_update
       description: |-
         Members read their own profile; office, admin and management read every
-        profile. Writes are office-only.
+        profile. Writes here are office-only: a member signs their own mandate
+        through ``MySepaMandateView``.
 
         Edits that touch any of the SEPA-mandate fields require step-up
         auth, because rewriting IBAN / mandate-reference could redirect a
@@ -26697,7 +26700,8 @@ paths:
       operationId: payments_billing_profiles_partial_update
       description: |-
         Members read their own profile; office, admin and management read every
-        profile. Writes are office-only.
+        profile. Writes here are office-only: a member signs their own mandate
+        through ``MySepaMandateView``.
 
         Edits that touch any of the SEPA-mandate fields require step-up
         auth, because rewriting IBAN / mandate-reference could redirect a
@@ -26765,7 +26769,8 @@ paths:
       operationId: payments_billing_profiles_destroy
       description: |-
         Members read their own profile; office, admin and management read every
-        profile. Writes are office-only.
+        profile. Writes here are office-only: a member signs their own mandate
+        through ``MySepaMandateView``.
 
         Edits that touch any of the SEPA-mandate fields require step-up
         auth, because rewriting IBAN / mandate-reference could redirect a
@@ -27331,6 +27336,79 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/payments/my_sepa_mandate/:
+    post:
+      operationId: payments_my_sepa_mandate_create
+      description: Creates the authenticated member's billing profile with a SEPA
+        mandate, or re-signs a mandate that has never been used for a collection.
+        The signature date is today and the mandate reference is minted server-side;
+        re-signing keeps the reference only while the account stays the same. The
+        consent is recorded against `consent_document_id`, which must be the SEPA
+        mandate text in force today, and replaces the member's earlier SEPA consent.
+        Refused with 409 when the mandate has already been used for a collection (a
+        different account needs a new mandate from the office) or when the office
+        has deactivated the profile. Responds 201 when the profile was created, 200
+        when it existed. Step-up authentication is required.
+      summary: Sign the member's own SEPA mandate (self-service)
+      tags:
+      - Payments — Billing profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MySepaMandate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MySepaMandate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MySepaMandate'
+        required: true
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingProfileMember'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingProfileMember'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
           content:
             application/json:
               schema:
@@ -30013,6 +30091,67 @@ components:
           type: boolean
         notes:
           type: string
+        is_sepa_ready:
+          type: boolean
+          readOnly: true
+      required:
+      - member
+    BillingProfileMember:
+      type: object
+      description: |-
+        Member-facing read serializer for a member's OWN billing profile.
+
+        Identical to the office :class:`BillingProfileSerializer` but WITHOUT the
+        office-internal free-text ``notes``. ``read_only_fields`` guards writes,
+        not read exposure, so the office serializer would otherwise leak the
+        office's billing annotations to the member. It shapes what the member reads
+        back; the member's own mandate is written through ``MySepaMandateView``,
+        never through this serializer.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        member:
+          type: string
+        member_string:
+          type: string
+          readOnly: true
+        payment_method:
+          $ref: '#/components/schemas/PaymentMethodEnum'
+        iban:
+          type: string
+          writeOnly: true
+          maxLength: 34
+        account_holder:
+          type: string
+          writeOnly: true
+          maxLength: 200
+        iban_masked:
+          type: string
+          readOnly: true
+        account_holder_masked:
+          type: string
+          readOnly: true
+        sepa_mandate_reference:
+          type: string
+          nullable: true
+          maxLength: 35
+        sepa_mandate_signed_at:
+          type: string
+          format: date
+          nullable: true
+        sepa_mandate_first_use_at:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+          description: Set when first SEPA debit is exported. Drives FRST→RCUR.
+        sepa_mandate_paper_received_at:
+          type: string
+          format: date
+          nullable: true
+        is_active:
+          type: boolean
         is_sepa_ready:
           type: boolean
           readOnly: true
@@ -36196,6 +36335,26 @@ components:
           type: string
           nullable: true
           maxLength: 255
+    MySepaMandate:
+      type: object
+      description: |-
+        Request body for a member signing their own SEPA mandate.
+
+        Carries only what the member decides: the account, and which mandate text
+        they agreed to. The member, the signature date and the mandate reference are
+        set server-side.
+      properties:
+        iban:
+          type: string
+        account_holder:
+          type: string
+          maxLength: 200
+        consent_document_id:
+          type: string
+      required:
+      - account_holder
+      - consent_document_id
+      - iban
     MySubscriptionSubscribe:
       type: object
       description: |-

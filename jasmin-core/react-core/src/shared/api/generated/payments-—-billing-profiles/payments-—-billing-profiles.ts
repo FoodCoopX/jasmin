@@ -26,7 +26,9 @@ import type {
 
 import type {
   BillingProfile,
+  BillingProfileMember,
   ErrorResponse,
+  MySepaMandate,
   PaymentsBillingProfilesListParams,
   ReplaceMandate
 } from '.././models';
@@ -159,7 +161,8 @@ export function usePaymentsBillingProfilesList<TData = Awaited<ReturnType<typeof
 
 /**
  * Members read their own profile; office, admin and management read every
-profile. Writes are office-only.
+profile. Writes here are office-only: a member signs their own mandate
+through ``MySepaMandateView``.
 
 Edits that touch any of the SEPA-mandate fields require step-up
 auth, because rewriting IBAN / mandate-reference could redirect a
@@ -233,7 +236,8 @@ export const usePaymentsBillingProfilesCreate = <TError = ErrorResponse,
     }
     /**
  * Members read their own profile; office, admin and management read every
-profile. Writes are office-only.
+profile. Writes here are office-only: a member signs their own mandate
+through ``MySepaMandateView``.
 
 Edits that touch any of the SEPA-mandate fields require step-up
 auth, because rewriting IBAN / mandate-reference could redirect a
@@ -335,7 +339,8 @@ export function usePaymentsBillingProfilesRetrieve<TData = Awaited<ReturnType<ty
 
 /**
  * Members read their own profile; office, admin and management read every
-profile. Writes are office-only.
+profile. Writes here are office-only: a member signs their own mandate
+through ``MySepaMandateView``.
 
 Edits that touch any of the SEPA-mandate fields require step-up
 auth, because rewriting IBAN / mandate-reference could redirect a
@@ -409,7 +414,8 @@ export const usePaymentsBillingProfilesUpdate = <TError = ErrorResponse,
     }
     /**
  * Members read their own profile; office, admin and management read every
-profile. Writes are office-only.
+profile. Writes here are office-only: a member signs their own mandate
+through ``MySepaMandateView``.
 
 Edits that touch any of the SEPA-mandate fields require step-up
 auth, because rewriting IBAN / mandate-reference could redirect a
@@ -483,7 +489,8 @@ export const usePaymentsBillingProfilesPartialUpdate = <TError = ErrorResponse,
     }
     /**
  * Members read their own profile; office, admin and management read every
-profile. Writes are office-only.
+profile. Writes here are office-only: a member signs their own mandate
+through ``MySepaMandateView``.
 
 Edits that touch any of the SEPA-mandate fields require step-up
 auth, because rewriting IBAN / mandate-reference could redirect a
@@ -615,6 +622,71 @@ export const usePaymentsBillingProfilesReplaceMandateCreate = <TError = ErrorRes
       > => {
 
       const mutationOptions = getPaymentsBillingProfilesReplaceMandateCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Creates the authenticated member's billing profile with a SEPA mandate, or re-signs a mandate that has never been used for a collection. The signature date is today and the mandate reference is minted server-side; re-signing keeps the reference only while the account stays the same. The consent is recorded against `consent_document_id`, which must be the SEPA mandate text in force today, and replaces the member's earlier SEPA consent. Refused with 409 when the mandate has already been used for a collection (a different account needs a new mandate from the office) or when the office has deactivated the profile. Responds 201 when the profile was created, 200 when it existed. Step-up authentication is required.
+ * @summary Sign the member's own SEPA mandate (self-service)
+ */
+export const paymentsMySepaMandateCreate = (
+    mySepaMandate: MySepaMandate,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<BillingProfileMember | BillingProfileMember>(
+      {url: `/api/payments/my_sepa_mandate/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: mySepaMandate, signal
+    },
+      );
+    }
+  
+
+
+export const getPaymentsMySepaMandateCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandate}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandate}, TContext> => {
+
+const mutationKey = ['paymentsMySepaMandateCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, {data: MySepaMandate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  paymentsMySepaMandateCreate(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PaymentsMySepaMandateCreateMutationResult = NonNullable<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>>
+    export type PaymentsMySepaMandateCreateMutationBody = MySepaMandate
+    export type PaymentsMySepaMandateCreateMutationError = ErrorResponse
+
+    /**
+ * @summary Sign the member's own SEPA mandate (self-service)
+ */
+export const usePaymentsMySepaMandateCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandate}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>,
+        TError,
+        {data: MySepaMandate},
+        TContext
+      > => {
+
+      const mutationOptions = getPaymentsMySepaMandateCreateMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

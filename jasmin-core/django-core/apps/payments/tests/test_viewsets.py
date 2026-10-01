@@ -16,6 +16,8 @@ from xml.etree import ElementTree as ET
 
 import pytest
 import time_machine
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 
 from apps.commissioning.tests.factories import MemberFactory
@@ -168,6 +170,23 @@ class TestBillingProfileViewSet:
         assert resp.status_code == status.HTTP_403_FORBIDDEN
         billing_profile.refresh_from_db()
         assert billing_profile.is_active is True  # unchanged
+
+    def test_office_edit_reads_the_profile_under_lock(
+        self, api_client, tenant, billing_profile
+    ):
+        # The export stamps ``sepa_mandate_first_use_at`` under this lock. Read
+        # without it, an edit made during an export would save back the
+        # unstamped row it read before.
+        with CaptureQueriesContext(connection) as queries:
+            resp = api_client.patch(
+                f"{self.URL}{billing_profile.pk}/", {"notes": "called"}, format="json"
+            )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert any(
+            "FOR UPDATE" in query["sql"] and "payments_billingprofile" in query["sql"]
+            for query in queries.captured_queries
+        )
 
     def test_patch_notes_does_not_require_step_up(
         self, api_client, tenant, billing_profile

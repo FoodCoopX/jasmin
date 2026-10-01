@@ -17,6 +17,7 @@ import type {
   ConsentRecordRevoke,
 } from "@shared/api/generated/models";
 import { downloadConsentPdf } from "@shared/consent/downloadConsentPdf";
+import { isSupersededConsent } from "@shared/consent/supersededConsent";
 import { notify, unwrapList } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 import { useQueryClient } from "@tanstack/react-query";
@@ -204,15 +205,24 @@ const MemberConsentsCard = ({
                         {t("consent.consented_at")}:{" "}
                         {formatDateTimeWithFallback(record.consented_at, "—")}
                       </Text>
-                      {!active && record.revoked_at && (
-                        <Text type="danger">
-                          {t("consent.revoked_at")}:{" "}
-                          {formatDateTimeWithFallback(record.revoked_at, "—")}
-                          {record.revoked_reason
-                            ? ` — ${record.revoked_reason}`
-                            : ""}
-                        </Text>
-                      )}
+                      {!active &&
+                        record.revoked_at &&
+                        (isSupersededConsent(record) ? (
+                          // Closed by a newer consent of the same kind, not
+                          // withdrawn.
+                          <Text type="secondary">
+                            {t("consent.superseded_at")}:{" "}
+                            {formatDateTimeWithFallback(record.revoked_at, "—")}
+                          </Text>
+                        ) : (
+                          <Text type="danger">
+                            {t("consent.revoked_at")}:{" "}
+                            {formatDateTimeWithFallback(record.revoked_at, "—")}
+                            {record.revoked_reason
+                              ? ` — ${record.revoked_reason}`
+                              : ""}
+                          </Text>
+                        ))}
                     </Space>
                   }
                 />

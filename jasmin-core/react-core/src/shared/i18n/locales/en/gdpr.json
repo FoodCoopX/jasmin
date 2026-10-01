@@ -30,6 +30,7 @@
   "consents": "Consents",
   "consent_given_at": "Granted on",
   "consent_revoked_at": "Revoked on",
+  "consent_superseded_at": "Replaced by a new signature on",
   "no_consents": "No consents recorded.",
   "consent_kind_privacy": "Privacy Consent",
   "consent_kind_sepa": "SEPA Consent",

@@ -30,6 +30,7 @@
   "consents": "Einwilligungen",
   "consent_given_at": "Zugestimmt am",
   "consent_revoked_at": "Widerrufen am",
+  "consent_superseded_at": "Durch neue Unterschrift ersetzt am",
   "no_consents": "Keine Einwilligungen erfasst.",
   "consent_kind_privacy": "Datenschutz-Einwilligung",
   "consent_kind_sepa": "SEPA-Einwilligung",
