@@ -29,7 +29,7 @@ log() { echo "[deploy] $*"; }
 [ -f docker-compose.yml ] || die "no docker-compose.yml here — run from the repo root."
 command -v docker >/dev/null 2>&1 || die "docker not found — run scripts/bootstrap-server.sh first."
 docker info >/dev/null 2>&1 || die "can't talk to docker (add your user to the 'docker' group and re-login)."
-[ -f "$ENV_FILE" ] || die ".env not found — run scripts/init-env.sh first."
+[ -f "$ENV_FILE" ] || die ".env not found — restore the production .env from the password manager."
 
 # Read a value from .env (keeps everything after the first '=').
 envval() { grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2-; }

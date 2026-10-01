@@ -27,6 +27,14 @@
 #
 # The super-admin password is generated and PRINTED ONCE at the end — save it.
 # =============================================================================
+
+# Disabled. Production's secrets already exist and are kept in the password
+# manager. A replacement server restores that .env: running this instead would
+# mint new keys, and no encrypted backup or encrypted PII column could be read
+# with them. Delete these lines only to set up a genuinely new deployment.
+echo "init-env.sh is disabled: restore the production .env from the password manager instead." >&2
+exit 1
+
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
