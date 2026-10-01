@@ -317,7 +317,7 @@ jobs:
           docker run --rm \
             -v "$PWD/nginx:/work:ro" \
             -v /tmp/nginx_check.sh:/tmp/nginx_check.sh:ro \
-            nginx:1.27-alpine sh /tmp/nginx_check.sh
+            nginx:1.31-alpine sh /tmp/nginx_check.sh
 
   docker-smoke:
     name: Docker smoke (backend image builds + boots + serves)

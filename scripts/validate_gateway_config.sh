@@ -37,7 +37,7 @@ docker run --rm \
     -v "$REPO_ROOT/nginx/security_headers_admin.conf:/etc/nginx/security_headers_admin.conf:ro" \
     -v "${PROJECT}_certbot_conf:/etc/letsencrypt:ro" \
     -v "${PROJECT}_certbot_www:/var/www/certbot:ro" \
-    nginx:1.27-alpine \
+    nginx:1.31-alpine \
     sh -c "envsubst '\$FRONTEND_DOMAIN \$SUPER_ADMIN_SUBDOMAIN \$BACKEND_HOST \$BACKEND_PORT \$FRONTEND_HOST \$FRONTEND_PORT' \
            < /etc/nginx/templates/nginx.conf.template > /tmp/rendered.conf \
            && nginx -t -c /tmp/rendered.conf"
