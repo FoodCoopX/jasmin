@@ -37,9 +37,7 @@ class CapacityWeekEntrySerializer(serializers.Serializer):
     {occupied, free} shape instead of ``{[key: string]: unknown}``."""
 
     occupied = serializers.IntegerField()
-    # Always an int, since every capacity is NOT NULL; the published schema
-    # declares it nullable.
-    free = serializers.IntegerField(allow_null=True)
+    free = serializers.IntegerField()
 
 
 class DeliveryStationListSerializer(serializers.ListSerializer):

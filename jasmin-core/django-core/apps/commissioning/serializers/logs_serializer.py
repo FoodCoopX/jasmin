@@ -124,7 +124,7 @@ class StorageLoggingEntrySerializer(serializers.Serializer):
     including INVENTORY movements (physical stock counts).
 
     Fields that are null indicate they're not applicable for that entry type:
-    - Non-INVENTORY movements: washed, cleaned, for_* fields are None
+    - Non-INVENTORY movements: washed, cleaned, for_* and is_finalized are None
     - INVENTORY movements: cultivation_origin is None
     """
 
@@ -135,14 +135,15 @@ class StorageLoggingEntrySerializer(serializers.Serializer):
     )
     share_article = serializers.CharField()
     share_article_name = serializers.CharField()
-    amount = serializers.FloatField(allow_null=True)
+    amount = serializers.FloatField()
     unit = serializers.CharField()
     size = serializers.CharField()
+    # The ISO week and weekday of ``date``.
+    year = serializers.IntegerField()
+    delivery_week = serializers.IntegerField()
+    day_number = serializers.IntegerField()
 
     # INVENTORY-specific fields
-    year = serializers.IntegerField(allow_null=True, required=False)
-    delivery_week = serializers.IntegerField(allow_null=True, required=False)
-    day_number = serializers.IntegerField(allow_null=True, required=False)
     washed = serializers.BooleanField(allow_null=True, required=False)
     cleaned = serializers.BooleanField(allow_null=True, required=False)
     for_shares = serializers.BooleanField(allow_null=True, required=False)
@@ -156,4 +157,4 @@ class StorageLoggingEntrySerializer(serializers.Serializer):
     # Common fields
     note = serializers.CharField(allow_null=True, required=False)
     storage_name = serializers.CharField()
-    running_balance = serializers.FloatField(allow_null=True, required=False)
+    running_balance = serializers.FloatField()

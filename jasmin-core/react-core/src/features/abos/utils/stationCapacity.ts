@@ -76,7 +76,6 @@ export function stationDayTermCapacity(
         peakOccupied = Math.max(peakOccupied, week.occupied);
         if (week.occupied >= peakOccupied) peakWeekKey = key;
       }
-      if (week.free == null) continue;
       minFree = minFree == null ? week.free : Math.min(minFree, week.free);
     }
   }

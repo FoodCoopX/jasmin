@@ -25,25 +25,20 @@ export interface DeliveryNoteReseller {
   readonly sum_brutto?: string;
   /** @nullable */
   readonly reseller_name?: string | null;
-  /** @nullable */
-  readonly reseller_address?: string | null;
-  /** @nullable */
-  readonly reseller_zip?: string | null;
-  /** @nullable */
-  readonly reseller_city?: string | null;
+  readonly reseller_address?: string;
+  readonly reseller_zip?: string;
+  readonly reseller_city?: string;
   /** @nullable */
   readonly reseller_country?: string | null;
   readonly delivery_note_number?: string;
   readonly delivery_note_date?: string;
-  /** @nullable */
-  readonly order_number?: string | null;
+  readonly order_number?: string;
   /**
    * Order date via the shared ISO-week resolver (year/week/day_number).
    * @nullable
    */
   readonly order_date?: string | null;
-  /** @nullable */
-  readonly order_prefix?: string | null;
+  readonly order_prefix?: string;
   readonly created_at?: string;
   readonly is_finalized?: boolean;
   /** @nullable */

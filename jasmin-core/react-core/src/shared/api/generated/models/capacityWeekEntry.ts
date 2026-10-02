@@ -13,6 +13,5 @@ method builds plain dicts; this gives the generated client a typed
  */
 export interface CapacityWeekEntry {
   occupied: number;
-  /** @nullable */
-  free: number | null;
+  free: number;
 }

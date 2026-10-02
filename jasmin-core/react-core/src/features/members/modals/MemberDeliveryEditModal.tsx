@@ -94,7 +94,7 @@ const MemberDeliveryEditModal: FC<MemberDeliveryEditModalProps> = ({
   const selectOptions = useMemo(() => {
     const mapped = filteredOptions.map((stationDay) => {
       const cap = weekKey ? stationDay.capacity_by_week?.[weekKey] : undefined;
-      const isFull = cap != null && cap.free !== null && cap.free <= 0;
+      const isFull = cap != null && cap.free <= 0;
       return {
         value: stationDay.value,
         label: stationDay.label,

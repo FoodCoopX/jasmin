@@ -240,7 +240,7 @@ class SarResellerSerializer(serializers.Serializer):
     invoice_email = serializers.CharField(allow_blank=True, allow_null=True)
     note = serializers.CharField(allow_blank=True, allow_null=True)
 
-    contact = SarContactEntitySerializer(allow_null=True)
+    contact = SarContactEntitySerializer()
 
 
 # ---------------------------------------------------------------------------

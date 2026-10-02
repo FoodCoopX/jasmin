@@ -884,17 +884,14 @@ class DeliveryNoteResellerSerializer(
     reseller_address = serializers.CharField(
         source="order.reseller.contact.address",
         read_only=True,
-        allow_null=True,
     )
     reseller_zip = serializers.CharField(
         source="order.reseller.contact.zip_code",
         read_only=True,
-        allow_null=True,
     )
     reseller_city = serializers.CharField(
         source="order.reseller.contact.city",
         read_only=True,
-        allow_null=True,
     )
     reseller_country = serializers.CharField(
         source="order.reseller.contact.country",
@@ -909,13 +906,11 @@ class DeliveryNoteResellerSerializer(
     order_number = serializers.CharField(
         source="order.display_number",
         read_only=True,
-        allow_null=True,
     )
     order_date = serializers.SerializerMethodField()
     order_prefix = serializers.CharField(
         source="order.prefix",
         read_only=True,
-        allow_null=True,
     )
     # ``created_by_name`` comes from ``CreatedByNameMixin``.
 

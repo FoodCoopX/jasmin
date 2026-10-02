@@ -30885,7 +30885,6 @@ components:
           type: integer
         free:
           type: integer
-          nullable: true
       required:
       - free
       - occupied
@@ -32973,15 +32972,12 @@ components:
         reseller_address:
           type: string
           readOnly: true
-          nullable: true
         reseller_zip:
           type: string
           readOnly: true
-          nullable: true
         reseller_city:
           type: string
           readOnly: true
-          nullable: true
         reseller_country:
           type: string
           readOnly: true
@@ -32996,7 +32992,6 @@ components:
         order_number:
           type: string
           readOnly: true
-          nullable: true
         order_date:
           type: string
           format: date
@@ -33006,7 +33001,6 @@ components:
         order_prefix:
           type: string
           readOnly: true
-          nullable: true
         created_at:
           type: string
           format: date-time
@@ -39478,9 +39472,7 @@ components:
           type: string
           nullable: true
         contact:
-          allOf:
-          - $ref: '#/components/schemas/SarContactEntity'
-          nullable: true
+          $ref: '#/components/schemas/SarContactEntity'
       required:
       - contact
       - customer_number
@@ -41476,7 +41468,7 @@ components:
         including INVENTORY movements (physical stock counts).
 
         Fields that are null indicate they're not applicable for that entry type:
-        - Non-INVENTORY movements: washed, cleaned, for_* fields are None
+        - Non-INVENTORY movements: washed, cleaned, for_* and is_finalized are None
         - INVENTORY movements: cultivation_origin is None
       properties:
         id:
@@ -41495,20 +41487,16 @@ components:
         amount:
           type: number
           format: double
-          nullable: true
         unit:
           type: string
         size:
           type: string
         year:
           type: integer
-          nullable: true
         delivery_week:
           type: integer
-          nullable: true
         day_number:
           type: integer
-          nullable: true
         washed:
           type: boolean
           nullable: true
@@ -41538,17 +41526,20 @@ components:
         running_balance:
           type: number
           format: double
-          nullable: true
       required:
       - amount
       - date
+      - day_number
+      - delivery_week
       - id
+      - running_balance
       - share_article
       - share_article_name
       - size
       - storage_name
       - type
       - unit
+      - year
     SubjectAccessBundle:
       type: object
       description: |-

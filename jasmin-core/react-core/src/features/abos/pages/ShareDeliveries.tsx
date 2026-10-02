@@ -300,8 +300,8 @@ export default function ShareDeliveries() {
                   : "";
               // Grey out (disable) a full station-day for this week, but keep
               // the row's currently-assigned one selectable so an edit isn't
-              // blocked. ``free === null`` = no capacity limit → always free.
-              const isFull = cap != null && cap.free !== null && cap.free <= 0;
+              // blocked.
+              const isFull = cap != null && cap.free <= 0;
               const isCurrent =
                 stationDay.value === record.delivery_station_day;
               return {

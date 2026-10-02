@@ -474,7 +474,6 @@ export * from './sarMemberEmail';
 export * from './sarMemberLoan';
 export * from './sarOrder';
 export * from './sarReseller';
-export * from './sarResellerContact';
 export * from './sarSubject';
 export * from './sarSubjectEmail';
 export * from './sarSubscription';

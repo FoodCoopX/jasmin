@@ -11,7 +11,7 @@
 including INVENTORY movements (physical stock counts).
 
 Fields that are null indicate they're not applicable for that entry type:
-- Non-INVENTORY movements: washed, cleaned, for_* fields are None
+- Non-INVENTORY movements: washed, cleaned, for_* and is_finalized are None
 - INVENTORY movements: cultivation_origin is None
  */
 export interface StorageLoggingEntry {
@@ -22,16 +22,12 @@ export interface StorageLoggingEntry {
   type: string;
   share_article: string;
   share_article_name: string;
-  /** @nullable */
-  amount: number | null;
+  amount: number;
   unit: string;
   size: string;
-  /** @nullable */
-  year?: number | null;
-  /** @nullable */
-  delivery_week?: number | null;
-  /** @nullable */
-  day_number?: number | null;
+  year: number;
+  delivery_week: number;
+  day_number: number;
   /** @nullable */
   washed?: boolean | null;
   /** @nullable */
@@ -49,6 +45,5 @@ export interface StorageLoggingEntry {
   /** @nullable */
   note?: string | null;
   storage_name: string;
-  /** @nullable */
-  running_balance?: number | null;
+  running_balance: number;
 }

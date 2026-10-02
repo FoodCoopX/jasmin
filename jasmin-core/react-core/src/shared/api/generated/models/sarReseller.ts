@@ -5,7 +5,7 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
-import type { SarResellerContact } from './sarResellerContact';
+import type { SarContactEntity } from './sarContactEntity';
 
 /**
  * Full ``apps.commissioning.models.Reseller`` row + nested
@@ -54,6 +54,5 @@ export interface SarReseller {
   invoice_email: string | null;
   /** @nullable */
   note: string | null;
-  /** @nullable */
-  contact: SarResellerContact;
+  contact: SarContactEntity;
 }

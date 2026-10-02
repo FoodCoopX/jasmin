@@ -99,10 +99,7 @@ export default function LoggingStorage() {
   const data = useMemo(() => {
     const rows: StorageLoggingEntry[] = rawData ?? [];
     if (!hideInactiveStorage) return rows;
-    return rows.filter((r) => {
-      if (r.amount === null || r.amount === undefined) return true;
-      return parseFloat(String(r.amount)) !== 0;
-    });
+    return rows.filter((r) => r.amount !== 0);
   }, [rawData, hideInactiveStorage]);
 
   // Workflow via RQ
@@ -248,32 +245,13 @@ export default function LoggingStorage() {
       dataIndex: "date",
       key: "date",
       width: "10em",
-      render: (_: unknown, record: StorageLoggingEntry) => {
-        if (
-          record.year != null &&
-          record.delivery_week != null &&
-          record.day_number != null
-        ) {
-          const date = dateForWeekDayNumber(
-            record.year,
-            record.delivery_week,
-            record.day_number,
-          );
-          return formatDate(date);
-        }
-        return record.date ? formatDate(record.date) : "-";
-      },
-      sorter: (a: StorageLoggingEntry, b: StorageLoggingEntry) => {
-        const dateA =
-          a.year != null && a.delivery_week != null && a.day_number != null
-            ? dateForWeekDayNumber(a.year, a.delivery_week, a.day_number)
-            : dayjs(a.date);
-        const dateB =
-          b.year != null && b.delivery_week != null && b.day_number != null
-            ? dateForWeekDayNumber(b.year, b.delivery_week, b.day_number)
-            : dayjs(b.date);
-        return dateA.unix() - dateB.unix();
-      },
+      render: (_: unknown, record: StorageLoggingEntry) =>
+        formatDate(
+          dateForWeekDayNumber(record.year, record.delivery_week, record.day_number),
+        ),
+      sorter: (a: StorageLoggingEntry, b: StorageLoggingEntry) =>
+        dateForWeekDayNumber(a.year, a.delivery_week, a.day_number).unix() -
+        dateForWeekDayNumber(b.year, b.delivery_week, b.day_number).unix(),
       defaultSortOrder: "descend",
     },
     {
@@ -310,19 +288,14 @@ export default function LoggingStorage() {
       key: "amount",
       width: "7em",
       align: "right",
-      render: (amount: number | null, record: StorageLoggingEntry) => {
-        if (amount === null || amount === undefined) return "-";
-        const numAmount = parseFloat(String(amount));
+      render: (amount: number, record: StorageLoggingEntry) => {
         if (record.type === "STOCK_COUNT") {
-          return (
-            <span style={{ fontWeight: "bold" }}>{format(numAmount, 2)}</span>
-          );
+          return <span style={{ fontWeight: "bold" }}>{format(amount, 2)}</span>;
         }
-        const isNegative = numAmount < 0;
         return (
-          <span className={isNegative ? "text-error" : "text-success"}>
-            {numAmount > 0 ? "+" : ""}
-            {format(numAmount, 2)}
+          <span className={amount < 0 ? "text-error" : "text-success"}>
+            {amount > 0 ? "+" : ""}
+            {format(amount, 2)}
           </span>
         );
       },
@@ -333,15 +306,11 @@ export default function LoggingStorage() {
       key: "running_balance",
       width: "8em",
       align: "right",
-      render: (balance: number | null) => {
-        if (balance === null || balance === undefined) return "-";
-        const num = parseFloat(String(balance));
-        return (
-          <span className={num < 0 ? "text-error" : undefined}>
-            {format(num, 2)}
-          </span>
-        );
-      },
+      render: (balance: number) => (
+        <span className={balance < 0 ? "text-error" : undefined}>
+          {format(balance, 2)}
+        </span>
+      ),
     },
     // EditableColumnConfig-based unit/size columns reused inside a plain AntD
     // table — structurally compatible cells, widened once at the spread.
