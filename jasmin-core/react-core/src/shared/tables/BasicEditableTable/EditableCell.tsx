@@ -269,7 +269,7 @@ const EditingCell = <T extends TableRecord = TableRecord>({
   }
 
   const getErrorMessage = (): string | undefined => {
-    const fieldError = form?.getFieldError(dataIndex)?.[0];
+    const fieldError = form?.getFieldError(dataIndex)[0];
     const customError = formErrors[dataIndex];
     return fieldError || customError;
   };

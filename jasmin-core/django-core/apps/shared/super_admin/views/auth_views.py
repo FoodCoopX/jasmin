@@ -40,7 +40,7 @@ from ..errors import (
 )
 from ..lockout import is_locked, register_failure, reset_failures
 from ..models import SuperAdmin, SuperAdminBlacklistedToken
-from ..permissions import IsSuperAdmin
+from ..permissions import IsSuperAdmin, super_admin_user
 from ..serializers import (
     SessionTenantSerializer,
     SessionUserSerializer,
@@ -444,8 +444,8 @@ def super_admin_step_up_view(request: Request) -> Response:
 
     from apps.accounts.errors import InvalidCredentials
 
-    user = request.user
-    email = getattr(user, "email", "")
+    user = super_admin_user(request)
+    email = user.email
 
     # Step-up re-verifies the login credential, so its failures spend the same
     # per-account budget the login view keeps: one counter per credential, not
@@ -460,13 +460,11 @@ def super_admin_step_up_view(request: Request) -> Response:
         register_failure(email)
         logger.warning(
             "superadmin.step_up.verify_failed user=%s",
-            email or "-",
+            email,
         )
         raise InvalidCredentials("Incorrect password.")
 
-    current_payload = (
-        getattr(request.auth, "payload", None) if request.auth else None
-    ) or {}
+    current_payload = getattr(request.auth, "payload", None) or {}
     access = AccessToken()
     for claim in _STEP_UP_CARRY_CLAIMS:
         if claim in current_payload:
@@ -476,7 +474,7 @@ def super_admin_step_up_view(request: Request) -> Response:
     reset_failures(email)
     logger.info(
         "superadmin.step_up.verified user=%s ttl=%ss",
-        email or "-",
+        email,
         settings.STEP_UP_TTL_SECONDS,
     )
     return Response(

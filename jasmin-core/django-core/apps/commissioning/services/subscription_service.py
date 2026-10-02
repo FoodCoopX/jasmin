@@ -47,10 +47,8 @@ logger = logging.getLogger(__name__)
 
 def _delivery_cycle_of(subscription: Subscription) -> str | None:
     """The ``ShareType.delivery_cycle`` governing this subscription's cadence,
-    or ``None`` (→ weekly) when any link in the chain is missing."""
-    variation = getattr(subscription, "share_type_variation", None)
-    share_type = getattr(variation, "share_type", None)
-    return getattr(share_type, "delivery_cycle", None)
+    or ``None`` (→ weekly) when the share type sets none."""
+    return subscription.share_type_variation.share_type.delivery_cycle
 
 
 class SubscriptionService:
@@ -73,10 +71,7 @@ class SubscriptionService:
         if not delivery_station_day or not valid_from:
             return
 
-        if (
-            delivery_station_day.valid_from
-            and delivery_station_day.valid_from > valid_from
-        ):
+        if delivery_station_day.valid_from > valid_from:
             raise SubscriptionDeliveryStationDayOutOfRange(
                 f"Delivery station day starts ({delivery_station_day.valid_from}) "
                 f"after subscription start ({valid_from})",
@@ -297,9 +292,9 @@ class SubscriptionService:
         weeks, so past occupancy the office can no longer change never blocks
         the confirm. Past deliveries are billed like any other delivery.
         """
-        if not subscription.valid_from or not subscription.valid_until:
+        if not subscription.valid_until:
             logger.info(
-                "Subscription %s missing valid_from/until; skipping materialise",
+                "Subscription %s missing valid_until; skipping materialise",
                 subscription.pk,
             )
             return subscription
@@ -655,7 +650,7 @@ class SubscriptionService:
         open-ended, else the per-week successor resolved from the station's
         time-bounded chain (mirrors the resolution in
         ``_create_share_deliveries``). Empty when the subscription consumes no
-        station-day (no default DSD or missing dates).
+        station-day (no default DSD or no ``valid_until``).
 
         Capacity enforcement uses this so it reserves/checks the SAME DSD that
         materialization will write to, not just the default DSD. Capacity
@@ -664,11 +659,7 @@ class SubscriptionService:
         ``_delivery_weeks_excluding_paused``).
         """
         default_delivery_station_day = subscription.default_delivery_station_day
-        if (
-            not default_delivery_station_day
-            or not subscription.valid_from
-            or not subscription.valid_until
-        ):
+        if not default_delivery_station_day or not subscription.valid_until:
             return {}
 
         year_weeks = SubscriptionService._delivery_weeks_excluding_paused(
@@ -823,9 +814,7 @@ class SubscriptionService:
         # Without this, an on-by-default opt-in variation would be born opted-OUT
         # — silently suppressing both its billing and its production demand.
         variation = subscription.share_type_variation
-        is_opted_in = bool(
-            variation and variation.requires_optin and variation.default_optin_state
-        )
+        is_opted_in = bool(variation.requires_optin and variation.default_optin_state)
 
         # Single source of truth for the (year, week) -> DSD mapping: the same
         # resolver the capacity paths reserve/check against, so materialisation

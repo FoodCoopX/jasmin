@@ -240,8 +240,6 @@ class PreviewMixin:
         branch in ``_anonymize_reseller_for_user`` (a contact shared with
         another Reseller or a DeliveryStation is kept, not scrubbed)."""
         contact = reseller.contact
-        if contact is None:
-            return False
         shared = (
             Reseller.objects.filter(contact=contact).exclude(pk=reseller.pk).exists()
             or DeliveryStation.objects.filter(contact=contact).exists()

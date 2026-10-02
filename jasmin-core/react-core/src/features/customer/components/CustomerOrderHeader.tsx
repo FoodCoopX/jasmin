@@ -89,7 +89,7 @@ export default function CustomerOrderHeader({ reseller, logoUrl }: Props) {
               }}
             >
               <img
-                src={logoUrl ?? undefined}
+                src={logoUrl}
                 alt={tenantName ?? t("common.logo")}
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />

@@ -48,7 +48,7 @@ class _TheoreticalBaseViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
         # The recency window trims the LIST payload only — a detail route must
         # still reach a row outside it, or editing/deleting an older entry 404s.
-        if getattr(self, "action", None) == "list":
+        if self.action == "list":
             today = timezone.localdate()
             current_year, current_week = today.isocalendar()[:2]
             if year is None:

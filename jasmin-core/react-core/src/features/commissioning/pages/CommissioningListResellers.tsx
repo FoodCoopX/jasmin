@@ -225,7 +225,7 @@ export default function CommissioningListResellers() {
                 title={
                   <div className="reseller-card-header">
                     <span>{reseller.name}</span>
-                    {reseller.order?.note && (
+                    {reseller.order.note && (
                       <span className="reseller-card-header-note">
                         — {reseller.order.note}
                       </span>
@@ -240,7 +240,7 @@ export default function CommissioningListResellers() {
                       marginTop: -8,
                     }}
                   >
-                    {(reseller.order?.contents ?? []).map((item) => {
+                    {reseller.order.contents.map((item) => {
                       const amount = Number(item.amount);
                       const amountPerPu = Number(item.amount_per_pu);
                       const puCount =
@@ -326,7 +326,7 @@ export default function CommissioningListResellers() {
                   <Table
                     className="custom-jasmin-table"
                     columns={columns}
-                    dataSource={reseller.order?.contents}
+                    dataSource={reseller.order.contents}
                     rowKey="share_article_id"
                     loading={loadingResellers}
                     pagination={false}

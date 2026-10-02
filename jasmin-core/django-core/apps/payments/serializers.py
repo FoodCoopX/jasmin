@@ -15,7 +15,7 @@ from .errors import IbanLocked, MandateReferenceLocked, SepaMandateSignedInFutur
 from .models import BillingProfile, BillingRun, ChargeSchedule
 
 
-def normalized_iban(value) -> str:
+def normalized_iban(value: str) -> str:
     """Canonical form of an IBAN: no whitespace, upper-case.
 
     An IBAN identifies the same account however it is typed. The office pastes
@@ -30,7 +30,7 @@ def normalized_iban(value) -> str:
     one. Normalising on the way in keeps the comparison form and the stored
     form the same.
     """
-    return "".join(str(value or "").split()).upper()
+    return "".join(value.split()).upper()
 
 
 def validate_mandate_signature_date(value):
@@ -242,7 +242,6 @@ class ChargeScheduleSerializer(serializers.ModelSerializer):
     member_name = serializers.SerializerMethodField()
     member_number = serializers.IntegerField(
         source="member.member_number",
-        default=None,
         read_only=True,
         allow_null=True,
     )
@@ -284,15 +283,9 @@ class ChargeScheduleSerializer(serializers.ModelSerializer):
 
     def get_subscription_label(self, obj: ChargeSchedule) -> str:
         """Clean label without the (physical/virtual) variation_type suffix."""
-        share_type_variation = getattr(obj.subscription, "share_type_variation", None)
-        if share_type_variation is None:
-            return str(obj.subscription)
-        share_type = getattr(share_type_variation, "share_type", "")
-        size = (
-            share_type_variation.get_size_display()
-            if hasattr(share_type_variation, "get_size_display")
-            else ""
-        )
+        share_type_variation = obj.subscription.share_type_variation
+        share_type = share_type_variation.share_type
+        size = share_type_variation.get_size_display()
         return f"{share_type} – {size}".strip(" –")
 
 

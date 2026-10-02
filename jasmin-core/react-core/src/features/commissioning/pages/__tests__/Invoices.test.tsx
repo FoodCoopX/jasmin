@@ -257,8 +257,8 @@ function makeRow(overrides: Partial<Record<string, unknown>> = {}) {
     invoice_number: "RE-2026-001",
     invoice_storno_id: null,
     // delivery_note_id is REQUIRED — the page's filteredData useMemo
-    // drops rows where this is null/undefined, so without it the table
-    // never sees the row.
+    // drops rows where this is null, so with a null id the table never
+    // sees the row.
     delivery_note_id: "dn-77",
     delivery_note_date: "2026-05-21",
     delivery_note_number: "LS-2026-001",

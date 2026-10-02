@@ -143,4 +143,4 @@ class DeliveryExceptionPeriod(JasminModel, TimeBoundMixin):
         for the started portion already stand, so it may not be edited or
         deleted (only future, not-yet-started pauses are mutable)."""
         today = on or timezone.localdate()
-        return self.valid_from is not None and self.valid_from <= today
+        return self.valid_from <= today

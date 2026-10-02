@@ -15,7 +15,6 @@ import {
   SettingsRenderer,
 } from "@features/configuration/components/SettingsRenderer";
 import {
-  DEFAULT_UI_SETTINGS,
   splitSettingsForSave,
   tenantToSaveablePayload,
   TENANT_SETTINGS_OVERLAY_KEYS,
@@ -39,12 +38,6 @@ export default function ConfigurationApp() {
     "uploads_weekly_share_amount",
     false,
   ) as boolean;
-
-  // Default settings
-  const defaultSettings = DEFAULT_UI_SETTINGS as unknown as Record<
-    string,
-    unknown
-  >;
 
   const settingsConfig = useMemo<SettingsCategory[]>(
     () => [
@@ -236,15 +229,15 @@ export default function ConfigurationApp() {
     // Don't overwrite local changes
     if (hasChanges || saving) return;
 
-    const currentSettings = tenant
-      ? tenantToUISettings(tenant as Record<string, unknown>)
-      : defaultSettings;
+    const currentSettings = tenantToUISettings(
+      tenant as Record<string, unknown>,
+    );
 
     // Hydrate the versioned ``TenantSettings`` overlay values from the merged
     // ``settings`` dict the backend exposes on ``current-tenant`` so the form
     // shows the persisted value (and not just the default).
     const tenantSettingsOverlay =
-      ((tenant as Record<string, unknown>)?.settings as
+      ((tenant as Record<string, unknown>).settings as
         | Record<string, unknown>
         | undefined) || {};
     for (const overlayKey of TENANT_SETTINGS_OVERLAY_KEYS) {

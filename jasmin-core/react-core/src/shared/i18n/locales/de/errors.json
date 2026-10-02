@@ -255,7 +255,6 @@
     "missing_fields": "Bitte alle Pflichtfelder ausfüllen.",
     "refresh_missing": "Sitzung abgelaufen — bitte erneut anmelden.",
     "tenant_mismatch": "Dieser Account gehört nicht zu diesem Mandanten.",
-    "tenant_missing": "Mandant nicht angegeben.",
     "account_blocked": "Dieser Account ist gesperrt.",
     "self_registration_disabled": "Die Selbst-Registrierung ist für diese Organisation deaktiviert.",
     "step_up_required": "Für diese Aktion ist eine erneute Bestätigung der Identität erforderlich.",

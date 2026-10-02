@@ -94,7 +94,7 @@ class SharesDeliveryDaySerializer(serializers.ModelSerializer):
         create / update path (no list parent, or a bulk-batch failure) falls
         through to the per-instance check — identical result.
         """
-        parent = getattr(self, "parent", None)
+        parent = self.parent
         if (
             isinstance(parent, SharesDeliveryDayListSerializer)
             and not parent._bulk_failed

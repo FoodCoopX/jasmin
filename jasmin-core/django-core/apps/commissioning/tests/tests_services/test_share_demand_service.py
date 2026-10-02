@@ -450,10 +450,10 @@ class TestShareDemandServiceDispatcher:
 
     def test_resolve_backend_falls_back_to_schema_name(self, tenant):
         # On the Huey worker, connection.tenant under schema_context is a
-        # FakeTenant (not a Tenant model), so get_current_settings(FakeTenant)
-        # matches nothing and the backend silently wrongly falls back to
-        # subscriptions. _resolve_backend must resolve the real Tenant by
-        # schema_name instead. Simulate the non-Tenant connection.tenant.
+        # FakeTenant (not a Tenant model). The backend must still come from the
+        # real tenant's settings, found by schema_name, or an external-CSV
+        # tenant falls back to subscriptions. Simulate the non-Tenant
+        # connection.tenant.
         import datetime
 
         from django.db import connection

@@ -162,9 +162,7 @@ class Reseller(JasminModel):
         ]
 
     def __str__(self) -> str:
-        if self.contact:
-            return str(self.contact)
-        return f"Reseller #{self.customer_number or self.get_display_id()}"
+        return str(self.contact)
 
     # ── Payment-condition resolution ────────────────────────────────────
     # ``get_payment_terms_days`` / ``get_early_payment_discount`` are the
@@ -202,8 +200,8 @@ class Reseller(JasminModel):
         if settings is None:
             return (None, None)
         return (
-            getattr(settings, "early_payment_discount_percent", None),
-            getattr(settings, "early_payment_discount_days", None),
+            settings.early_payment_discount_percent,
+            settings.early_payment_discount_days,
         )
 
     @staticmethod
@@ -211,14 +209,10 @@ class Reseller(JasminModel):
         # Lazy import — ``apps.commissioning`` is the "to-be-extracted"
         # tenant app, so we keep the cross-app import out of the module
         # namespace per CLAUDE.md ("isolation is one-way").
-        from django.db import connection
-
         from apps.shared.tenants.models import TenantSettings
+        from core.tenant_db import connection
 
-        tenant = getattr(connection, "tenant", None)
-        if tenant is None:
-            return None
-        return TenantSettings.get_current_settings(tenant)
+        return TenantSettings.get_current_settings(connection.tenant)
 
 
 class OrganicCertificate(JasminModel, TimeBoundMixin):
@@ -385,8 +379,6 @@ class Offer(FinalizableMixin, FinalizedProtectedMixin, JasminModel):
         return f"{self.share_article.name} [{self.unit}] - ({self.amount_per_pu} {self.unit}/VPE)"
 
     def update_available_amount(self, ordered_amount: Decimal | int | float) -> None:
-        if self.amount is None:
-            raise ValidationError("No available amount set for this offer")
         ordered_amount = Decimal(str(ordered_amount))
 
         if self.amount < ordered_amount:
@@ -397,8 +389,6 @@ class Offer(FinalizableMixin, FinalizedProtectedMixin, JasminModel):
         self.save(update_fields=["amount"])
 
     def check_availability(self, requested_amount: Decimal | int | float) -> bool:
-        if self.amount is None:
-            return False
         return self.amount >= Decimal(str(requested_amount))
 
 
@@ -628,7 +618,7 @@ class OrderContent(FinalizableMixin, FinalizedProtectedMixin, OrderableItem):
         """
         if self.share_article_id:
             return self.share_article
-        if self.offer and self.offer.share_article_id:
+        if self.offer_id:
             return self.offer.share_article
         return None
 
@@ -715,7 +705,7 @@ class CrateOrderContent(
         now-empty order too. Crates attached via ``order_content`` rather
         than directly to ``order`` rely on the OrderContent cascade.
         """
-        order = self.order or (self.order_content.order if self.order_content else None)
+        order = self.order or self.order_content.order
         result = super().delete(*args, **kwargs)
         delete_parent_if_childless(order, ["ordercontent_set", "crateordercontent_set"])
         return result
@@ -1253,22 +1243,22 @@ class InvoiceReseller(
         resolution). Frozen into ``recipient_snapshot`` at finalization (see
         ``resolved_recipient``); not read directly off a finalized invoice."""
         reseller = self.reseller
-        contact = getattr(reseller, "contact", None)
+        contact = reseller.contact
 
         def pick(invoice_attr: str, contact_attr: str):
-            value = getattr(reseller, invoice_attr, None)
+            value = getattr(reseller, invoice_attr)
             if value:
                 return value
-            return getattr(contact, contact_attr, None) if contact else None
+            return getattr(contact, contact_attr)
 
         return {
             "name": pick("invoice_name", "name"),
-            "name2": getattr(reseller, "invoice_name2", None),
+            "name2": reseller.invoice_name2,
             "address": pick("invoice_address", "address"),
             "zip": pick("invoice_plz", "zip_code"),
             "city": pick("invoice_city", "city"),
-            "country": getattr(contact, "country", None) if contact else None,
-            "uid": getattr(contact, "uid", None) if contact else None,
+            "country": contact.country,
+            "uid": contact.uid,
         }
 
     def _get_tenant_settings_fields(self) -> tuple[str, str]:

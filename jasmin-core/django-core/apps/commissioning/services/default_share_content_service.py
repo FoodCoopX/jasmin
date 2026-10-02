@@ -7,7 +7,6 @@ from typing import Any
 
 from django.db import transaction
 from django.db.models import QuerySet, Sum
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 from isoweek import Week
 
@@ -211,12 +210,11 @@ class DefaultShareContentService:
         direct_by_variation: dict[str, Decimal] = {}
         for row in (
             active_subs.values("share_type_variation_id")
-            .annotate(total=Coalesce(Sum("quantity"), 0))
+            .annotate(total=Sum("quantity"))
             .order_by()
         ):
             var_id = row["share_type_variation_id"]
-            if var_id is not None:
-                direct_by_variation[str(var_id)] = Decimal(row["total"])
+            direct_by_variation[str(var_id)] = Decimal(row["total"])
 
         components_by_physical: dict[str, list[tuple[str, Decimal]]] = {}
         virtual_ids: set[str] = set()
@@ -237,7 +235,7 @@ class DefaultShareContentService:
             future_by_var: dict[str, list[tuple[datetime.date, int]]] = defaultdict(
                 list
             )
-            for var_id, valid_from, quantity in Subscription.current.filter(
+            for var_id, valid_from, subscribed_quantity in Subscription.current.filter(
                 share_type_variation_id__in=zero_vars,
                 valid_from__gt=snapshot_date,
             ).values_list(
@@ -245,8 +243,7 @@ class DefaultShareContentService:
                 "valid_from",
                 "quantity",
             ):
-                if var_id is not None:
-                    future_by_var[str(var_id)].append((valid_from, quantity or 0))
+                future_by_var[str(var_id)].append((valid_from, subscribed_quantity))
             for var_id, rows in future_by_var.items():
                 earliest = min(valid_from for valid_from, _ in rows)
                 direct_by_variation[var_id] = Decimal(
@@ -741,7 +738,7 @@ class DefaultShareContentService:
             return 0
 
         def _active_at(obj: Any, on_date: datetime.date) -> bool:
-            if obj.valid_from and obj.valid_from > on_date:
+            if obj.valid_from > on_date:
                 return False
             return obj.valid_until is None or obj.valid_until >= on_date
 
@@ -954,8 +951,7 @@ class DefaultShareContentService:
         for content in all_contents:
             key = (content.share_article_id, content.unit, content.size)
             grouped.setdefault(key, []).append(content)
-            if content.share_type_variation_id is not None:
-                variation_ids.add(str(content.share_type_variation_id))
+            variation_ids.add(str(content.share_type_variation_id))
 
         # Precompute active-subscriber counts ONCE for every variation on the
         # page. ``_calculate_needed_amount`` would otherwise re-query per group
@@ -1000,7 +996,7 @@ class DefaultShareContentService:
                 subscriber_counts=subscriber_counts,
             )
 
-            result: dict[str, Any] = {
+            row: dict[str, Any] = {
                 "id": f"{year}_{sa_id}_{unit_val}_{size_val}",
                 "year": year,
                 "share_article": sa_id,
@@ -1017,8 +1013,8 @@ class DefaultShareContentService:
                 "seller": str(first.seller_id) if first.seller_id else None,
                 "seller_name": str(first.seller) if first.seller_id else None,
             }
-            result.update(amounts_dict)
-            results.append(result)
+            row.update(amounts_dict)
+            results.append(row)
 
         return results
 

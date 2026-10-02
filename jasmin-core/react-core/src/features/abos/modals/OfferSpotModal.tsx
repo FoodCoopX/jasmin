@@ -58,7 +58,7 @@ export function OfferSpotModal({
   }, [open, record, suggestedPrice]);
 
   const term =
-    record?.valid_from && record?.valid_until
+    record?.valid_from && record.valid_until
       ? `${formatDate(record.valid_from)} – ${formatDate(record.valid_until)}`
       : record?.valid_from
         ? formatDate(record.valid_from)

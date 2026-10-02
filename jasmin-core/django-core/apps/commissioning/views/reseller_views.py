@@ -20,7 +20,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import RequiresStepUp
 from apps.authz.permissions import APIViewRolePermissionsMixin, IsOffice, IsStaff
-from apps.shared.request_utils import body
+from apps.shared.request_utils import auth_user, body
 from core.errors import ConflictError, NotFoundError
 from core.serializers import ErrorResponseSerializer
 
@@ -140,9 +140,9 @@ def _run_per_order_bulk(
     ``handler(order, results, errors)`` does one order's work: it appends a
     success row to ``results`` and may append business-rule rejections to
     ``errors`` directly (then ``return`` to skip the order). Any
-    ``ValidationError`` / ``ConflictError`` / DB / type error it raises is
-    caught here and recorded as a per-order error, so a single bad order never
-    aborts the whole batch.
+    ``ValidationError`` / ``ConflictError`` / DB error / ``ValueError`` it
+    raises is caught here and recorded as a per-order error, so a single bad
+    order never aborts the whole batch.
     """
     results: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
@@ -165,8 +165,6 @@ def _run_per_order_bulk(
             ConflictError,
             DatabaseError,
             ValueError,
-            TypeError,
-            AttributeError,
         ),
         on_error=record_error,
     )
@@ -788,9 +786,7 @@ class CombinedOrderOverviewView(APIViewRolePermissionsMixin, APIView):
         )
 
         # Apply filters if provided
-        filters: dict[str, Any] = {}
-        if year:
-            filters["year"] = year
+        filters: dict[str, Any] = {"year": year}
         if delivery_week:
             filters["delivery_week"] = delivery_week
         if day_number is not None:
@@ -798,8 +794,7 @@ class CombinedOrderOverviewView(APIViewRolePermissionsMixin, APIView):
         if reseller_id:
             filters["reseller__id"] = reseller_id
 
-        if filters:
-            orders = orders.filter(**filters)
+        orders = orders.filter(**filters)
 
         # Order by most recent first
         orders = list(orders.order_by("-year", "-delivery_week", "-day_number"))
@@ -900,7 +895,7 @@ class CombinedOrderOverviewView(APIViewRolePermissionsMixin, APIView):
             "order_is_finalized": order.is_finalized,
             "sum_netto": self._get_total_price(invoice, delivery_note, order),
             # Reseller information
-            "reseller_id": str(order.reseller.id) if order.reseller else None,
+            "reseller_id": str(order.reseller_id),
             "reseller_name": self._get_reseller_name(order),
             # Delivery note information
             "has_delivery_note": delivery_note is not None,
@@ -973,12 +968,12 @@ class CombinedOrderOverviewView(APIViewRolePermissionsMixin, APIView):
 
     def _calculate_order_date(
         self,
-        year: int | None,
-        delivery_week: int | None,
+        year: int,
+        delivery_week: int,
         day_number: int | None,
     ) -> Any:
         """Calculate order date from year, week, and day_number."""
-        if year is None or delivery_week is None or day_number is None:
+        if day_number is None:
             return None
 
         try:
@@ -987,22 +982,16 @@ class CombinedOrderOverviewView(APIViewRolePermissionsMixin, APIView):
             # Out-of-range week/day_number inputs — caller treats None as "no date".
             return None
 
-    def _get_total_price(self, invoice, delivery_note, order) -> str | None:
+    def _get_total_price(self, invoice, delivery_note, order) -> str:
         """Get net document total, preferring invoice > delivery note > order."""
         if invoice:
             return str(invoice.sum_netto)
         if delivery_note:
             return str(delivery_note.sum_netto)
-        if order:
-            return str(order.sum_netto)
-        return None
+        return str(order.sum_netto)
 
     def _get_reseller_name(self, order: Order) -> str | None:
         """Get reseller contact name."""
-        if not order.reseller:
-            return None
-        if not order.reseller.contact:
-            return None
         return order.reseller.contact.name
 
     def _format_document_number(self, document) -> str | None:
@@ -1472,7 +1461,7 @@ class BulkSendInvoiceRemindersViaEmailView(APIViewRolePermissionsMixin, APIView)
                 "order_ids": [str(order_id) for order_id in order_ids],
                 "email_ctx": capture_tenant_email_context(),
             },
-            created_by=request.user if request.user.is_authenticated else None,
+            created_by=auth_user(request),
         )
 
         return Response(
@@ -1532,12 +1521,12 @@ def offer_sending_status(request: Request) -> Response:
         result.append(
             {
                 "id": reseller.id,
-                "name": contact.name if contact else None,
-                "address": contact.address if contact else None,
-                "zip_code": contact.zip_code if contact else None,
-                "city": contact.city if contact else None,
-                "country": contact.country if contact else None,
-                "uid": contact.uid if contact else None,
+                "name": contact.name,
+                "address": contact.address,
+                "zip_code": contact.zip_code,
+                "city": contact.city,
+                "country": contact.country,
+                "uid": contact.uid,
                 "sent": offer_sending is not None,
                 "sent_at": offer_sending.created_at if offer_sending else None,
             }
@@ -1594,7 +1583,7 @@ class BulkSendOffersViaEmailView(APIViewRolePermissionsMixin, APIView):
                 "offer_group_id": str(offer_group.id),
                 "email_ctx": capture_tenant_email_context(),
             },
-            created_by=request.user if request.user.is_authenticated else None,
+            created_by=auth_user(request),
         )
 
         return Response(

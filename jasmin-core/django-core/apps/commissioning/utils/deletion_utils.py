@@ -38,15 +38,11 @@ def can_delete_instance(
         if model_name in exclude_model_names:
             continue
 
-        # Reverse OneToOne: accessor returns a model instance (or raises
-        # RelatedObjectDoesNotExist) instead of a manager.
+        # Reverse OneToOne: accessor returns a model instance instead of a
+        # manager. A missing row raises RelatedObjectDoesNotExist, which is an
+        # AttributeError, so getattr's default reads it as None.
         if related_object.one_to_one:
-            try:
-                related_obj = getattr(
-                    instance, related_object.get_accessor_name(), None
-                )
-            except related_object.related_model.DoesNotExist:
-                continue
+            related_obj = getattr(instance, related_object.get_accessor_name(), None)
             if related_obj is None:
                 continue
 

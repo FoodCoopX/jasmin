@@ -202,7 +202,7 @@ export default function PaymentsResellers() {
                 ) : (
                   !record.has_been_paid && (
                     <BulkActionButton
-                      selectedIds={record.id ? [record.id as string] : []}
+                      selectedIds={[record.id]}
                       apiFunction={(payload) =>
                         commissioningBulkSetToPaidDocumentsCreate(
                           payload as unknown as BulkDocumentRequest,
@@ -352,7 +352,7 @@ export default function PaymentsResellers() {
               // The endpoint returns 202 + ``{job_id, kind,
               // status}``. Open the JobProgressDrawer to poll until
               // the Huey worker finishes the per-reseller dispatch.
-              const jobId = (responseData as { job_id?: string })?.job_id;
+              const jobId = responseData.job_id;
               if (jobId) setActiveJobId(jobId);
             }}
             payload={{ model: "invoice" }}

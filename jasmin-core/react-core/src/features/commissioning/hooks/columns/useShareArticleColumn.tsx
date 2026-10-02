@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { ShareArticle } from "@shared/api/generated/models";
 import type {
   EditableColumnConfig,
   SelectOption,
@@ -8,8 +7,6 @@ import type {
 } from "@shared/tables/BasicEditableTable/types";
 import ToolTipIcon from "@shared/ui/ToolTipIcon";
 import { pickTierPriceFromAmount } from "@shared/utils/tierPrice";
-import { useUnitOptions } from "@hooks/useUnitOptions";
-import type { ShareArticleOption } from "../useShareArticles";
 import { useShareArticles } from "../useShareArticles";
 import {
   computeShareArticlePatch,
@@ -73,17 +70,6 @@ interface ShareArticleColumnConfig {
   tooltip?: boolean | null;
 }
 
-/**
- * `ShareArticleOption` is `ShareArticle | ArticleForOrderItem` (plus value/label).
- * Only the full `ShareArticle` form carries pricing / defaults; the lightweight
- * `ArticleForOrderItem` does not. This helper narrows the option to the
- * `ShareArticle` shape so we can safely read those fields.
- */
-const asShareArticle = (
-  option: ShareArticleOption,
-): ShareArticle & { value: string; label: string } =>
-  option as ShareArticle & { value: string; label: string };
-
 export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => {
   const {
     filters = {},
@@ -101,7 +87,6 @@ export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => 
 
   const { t } = useTranslation();
 
-  const { unitOptions } = useUnitOptions();
   const { shareArticles, loading: shareArticlesLoading } =
     useShareArticles(filters);
 
@@ -109,9 +94,8 @@ export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => 
 
   /**
    * Default share-article-change handler. Seeds ``unit`` from the
-   * article's ``default_movement_unit`` (falling back to the first
-   * unit option, then KG), then writes the context-specific patch:
-   * amount-per-PU + crate + prices + description.
+   * article's ``default_movement_unit``, then writes the context-specific
+   * patch: amount-per-PU + crate + prices + description.
    */
   const handleShareArticleChange = useCallback(
     (
@@ -120,12 +104,10 @@ export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => 
       form: FormInstance,
     ) => {
       if (!autofillContext) return {};
-      const selected = shareArticles.find((a) => a.value === shareArticleValue);
-      if (!selected) return {};
-      const article = asShareArticle(selected);
+      const article = shareArticles.find((a) => a.value === shareArticleValue);
+      if (!article) return {};
 
-      const defaultUnit =
-        article.default_movement_unit || unitOptions[0]?.value || "KG";
+      const defaultUnit = article.default_movement_unit;
 
       form.setFieldsValue({ unit: defaultUnit });
       form.setFieldsValue(
@@ -134,7 +116,7 @@ export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => 
       onDefaultsApplied?.(shareArticleValue, defaultUnit, form);
       return {};
     },
-    [autofillContext, shareArticles, unitOptions, onDefaultsApplied],
+    [autofillContext, shareArticles, onDefaultsApplied],
   );
 
   /**
@@ -154,9 +136,8 @@ export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => 
         (form.getFieldValue("share_article") as string | undefined) ??
         (form.getFieldValue("share_article_name") as string | undefined);
       if (!articleId) return {};
-      const selected = shareArticles.find((a) => a.value === articleId);
-      if (!selected) return {};
-      const article = asShareArticle(selected);
+      const article = shareArticles.find((a) => a.value === articleId);
+      if (!article) return {};
       form.setFieldsValue(computeUnitChangePatch(autofillContext, article, newUnit));
       onDefaultsApplied?.(articleId, newUnit, form);
       return {};

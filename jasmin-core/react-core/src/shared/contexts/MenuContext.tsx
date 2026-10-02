@@ -89,7 +89,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 
         // Don't add if it's a duplicate of the last breadcrumb
         const lastBreadcrumb = baseBreadcrumbs[baseBreadcrumbs.length - 1];
-        if (lastBreadcrumb?.href !== currentPath) {
+        if (lastBreadcrumb.href !== currentPath) {
           baseBreadcrumbs.push({
             title,
             href: currentPath,
@@ -129,7 +129,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 
   // Add breadcrumb to the end
   const addBreadcrumb = useCallback((breadcrumb: Breadcrumb) => {
-    if (!breadcrumb?.title || !breadcrumb?.href) {
+    if (!breadcrumb.title || !breadcrumb.href) {
       console.error("Breadcrumb must have title and href");
       return;
     }

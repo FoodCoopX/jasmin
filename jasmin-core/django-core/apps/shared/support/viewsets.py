@@ -96,7 +96,7 @@ class SupportTicketViewSet(
                 tenant_schema=schema,
                 creator_id=str(user.id),
                 creator_name=user.name,
-                creator_email=(user.email or ""),
+                creator_email=user.email,
                 creator_roles=list(user.roles or []),
                 status=TicketStatus.OPEN,
             )

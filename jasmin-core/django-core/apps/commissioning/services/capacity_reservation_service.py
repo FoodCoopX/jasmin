@@ -18,7 +18,6 @@ import logging
 
 from django.db import transaction
 from django.db.models import Sum
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from ..errors import DeliveryStationOverCapacity
@@ -41,7 +40,7 @@ def _reservation_ttl_days() -> int:
     from core.tenant_db import connection
 
     settings = TenantSettings.get_current_settings(connection.tenant)
-    if settings is None or settings.reservation_ttl_days is None:
+    if settings is None:
         return RESERVATION_TTL_DAYS
     return settings.reservation_ttl_days
 
@@ -66,8 +65,7 @@ class CapacityReservationService:
         creates NO reservations in that case (the whole order is refused).
 
         No-op when the subscription doesn't consume harvest capacity: no
-        default station-day, missing dates, a non-harvest share option, or a
-        station-day with no capacity limit.
+        default station-day, no end date, or an additional share type.
 
         Reserves against the ACTUAL per-week station-day (via
         ``SubscriptionService.resolve_station_days_by_week``): the default DSD
@@ -78,11 +76,7 @@ class CapacityReservationService:
         confirm backfills are materialised without a capacity hold or check.
         """
         delivery_station_day_id = subscription.default_delivery_station_day_id
-        if (
-            not delivery_station_day_id
-            or not subscription.valid_from
-            or not subscription.valid_until
-        ):
+        if not delivery_station_day_id or not subscription.valid_until:
             return
         if not cls._counts_toward_capacity(subscription):
             return
@@ -179,11 +173,7 @@ class CapacityReservationService:
         any more, so its occupancy never blocks the confirm.
         """
         delivery_station_day_id = subscription.default_delivery_station_day_id
-        if (
-            not delivery_station_day_id
-            or not subscription.valid_from
-            or not subscription.valid_until
-        ):
+        if not delivery_station_day_id or not subscription.valid_until:
             return
         if not cls._counts_toward_capacity(subscription):
             return
@@ -220,9 +210,9 @@ class CapacityReservationService:
             station_day_ids=distinct_ids,
             year_weeks=year_weeks,
         )
-        # Our own still-active holds, quantity-weighted (Coalesce(quantity, 1))
-        # to match ``total``, per (resolved DSD, year, week). A plain row count
-        # under-subtracts for a multi-quantity subscription.
+        # Our own still-active holds, quantity-weighted to match ``total``, per
+        # (resolved DSD, year, week). A plain row count under-subtracts for a
+        # multi-quantity subscription.
         own_by_week = {
             (row["delivery_station_day_id"], row["year"], row["week"]): row["c"]
             for row in CapacityReservation.objects.filter(
@@ -231,7 +221,7 @@ class CapacityReservationService:
                 expires_at__gt=now,
             )
             .values("delivery_station_day_id", "year", "week")
-            .annotate(c=Sum(Coalesce("subscription__quantity", 1)))
+            .annotate(c=Sum("subscription__quantity"))
         }
         quantity = subscription.quantity or 1
         for (year, week), resolved in delivery_station_day_by_week.items():
@@ -363,10 +353,5 @@ class CapacityReservationService:
     def _counts_toward_capacity(subscription) -> bool:
         """A subscription occupies station-day capacity iff its share_type is a
         standalone (non-additional) share. Add-ons (``is_additional_share_type``)
-        ride along in another share's box and take no slot. Unknown share_type
-        (defensive) → False, i.e. reserve nothing."""
-        variation = getattr(subscription, "share_type_variation", None)
-        share_type = getattr(variation, "share_type", None)
-        if share_type is None:
-            return False
-        return not share_type.is_additional_share_type
+        ride along in another share's box and take no slot."""
+        return not subscription.share_type_variation.share_type.is_additional_share_type

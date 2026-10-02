@@ -206,16 +206,14 @@ class PackingListService:
 
         if packing_station is None:
             # Group by packing station, then sort each group
-            grouped_by_station: defaultdict[int | None, list[dict[str, Any]]] = (
-                defaultdict(list)
+            grouped_by_station: defaultdict[int, list[dict[str, Any]]] = defaultdict(
+                list
             )
             for item in filtered_results:
-                grouped_by_station[item.get("packing_station")].append(item)
+                grouped_by_station[item["packing_station"]].append(item)
 
             result: list[dict[str, Any]] = []
-            for station_key in sorted(
-                grouped_by_station.keys(), key=lambda x: x if x is not None else 0
-            ):
+            for station_key in sorted(grouped_by_station.keys()):
                 result.extend(sort_share_articles(grouped_by_station[station_key]))
         else:
             result = sort_share_articles(filtered_results)
@@ -526,8 +524,8 @@ class PackingListService:
                     "id": composite_key,
                     "share_article_id": content["share_article__id"],
                     "share_article_name": content["share_article__name"],
-                    "unit": content["unit"] or "",
-                    "size": content["size"] or "",
+                    "unit": content["unit"],
+                    "size": content["size"],
                     "note": content["note"] or "",
                 }
             variation_key = f"variation_{variation_id}"
@@ -613,7 +611,7 @@ class PackingListService:
             column = {
                 "key": f"variation_{variation.id}",
                 "base_variation_id": variation.id,
-                "base_size": variation.size or "",
+                "base_size": variation.size,
                 "base_sort_order": variation.sort_order,
                 "base_share_type_id": share_type.id,
                 "base_share_type_name": share_type.name or "",

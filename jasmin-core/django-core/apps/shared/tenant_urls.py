@@ -25,13 +25,9 @@ def frontend_base_url() -> str:
 
     from core.tenant_db import connection
 
-    tenant = getattr(connection, "tenant", None)
-    domains = getattr(tenant, "domains", None) if tenant is not None else None
+    domains = getattr(connection.tenant, "domains", None)
     if domains is not None:
-        try:
-            primary_domain = domains.filter(is_primary=True).first() or domains.first()
-        except (AttributeError, TypeError):
-            primary_domain = None
+        primary_domain = domains.filter(is_primary=True).first() or domains.first()
         if primary_domain:
             scheme = "http" if settings.DEBUG else "https"
             return f"{scheme}://{primary_domain.domain}"
@@ -42,5 +38,4 @@ def tenant_name() -> str:
     """Human-readable name of the current tenant, or ``""`` when unresolved."""
     from core.tenant_db import connection
 
-    tenant = getattr(connection, "tenant", None)
-    return getattr(tenant, "name", "") or ""
+    return getattr(connection.tenant, "name", "")

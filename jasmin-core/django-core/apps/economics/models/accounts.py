@@ -41,7 +41,7 @@ class AccountValue(models.Model):
         """Calculate balance based on account class (account_number / 1,000,000)"""
         try:
             account_class = int(int(self.account.account_number) / 1000000)
-        except (ValueError, TypeError):
+        except ValueError:
             return self.value
 
         if account_class in [0, 1, 4, 5, 6, 9]:

@@ -88,11 +88,7 @@ export function useHarvestingListData({
   );
 
   const deliveryDaysForHarvesting = useMemo(() => {
-    if (
-      !daysLoaded ||
-      selectedDay === null ||
-      !getRelatedDays?.getDeliveryDaysForHarvesting
-    ) {
+    if (!daysLoaded || selectedDay === null) {
       return [];
     }
     return getRelatedDays.getDeliveryDaysForHarvesting(selectedDay);
@@ -319,23 +315,9 @@ export function useHarvestingListData({
           record.computed_amount_combined_order_content;
         const combinedAmount = record.computed_amount_combined;
 
-        const hasShareContent =
-          shareContentAmount &&
-          shareContentAmount !== 0 &&
-          shareContentAmount !== "0" &&
-          shareContentAmount !== "";
-
-        const hasOrderContent =
-          orderContentAmount &&
-          orderContentAmount !== 0 &&
-          orderContentAmount !== "0" &&
-          orderContentAmount !== "";
-
-        const hasCombinedAmount =
-          combinedAmount &&
-          combinedAmount !== "0" &&
-          combinedAmount !== "" &&
-          combinedAmount !== 0;
+        const hasShareContent = !!shareContentAmount;
+        const hasOrderContent = !!orderContentAmount;
+        const hasCombinedAmount = !!combinedAmount;
 
         return hasShareContent || hasOrderContent || hasCombinedAmount;
       });

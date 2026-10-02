@@ -52,7 +52,7 @@ def jasmin_exception_handler(
     exc: Exception, context: dict[str, Any]
 ) -> Response | None:
     request = context.get("request")
-    request_id = getattr(request, "id", None) if request is not None else None
+    request_id = getattr(request, "id", None)
     view = context.get("view")
     view_name = view.__class__.__name__ if view is not None else "<unknown>"
 

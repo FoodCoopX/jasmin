@@ -31,7 +31,7 @@ const formats = [
 const htmlToPlainText = (html: string): string => {
   const container = document.createElement("div");
   container.innerHTML = html;
-  return container.textContent ?? "";
+  return container.textContent;
 };
 
 const getPlainTextLength = (html: string): number =>

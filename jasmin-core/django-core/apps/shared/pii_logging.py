@@ -9,10 +9,10 @@ auditlog (which only records writes) doesn't catch.
 Lives in the always-shared layer so any app can mount it without crossing a
 feature boundary — it's used by ``commissioning`` (Member / Reseller
 viewsets) and ``payments`` (BillingProfile). It has no GDPR-app dependency:
-its only first-party import is ``apps.shared.request_utils.client_ip``, and
-it logs to the ``gdpr`` logger purely by name (routing lives in
-``config/settings.py``), so the entries still land next to the other
-GDPR-flow records.
+its only first-party imports are ``apps.shared.request_utils.client_ip`` and
+the typed ``core.tenant_db.connection``, and it logs to the ``gdpr`` logger
+purely by name (routing lives in ``config/settings.py``), so the entries
+still land next to the other GDPR-flow records.
 
 Design choices baked in:
 
@@ -29,10 +29,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from django.db import connection
 from rest_framework import status as drf_status
 
 from apps.shared.request_utils import client_ip
+from core.tenant_db import connection
 
 logger = logging.getLogger("gdpr")
 
@@ -96,7 +96,7 @@ class PIIReadLoggingMixin:
                 sanitize_log_value(actor),
                 subject_kind,
                 sanitize_log_value(subject_id),
-                getattr(connection, "schema_name", "?"),
+                connection.schema_name,
                 sanitize_log_value(client_ip(request)),
             )
         except Exception:
@@ -124,7 +124,7 @@ class PIIReadLoggingMixin:
                 sanitize_log_value(getattr(request.user, "email", None) or "anonymous"),
                 self._pii_subject_kind(),
                 sanitize_log_value(subject_id),
-                getattr(connection, "schema_name", "?"),
+                connection.schema_name,
                 sanitize_log_value(client_ip(request)),
             )
         except Exception:

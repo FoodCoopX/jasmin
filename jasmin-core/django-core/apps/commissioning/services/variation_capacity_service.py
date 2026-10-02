@@ -71,12 +71,11 @@ def _occupying_q() -> Q:
 
 def _occupying_qs(variation_ids: Iterable[str]):
     """Subs of these variations that consume a production slot (see
-    :func:`_occupying_q`): non-cancelled, dated, and active / offered /
+    :func:`_occupying_q`): non-cancelled and active / offered /
     accepted-pending."""
     return Subscription.objects.filter(
         share_type_variation_id__in=list(variation_ids),
         cancelled_at__isnull=True,
-        valid_from__isnull=False,
     ).filter(_occupying_q())
 
 
@@ -217,16 +216,13 @@ class VariationCapacityService:
     def assert_capacity_available(cls, subscription) -> None:
         """Verify the subscription's variation has room in EVERY week of its
         term. Row-locks the ``ShareTypeVariation`` so concurrent orders
-        serialise. No-op when the subscription has no start date. Callers decide
-        WHEN to call: not for a waiting-listed DRAFT (it holds no slot), but
-        always at confirm — promoting a waiting-listed subscription must still
-        fit. Raises :class:`ShareTypeVariationOverCapacity` (409) when the peak
-        week is full.
+        serialise. Callers decide WHEN to call: not for a waiting-listed DRAFT
+        (it holds no slot), but always at confirm — promoting a waiting-listed
+        subscription must still fit. Raises
+        :class:`ShareTypeVariationOverCapacity` (409) when the peak week is
+        full.
         """
         variation_id = subscription.share_type_variation_id
-        if not variation_id or not subscription.valid_from:
-            return
-
         variation = (
             ShareTypeVariation.objects.select_for_update()
             .filter(pk=variation_id)
@@ -275,11 +271,8 @@ class VariationCapacityService:
     @classmethod
     def is_over_capacity(cls, subscription) -> bool:
         """Non-locking, non-raising twin of :meth:`assert_capacity_available` —
-        used to infer WHY a subscription is being waiting-listed. ``False`` for
-        termless / variation-less subs."""
+        used to infer WHY a subscription is being waiting-listed."""
         variation_id = subscription.share_type_variation_id
-        if not variation_id or not subscription.valid_from:
-            return False
         variation = ShareTypeVariation.objects.filter(pk=variation_id).first()
         if variation is None:
             return False

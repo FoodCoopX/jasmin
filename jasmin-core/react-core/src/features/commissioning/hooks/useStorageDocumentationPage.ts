@@ -9,8 +9,7 @@
  *
  * Each page keeps only what genuinely differs: its columns, mutation
  * ``apiFunctions``, ``customEdit``, bulk actions, and JSX. The only per-page
- * knobs here are ``withDay`` (harvest is day-scoped, purchase week-scoped), an
- * ``extraQueryEnabled`` gate (harvest also waits for async columns), and a
+ * knobs here are ``withDay`` (harvest is day-scoped, purchase week-scoped) and a
  * ``rowHasData`` predicate (the "is this storage-matched row worth showing?"
  * check, which reads model-specific amount fields).
  */
@@ -33,11 +32,6 @@ interface UseStorageDocumentationPageOptions {
   /** Day-scoped (harvest) vs week-scoped (purchase). Default true. */
   withDay?: boolean;
   /**
-   * AND-ed with ``!!selectedStorage`` to gate the summary query — e.g. a page
-   * that also waits for async columns to load. Default true.
-   */
-  extraQueryEnabled?: boolean;
-  /**
    * Does a storage-matched summary row carry real data worth showing? Runs
    * AFTER the storage filter. MUST be referentially stable (useCallback at the
    * call site) — it feeds the ``data`` memo.
@@ -48,7 +42,6 @@ interface UseStorageDocumentationPageOptions {
 export function useStorageDocumentationPage({
   model,
   withDay = true,
-  extraQueryEnabled = true,
   rowHasData,
 }: UseStorageDocumentationPageOptions) {
   const [selectedStorage, setSelectedStorage] = useState<string | null>(null);
@@ -57,7 +50,7 @@ export function useStorageDocumentationPage({
   const summary = useDocumentationSummaryPage({
     model,
     withDay,
-    queryEnabled: !!selectedStorage && extraQueryEnabled,
+    queryEnabled: !!selectedStorage,
   });
 
   const { rawData, selectedYear, selectedWeek, selectedDay } = summary;
@@ -73,7 +66,7 @@ export function useStorageDocumentationPage({
         if (!item[`storage_${selectedStorage}`]) return false;
         return rowHasData(item);
       })
-      .map((item) => ({ ...item, key: item.id ?? "" }));
+      .map((item) => ({ ...item, key: item.id }));
   }, [rawData, selectedStorage, rowHasData]);
 
   // The whole grid is scoped to one page-level storage; stamp it (and the

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -11,7 +10,7 @@ from django.db.models import Q, QuerySet
 from ..constants import crates_should_be_on_documents
 from ..errors import CrateNotFound, CratesDisabledOnDocuments
 from ..models import Crate, CrateOrderContent, Order
-from ..utils.iso_week_utils import date_from_order, week_day_to_date
+from ..utils.iso_week_utils import week_day_to_date
 from ..utils.tax_rate_utils import effective_crate_tax_rate
 from .crate_summary import build_crate_summary_row, summarize_crate_items
 
@@ -52,38 +51,15 @@ class CrateOrderContentService:
         ``build_crate_summary_row``), matching the DN/invoice crate
         summary — never as JSON floats.
         """
-        tax_rate = (
-            crate_order_content.tax_rate
-            if crate_order_content.tax_rate is not None
-            else effective_crate_tax_rate(
-                crate_order_content.crate_type,
-                CrateOrderContentService._date_from_crate_order_content(
-                    crate_order_content
-                ),
-            )
-        )
         return build_crate_summary_row(
             crate_type_id=crate_order_content.crate_type_id,
             crate_type_name=crate_order_content.crate_type.name,
             amount=crate_order_content.amount,
             price=crate_order_content.price_per_unit,
             rabatt=crate_order_content.rabatt,
-            tax_rate=tax_rate,
+            tax_rate=crate_order_content.tax_rate,
             extras={"note": crate_order_content.note},
         )
-
-    @staticmethod
-    def _date_from_crate_order_content(crate_order_content: CrateOrderContent) -> date:
-        """Derive the calendar date from a CrateOrderContent's order chain.
-
-        Falls back to today when no order is reachable.
-        """
-        order = crate_order_content.order or (
-            crate_order_content.order_content.order
-            if crate_order_content.order_content
-            else None
-        )
-        return date_from_order(order)
 
     # ──────────────────────────────────────────────
     # Public API
@@ -111,14 +87,9 @@ class CrateOrderContentService:
 
         rows = CrateOrderContent.objects.filter(filter_q).select_related("crate_type")
 
-        pricing_date = week_day_to_date(year, delivery_week, day_number)
-
-        def _resolve_tax_rate(crate_type):
-            return effective_crate_tax_rate(crate_type, pricing_date)
-
-        summary = summarize_crate_items(rows, resolve_tax_rate=_resolve_tax_rate)
+        summary = summarize_crate_items(rows)
         # Hide fully-returned / net-zero crate groups.
-        return [row for row in summary if row["amount"] and row["amount"] > 0]
+        return [row for row in summary if row["amount"] > 0]
 
     @staticmethod
     @transaction.atomic
@@ -167,7 +138,7 @@ class CrateOrderContentService:
 
         # tax_rate is NOT NULL — resolve from crate pricing or tenant default
         # when the caller didn't pass an explicit value.
-        if "tax_rate" not in kwargs or kwargs.get("tax_rate") is None:
+        if kwargs.get("tax_rate") is None:
             kwargs["tax_rate"] = effective_crate_tax_rate(crate, pricing_date)
 
         crate_order_content = CrateOrderContent.objects.create(

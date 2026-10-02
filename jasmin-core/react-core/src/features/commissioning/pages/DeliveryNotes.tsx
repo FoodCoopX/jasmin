@@ -126,9 +126,9 @@ export default function DeliveryNotes() {
 
   const handleFinalizeDeliveryNotesSuccess = useCallback(
     async (responseData: BulkOperationResponse) => {
-      const deliveryNoteIds = (responseData?.results ?? [])
-        .filter((r) => r.success && r.delivery_note_id)
-        .map((r) => r.delivery_note_id);
+      const deliveryNoteIds = responseData.results.map(
+        (r) => r.delivery_note_id,
+      );
 
       for (const id of deliveryNoteIds) {
         try {
@@ -374,7 +374,7 @@ export default function DeliveryNotes() {
                   )}
                 {!record.has_delivery_note && (
                   <BulkActionButton
-                    selectedIds={record.id ? [record.id] : []}
+                    selectedIds={[record.id]}
                     apiFunction={bulkCreateDocuments}
                     buttonText={t("commissioning.create_delivery_note")}
                     buttonProps={{ type: "primary" }}
@@ -387,7 +387,7 @@ export default function DeliveryNotes() {
                 {!record.delivery_note_is_finalized &&
                   record.has_delivery_note && (
                     <BulkActionButton
-                      selectedIds={record.id ? [record.id] : []}
+                      selectedIds={[record.id]}
                       apiFunction={bulkFinalizeDocuments}
                       buttonText={t("commissioning.finalize_delivery_note")}
                       buttonProps={{ type: "primary" }}
@@ -399,7 +399,7 @@ export default function DeliveryNotes() {
                 {!record.delivery_note_is_finalized &&
                   record.has_delivery_note && (
                     <BulkActionButton
-                      selectedIds={record.id ? [record.id] : []}
+                      selectedIds={[record.id]}
                       apiFunction={(payload) =>
                         commissioningBulkDeleteDocumentsCreate(payload as never)
                       }

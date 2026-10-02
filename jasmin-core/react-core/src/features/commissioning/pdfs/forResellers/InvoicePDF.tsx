@@ -230,7 +230,7 @@ export default function InvoicePDF({
     resolvedTerms.earlyPaymentDiscountDays != null &&
     Number(resolvedTerms.earlyPaymentDiscountPercent) > 0;
   const { invoice, lineItems, crateItems, taxBreakdown, totals } = data;
-  const locale = tenantSettings?.number_locale ?? "de-DE";
+  const locale = tenantSettings.number_locale ?? "de-DE";
   const getUnitLabel = (value: string) => getUnitLabelPure(value, t);
   const getVegetableSizeLabel = (value: string) => getVegetableSizeLabelPure(value, t);
 

@@ -81,12 +81,10 @@ export default function LoggingStorage() {
   const storageLoggingParams: CommissioningStorageLoggingListParams = useMemo(
     () => ({
       storage: selectedStorage ?? "",
-      ...(dateRange &&
-        dateRange[0] &&
-        dateRange[1] && {
-          start_date: toApiDate(dateRange[0])!,
-          end_date: toApiDate(dateRange[1])!,
-        }),
+      ...(dateRange && {
+        start_date: toApiDate(dateRange[0])!,
+        end_date: toApiDate(dateRange[1])!,
+      }),
       ...(selectedShareArticle && {
         share_article: selectedShareArticle,
       }),

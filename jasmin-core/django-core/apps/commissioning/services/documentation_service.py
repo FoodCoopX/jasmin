@@ -146,11 +146,10 @@ class GenericDocumentationService:
         its harvest onto the LONG-term storage (Storage.select_harvest), so that
         storage carries theoreticals exactly like the short-term one — gating only
         on short-term double-counts the long-term theoretical."""
-        if not instance.storage_id:
-            return False
         storage = instance.storage
-        return getattr(storage, "is_short_term_harvest_storage", False) or getattr(
-            storage, "is_long_term_harvest_storage", False
+        return (
+            storage.is_short_term_harvest_storage
+            or storage.is_long_term_harvest_storage
         )
 
     @staticmethod
@@ -230,18 +229,14 @@ class GenericDocumentationService:
         # Harvest / Purchase on a harvest storage (short OR long term) → correction
         # mode (counted_amount anchors the actual; amount = counted − Σ theoretical)
         if GenericDocumentationService._carries_theoreticals(instance):
-            actual_amount = instance.amount
-            if actual_amount is None:
-                actual_amount = 0
-
-            counted = Decimal(str(actual_amount))
+            counted = Decimal(str(instance.amount))
             base["counted_amount"] = counted
 
             theoretical_sum = GenericDocumentationService._sum_theoretical(
                 share_article_id=str(instance.share_article_id),
                 unit=instance.unit,
                 size=instance.size,
-                storage_id=str(instance.storage_id) if instance.storage_id else None,
+                storage_id=str(instance.storage_id),
                 movement_type=mtype,
                 up_to=base["date"],
             )
@@ -259,7 +254,7 @@ class GenericDocumentationService:
         share_article_id: str,
         unit: str | None,
         size: str | None,
-        storage_id: str | None,
+        storage_id: str,
         movement_type: str,
         up_to,
     ) -> Decimal:
@@ -291,16 +286,13 @@ class GenericDocumentationService:
         # earlier day's plan from every later day's correction.
         q = Q(
             share_article_id=share_article_id,
+            unit=unit,
+            size=size,
+            storage_id=storage_id,
             movement_type=movement_type,
             is_theoretical=True,
             date=up_to,
         )
-        q &= Q(unit=unit) if unit else Q(unit__isnull=True)
-        q &= Q(size=size) if size else Q(size__isnull=True)
-        if storage_id:
-            q &= Q(storage_id=storage_id)
-        else:
-            q &= Q(storage__isnull=True)
 
         return MovementShareArticle.objects.filter(q).aggregate(total=Sum("amount"))[
             "total"

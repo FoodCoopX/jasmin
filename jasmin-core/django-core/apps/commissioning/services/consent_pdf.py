@@ -64,7 +64,7 @@ def _render_consent_pdf(document) -> ContentFile:
     from weasyprint import HTML
     from weasyprint.urls import URLFetcher
 
-    body = document.body or ""
+    body = document.body
     if _LOOKS_LIKE_HTML.search(body):
         body_block = body
     else:

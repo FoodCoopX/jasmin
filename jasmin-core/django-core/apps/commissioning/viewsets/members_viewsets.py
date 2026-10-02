@@ -328,10 +328,9 @@ class MemberViewSet(
         # on the read actions; staff keep the office serializer. Writes are
         # office-only, and anonymous / schema-generation falls through to the
         # office serializer (the documented response shape).
-        request = getattr(self, "request", None)
+        request = self.request
         if (
             self.action in {"list", "retrieve"}
-            and request is not None
             and getattr(request, "user", None)
             and request.user.is_authenticated
             and not IsStaff().has_permission(request, self)
@@ -343,7 +342,6 @@ class MemberViewSet(
         # tenant and keeps documenting ``MemberSerializer``.
         if (
             self.action in {"create", "update", "partial_update"}
-            and request is not None
             and not getattr(self, "swagger_fake_view", False)
             and onboarding_mode_enabled()
         ):
@@ -376,9 +374,7 @@ class MemberViewSet(
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self) -> QuerySet[Member]:
-        return _build_member_queryset(
-            self.request, filtered=getattr(self, "action", None) == "list"
-        )
+        return _build_member_queryset(self.request, filtered=self.action == "list")
 
     @extend_schema(
         description=(
@@ -613,22 +609,19 @@ class MemberViewSet(
         # on/off): a bare ``bool()`` cast reads the string "false" as True and
         # would force-end every active subscription the caller wanted kept.
         force = parse_body_bool(body(request), "force")
-        result_member = cancel_member_with_coop_shares(
+        cancellation = cancel_member_with_coop_shares(
             member,
             cancelled_effective_at=effective,
             cancelled_by=request.user,
             reason=body(request).get("reason"),
             force=force,
         )
-        cancellation_result = getattr(result_member, "cancellation_result", {})
 
         updated_member = self.refetch_for_response(member)
         return Response(
             {
                 "member": self.get_serializer(updated_member).data,
-                "subscriptions_not_ended": cancellation_result.get(
-                    "subscriptions_not_ended", []
-                ),
+                "subscriptions_not_ended": cancellation.subscriptions_not_ended,
             },
             status=status.HTTP_200_OK,
         )
@@ -910,16 +903,15 @@ class SubscriptionViewSet(
         has no tenant and leaves it out.
         """
         ctx = super().get_serializer_context()
-        from django.db import connection
-
         from apps.shared.tenants.models import TenantSettings
+        from core.tenant_db import connection
 
-        tenant = getattr(connection, "tenant", None)
-        if tenant is not None and getattr(tenant, "schema_name", "") != "public":
+        tenant = connection.tenant
+        if tenant.schema_name != "public":
             settings = TenantSettings.get_current_settings(tenant)
             if settings is not None:
-                ctx["min_weeks_to_cancel_before_ending"] = getattr(
-                    settings, "min_weeks_to_cancel_before_ending", None
+                ctx["min_weeks_to_cancel_before_ending"] = (
+                    settings.min_weeks_to_cancel_before_ending
                 )
         if self.action in {"create", "update", "partial_update"} and not getattr(
             self, "swagger_fake_view", False
@@ -950,7 +942,7 @@ class SubscriptionViewSet(
 
     def get_queryset(self) -> QuerySet[Subscription]:
         return _build_subscription_queryset(
-            self.request, filtered=getattr(self, "action", None) == "list"
+            self.request, filtered=self.action == "list"
         )
 
     @extend_schema(
@@ -1088,7 +1080,7 @@ class SubscriptionViewSet(
             # already ran, so it lets one through when the member is confirmed
             # and the subscription ends by the exit date.
             member = subscription.member
-            if member and member.cancelled_at is not None:
+            if member.cancelled_at is not None:
                 if not onboarding_mode_enabled():
                     raise MemberAlreadyCancelled(
                         "Cannot confirm a subscription for a cancelled member."
@@ -1366,7 +1358,6 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # tenant and keeps documenting ``CoopShareSerializer``.
         if (
             self.action in {"create", "update", "partial_update"}
-            and getattr(self, "request", None) is not None
             and not getattr(self, "swagger_fake_view", False)
             and onboarding_mode_enabled()
         ):
@@ -1397,7 +1388,7 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
         # List-only: a detail route reaches one share by id, where the office
         # page's member/year filters would 404 a share that exists.
-        if getattr(self, "action", None) == "list":
+        if self.action == "list":
             params = validate_query_params(self.request, optional=["member", "year"])
             if params["member"]:
                 queryset = queryset.filter(member=params["member"])
@@ -1434,9 +1425,8 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             # The advisory lock makes the second writer wait until the first
             # commits, so its clean() sees the fresh total (mirrors
             # ``Member._generate_member_number``).
-            member = serializer.validated_data.get("member")
-            if member is not None:
-                acquire_advisory_xact_lock(f"coop_share_bounds:{member.pk}")
+            member = serializer.validated_data["member"]
+            acquire_advisory_xact_lock(f"coop_share_bounds:{member.pk}")
             instance = serializer.save()
             # In onboarding mode the office enters shares a member already
             # holds, so a trial member's conversion sends no welcome email.
@@ -1553,8 +1543,8 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             )
 
             member = coop_share.member
-            member_admitted = member is not None and member.admin_confirmed
-            if member is not None and not member_admitted:
+            member_admitted = member.admin_confirmed
+            if not member_admitted:
                 # Lock the member row too — the admission cascade's
                 # ``admin_confirmed`` check must not race a concurrent
                 # member-confirm (or a sibling share's cascade).
@@ -1582,11 +1572,7 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
             # Only reachable in onboarding mode: ``confirm`` refuses a departed
             # member's share otherwise.
-            if (
-                member is not None
-                and member_admitted
-                and member.cancelled_at is not None
-            ):
+            if member_admitted and member.cancelled_at is not None:
                 cancel_coop_shares_of_departed_member(member)
                 coop_share.refresh_from_db()
 
@@ -1681,7 +1667,7 @@ class MemberLoanViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
         # List-only, as on the sibling coop-share list: the detail route
         # addresses one loan by id and reads neither filter.
-        if getattr(self, "action", None) == "list":
+        if self.action == "list":
             params = validate_query_params(self.request, optional=["member", "year"])
             if params["member"]:
                 queryset = queryset.filter(member=params["member"])

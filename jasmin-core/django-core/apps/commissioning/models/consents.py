@@ -158,15 +158,14 @@ class ConsentDocument(JasminModel, TimeBoundMixin):
         # by skipping TimeBoundMixin in the MRO.
         super(TimeBoundMixin, self).clean()
         self.validate_date_range(self.valid_from, self.valid_until)
-        if self.overlap_unique_fields:
-            self._validate_no_overlap()
+        self._validate_no_overlap()
 
     def save(self, *args, **kwargs):
         # Recompute the hash on every save so the row is always
         # self-consistent. Once a ConsentRecord points here you
         # shouldn't be calling .save() at all, but if it happens the
         # hash stays truthful and any tampering is detectable.
-        self.body_sha256 = _sha256_of(self.body or "")
+        self.body_sha256 = _sha256_of(self.body)
         super().save(*args, **kwargs)
 
     @property

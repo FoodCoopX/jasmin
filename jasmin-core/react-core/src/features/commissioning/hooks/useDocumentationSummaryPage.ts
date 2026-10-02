@@ -66,7 +66,7 @@ interface UseDocumentationSummaryPageOptions {
    * call site) — it feeds the query key.
    */
   extraListParams?: Record<string, unknown>;
-  /** Gate the summary query (e.g. until dynamic columns have loaded). */
+  /** Gate the summary query (e.g. until a storage is selected). */
   queryEnabled?: boolean;
 }
 

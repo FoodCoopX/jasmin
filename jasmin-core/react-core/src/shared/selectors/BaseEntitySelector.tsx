@@ -85,8 +85,7 @@ export default function BaseEntitySelector<V extends string | number | null>({
     const isMissing = value === null || value === undefined || !currentExists;
 
     if (preserveSelection ? isMissing : autoSelectFirst && !value) {
-      const first = options[0]?.value;
-      if (first !== undefined) onValueChange(first);
+      onValueChange(options[0].value);
     }
   }, [
     options,

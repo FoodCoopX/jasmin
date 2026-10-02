@@ -35,7 +35,7 @@ from apps.authz.permissions import (
     has_any_role,
 )
 from apps.authz.roles import Role
-from apps.shared.request_utils import client_ip
+from apps.shared.request_utils import auth_user, client_ip
 from core.serializers import ErrorResponseSerializer
 
 from ..errors import (
@@ -415,6 +415,6 @@ class ConsentRecordViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         updated = ConsentService.revoke(
             record,
             reason=payload.validated_data.get("reason", ""),
-            revoked_by=request.user if request.user.is_authenticated else None,
+            revoked_by=auth_user(request),
         )
         return Response(ConsentRecordSerializer(updated).data)

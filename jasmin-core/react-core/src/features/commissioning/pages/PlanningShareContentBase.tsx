@@ -127,7 +127,6 @@ export default function PlanningShareContentBase({
     () => isWeekInPast(selectedYear, selectedWeek),
     [selectedYear, selectedWeek],
   );
-  const [columnsLoaded, setColumnsLoaded] = useState(false);
 
   const [showDaysTogether, setShowDaysTogether] = useState(false);
   const [showDetailedColumns, setShowDetailedColumns] = useState(true);
@@ -351,7 +350,7 @@ export default function PlanningShareContentBase({
         // Prefer the default matching the row's unit; fall back to a
         // unit-agnostic default, then to whatever is configured.
         const match =
-          candidates.find((entry) => (entry.unit ?? "") === (unit ?? "")) ??
+          candidates.find((entry) => (entry.unit ?? "") === unit) ??
           candidates.find((entry) => !entry.unit) ??
           candidates[0];
         const quantity = match ? parseFloat(String(match.quantity)) : NaN;
@@ -383,9 +382,7 @@ export default function PlanningShareContentBase({
   // size, so they refresh whenever any of those change.
   const pricingArticlesById = useMemo(
     () =>
-      new Map(
-        (pricingArticles ?? []).map((article) => [String(article.id), article]),
-      ),
+      new Map(pricingArticles.map((article) => [String(article.id), article])),
     [pricingArticles],
   );
 
@@ -624,7 +621,7 @@ export default function PlanningShareContentBase({
   const customSave = useCallback(
     (transformedData: Record<string, unknown>) => {
       // Validate seller_name for purchased items
-      const shareArticle = vegetables_and_fruits?.find(
+      const shareArticle = vegetables_and_fruits.find(
         (article: ShareArticleOption) =>
           article.id === transformedData.share_article,
       );
@@ -733,21 +730,6 @@ export default function PlanningShareContentBase({
     }
   }, [daysOk, toursOk, toursExist]);
 
-  // Deliberate latch — once columns are loaded, ``columnsLoaded`` stays
-  // true forever. It gates the planning-data query below
-  // (``enabled: columnsLoaded``); flipping back to false during a brief
-  // column refetch would cause a query-disable → re-enable → refetch storm.
-  // Don't convert to a derived useMemo.
-  useEffect(() => {
-    if (
-      shareArticleColumn &&
-      amountUnitSizeColumns &&
-      amountUnitSizeColumns.length > 0
-    ) {
-      setColumnsLoaded(true);
-    }
-  }, [shareArticleColumn, amountUnitSizeColumns]);
-
   const apiFunctions: ApiFunctions = useMemo(
     () => ({
       create: (data) =>
@@ -771,7 +753,7 @@ export default function PlanningShareContentBase({
       // Don't fetch the planning grid when there are no variation columns
       // (no share-type variations / delivery-station days) — the banner shows
       // instead, so the rows would never render.
-      query: { enabled: columnsLoaded && hasVariationColumns },
+      query: { enabled: hasVariationColumns },
     });
   const data = useMemo(
     () => (rawData ?? []) as unknown as TableRecord[],
@@ -906,7 +888,7 @@ export default function PlanningShareContentBase({
   // contribute nothing. Computed from the already-loaded grid; no extra fetch.
   const totalPurchaseMoney = useMemo(() => {
     const articlesById = new Map(
-      (vegetables_and_fruits ?? []).map((article: ShareArticleOption) => [
+      vegetables_and_fruits.map((article: ShareArticleOption) => [
         article.id,
         article,
       ]),
@@ -987,7 +969,7 @@ export default function PlanningShareContentBase({
 
   const handleSaveSuccess = useCallback(
     (savedRecord: TableRecord, action: "create" | "update") => {
-      refetchGranularity?.();
+      refetchGranularity();
       // Refetch policy for the planning grid: NEVER invalidate on
       // CREATE or UPDATE. ``EditableTable`` already shows the new /
       // edited row in local state where the planner put it; refetching
@@ -1059,7 +1041,7 @@ export default function PlanningShareContentBase({
 
   const handleDeleteSuccess = useCallback(
     (_deletedKey: Key) => {
-      refetchGranularity?.();
+      refetchGranularity();
       // Deletes change the visible row count — refetch so the table
       // mirrors the server state.
       invalidateData();
@@ -1170,7 +1152,7 @@ export default function PlanningShareContentBase({
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningBulkFinalizeShareContentCreate({
-                ids: (payload.ids as string[]) ?? [],
+                ids: payload.ids as string[],
               })
             }
             buttonText={t("commissioning.finalize")}
@@ -1182,7 +1164,7 @@ export default function PlanningShareContentBase({
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningBulkUnfinalizeShareContentCreate({
-                ids: (payload.ids as string[]) ?? [],
+                ids: payload.ids as string[],
               })
             }
             buttonText={t("commissioning.unfinalize")}

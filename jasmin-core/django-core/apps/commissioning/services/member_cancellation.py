@@ -26,6 +26,7 @@ forgotten.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date, datetime
 
 from django.db import DatabaseError, transaction
@@ -39,6 +40,15 @@ from ..errors import MemberAlreadyCancelled, MemberExitBeforeTransfer
 from ..models import CoopShare, CoopShareTransfer, Member
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class MemberCancellation:
+    """Which active subscriptions a cancellation ended, and which it could not
+    end: those keep a live mandate and need the office's attention."""
+
+    subscriptions_ended: list[str]
+    subscriptions_not_ended: list[str]
 
 
 def latest_coop_share_transfer_date(member: Member) -> date | None:
@@ -63,7 +73,7 @@ def cancel_member_with_coop_shares(
     force: bool = False,
     shares_transferred: bool = False,
     notify: bool = True,
-) -> Member:
+) -> MemberCancellation:
     """Stamp cancellation timestamps on ``member`` and cascade to every
     still-open ``CoopShare`` for that member.
 
@@ -93,10 +103,9 @@ def cancel_member_with_coop_shares(
     went to another member, so no settlement of their share balance follows.
     ``notify=False`` cancels without scheduling that email.
 
-    Returns ``member`` with a transient ``cancellation_result`` attribute —
-    ``{"subscriptions_ended": [...], "subscriptions_not_ended": [...]}`` — so the
-    caller can surface to the office which subscriptions a force-cancel could
-    NOT end (those keep an active mandate and need manual attention).
+    Returns a :class:`MemberCancellation`, so the caller can surface to the
+    office which subscriptions a force-cancel could NOT end (those keep an
+    active mandate and need manual attention).
     """
     # The row lock a coop share transfer of this member holds while it writes:
     # the exit is checked against a transfer recorded concurrently, and a second
@@ -149,13 +158,10 @@ def cancel_member_with_coop_shares(
     if notify and member.email:
         _send_cancellation_email(member, shares_transferred=shares_transferred)
 
-    # Transient (not persisted) report for the caller — which subscriptions the
-    # cancellation ended vs. could not end (the latter keep a live mandate).
-    member.cancellation_result = {
-        "subscriptions_ended": subscriptions_ended,
-        "subscriptions_not_ended": subscriptions_not_ended,
-    }
-    return member
+    return MemberCancellation(
+        subscriptions_ended=subscriptions_ended,
+        subscriptions_not_ended=subscriptions_not_ended,
+    )
 
 
 def _assert_no_active_subscription(member: Member, *, today: date) -> None:

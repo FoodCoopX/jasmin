@@ -262,7 +262,7 @@ class AnonymizationMixin:
 
         # B2B side: any ContactEntity the user's Reseller points to.
         reseller = Reseller.objects.filter(linked_user=user).first()
-        if reseller is not None and reseller.contact is not None:
+        if reseller is not None:
             contact_fields = ["email", "order_email"]
             if include_shared_secondaries:
                 contact_fields += ["email_2", "email_3"]
@@ -463,8 +463,6 @@ class AnonymizationMixin:
         GDPRService._purge_reseller_documents(reseller)
 
         contact = reseller.contact
-        if contact is None:
-            return
 
         # Safety: only wipe the contact if nobody else uses it.
         other_resellers = (
@@ -671,19 +669,18 @@ class AnonymizationMixin:
                 ).values_list("pk", flat=True),
             )
 
+            # Mirror ``_anonymize_reseller_for_user``: a contact shared with
+            # other resellers / delivery stations keeps its PII, so its audit
+            # history stays too.
             contact = reseller.contact
-            if contact is not None:
-                # Mirror ``_anonymize_reseller_for_user``: a contact
-                # shared with other resellers / delivery stations keeps
-                # its PII, so its audit history stays too.
-                shared = (
-                    Reseller.objects.filter(contact=contact)
-                    .exclude(pk=reseller.pk)
-                    .exists()
-                    or DeliveryStation.objects.filter(contact=contact).exists()
-                )
-                if not shared:
-                    scrub(ContactEntity, [contact.pk])
+            shared = (
+                Reseller.objects.filter(contact=contact)
+                .exclude(pk=reseller.pk)
+                .exists()
+                or DeliveryStation.objects.filter(contact=contact).exists()
+            )
+            if not shared:
+                scrub(ContactEntity, [contact.pk])
 
     @staticmethod
     def _anonymize_consent_records(member: Member) -> None:

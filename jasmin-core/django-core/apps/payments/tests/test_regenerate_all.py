@@ -10,7 +10,6 @@ Invariants:
     - Idempotent: a second call on the same dataset returns the same map
       and produces no net DB change in PLANNED rows.
     - Locked statuses (ISSUED / PAID / FAILED / WAIVED) are preserved.
-    - Subscriptions with no valid_from contribute 0 (and don't crash).
 """
 
 from __future__ import annotations
@@ -239,17 +238,3 @@ class TestRegenerateAll:
             "TenantSettings query fans out across subscriptions: "
             f"1 sub -> {small_settings} selects, 5 subs -> {large_settings}"
         )
-
-    def test_subscription_without_valid_from_returns_zero(
-        self, tenant, tenant_settings
-    ):
-        # The Subscription model has a DB-level NOT NULL on valid_from, so
-        # we can't actually persist a row without it. The service code
-        # still defends with `if not subscription.valid_from: return 0`,
-        # which we exercise via an in-memory instance.
-        sub = _make_subscription()
-        sub.valid_from = None
-        from apps.payments.services import ChargeScheduleService
-
-        n = ChargeScheduleService.regenerate_for_subscription(sub)
-        assert n == 0

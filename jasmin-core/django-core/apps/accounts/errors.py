@@ -67,13 +67,6 @@ class MissingCredentials(_AuthError):
     http_status = 400
 
 
-class TenantMissing(_AuthError):
-    """Request did not resolve to a tenant (wrong host or public schema)."""
-
-    code = "auth.tenant_missing"
-    http_status = 400
-
-
 class RefreshTokenMissing(_AuthError):
     """No refresh cookie on the request."""
 
@@ -255,7 +248,6 @@ __all__ = [
     "TenantMismatch",
     "InvalidToken",
     "MissingCredentials",
-    "TenantMissing",
     "RefreshTokenMissing",
     "InvitationInvalid",
     "RegistrationError",

@@ -77,7 +77,7 @@ def has_two_factor(user: JasminUser) -> bool:
 @dataclass
 class TwoFactorStatus:
     enrolled: bool
-    enrolled_at: Any  # datetime | None — TOTPDevice has no ``created_at``, use ``last_used_at`` only
+    enrolled_at: Any  # datetime | None — the device's ``last_used_at``
     recovery_codes_remaining: int
 
 
@@ -91,10 +91,9 @@ def status_for_user(user: JasminUser) -> TwoFactorStatus:
     remaining = static.token_set.count() if static else 0
     return TwoFactorStatus(
         enrolled=True,
-        # TOTPDevice has no creation timestamp by default; expose last_used_at
-        # for the UI to show "active since" approximately. Good enough — a
-        # real "enrolled at" would need a custom model.
-        enrolled_at=getattr(device, "last_used_at", None),
+        # The device's last verified code (None until its first use), not the
+        # enrolment time the field name suggests.
+        enrolled_at=device.last_used_at,
         recovery_codes_remaining=remaining,
     )
 
@@ -228,7 +227,7 @@ def verify_code(*, user: JasminUser, code: str) -> bool:
     if not has_two_factor(user):
         raise TwoFactorNotEnrolled("Two-factor auth is not active for this user.")
 
-    cleaned = (code or "").replace(" ", "").replace("-", "").strip()
+    cleaned = code.replace(" ", "").replace("-", "").strip()
     if not cleaned:
         raise TwoFactorInvalidCode("Code is empty.")
 
@@ -266,7 +265,7 @@ def regenerate_recovery_codes(*, user: JasminUser, code: str) -> list[str]:
     if not has_two_factor(user):
         raise TwoFactorNotEnrolled("Two-factor auth is not active for this user.")
     totp = _active_totp(user)
-    if totp is None or not totp.verify_token((code or "").replace(" ", "").strip()):
+    if totp is None or not totp.verify_token(code.replace(" ", "").strip()):
         # Recovery codes shouldn't be usable here — we're trying to PROVE
         # the user still holds the TOTP device. Anyone with just a
         # recovery code shouldn't be able to lock the real owner out.

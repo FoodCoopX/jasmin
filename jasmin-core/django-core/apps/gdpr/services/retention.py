@@ -190,7 +190,7 @@ class RetentionChecksMixin:
         obligation) instead of ~5 queries per user. Used by the office GDPR
         pending-deletions inbox, which must reflect current state per row.
         """
-        user_ids = [u.id for u in users if u is not None]
+        user_ids = [u.id for u in users]
         if not user_ids:
             return {}
         today = timezone.localdate()

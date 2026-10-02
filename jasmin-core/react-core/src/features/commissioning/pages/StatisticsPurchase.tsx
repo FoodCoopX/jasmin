@@ -83,9 +83,7 @@ export default function StatisticsPurchase() {
         <RangePicker
           value={range}
           onChange={(v) => setRange(v && v[0] && v[1] ? [v[0], v[1]] : null)}
-          onCalendarChange={(dates) =>
-            setPickedBound(dates ? [dates[0] ?? null, dates[1] ?? null] : null)
-          }
+          onCalendarChange={(dates) => setPickedBound(dates)}
           onOpenChange={(open) => {
             if (!open) setPickedBound(null);
           }}

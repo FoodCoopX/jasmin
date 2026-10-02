@@ -47,7 +47,7 @@ class TenantActiveMiddleware:
             if (
                 tenant is not None
                 and connection.schema_name != get_public_schema_name()
-                and not getattr(tenant, "is_active", True)
+                and not tenant.is_active
             ):
                 logger.warning(
                     "tenant.deactivated.blocked schema=%s path=%s",

@@ -26,9 +26,7 @@ export const useShareDeliveryDays = (params: CommissioningSharesDeliveryDaysList
     }
 
     return toOptions(filteredData, (day) =>
-      DELIVERY_DAY_SHORT_KEYS[day.day_number as number]
-        ? t(DELIVERY_DAY_SHORT_KEYS[day.day_number as number])
-        : String(day.day_number),
+      t(DELIVERY_DAY_SHORT_KEYS[day.day_number]),
     );
   }, [data, params.get_delivery_stations, t]);
 

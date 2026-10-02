@@ -140,7 +140,6 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
     const today = dayjs();
     const byDate = new Map<string, PaymentGroup>();
     for (const charge of rows) {
-      if (!charge.due_date) continue;
       let group = byDate.get(charge.due_date);
       if (!group) {
         group = {
@@ -154,7 +153,7 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
       }
       group.items.push({
         label: charge.subscription_label ?? "",
-        amount: Number.parseFloat(charge.expected_amount ?? "0"),
+        amount: Number.parseFloat(charge.expected_amount),
         status: charge.status ?? "PLANNED",
       });
       if (charge.status !== "PAID") group.isPaid = false;

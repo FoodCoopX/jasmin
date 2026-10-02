@@ -164,7 +164,7 @@ class DeliveryNoteService:
 
         finalize_children(delivery_note.items, delivery_note.crate_items, user=user)
 
-        if delivery_note.order and not delivery_note.order.is_finalized:
+        if not delivery_note.order.is_finalized:
             from .order_service import OrderService
 
             OrderService.finalize_order(delivery_note.order, user=user)
@@ -190,13 +190,13 @@ class DeliveryNoteService:
     def _build_delivery_note_email_context(delivery_note: DeliveryNoteReseller) -> dict:
         """Render the ``{{ var }}`` context for the
         ``commissioning.delivery_note`` template."""
-        from django.db import connection
+        from core.tenant_db import connection
 
         # ``name`` is None for a contact with no company, first or last name.
         reseller_name = delivery_note.order.reseller.contact.name or ""
 
-        tenant = getattr(connection, "tenant", None)
-        tenant_name = getattr(tenant, "name", "") if tenant else ""
+        # A FakeTenant under ``schema_context`` has no ``name``.
+        tenant_name = getattr(connection.tenant, "name", "")
 
         delivery_note_number = delivery_note.full_number
 
@@ -205,8 +205,7 @@ class DeliveryNoteService:
         else:
             date_str = ""
 
-        order = delivery_note.order
-        order_number = order.full_number if order is not None else ""
+        order_number = delivery_note.order.full_number
 
         return {
             "tenant_name": tenant_name,
@@ -236,13 +235,13 @@ class DeliveryNoteService:
         email configured, no PDF on disk, SMTP error, template
         error). Never raises.
         """
-        reseller = delivery_note.order.reseller if delivery_note.order else None
-        if not reseller or not reseller.invoice_email:
+        reseller = delivery_note.order.reseller
+        if not reseller.invoice_email:
             logger.info(
                 "Skipping DN-to-reseller send for DN %s: no "
                 "invoice_email on reseller %s",
                 delivery_note.pk,
-                getattr(reseller, "pk", "<none>"),
+                reseller.pk,
             )
             return False
 

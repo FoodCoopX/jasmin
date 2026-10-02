@@ -147,13 +147,13 @@ export default function SettingsPage({
   );
 
   // Locked settings (optional). React Query gates the call on
-  // ``withLockedSettings`` + a tenant being present; a failure resolves
-  // to an empty list via the select fallback so the page stays usable.
+  // ``withLockedSettings`` + a tenant being present; while the query is
+  // disabled, loading or failed, the ``= []`` default keeps the page usable.
   const { data: lockedSettings = [] } =
     useTenantsSettingsLockedSettingsRetrieve({
       query: {
         enabled: !!withLockedSettings && !!tenant?.id,
-        select: (res) => res.locked_settings ?? [],
+        select: (res) => res.locked_settings,
       },
     });
 

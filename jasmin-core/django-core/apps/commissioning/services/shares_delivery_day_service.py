@@ -30,7 +30,7 @@ def _is_future_and_within_validity(
     *timebound*'s [valid_from, valid_until] window."""
     if record_date <= today:
         return False
-    if timebound.valid_from and record_date < timebound.valid_from:
+    if record_date < timebound.valid_from:
         return False
     if timebound.valid_until and record_date > timebound.valid_until:
         return False
@@ -222,7 +222,7 @@ class SharesDeliveryDayService:
             # idempotent, so the overlap with the sibling is harmless.)
             from .recompute import recompute_shares
 
-            recompute_shares({share.id for share in future_shares if share.id})
+            recompute_shares({share.id for share in future_shares})
 
         return len(future_shares)
 
@@ -315,11 +315,7 @@ class SharesDeliveryDayService:
             from .recompute import recompute_shares
 
             recompute_shares(
-                {
-                    share_delivery.share_id
-                    for share_delivery in updated_deliveries
-                    if share_delivery.share_id
-                }
+                {share_delivery.share_id for share_delivery in updated_deliveries}
             )
 
         return len(updated_deliveries)

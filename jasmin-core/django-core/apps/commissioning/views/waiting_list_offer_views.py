@@ -27,9 +27,9 @@ def _format_address(contact) -> str:
     """ "<street>, <zip> <city>" from a ContactEntity, skipping blank parts."""
     if contact is None:
         return ""
-    street = getattr(contact, "address", "") or ""
-    zip_code = getattr(contact, "zip_code", "") or ""
-    city = getattr(contact, "city", "") or ""
+    street = contact.address
+    zip_code = contact.zip_code
+    city = contact.city
     locality = " ".join(p for p in (zip_code, city) if p)
     return ", ".join(p for p in (street, locality) if p)
 
@@ -37,24 +37,22 @@ def _format_address(contact) -> str:
 def _offer_payload(subscription) -> dict:
     """Flat, PII-light view of an offer for the public accept page."""
     variation = subscription.share_type_variation
-    share_type = getattr(variation, "share_type", None) if variation else None
+    share_type = variation.share_type
     station_day = subscription.default_delivery_station_day
-    station = getattr(station_day, "delivery_station", None) if station_day else None
-    contact = getattr(station, "contact", None) if station else None
+    station = station_day.delivery_station if station_day else None
+    contact = station.contact if station else None
     member = subscription.member
     return {
-        "member_first_name": getattr(member, "first_name", "") or "",
+        "member_first_name": member.first_name or "",
         # Share-type name + RAW size sent separately: the client composes
         # "<qty> × <name> <size-label>" and LOCALIZES the size itself.
         # ``share_type_variation_string`` bakes in the untranslated size, so it
         # can't be re-localized downstream — hence name + size here.
-        "variation_name": getattr(share_type, "name", "") or "",
-        "variation_size": getattr(variation, "size", "") or "",
+        "variation_name": share_type.name or "",
+        "variation_size": variation.size,
         "delivery_station_name": offer_station_name(station_day),
         "delivery_station_address": _format_address(contact),
-        "valid_from": (
-            subscription.valid_from.isoformat() if subscription.valid_from else None
-        ),
+        "valid_from": subscription.valid_from.isoformat(),
         "valid_until": (
             subscription.valid_until.isoformat() if subscription.valid_until else None
         ),

@@ -73,7 +73,7 @@ export function usePackingBaseColumns(
             : ((record.share_article_name as ReactNode) ??
               (value as ReactNode) ??
               "");
-          const backup = record?.backup_share_article_name
+          const backup = record.backup_share_article_name
             ? `${t("commissioning.backup")}: ${record.backup_share_article_name}`
             : null;
           return withBackupSubline(original, backup);
@@ -96,7 +96,7 @@ export function usePackingBaseColumns(
               ? col.render(value, record, index)
               : ((value as ReactNode) ?? "");
             let backup: ReactNode = null;
-            if (record?.backup_share_article_name) {
+            if (record.backup_share_article_name) {
               if (isUnit && record.backup_share_article_unit) {
                 backup = getUnitLabel(
                   record.backup_share_article_unit as string,

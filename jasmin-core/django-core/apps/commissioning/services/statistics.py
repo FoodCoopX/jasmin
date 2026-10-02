@@ -98,12 +98,9 @@ def _compute_variation_averages(
 
         variation_id = record_data["share__share_type_variation_id"]
         day_id = record_data["share__delivery_day__id"]
-        station_id = record_data.get("delivery_station__id")
+        station_id = record_data["delivery_station__id"]
         week = record_data["share__delivery_week"]
         record_year = record_data["share__year"]
-
-        if not station_id:
-            continue
 
         # Convert to kg. ``amount`` and the ``kg_per_*`` columns are all
         # DecimalFields — coerce via ``Decimal(str(...))`` (never

@@ -5,6 +5,6 @@
  * @react-pdf/renderer into the eager bundle.
  */
 export interface CrateQuantity {
-  crate_name?: string;
-  quantity?: number;
+  crate_name: string;
+  quantity: number;
 }

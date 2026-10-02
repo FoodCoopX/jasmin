@@ -147,7 +147,7 @@ function OfferPage({
   previewMode = false,
 }: Omit<OfferPDFProps, "resellers">) {
   const { offers, delivery_week } = data;
-  const locale = tenantSettings?.number_locale ?? "de-DE";
+  const locale = tenantSettings.number_locale ?? "de-DE";
   const { getUnitLabel } = useUnitOptions();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
 
@@ -184,7 +184,7 @@ function OfferPage({
   // or empty. A row whose only non-zero price sat in a dropped tier
   // disappears entirely, rather than rendering with all price cells
   // empty.
-  const filteredOffers = offers?.filter((o) => {
+  const filteredOffers = offers.filter((o) => {
     const p1 = tier1Configured && o.price_1 != null && Number(o.price_1) !== 0;
     const p2 = tier2Configured && o.price_2 != null && Number(o.price_2) !== 0;
     const p3 = tier3Configured && o.price_3 != null && Number(o.price_3) !== 0;
@@ -195,13 +195,13 @@ function OfferPage({
   // it AND (b) at least one row has a non-zero price for it.
   const hasPrice1 =
     tier1Configured &&
-    filteredOffers?.some((o) => o.price_1 != null && Number(o.price_1) !== 0);
+    filteredOffers.some((o) => o.price_1 != null && Number(o.price_1) !== 0);
   const hasPrice2 =
     tier2Configured &&
-    filteredOffers?.some((o) => o.price_2 != null && Number(o.price_2) !== 0);
+    filteredOffers.some((o) => o.price_2 != null && Number(o.price_2) !== 0);
   const hasPrice3 =
     tier3Configured &&
-    filteredOffers?.some((o) => o.price_3 != null && Number(o.price_3) !== 0);
+    filteredOffers.some((o) => o.price_3 != null && Number(o.price_3) !== 0);
   const visibleTiers = [hasPrice1, hasPrice2, hasPrice3].filter(Boolean).length;
   // Redistribute width from hidden tier columns
   // With all 3 tiers: 18+19+15+10+10+10+18 = 100%
@@ -305,7 +305,7 @@ function OfferPage({
           </Text>
         </View>
 
-        {filteredOffers?.map((offer, index) => (
+        {filteredOffers.map((offer, index) => (
           <View key={index} style={styles.tableRow} wrap={false}>
             <Text style={widenedColumnStyles.articleColumn}>
               {offer.share_article_name}

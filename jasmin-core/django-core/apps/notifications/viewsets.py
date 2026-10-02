@@ -102,28 +102,23 @@ def _tenant_language() -> str:
     """Return the current tenant's main language, or DEFAULT_LANGUAGE.
 
     Uses ``connection.tenant`` (django-tenants) which is set on every
-    request in a tenant schema. Falls back gracefully when not running
-    inside a tenant context (e.g. during tests).
+    request in a tenant schema. Outside a tenant context (public schema, or
+    ``schema_context`` in tasks and tests) it is a FakeTenant without
+    ``tenant_language``, which falls back to DEFAULT_LANGUAGE.
     """
-    try:
-        from core.tenant_db import connection
+    from core.tenant_db import connection
 
-        tenant = getattr(connection, "tenant", None)
-        raw = getattr(tenant, "tenant_language", None)
-        lang = normalize_language(raw)
-        logger.info(
-            "email_templates: tenant=%s tenant_language=%r resolved=%r",
-            getattr(tenant, "schema_name", "?"),
-            raw,
-            lang,
-        )
-        if lang:
-            return lang
-    except (AttributeError, ValueError, TypeError):
-        # Tenant context is missing / mis-shaped (test setup, public
-        # schema, etc.) — fall back to DEFAULT_LANGUAGE. Any other
-        # exception is a real bug worth crashing on.
-        logger.exception("email_templates: failed to resolve tenant language")
+    tenant = connection.tenant
+    raw = getattr(tenant, "tenant_language", None)
+    lang = normalize_language(raw)
+    logger.info(
+        "email_templates: tenant=%s tenant_language=%r resolved=%r",
+        connection.schema_name,
+        raw,
+        lang,
+    )
+    if lang:
+        return lang
     return DEFAULT_LANGUAGE
 
 
@@ -246,7 +241,7 @@ class EmailTemplateViewSet(RolePermissionsMixin, viewsets.ViewSet):
             if override.is_customized:
                 custom_by_slug.setdefault(override.slug, []).append(override.language)
             prev = latest_update.get(override.slug)
-            if prev is None or (override.updated_at and override.updated_at > prev):
+            if prev is None or override.updated_at > prev:
                 latest_update[override.slug] = override.updated_at
         items = []
         for spec in all_specs():
@@ -322,7 +317,7 @@ class EmailTemplateViewSet(RolePermissionsMixin, viewsets.ViewSet):
         if "body_text" in data:
             override.body_text = data["body_text"]
         override.is_customized = True
-        override.updated_by = request.user if request.user.is_authenticated else None
+        override.updated_by = auth_user(request)
         override.save()
         return Response(_serialize_detail(spec, override, language))
 
@@ -488,7 +483,7 @@ class EmailLogViewSet(RolePermissionsMixin, viewsets.ReadOnlyModelViewSet):
 
         queryset = EmailLog.objects.all()
 
-        if getattr(self, "action", None) != "list":
+        if self.action != "list":
             # The three filters below scope the LIST. The detail route addresses
             # one log row by id, so applying them there would 404 a row that
             # exists (or 400 the call) over a parameter it never reads.

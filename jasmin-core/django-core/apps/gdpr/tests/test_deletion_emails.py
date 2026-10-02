@@ -189,13 +189,10 @@ class TestSendDeletionPendingAdminOfficeEmail:
     surface the requested email or member name."""
 
     def _set_office_email(self, tenant, address: str | None) -> None:
-        from django.db import connection
-
-        live_tenant = getattr(connection, "tenant", None)
-        if live_tenant is None:
-            return
-        live_tenant.email = address
-        live_tenant.save(update_fields=["email"])
+        # ``tenant`` is the very object the fixture handed to
+        # ``connection.set_tenant``, so the helper under test reads this value.
+        tenant.email = address
+        tenant.save(update_fields=["email"])
 
     def test_sends_to_tenant_email(self, tenant):
         self._set_office_email(tenant, "office@example.org")

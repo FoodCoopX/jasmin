@@ -854,7 +854,7 @@ class SubscriptionSerializer(
             return obj.valid_until.isoformat()
 
         deadline = obj.valid_until - timedelta(weeks=weeks)
-        if obj.valid_from and deadline < obj.valid_from:
+        if deadline < obj.valid_from:
             return None
         return deadline.isoformat()
 
@@ -870,7 +870,7 @@ class SubscriptionSerializer(
 
     def get_display_id(self, obj) -> str:
         """Get human-readable display ID"""
-        return obj.get_display_id() if hasattr(obj, "get_display_id") else obj.id
+        return obj.get_display_id()
 
 
 class CoopShareSerializer(

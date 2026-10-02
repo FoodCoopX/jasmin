@@ -16,7 +16,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from django.db import connection
+from core.tenant_db import connection
 
 
 @dataclass(frozen=True)
@@ -56,6 +56,6 @@ _PRESETS: dict[str, CsvDialect] = {
 
 def get_csv_dialect(tenant: Any | None = None) -> CsvDialect:
     if tenant is None:
-        tenant = getattr(connection, "tenant", None)
+        tenant = connection.tenant
     preset_key = str(getattr(tenant, "csv_format", None) or "de").lower()
     return _PRESETS.get(preset_key, _PRESETS["de"])

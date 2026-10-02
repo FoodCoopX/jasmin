@@ -88,49 +88,42 @@ export default function ExternalCodeMappingsModal({
 
   const variationOptions = useMemo<SelectOption[]>(
     () =>
-      (variationsData ?? [])
-        .filter((v) => !!v.id)
-        .map((v) => {
-          const sizeLabel = v.size ? getShareTypeVariationSizeLabel(v.size) : "";
-          const parts = [v.share_type_name, sizeLabel].filter(Boolean);
-          return {
-            value: v.id as string,
-            label: `${v.id} — ${parts.join(" · ") || t("import_shares.mappings.no_label")}`,
-          };
-        }),
+      (variationsData ?? []).map((v) => {
+        const sizeLabel = getShareTypeVariationSizeLabel(v.size);
+        const parts = [v.share_type_name, sizeLabel].filter(Boolean);
+        return {
+          value: v.id as string,
+          label: `${v.id} — ${parts.join(" · ") || t("import_shares.mappings.no_label")}`,
+        };
+      }),
     [variationsData, getShareTypeVariationSizeLabel, t],
   );
 
   const stationOptions = useMemo<SelectOption[]>(
     () =>
-      (stationsData ?? [])
-        .filter((s) => !!s.id)
-        .map((s) => {
-          const parts = [s.short_name, s.city].filter(Boolean);
-          return {
-            value: s.id as string,
-            label: `${s.id} — ${parts.join(" · ") || t("import_shares.mappings.no_label")}`,
-          };
-        }),
+      (stationsData ?? []).map((s) => {
+        const parts = [s.short_name, s.city].filter(Boolean);
+        return {
+          value: s.id as string,
+          label: `${s.id} — ${parts.join(" · ") || t("import_shares.mappings.no_label")}`,
+        };
+      }),
     [stationsData, t],
   );
 
   const dayOptions = useMemo<SelectOption[]>(
     () =>
-      (daysData ?? [])
-        .filter((d) => !!d.id)
-        .map((d) => {
-          const dayKey = DELIVERY_DAY_SHORT_KEYS[Number(d.day_number)];
-          const dayShort = dayKey ? t(dayKey) : String(d.day_number);
-          const validity = [formatDate(d.valid_from), formatDate(d.valid_until)]
-            .filter(Boolean)
-            .join(" → ");
-          const parts = [dayShort, validity].filter(Boolean);
-          return {
-            value: d.id as string,
-            label: `${d.id} — ${parts.join(" · ")}`,
-          };
-        }),
+      (daysData ?? []).map((d) => {
+        const dayShort = t(DELIVERY_DAY_SHORT_KEYS[d.day_number]);
+        const validity = [formatDate(d.valid_from), formatDate(d.valid_until)]
+          .filter(Boolean)
+          .join(" → ");
+        const parts = [dayShort, validity].filter(Boolean);
+        return {
+          value: d.id as string,
+          label: `${d.id} — ${parts.join(" · ")}`,
+        };
+      }),
     [daysData, t, formatDate],
   );
 
@@ -224,7 +217,7 @@ export default function ExternalCodeMappingsModal({
       // (form values, not just the persisted record). When kind isn't set
       // yet, fall back to the union so the column is never empty/disabled.
       options: (record: Mapping) => {
-        const kind = record?.kind as string | undefined;
+        const kind = record.kind as string | undefined;
         if (kind && optionsByKind[kind]) return optionsByKind[kind];
         return [...variationOptions, ...stationOptions, ...dayOptions];
       },

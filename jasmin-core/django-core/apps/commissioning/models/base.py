@@ -51,7 +51,7 @@ class JasminModel(models.Model):
         (PostgreSQL convention: ``<table>_pkey``) and falls back to a
         narrower string match.
         """
-        cause = getattr(exc, "__cause__", None)
+        cause = exc.__cause__
         constraint_name = getattr(getattr(cause, "diag", None), "constraint_name", None)
         if constraint_name:
             return constraint_name.endswith("_pkey")

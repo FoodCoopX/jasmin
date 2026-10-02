@@ -255,7 +255,6 @@
     "missing_fields": "Please fill in all required fields.",
     "refresh_missing": "Session expired — please sign in again.",
     "tenant_mismatch": "This account does not belong to this tenant.",
-    "tenant_missing": "No tenant specified.",
     "account_blocked": "This account is blocked.",
     "self_registration_disabled": "Self-registration is disabled for this organisation.",
     "step_up_required": "This action requires re-authentication to confirm identity.",

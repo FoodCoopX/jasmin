@@ -96,10 +96,8 @@ export function buildInvoicePdfData(
   invoiceData: InvoiceReseller,
   bankDetails: BankDetails,
 ): InvoicePDFData {
-  const lineItems =
-    (invoiceData.line_items as unknown as LineItemBase[]) || [];
-  const crateItems =
-    (invoiceData.crate_items as unknown as LineItemBase[]) || [];
+  const lineItems = invoiceData.line_items as unknown as LineItemBase[];
+  const crateItems = invoiceData.crate_items as unknown as LineItemBase[];
 
   const taxBreakdown = taxBreakdownFromBackend(invoiceData.tax_breakdown) ?? [];
   const netto =
@@ -120,7 +118,7 @@ export function buildInvoicePdfData(
 
   return {
     invoice: {
-      prefix: invoiceData.prefix ?? undefined,
+      prefix: invoiceData.prefix,
       invoice_number: invoiceData.number ?? undefined,
       invoice_date: invoiceData.date ?? undefined,
       reseller_name: invoiceData.reseller_name,
@@ -155,7 +153,7 @@ export function buildDeliveryNotePdfData(
 ): DeliveryNotePDFData {
   return {
     deliveryNote: {
-      prefix: deliveryNoteData.prefix ?? undefined,
+      prefix: deliveryNoteData.prefix,
       delivery_note_number: deliveryNoteData.number ?? undefined,
       delivery_note_date: deliveryNoteData.date ?? undefined,
       reseller_name: deliveryNoteData.reseller_name,
@@ -169,7 +167,7 @@ export function buildDeliveryNotePdfData(
       document_hash:
         (deliveryNoteData as { document_hash?: string | null }).document_hash ?? "",
     },
-    lineItems: (deliveryNoteData.line_items as unknown as LineItemBase[]) || [],
-    crateItems: (deliveryNoteData.crate_items as unknown as LineItemBase[]) || [],
+    lineItems: deliveryNoteData.line_items as unknown as LineItemBase[],
+    crateItems: deliveryNoteData.crate_items as unknown as LineItemBase[],
   };
 }

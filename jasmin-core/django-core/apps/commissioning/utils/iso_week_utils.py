@@ -15,27 +15,23 @@ def week_day_to_date(year: int, week: int, day_index: int) -> _dt.date:
 
 
 def delivery_date_from_fields(
-    year: int | None,
-    delivery_week: int | None,
+    year: int,
+    delivery_week: int,
     changed_day_number: int | None,
-    delivery_day_number: int | None,
+    delivery_day_number: int,
 ) -> _dt.date | None:
     """Core of :func:`share_delivery_date`, taking the raw Share fields.
 
     Callers that fetched a Share via ``.values(...)`` — to avoid instantiating
     full model instances in a hot loop — resolve the date through this instead
     of the duck-typed variant, keeping one implementation of the day-priority
-    rule. Day priority: explicit ``changed_day_number`` override ->
-    SharesDeliveryDay ``day_number`` -> Monday. The index is a 0=Mon…6=Sun
+    rule. Day priority: explicit ``changed_day_number`` override, else the
+    SharesDeliveryDay ``day_number``. The index is a 0=Mon…6=Sun
     DayNumberOptions value (``week_day_to_date`` raises on out-of-range).
     """
-    if year is None or delivery_week is None:
-        return None
     day_idx = changed_day_number
     if day_idx is None:
         day_idx = delivery_day_number
-    if day_idx is None:
-        day_idx = 0
     try:
         return week_day_to_date(year, delivery_week, day_idx)
     except (ValueError, TypeError):
@@ -47,20 +43,16 @@ def share_delivery_date(share_delivery) -> _dt.date | None:
 
     Reads the linked Share's ISO ``(year, week)`` plus a day index — an
     explicit ``changed_day_number`` if set, else the delivery_day's
-    ``day_number``, defaulting to Monday. Returns ``None`` for a malformed
-    Share row. Duck-typed on ``share_delivery`` so this stays a pure date
-    helper with no model import. Single source for the optin, cancellation
-    and billing-regen flows.
+    ``day_number``. Returns ``None`` for a malformed Share row. Duck-typed on
+    ``share_delivery`` so this stays a pure date helper with no model import.
+    Single source for the optin, cancellation and billing-regen flows.
     """
     share = share_delivery.share
-    if share is None:
-        return None
-    delivery_day = getattr(share, "delivery_day", None)
     return delivery_date_from_fields(
         share.year,
         share.delivery_week,
         share.changed_day_number,
-        getattr(delivery_day, "day_number", None),
+        share.delivery_day.day_number,
     )
 
 
@@ -126,11 +118,12 @@ def coerce_document_date(
             pass
     if fallback_date:
         return fallback_date
+    # ``delivery_week`` is tested for 0, not None: nothing in the database
+    # bounds an order's week, and week 0 names no ISO week.
     if (
         fallback_order is not None
-        and getattr(fallback_order, "year", None)
-        and getattr(fallback_order, "delivery_week", None)
-        and getattr(fallback_order, "day_number", None) is not None
+        and fallback_order.delivery_week
+        and fallback_order.day_number is not None
     ):
         try:
             return week_day_to_date(

@@ -146,7 +146,7 @@ def get_total_quantity_of_share_type_variations(
     totals: dict[str, int] = defaultdict(int)
     for r in rows:
         if r["variation_id"] in variation_lookup:
-            totals[r["variation_id"]] += int(r["count"] or 0)
+            totals[r["variation_id"]] += r["count"]
 
     return sorted(
         (
@@ -159,7 +159,7 @@ def get_total_quantity_of_share_type_variations(
             }
             for variation_id, total in totals.items()
         ),
-        key=lambda r: r["share__share_type_variation__size"] or "",
+        key=lambda r: r["share__share_type_variation__size"],
     )
 
 
@@ -216,7 +216,7 @@ def get_physical_share_type_variation_totals(
     totals: dict[object, Decimal] = defaultdict(Decimal)
     for row in rows:
         var_id = row["variation_id"]
-        count = Decimal(int(row["count"] or 0))
+        count = Decimal(row["count"])
         if var_id in physical_ids:
             totals[var_id] += count
         # Virtual variations distribute their count to physical components.
@@ -228,11 +228,8 @@ def get_physical_share_type_variation_totals(
         {
             "share__share_type_variation_id": str(physical_variation.id),
             "share__share_type_variation__size": physical_variation.size,
-            "share__share_type_variation__name": (
-                physical_variation.name
-                if hasattr(physical_variation, "name")
-                else physical_variation.size
-            ),
+            # A variation has no name of its own; the key carries its size.
+            "share__share_type_variation__name": physical_variation.size,
             "total_quantity": round(totals.get(physical_variation.id, Decimal(0))),
         }
         for physical_variation in physical_variations

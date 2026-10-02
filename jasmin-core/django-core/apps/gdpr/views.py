@@ -12,7 +12,7 @@ from rest_framework.response import Response
 
 from apps.accounts.permissions import RequiresStepUp
 from apps.authz.permissions import IsAdmin
-from apps.shared.request_utils import auth_user, body, client_ip
+from apps.shared.request_utils import auth_user, body, client_ip, request_tenant
 from core.pagination import OptionalLimitOffsetPagination
 from core.serializers import ErrorResponseSerializer
 from core.tenant_db import connection
@@ -459,7 +459,7 @@ def gdpr_admin_pending_deletions_view(request: Request) -> Response:
         [
             deletion_request.user
             for deletion_request in pending_requests
-            if deletion_request.user_id
+            if deletion_request.user is not None
         ]
     )
     pending = [
@@ -621,38 +621,38 @@ def gdpr_processing_activities_view(request: Request) -> Response:
 
     from . import vvt
 
-    tenant = getattr(connection, "tenant", None)
+    tenant = request_tenant(request)
 
     # Controller block: pull every field we know the tenant has on
     # ``Tenant``. legal_form / DPO / data-protection contact / supervisory
     # authority are writable on the Tenant model (the office fills them in
     # ConfigurationGDPR) and read here; empty until the tenant fills them.
     controller = {
-        "organisation_name": getattr(tenant, "name", "") or "",
-        "legal_form": getattr(tenant, "legal_form", "") or "",
+        "organisation_name": tenant.name,
+        "legal_form": tenant.legal_form,
         "registered_address": " ".join(
             filter(
                 None,
                 [
-                    getattr(tenant, "address", "") or "",
+                    tenant.address or "",
                     " ".join(
                         filter(
                             None,
                             [
-                                getattr(tenant, "zip_code", "") or "",
-                                getattr(tenant, "city", "") or "",
+                                tenant.zip_code or "",
+                                tenant.city or "",
                             ],
                         )
                     ),
-                    getattr(tenant, "country", "") or "",
+                    tenant.country or "",
                 ],
             )
         ).strip(),
-        "contact_email": getattr(tenant, "email", "") or "",
-        "contact_phone": getattr(tenant, "phone_number", "") or "",
-        "data_protection_contact": getattr(tenant, "data_protection_contact", "") or "",
-        "dpo": getattr(tenant, "dpo", "") or "",
-        "supervisory_authority": getattr(tenant, "supervisory_authority", "") or "",
+        "contact_email": tenant.email or "",
+        "contact_phone": tenant.phone_number or "",
+        "data_protection_contact": tenant.data_protection_contact,
+        "dpo": tenant.dpo,
+        "supervisory_authority": tenant.supervisory_authority,
     }
 
     payload = {
@@ -673,7 +673,7 @@ def gdpr_processing_activities_view(request: Request) -> Response:
 
     logger.info(
         "gdpr.vvt_exported actor=%s tenant=%s ip=%s",
-        getattr(request.user, "email", "-"),
+        auth_user(request).email,
         connection.schema_name,
         client_ip(request),
     )

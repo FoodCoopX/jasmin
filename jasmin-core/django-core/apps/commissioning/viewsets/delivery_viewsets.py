@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from django.db import transaction
@@ -154,8 +154,8 @@ class DeliveryStationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         """
         context = super().get_serializer_context()
         request = self.request
-        if request is not None and not has_any_role(request, *IsStaff.required_roles):
-            member = getattr(getattr(request, "user", None), "member_profile", None)
+        if not has_any_role(request, *IsStaff.required_roles):
+            member = getattr(request.user, "member_profile", None)
             context["own_station_ids"] = (
                 frozenset(_subscribed_station_ids(member)) if member else frozenset()
             )
@@ -458,9 +458,9 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # existing long-term plan out to it (future weeks only) so its shares
         # are theoretically delivered at the new station without re-running
         # planning by hand.
-        valid_from = serializer.validated_data.get("valid_from")
+        valid_from = serializer.validated_data["valid_from"]
         today = timezone.now().date()
-        if valid_from and valid_from < today:
+        if valid_from < today:
             raise DeliveryDayValidFromInPast(
                 "Cannot create a station-day with valid_from in the past.",
                 field="valid_from",
@@ -473,12 +473,8 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # picker that only bounds the date at today — and once the row is saved
         # the office UI locks both fields, so an out-of-window row could not be
         # repaired from there.
-        delivery_day = serializer.validated_data.get("delivery_day")
-        if (
-            valid_from
-            and delivery_day is not None
-            and valid_from < delivery_day.valid_from
-        ):
+        delivery_day = serializer.validated_data["delivery_day"]
+        if valid_from < delivery_day.valid_from:
             raise DeliveryStationDayStartsBeforeDeliveryDay(
                 station_day=(
                     f"{serializer.validated_data.get('delivery_station')} - "
@@ -503,10 +499,8 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
     @staticmethod
     def _migrate_succession_children(
-        station_day: DeliveryStationDay, valid_from: Any
+        station_day: DeliveryStationDay, valid_from: date
     ) -> None:
-        if valid_from is None:
-            return
         today = timezone.now().date()
         predecessor = (
             DeliveryStationDay.objects.filter(
@@ -565,8 +559,7 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             ):
                 share_delivery.delivery_station_day = resolved
                 deliveries_to_update.append(share_delivery)
-                if share_delivery.share_id:
-                    affected_share_ids.add(share_delivery.share_id)
+                affected_share_ids.add(share_delivery.share_id)
         if deliveries_to_update:
             ShareDelivery.objects.bulk_update(
                 deliveries_to_update, fields=["delivery_station_day"]
@@ -769,7 +762,7 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         delivery_day = params["delivery_day"]
         member = params["member"]
 
-        if getattr(self, "action", None) == "list":
+        if self.action == "list":
             # The capacity window (year / delivery_week / num_weeks) is read by
             # the SERIALIZER, once per row. On a week with no rows nothing ever
             # looks at it, so a malformed value passes silently there while the

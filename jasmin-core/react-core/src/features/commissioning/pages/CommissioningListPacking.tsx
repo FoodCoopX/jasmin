@@ -79,7 +79,7 @@ function buildRows(
     result.push({
       key: id,
       id,
-      share_article: String(row.share_article ?? ""),
+      share_article: row.share_article,
       share_article_name: String(row.share_article_name ?? ""),
       size: (row.size as string | null) ?? null,
       unit: (row.unit as string | null) ?? null,

@@ -49,7 +49,7 @@ class HasAnyRole(BasePermission):
             logger.warning(
                 "permission.denied user=%s tenant=%s ip=%s path=%s method=%s "
                 "required=%s actual=%s view=%s",
-                getattr(request.user, "id", "-"),
+                request.user.id,
                 tenant,
                 client_ip(request),
                 request.path,
@@ -261,7 +261,7 @@ class APIViewRolePermissionsMixin:
 
     def get_permissions(self):
         base = super().get_permissions()
-        method = (getattr(self.request, "method", "") or "").upper()
+        method = self.request.method
         chosen = (
             self.read_permission
             if method in self._READ_METHODS

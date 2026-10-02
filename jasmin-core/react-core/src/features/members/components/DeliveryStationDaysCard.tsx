@@ -18,7 +18,7 @@ const isMoreCurrent = (a: DeliveryStationDay, b: DeliveryStationDay) => {
   const aOpen = a.valid_until == null;
   const bOpen = b.valid_until == null;
   if (aOpen !== bOpen) return aOpen;
-  return (a.valid_from ?? "") > (b.valid_from ?? "");
+  return a.valid_from > b.valid_from;
 };
 
 /** MemberDetail card listing the member's active / upcoming delivery station-days

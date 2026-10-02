@@ -143,7 +143,6 @@ class ShareContentGranularityView(APIViewRolePermissionsMixin, APIView):
         pairs = {
             (item["delivery_station_id"], item["share__delivery_day_id"])
             for item in content_rows
-            if item["delivery_station_id"]
         }
         if not pairs:
             return {}
@@ -201,7 +200,7 @@ class ShareContentGranularityView(APIViewRolePermissionsMixin, APIView):
         for item in content_rows:
             station_id = item["delivery_station_id"]
             day_id = item["share__delivery_day_id"]
-            tour_number = tour_map.get((station_id, day_id)) if station_id else None
+            tour_number = tour_map.get((station_id, day_id))
             key = (
                 item["share_article_id"],
                 item["share__share_type_variation_id"],
@@ -456,7 +455,6 @@ class ShareTypeVariationAmountsForPlanningView(APIViewRolePermissionsMixin, APIV
                 {
                     delivery_station_day.tour_number
                     for delivery_station_day in delivery_station_days
-                    if delivery_station_day.tour_number is not None
                 }
             )
 

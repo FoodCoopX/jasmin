@@ -13,11 +13,11 @@ from datetime import date as dt_date
 from decimal import Decimal
 from typing import Any, Literal
 
-from django.db import connection
 from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 
 from apps.shared.csv_safety import CsvEchoBuffer, escape_csv_row
+from core.tenant_db import connection
 
 from ..errors import InvalidExportDates  # re-exported for back-compat
 from ..models import Harvest, Purchase
@@ -205,7 +205,7 @@ class DocumentationExportService:
         source :func:`get_csv_dialect` reads for its preset, so the headers and
         the machine formatting never diverge. Unknown values degrade to German."""
         if tenant is None:
-            tenant = getattr(connection, "tenant", None)
+            tenant = connection.tenant
         key = str(getattr(tenant, "csv_format", None) or "de").lower()
         # German, not the platform-wide ``DEFAULT_LANGUAGE_CODE``: these labels
         # pair with the ``csv_format`` dialect, whose own default preset is German.
@@ -317,9 +317,9 @@ class DocumentationExportService:
         sums: dict[tuple, dict] = {}
         for instance, _ in filtered:
             key = (
-                instance.share_article.name if instance.share_article else "",
-                instance.unit or "",
-                instance.size or "",
+                instance.share_article.name,
+                instance.unit,
+                instance.size,
             )
             if key not in sums:
                 sums[key] = {
@@ -362,7 +362,7 @@ class DocumentationExportService:
             dialect.format(instance_date),
             instance.delivery_week,
             cls._day_label(instance.day_number, language),
-            instance.share_article.name if instance.share_article else "",
+            instance.share_article.name,
             cls._unit_label(instance.unit, language),
             cls._size_label(instance.size, language),
             amount_cell,
@@ -378,11 +378,11 @@ class DocumentationExportService:
                     if instance.price_per_unit is not None
                     else ""
                 ),
-                instance.storage.name if instance.storage else "",
+                instance.storage.name,
                 instance.note or "",
             ]
         # harvest
         return common_prefix + [
-            instance.storage.name if instance.storage else "",
+            instance.storage.name,
             instance.note or "",
         ]

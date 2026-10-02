@@ -150,8 +150,7 @@ def get_active_share_type_variations(
     variation_ids = {
         r["variation_id"]
         for r in rows
-        if r["variation_id"] is not None
-        and (not station_day_ids or r["station_day_id"] in station_day_ids)
+        if not station_day_ids or r["station_day_id"] in station_day_ids
     }
 
     # Fold virtual variations into their physical components: a virtual

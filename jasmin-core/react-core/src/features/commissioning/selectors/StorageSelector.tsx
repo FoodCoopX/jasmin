@@ -29,11 +29,11 @@ const StorageSelector = ({
     storages.forEach((storage) =>
       opts.push({
         value: storage.value,
-        label: storage.label || t("commissioning.all_storages"),
+        label: storage.label,
       }),
     );
     return opts;
-  }, [storages, include_null_option, t]);
+  }, [storages, include_null_option]);
 
   return (
     <BaseEntitySelector<string>

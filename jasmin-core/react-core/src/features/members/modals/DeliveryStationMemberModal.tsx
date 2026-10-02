@@ -74,7 +74,7 @@ export default function DeliveryStationMemberModal({
     : "";
   const pickup =
     stationDay?.pickup_time_begin || stationDay?.pickup_time_end
-      ? `${hourMinute(stationDay?.pickup_time_begin)}–${hourMinute(stationDay?.pickup_time_end)}`
+      ? `${hourMinute(stationDay.pickup_time_begin)}–${hourMinute(stationDay.pickup_time_end)}`
       : "";
 
   return (

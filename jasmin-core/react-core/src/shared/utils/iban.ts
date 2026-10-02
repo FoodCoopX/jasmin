@@ -48,7 +48,7 @@ export function checkIban(value: string | null | undefined): IbanCheck {
   if (result.valid) {
     return { valid: true, formatted: friendlyFormatIBAN(normalized) ?? "" };
   }
-  return { valid: false, reasons: result.errorCodes ?? [] };
+  return { valid: false, reasons: result.errorCodes };
 }
 
 /**

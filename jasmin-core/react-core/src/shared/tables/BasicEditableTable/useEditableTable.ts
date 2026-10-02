@@ -17,10 +17,10 @@ import type {
 } from "./types";
 
 // SelectOptions built by FK call sites often carry the full backend entity
-// alongside `label`/`value` (e.g. the raw id under `valueField` or the display
-// text under `displayField`). One documented intersection cast here keeps
-// those dynamic-field reads in a single place instead of scattering
-// `as unknown as Record<string, unknown>` at every lookup.
+// alongside `label`/`value` (e.g. the raw id under `valueField`). One
+// documented intersection cast here keeps those dynamic-field reads in a
+// single place instead of scattering `as unknown as Record<string, unknown>`
+// at every lookup.
 const readOptionField = (option: SelectOption, field: string): unknown =>
   (option as SelectOption & Record<string, unknown>)[field];
 
@@ -129,9 +129,9 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
     [dateFormat],
   );
 
-  const createUrl = apiEndpoints?.create;
-  const getUpdateUrl = useCallback((id: Key) => `${apiEndpoints?.update}${id}/`, [apiEndpoints?.update]);
-  const getDeleteUrl = useCallback((id: Key) => `${apiEndpoints?.delete}${id}/`, [apiEndpoints?.delete]);
+  const createUrl = apiEndpoints.create;
+  const getUpdateUrl = useCallback((id: Key) => `${apiEndpoints.update}${id}/`, [apiEndpoints.update]);
+  const getDeleteUrl = useCallback((id: Key) => `${apiEndpoints.delete}${id}/`, [apiEndpoints.delete]);
 
   const transformRowForApi = useCallback(
     (formData: Record<string, unknown>): Record<string, unknown> => {
@@ -179,7 +179,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
 
         columns.forEach((column) => {
           if (column.foreignKey) {
-            const { valueField, displayField } = column.foreignKey;
+            const { valueField } = column.foreignKey;
             const idValue = (record as Record<string, unknown>)[valueField];
 
             if (idValue !== undefined) {
@@ -188,16 +188,14 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
                   ? column.options(record as T)
                   : column.options ?? [];
 
-              const matchingOption = resolvedOptions?.find(
+              const matchingOption = resolvedOptions.find(
                 (option) =>
                   option.value === idValue ||
                   readOptionField(option, valueField) === idValue,
               );
 
               if (matchingOption) {
-                transformedRecord[column.dataIndex] =
-                  matchingOption.label ??
-                  readOptionField(matchingOption, displayField);
+                transformedRecord[column.dataIndex] = matchingOption.label;
                 transformedRecord[valueField] = idValue;
                 transformedRecord[`${column.dataIndex}_id`] = idValue;
               }
@@ -494,24 +492,24 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
           if (apiFunctions?.create) {
             const response = await apiFunctions.create(transformedRow);
             savedRecord =
-              (response?.data as Record<string, unknown>)?.grouped_data ?? response?.data;
+              (response.data as Record<string, unknown>)?.grouped_data ?? response.data;
           } else {
             if (!createUrl) throw new Error("Create URL not configured");
             const response = await axiosService.post(createUrl, transformedRow);
             savedRecord =
-              (response?.data as Record<string, unknown>)?.grouped_data ?? response?.data;
+              (response.data as Record<string, unknown>)?.grouped_data ?? response.data;
           }
         } else {
           if (apiFunctions?.update) {
             const response = await apiFunctions.update(String(key), transformedRow);
             savedRecord =
-              (response?.data as Record<string, unknown>)?.grouped_data ?? response?.data;
+              (response.data as Record<string, unknown>)?.grouped_data ?? response.data;
           } else {
             const updateUrl = getUpdateUrl(key);
-            if (!apiEndpoints?.update) throw new Error("Update URL not configured");
+            if (!apiEndpoints.update) throw new Error("Update URL not configured");
             const response = await axiosService.patch(updateUrl, transformedRow);
             savedRecord =
-              (response?.data as Record<string, unknown>)?.grouped_data ?? response?.data;
+              (response.data as Record<string, unknown>)?.grouped_data ?? response.data;
           }
         }
 
@@ -649,7 +647,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
       onDataChange,
       onSaveSuccess,
       onDeleteSuccess,
-      apiEndpoints?.update,
+      apiEndpoints.update,
       apiFunctions,
       t,
     ],

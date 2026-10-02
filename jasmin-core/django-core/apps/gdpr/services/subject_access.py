@@ -388,7 +388,7 @@ class SubjectAccessMixin:
             "note": reseller.note,
             # Nested contact block — full field-by-field mirror,
             # see ``_sar_contact_entity``.
-            "contact": _sar_contact_entity(contact) if contact else None,
+            "contact": _sar_contact_entity(contact),
         }
 
     @staticmethod
@@ -769,7 +769,8 @@ class SubjectAccessMixin:
                 "status": invitation.status,
                 "created_at": invitation.created_at,
                 "expires_at": invitation.expires_at,
-                "has_token": bool(invitation.token),
+                # ``token`` is a NOT NULL UUID, so every invitation has one.
+                "has_token": True,
             }
             for invitation in rows
         ]

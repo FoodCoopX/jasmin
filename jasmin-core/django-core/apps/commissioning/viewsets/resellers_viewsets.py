@@ -30,6 +30,7 @@ from apps.authz.permissions import (
 from apps.shared.openapi_params import param_schema
 from apps.shared.pii_logging import PIIReadLoggingMixin
 from apps.shared.query_params import coerce_param
+from apps.shared.request_utils import auth_user
 from core.errors import ForbiddenError, NotFoundError
 from core.pagination import OptionalLimitOffsetPagination
 from core.serializers import ErrorResponseSerializer
@@ -165,7 +166,7 @@ def _validate_uploaded_document(uploaded_file, *, kind: str) -> str | None:
     return None
 
 
-def _verify_einvoice_xml_matches(obj, uploaded_xml) -> str | None:
+def _verify_einvoice_xml_matches(obj: InvoiceReseller, uploaded_xml) -> str | None:
     """Cross-check that an uploaded e-invoice XML actually describes THIS
     finalized document, so a wrong or hand-edited e-invoice can't be stored
     and emailed in its place (the magic-byte check alone only proves it is
@@ -182,7 +183,8 @@ def _verify_einvoice_xml_matches(obj, uploaded_xml) -> str | None:
     import defusedxml.ElementTree as ET
     from defusedxml.common import DefusedXmlException
 
-    number = getattr(obj, "number", None)
+    number = obj.number
+    sum_brutto: Decimal | None
     try:
         sum_brutto = obj.sum_brutto
     except (AttributeError, TypeError):
@@ -535,7 +537,7 @@ class ResellerViewSet(PIIReadLoggingMixin, RolePermissionsMixin, viewsets.ModelV
         # What follows are the list page's filters. A detail route and the
         # re-read after a write reach this method too, and must not be narrowed
         # by a query param that happens to be on the URL.
-        if getattr(self, "action", None) != "list":
+        if self.action != "list":
             return queryset
 
         params = validate_query_params(
@@ -806,16 +808,15 @@ class OrderContentViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
         # Non-privileged callers may only create order content for their own
         # linked reseller.
-        reseller = serializer.validated_data.get("reseller")
-        reseller_id = getattr(reseller, "pk", reseller)
-        enforce_own_reseller(request, reseller_id)
+        reseller = serializer.validated_data["reseller"]
+        enforce_own_reseller(request, reseller.pk)
         self._reject_office_only_pricing(request, serializer.validated_data)
         self._require_own_offer_group_offer(
             request, serializer.validated_data, reseller
         )
 
         result = OrderContentService.create_order_with_content_and_crates(
-            created_by=getattr(request, "user", None),
+            created_by=auth_user(request),
             **serializer.validated_data,
         )
         return Response(result)
@@ -850,7 +851,7 @@ class OrderContentViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
     @staticmethod
     def _require_own_offer_group_offer(
-        request: Request, validated_data: dict, reseller: Reseller | None
+        request: Request, validated_data: dict, reseller: Reseller
     ) -> None:
         """Non-privileged (customer) callers may only order an offer of their
         own reseller's offer group — the offers the customer order page lists.
@@ -863,7 +864,7 @@ class OrderContentViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         offer = validated_data.get("offer")
         if offer is None or validated_data.get("share_article") is not None:
             raise OrderContentOfferRequired("Customers may only order offers.")
-        offer_group_id = reseller.offer_group_id if reseller is not None else None
+        offer_group_id = reseller.offer_group_id
         if offer_group_id is None or offer.offer_group_id != offer_group_id:
             raise OrderContentOfferNotInOfferGroup(
                 "This offer is not part of your offer group."
@@ -980,7 +981,7 @@ class OfferViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
         queryset = Offer.objects.all()
 
-        list_route = getattr(self, "action", None) == "list"
+        list_route = self.action == "list"
         params = validate_query_params(
             self.request,
             # The week scope is required on the list route, as the schema has
@@ -1159,7 +1160,7 @@ class CrateOrderContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
             price_per_unit=data.get("price_per_unit"),
             rabatt=data.get("rabatt"),
             note=data.get("note"),
-            created_by=getattr(request, "user", None),
+            created_by=auth_user(request),
         )
         return Response(
             CrateOrderSummarySerializer(result).data,
@@ -1681,8 +1682,8 @@ class DeliveryNoteResellerViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 "PDF not yet uploaded — finalize and upload first."
             )
 
-        reseller = delivery_note.order.reseller if delivery_note.order else None
-        if not reseller or not reseller.invoice_email:
+        reseller = delivery_note.order.reseller
+        if not reseller.invoice_email:
             raise ResellerEmailMissing("Reseller has no invoice_email configured.")
 
         sent = DeliveryNoteService.send_to_reseller(delivery_note)
@@ -1791,7 +1792,7 @@ def _build_commissioning_resellers_entry(order: Order) -> dict[str, Any]:
         "id": str(order.reseller.id),
         # The company, or the person a reseller without one is registered as.
         "name": contact.name or "",
-        "address": contact.address if contact else "",
+        "address": contact.address,
         "order": {
             "id": str(order.id),
             "number": order.display_number,

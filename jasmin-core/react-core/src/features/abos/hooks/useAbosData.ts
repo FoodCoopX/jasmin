@@ -88,7 +88,6 @@ export function useAbosData() {
     const out = new Map<string, string | null | undefined>();
     for (const variation of allShareTypeVariations) {
       const shareTypeId = variation.share_type;
-      if (shareTypeId == null) continue;
       out.set(
         String(variation.value),
         cycleByShareType.get(String(shareTypeId)),

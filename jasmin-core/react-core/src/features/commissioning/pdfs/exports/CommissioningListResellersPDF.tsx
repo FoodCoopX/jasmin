@@ -98,8 +98,7 @@ const CommissioningListResellersPDF = ({
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
 
   const resellersWithOrders = data.filter(
-    (reseller) =>
-      reseller.order?.contents?.length && reseller.order.contents.length > 0,
+    (reseller) => reseller.order.contents.length > 0,
   );
 
   return (
@@ -122,7 +121,7 @@ const CommissioningListResellersPDF = ({
             <View style={localStyles.table}>
               <TableHeader t={t} />
 
-              {reseller.order!.contents.map((item, index) => {
+              {reseller.order.contents.map((item, index) => {
                 const amount = Number(item.amount);
                 const amountPerPu = Number(item.amount_per_pu);
                 const puCount =
@@ -132,7 +131,7 @@ const CommissioningListResellersPDF = ({
                 const formattedAmount = !isNaN(amount)
                   ? formatNumber(amount, 1, locale)
                   : "-";
-                const isLast = index === reseller.order!.contents.length - 1;
+                const isLast = index === reseller.order.contents.length - 1;
 
                 return (
                   <View
@@ -152,7 +151,7 @@ const CommissioningListResellersPDF = ({
                     >
                       <Text style={{ fontWeight: 700 }}>
                         {puCount} {t("commissioning.pu")} ({formattedAmount}{" "}
-                        {getUnitLabel(item.unit ?? "") || ""})
+                        {getUnitLabel(item.unit)})
                       </Text>
                     </View>
                     <View
@@ -164,8 +163,7 @@ const CommissioningListResellersPDF = ({
                     >
                       <Text style={{ fontWeight: 500 }}>
                         {item.share_article_name}
-                        {item.size &&
-                          item.size !== "M" &&
+                        {item.size !== "M" &&
                           `, ${getVegetableSizeLabel(item.size)}`}
                       </Text>
                     </View>
@@ -178,7 +176,7 @@ const CommissioningListResellersPDF = ({
                     >
                       <Text style={{ color: pdfTheme.colors.text.secondary }}>
                         ({formatNumber(item.amount_per_pu, 2, locale)}{" "}
-                        {getUnitLabel(item.unit ?? "") || ""}/
+                        {getUnitLabel(item.unit)}/
                         {t("commissioning.pu")})
                       </Text>
                     </View>
@@ -189,7 +187,7 @@ const CommissioningListResellersPDF = ({
                         listStyles.cellLeft,
                       ]}
                     >
-                      <Text>{item.note || ""}</Text>
+                      <Text>{item.note}</Text>
                     </View>
                     <View
                       style={[

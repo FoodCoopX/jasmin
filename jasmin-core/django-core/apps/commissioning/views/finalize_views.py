@@ -16,7 +16,7 @@ from apps.authz.permissions import (
     IsStaff,
     has_any_role,
 )
-from apps.shared.request_utils import body
+from apps.shared.request_utils import auth_user, body
 from core.errors import ForbiddenError, JasminError, NotFoundError
 from core.serializers import ErrorResponseSerializer
 
@@ -158,7 +158,7 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
         if not objects:
             raise NotFoundError("No objects found with provided IDs")
 
-        results = self._finalize_objects(objects, request.user)
+        results = self._finalize_objects(objects, auth_user(request))
         # 207 Multi-Status when any item failed, so clients branching on the
         # status line see the partial-success state instead of reading 200 and
         # skipping the errors[] array. Mirrors reseller_views _build_bulk_response.
@@ -191,8 +191,6 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
         already_finalized_count = 0
         errors: list[dict[str, str]] = []
 
-        user = user if user.is_authenticated else None
-
         # Reserve the whole batch against the weekly finalization caps up front,
         # so a legitimate bulk finalize doesn't trip the per-minute burst cap on
         # item ~20 (the per-item guards are then suppressed with skip_quota). An
@@ -202,15 +200,12 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
         from apps.shared.tenants.rate_limits import enforce_action_quota_batch
 
         n_invoices = sum(
-            1
-            for o in objects
-            if isinstance(o, InvoiceReseller) and not getattr(o, "is_finalized", False)
+            1 for o in objects if isinstance(o, InvoiceReseller) and not o.is_finalized
         )
         n_delivery_notes = sum(
             1
             for o in objects
-            if isinstance(o, DeliveryNoteReseller)
-            and not getattr(o, "is_finalized", False)
+            if isinstance(o, DeliveryNoteReseller) and not o.is_finalized
         )
         enforce_action_quota_batch(
             RateLimitedAction.INVOICE_FINALIZATION, count=n_invoices, actor=user
@@ -223,9 +218,10 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
 
         def finalize_one(obj: Any) -> None:
             nonlocal finalized_count, already_finalized_count
-            if isinstance(
-                obj, (InvoiceReseller, Order, DeliveryNoteReseller)
-            ) and getattr(obj, "is_finalized", False):
+            if (
+                isinstance(obj, (InvoiceReseller, Order, DeliveryNoteReseller))
+                and obj.is_finalized
+            ):
                 already_finalized_count += 1
                 return
             if isinstance(obj, InvoiceReseller):
@@ -251,8 +247,7 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
                 already_finalized_count += 1
 
         def record_error(obj: Any, exc: Exception) -> None:
-            obj_id = getattr(obj, "id", "unknown")
-            errors.append({"id": str(obj_id), "error": str(exc)})
+            errors.append({"id": str(obj.id), "error": str(exc)})
 
         # ``JasminError`` is in the catch set because the commissioning
         # finalizers raise domain errors for a bad item (e.g. an empty
@@ -495,7 +490,7 @@ class BulkFinalizeShareContentView(APIViewRolePermissionsMixin, APIView):
 
         finalized_count = 0
         already_finalized_count = 0
-        user = request.user if request.user.is_authenticated else None
+        user = auth_user(request)
 
         def count_result(obj: ShareContent, finalized: bool) -> None:
             nonlocal finalized_count, already_finalized_count
@@ -514,8 +509,6 @@ class BulkFinalizeShareContentView(APIViewRolePermissionsMixin, APIView):
                 DatabaseError,
                 DjangoValidationError,
                 ValueError,
-                TypeError,
-                AttributeError,
             ),
             on_error=record_error,
             on_success=count_result,
@@ -592,8 +585,6 @@ class BulkUnfinalizeShareContentView(APIViewRolePermissionsMixin, APIView):
                 DatabaseError,
                 DjangoValidationError,
                 ValueError,
-                TypeError,
-                AttributeError,
             ),
             on_error=record_error,
             on_success=count_result,

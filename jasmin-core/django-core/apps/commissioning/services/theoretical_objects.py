@@ -593,22 +593,13 @@ def _create_theoretical_movements(
 
     for theoretical_purchase in created_objects.get("purchases", []):
         if theoretical_purchase.amount and theoretical_purchase.amount > 0:
-            # ``tp.day_number or PURCHASE_DAY`` would silently rewrite a
-            # Monday purchase (day_number=0) to PURCHASE_DAY=1 (Tuesday).
-            # Unreachable on current data because every TheoreticalPurchase
-            # is created with day_number=PURCHASE_DAY above, but use
-            # ``is not None`` for defense-in-depth.
-            theoretical_purchase_day = (
-                theoretical_purchase.day_number
-                if theoretical_purchase.day_number is not None
-                else PURCHASE_DAY
-            )
             movements_to_create.append(
                 MovementShareArticle(
                     date=make_noon_datetime(
                         theoretical_purchase.year,
                         theoretical_purchase.delivery_week,
-                        theoretical_purchase_day,
+                        # Always PURCHASE_DAY (``_build_theoretical_purchase``).
+                        theoretical_purchase.day_number,
                     ),
                     movement_type="PURCHASE",
                     theoretical_purchase=theoretical_purchase,
@@ -776,18 +767,18 @@ def _dimension_filter(
     storage_id: str | None,
     movement_type: str | None,
 ) -> Q:
-    """The movements of one stock dimension and movement type; an empty unit,
-    size or storage matches NULL."""
+    """The movements of one stock dimension and movement type; an empty
+    storage matches NULL."""
     q = Q(share_article_id=share_article_id, movement_type=movement_type)
-    q &= Q(unit=unit) if unit else Q(unit__isnull=True)
-    q &= Q(size=size) if size else Q(size__isnull=True)
+    q &= Q(unit=unit)
+    q &= Q(size=size)
     q &= Q(storage_id=storage_id) if storage_id else Q(storage__isnull=True)
     return q
 
 
 def _renet_corrections(
     actual_corrections: list[MovementShareArticle],
-    theoretical_movements: Sequence[tuple[Any, Decimal | None]],
+    theoretical_movements: Sequence[tuple[Any, Decimal]],
 ) -> list[MovementShareArticle]:
     """Re-net one dimension's corrections against its theoretical movements
     (``(date, amount)`` pairs) and save those whose amount changed; returns
@@ -817,7 +808,7 @@ def _renet_corrections(
         if carriers[correction.date] is correction:
             theoretical_sum = sum(
                 (
-                    theoretical_amount or Decimal("0")
+                    theoretical_amount
                     for movement_date, theoretical_amount in theoretical_movements
                     if movement_date == correction.date
                 ),

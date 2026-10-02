@@ -81,7 +81,7 @@ def _days_inventory_map(
             # Sum ALL of the day's INVENTORY corrections for this entity so
             # the theoretical baseline subtracts every same-day correction,
             # not just the last. Display fields keep the last row's.
-            "amount": prior_amount + (movement.amount or Decimal("0")),
+            "amount": prior_amount + movement.amount,
             # ``counted_amount IS NULL`` marks a metadata-only row (flags/note
             # toggled, no count) — the read path must not treat it as a count.
             # Keep the last row's, like the display fields.
@@ -215,9 +215,8 @@ class StockService:
             size,
             storage_id,
             movement_date,
-            amount,
+            movement_amount,
         ) in all_movements:
-            movement_amount = amount or Decimal("0")
             if movement_amount == 0:
                 continue
 
@@ -288,9 +287,7 @@ class StockService:
         )
         for share_article_id, unit, size, storage_id, amount in future_qs:
             key = _entity_key(share_article_id, unit, size, storage_id)
-            future_sums[key] = future_sums.get(key, Decimal("0")) + (
-                amount or Decimal("0")
-            )
+            future_sums[key] = future_sums.get(key, Decimal("0")) + amount
 
         # Entities to emit: union of balances and today's inventories
         all_keys = set(balances) | set(inventory_map)

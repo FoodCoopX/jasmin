@@ -62,7 +62,7 @@ class JasminModel(models.Model):
         (PostgreSQL convention: ``<table>_pkey``) and falls back to a
         narrower string match.
         """
-        cause = getattr(exc, "__cause__", None)
+        cause = exc.__cause__
         constraint_name = getattr(getattr(cause, "diag", None), "constraint_name", None)
         if constraint_name:
             return constraint_name.endswith("_pkey")
@@ -221,7 +221,7 @@ class Tenant(TenantMixin, JasminModel):
         filename instead would avoid that but breaks when Django reuses a name
         after a delete-then-upload, which is the failure that actually hurts.
         """
-        if not self.app_icon or not self.updated_at:
+        if not self.app_icon:
             return ""
         return f"{int(self.updated_at.timestamp())}{self.updated_at.microsecond:06d}"
 

@@ -30,7 +30,6 @@ from .errors import (
     EmptyNumberingPrefix,
     InvalidSettingsPayload,
     InvalidSettingsValue,
-    NoTenantContext,
     YearNumberingLocked,
 )
 from .models import (
@@ -215,7 +214,7 @@ class TenantViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # subdomain. An unfiltered ``Tenant.objects.all()`` would cross
         # over to the public schema and list every tenant on the platform.
         tenant = getattr(self.request, "tenant", None)
-        if tenant is None or getattr(tenant, "schema_name", "") == "public":
+        if tenant is None or tenant.schema_name == "public":
             return Tenant.objects.none()
         return Tenant.objects.filter(pk=tenant.pk)
 
@@ -265,7 +264,7 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
         # query-param plumbing needed (and no chance of one tenant asking for
         # another's settings).
         tenant = getattr(self.request, "tenant", None)
-        if tenant is None or getattr(tenant, "schema_name", "") == "public":
+        if tenant is None or tenant.schema_name == "public":
             return TenantSettings.objects.none()
 
         return TenantSettings.objects.filter(
@@ -308,9 +307,7 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
         """Update current settings for the calling tenant by closing the
         current version and creating a new one. The tenant is taken from
         ``request.tenant`` (set by TenantMainMiddleware from the subdomain)."""
-        tenant = getattr(request, "tenant", None)
-        if tenant is None or getattr(tenant, "schema_name", "") == "public":
-            raise NoTenantContext("No tenant context")
+        tenant = request_tenant(request)
 
         now = timezone.now()
 
@@ -355,8 +352,8 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
         if changed_sensitive:
             logger.info(
                 "tenant_settings.sensitive_changed actor=%s tenant=%s ip=%s changes=%s",
-                getattr(request.user, "id", "-"),
-                getattr(tenant, "schema_name", "-"),
+                auth_user(request).id,
+                tenant.schema_name,
                 client_ip(request),
                 "; ".join(
                     f"{field}:{old}->{new}"
@@ -392,7 +389,7 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
             if sensitive_field not in new_settings_data:
                 continue
             if current_settings is not None:
-                old_value: Any = getattr(current_settings, sensitive_field, None)
+                old_value: Any = getattr(current_settings, sensitive_field)
             else:
                 old_value = TenantSettings._meta.get_field(
                     sensitive_field
@@ -582,19 +579,10 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
         try:
             new_settings.full_clean(exclude=exclude_from_clean, validate_unique=False)
         except DjangoValidationError as exc:
-            error_by_field = (
-                exc.message_dict
-                if hasattr(exc, "message_dict")
-                else {"__all__": exc.messages}
-            )
-            offending_field = next(iter(error_by_field), None)
-            message = (
-                "; ".join(error_by_field.get(offending_field, []))
-                if offending_field
-                else "Invalid settings value."
-            )
+            error_by_field = exc.message_dict
+            offending_field = next(iter(error_by_field))
             raise InvalidSettingsValue(
-                message,
+                "; ".join(error_by_field[offending_field]),
                 field=offending_field if offending_field != "__all__" else None,
             ) from exc
 
@@ -631,10 +619,6 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
         name to ``public_read_actions`` or split it onto a method-aware
         mixin.
         """
-        tenant = getattr(request, "tenant", None)
-        if tenant is None or getattr(tenant, "schema_name", "") == "public":
-            raise NoTenantContext("No tenant context")
-
         locked: list[str] = []
         for setting_field, (model_path, _label) in YEAR_BASED_SETTING_TO_MODEL.items():
             from django.utils.module_loading import import_string
@@ -801,7 +785,7 @@ class TenantEmailConfigViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
             address.strip().lower()
             for address in (
                 auth_user(request).email,
-                getattr(config.tenant, "email", None),
+                config.tenant.email,
             )
             if address
         }
@@ -840,7 +824,7 @@ class TenantEmailConfigViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
         # if they want (it only affects their own future test sends).
         # ``EmailCategory.TEST_SEND`` keeps it going out in onboarding mode,
         # when tenants typically set up their SMTP.
-        tenant_name = getattr(getattr(config, "tenant", None), "name", "")
+        tenant_name = config.tenant.name
         try:
             ok = EmailService().send_email(
                 slug="tenants.smtp_test",

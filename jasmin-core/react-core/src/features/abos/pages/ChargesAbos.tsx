@@ -35,15 +35,18 @@ interface MemberGroup {
   total: number;
 }
 
-interface DisplayRow {
+interface DisplayRowBase {
   key: string;
-  type: "charge" | "subtotal";
-  charge?: ChargeRow;
   memberLabel?: string;
   memberRowSpan?: number;
   subtotal?: number;
   rowCount?: number;
 }
+
+// A charge row always carries its charge; a subtotal row has none.
+type DisplayRow =
+  | (DisplayRowBase & { type: "charge"; charge: ChargeRow })
+  | (DisplayRowBase & { type: "subtotal"; charge?: undefined });
 
 export default function ChargesAbos() {
   const { t } = useTranslation();
@@ -81,7 +84,7 @@ export default function ChargesAbos() {
     for (const r of rows) {
       const status = r.status ?? "?";
       const statusTotal = map.get(status) ?? { total: 0, count: 0 };
-      statusTotal.total += Number.parseFloat(r.expected_amount ?? "0");
+      statusTotal.total += Number.parseFloat(r.expected_amount);
       statusTotal.count += 1;
       map.set(status, statusTotal);
     }
@@ -101,7 +104,7 @@ export default function ChargesAbos() {
   const grouped: MemberGroup[] = useMemo(() => {
     const map = new Map<string, MemberGroup>();
     for (const r of filteredRows) {
-      const key = r.member ?? "?";
+      const key = r.member;
       const memberNumberPrefix = r.member_number
         ? `#${r.member_number} `
         : "";
@@ -118,10 +121,10 @@ export default function ChargesAbos() {
       }
       const g = map.get(key)!;
       g.rows.push(r);
-      g.total += Number.parseFloat(r.expected_amount ?? "0");
+      g.total += Number.parseFloat(r.expected_amount);
     }
     for (const g of map.values()) {
-      g.rows.sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
+      g.rows.sort((a, b) => a.due_date.localeCompare(b.due_date));
     }
     return [...map.values()].sort((a, b) =>
       a.memberLabel.localeCompare(b.memberLabel),
@@ -158,13 +161,13 @@ export default function ChargesAbos() {
     setRegenerating(true);
     try {
       const res = await paymentsChargeSchedulesRegenerateCreate();
-      const created = Object.values(res?.details ?? {}).reduce(
-        (a: number, b) => a + Number(b ?? 0),
+      const created = Object.values(res.details).reduce(
+        (a: number, b) => a + Number(b),
         0,
       );
       notify.success(
         t("abos.charges_regenerated", {
-          subscriptions: res?.regenerated_subscriptions ?? 0,
+          subscriptions: res.regenerated_subscriptions,
           rows: created,
         }),
       );
@@ -205,7 +208,7 @@ export default function ChargesAbos() {
               </span>
             );
           }
-          return r.charge?.subscription_label;
+          return r.charge.subscription_label;
         },
       },
       {
@@ -274,9 +277,7 @@ export default function ChargesAbos() {
           if (r.type === "subtotal") {
             return <strong>{formatCurrency(r.subtotal ?? 0)}</strong>;
           }
-          return formatCurrency(
-            Number.parseFloat(r.charge?.expected_amount ?? "0"),
-          );
+          return formatCurrency(Number.parseFloat(r.charge.expected_amount));
         },
       },
     ],

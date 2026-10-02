@@ -118,19 +118,12 @@ const FormInput = forwardRef<InputRef, FormInputProps>(
     ): HTMLInputElement | null => {
       if (!(target instanceof HTMLElement)) return null;
       if (target instanceof HTMLInputElement) return target;
-      return target.querySelector?.("input") ?? null;
+      return target.querySelector("input");
     };
 
     const selectInput = (input: HTMLInputElement | null) => {
       if (!input) return;
-      if (typeof input.select === "function") {
-        input.select();
-      } else if (
-        typeof input.setSelectionRange === "function" &&
-        typeof input.value === "string"
-      ) {
-        input.setSelectionRange(0, input.value.length);
-      }
+      input.select();
     };
 
     const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
@@ -175,10 +168,8 @@ const FormInput = forwardRef<InputRef, FormInputProps>(
       }
     };
 
-    const handleInputChange = (e: ChangeEvent<HTMLInputElement> | unknown) => {
-      const inputValue = (e as ChangeEvent<HTMLInputElement>).target
-        ? (e as ChangeEvent<HTMLInputElement>).target.value
-        : e;
+    const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+      const inputValue = e.target.value;
 
       if (onChange) {
         onChange(e);

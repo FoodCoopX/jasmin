@@ -199,9 +199,6 @@ class ChargeScheduleService:
 
         Returns the count of PLANNED rows after the operation.
         """
-        if not subscription.valid_from:
-            logger.info("subscription %s has no valid_from; skipping", subscription.pk)
-            return 0
         # A waiting-list subscription must NOT get a billable ledger — it
         # is not yet a committed membership and must never enter a SEPA run. The
         # bulk regenerate_all path filters these out (on_waiting_list=False); the
@@ -261,8 +258,6 @@ class ChargeScheduleService:
         periods = list(
             _iter_cycle_periods(subscription.valid_from, valid_until, cycle_choice)
         )
-        if not periods:
-            return 0
 
         delivery_dates = ChargeScheduleService._billable_delivery_dates(
             subscription, deliveries, valid_until, billing
@@ -345,15 +340,16 @@ class ChargeScheduleService:
         # SEPA-debit both the served AND the now-cancelled portion. Unbundle it
         # too so the delete below drops it and the loop recreates it at the
         # clamped period [period_start, valid_until] with a prorated amount.
-        # Same DRAFT-only / PLANNED-only safety; only relevant when truncated.
-        if valid_until is not None:
-            ChargeSchedule.objects.filter(
-                subscription=subscription,
-                status=ChargeStatus.PLANNED,
-                period_start__lte=valid_until,
-                period_end__gt=valid_until,
-                billing_run__status=BillingRunStatus.DRAFT,
-            ).update(billing_run=None)
+        # Same DRAFT-only / PLANNED-only safety; only a truncated term leaves a
+        # bundled period straddling ``valid_until``, so otherwise this matches
+        # no row.
+        ChargeSchedule.objects.filter(
+            subscription=subscription,
+            status=ChargeStatus.PLANNED,
+            period_start__lte=valid_until,
+            period_end__gt=valid_until,
+            billing_run__status=BillingRunStatus.DRAFT,
+        ).update(billing_run=None)
 
     @staticmethod
     def _resolve_locked_periods(
@@ -559,7 +555,7 @@ class ChargeScheduleService:
                 period_end=period.end,
                 due_date=_due_date_for(period.start, period.end, billing.due_day),
                 expected_amount=amount,
-                currency=tenant.currency or "EUR",
+                currency=tenant.currency,
                 description=ChargeScheduleService._description(subscription, period),
                 status=ChargeStatus.PLANNED,
             )
@@ -624,8 +620,7 @@ class ChargeScheduleService:
     # ------------------------------------------------------------------ #
     @staticmethod
     def _description(subscription: Subscription, period: _Period) -> str:
-        share_type_variation = getattr(subscription, "share_type_variation", None)
-        label = str(share_type_variation) if share_type_variation else "Subscription"
+        label = str(subscription.share_type_variation)
         return f"{label} {period.start.isoformat()}-{period.end.isoformat()}"[:140]
 
     # ------------------------------------------------------------------ #
@@ -1029,7 +1024,7 @@ class BillingRunService:
         # eligible charges. A mixed-currency set would yield a meaningless
         # cross-currency total (for SEPA the per-charge EUR guard fires at export,
         # but a BANK_TRANSFER run never hits it). Require a single currency.
-        currencies = {(charge.currency or "EUR") for charge in eligible_charges}
+        currencies = {charge.currency for charge in eligible_charges}
         if len(currencies) > 1:
             raise BillingRunMixedCurrency(
                 "Eligible charges span multiple currencies "
@@ -1240,14 +1235,14 @@ class BillingRunService:
         # --- Creditor identity (the farm / cooperative) -----------------
         # The pain.008 export requires these fields. Fail loudly here rather
         # than producing a half-built XML the bank would reject anyway.
-        creditor_name = (tenant.sepa_creditor_name or "").strip()
-        creditor_id = (tenant.sepa_creditor_id or "").strip()
+        creditor_name = tenant.sepa_creditor_name.strip()
+        creditor_id = tenant.sepa_creditor_id.strip()
         creditor_iban = (tenant.iban or "").replace(" ", "")
         # ``sepaxml`` requires BIC in its config even though
         # pain.008.001.02 marks the field as optional in the actual
         # XML. The library validates the config up-front and won't
         # accept an empty BIC — so we require it here for parity.
-        creditor_bic = (tenant.sepa_creditor_bic or "").strip().upper()
+        creditor_bic = tenant.sepa_creditor_bic.strip().upper()
         missing = [
             name
             for name, value in (
@@ -1280,8 +1275,8 @@ class BillingRunService:
         # below so each member sees readable text instead of the internal
         # ``ChargeSchedule.description`` (share label + ISO date range).
         remittance_template = (
-            tenant.sepa_remittance_template or ""
-        ).strip() or _DEFAULT_SEPA_REMITTANCE_TEMPLATE
+            tenant.sepa_remittance_template.strip() or _DEFAULT_SEPA_REMITTANCE_TEMPLATE
+        )
 
         ordered = sorted(
             charges,
@@ -1307,8 +1302,8 @@ class BillingRunService:
                 )
             mandate_ref = (billing_profile.sepa_mandate_reference or "").strip()
             mandate_signed = billing_profile.sepa_mandate_signed_at
-            debtor_iban = (billing_profile.iban or "").replace(" ", "")
-            debtor_name = (billing_profile.account_holder or "").strip()
+            debtor_iban = billing_profile.iban.replace(" ", "")
+            debtor_name = billing_profile.account_holder.strip()
             if not (mandate_ref and mandate_signed and debtor_iban and debtor_name):
                 raise SepaExportInvalid(
                     f"Charge {charge.pk}: debtor missing mandate fields "
@@ -1335,7 +1330,7 @@ class BillingRunService:
             # free CharField) would otherwise be silently direct-debited as the
             # same numeric amount in EUR. Fail loudly instead of emitting a
             # wrong-currency debit.
-            if (charge.currency or "EUR") != "EUR":
+            if charge.currency != "EUR":
                 raise SepaExportInvalid(
                     f"Charge {charge.pk}: currency {charge.currency} is not EUR; "
                     "SEPA pain.008 is EUR-only.",

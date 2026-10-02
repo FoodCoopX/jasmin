@@ -70,7 +70,7 @@ class TenantService:
                 tenant = Tenant.objects.create(
                     schema_name=schema_name,
                     name=name,
-                    tenant_language=tenant_language or "",
+                    tenant_language=tenant_language,
                 )
                 Domain.objects.create(domain=domain, tenant=tenant, is_primary=True)
                 # Versioned settings row: every tenant needs one current
@@ -105,7 +105,7 @@ class TenantService:
             # tenant). Drop it (row + schema + cascaded Domain/TenantSettings).
             # Re-fetch in the public schema — django-tenants forbids deleting a
             # tenant from another tenant's schema_context.
-            if tenant is not None and tenant.pk:
+            if tenant is not None:
                 try:
                     with schema_context("public"):
                         Tenant.objects.get(pk=tenant.pk).delete(force_drop=True)

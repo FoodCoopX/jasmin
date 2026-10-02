@@ -78,7 +78,7 @@ export default function UserMenu() {
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase() ?? "")
+    .map((s) => s[0].toUpperCase())
     .join("") || <UserOutlined />;
   const memberId = currentUser?.member_id;
 

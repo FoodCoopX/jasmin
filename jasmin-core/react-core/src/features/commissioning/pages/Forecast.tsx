@@ -250,7 +250,7 @@ export default function Forecast() {
           for_all_harvest_shares: true,
           ...(shareTypeVariationsCount > 1 &&
             Object.fromEntries(
-              (shareTypeVariations ?? []).map((v) => [
+              shareTypeVariations.map((v) => [
                 variationColumnKey(v.id!),
                 true,
               ]),
@@ -259,7 +259,7 @@ export default function Forecast() {
             for_all_harvest_shares_fruit: true,
             ...(shareTypeVariationsFruitsCount > 1 &&
               Object.fromEntries(
-                (shareTypeVariationsFruits ?? []).map((v) => [
+                shareTypeVariationsFruits.map((v) => [
                   variationColumnKey(v.id!),
                   true,
                 ]),
@@ -292,12 +292,11 @@ export default function Forecast() {
   // variation re-ticks the master. (``setFieldsValue`` doesn't fire onChange,
   // so these can't loop.)
   const vegVariationKeys = useMemo(
-    () => (shareTypeVariations ?? []).map((v) => variationColumnKey(v.id!)),
+    () => shareTypeVariations.map((v) => variationColumnKey(v.id!)),
     [shareTypeVariations],
   );
   const fruitVariationKeys = useMemo(
-    () =>
-      (shareTypeVariationsFruits ?? []).map((v) => variationColumnKey(v.id!)),
+    () => shareTypeVariationsFruits.map((v) => variationColumnKey(v.id!)),
     [shareTypeVariationsFruits],
   );
 
@@ -345,22 +344,20 @@ export default function Forecast() {
   );
 
   const shareTypeVariationColumns = useMemo(() => {
-    return (
-      shareTypeVariations?.map((variation) => ({
-        title: (
-          <>
-            {t("commissioning.for_size", {
-              size: getShareTypeVariationSizeLabel(variation.size),
-            })}
-          </>
-        ),
-        dataIndex: variationColumnKey(variation.id!),
-        inputType: "checkbox",
-        key: variationColumnKey(variation.id!),
-        align: "center",
-        onFieldChange: onVegVariationChange,
-      })) || []
-    );
+    return shareTypeVariations.map((variation) => ({
+      title: (
+        <>
+          {t("commissioning.for_size", {
+            size: getShareTypeVariationSizeLabel(variation.size),
+          })}
+        </>
+      ),
+      dataIndex: variationColumnKey(variation.id!),
+      inputType: "checkbox",
+      key: variationColumnKey(variation.id!),
+      align: "center",
+      onFieldChange: onVegVariationChange,
+    }));
   }, [
     shareTypeVariations,
     t,
@@ -369,22 +366,20 @@ export default function Forecast() {
   ]);
 
   const shareTypeVariationFruitsColumns = useMemo(() => {
-    return (
-      shareTypeVariationsFruits?.map((variation) => ({
-        title: (
-          <>
-            {t("commissioning.for_size", {
-              size: getShareTypeVariationSizeLabel(variation.size),
-            })}
-          </>
-        ),
-        dataIndex: variationColumnKey(variation.id!),
-        inputType: "checkbox",
-        key: variationColumnKey(variation.id!),
-        align: "center",
-        onFieldChange: onFruitVariationChange,
-      })) || []
-    );
+    return shareTypeVariationsFruits.map((variation) => ({
+      title: (
+        <>
+          {t("commissioning.for_size", {
+            size: getShareTypeVariationSizeLabel(variation.size),
+          })}
+        </>
+      ),
+      dataIndex: variationColumnKey(variation.id!),
+      inputType: "checkbox",
+      key: variationColumnKey(variation.id!),
+      align: "center",
+      onFieldChange: onFruitVariationChange,
+    }));
   }, [
     shareTypeVariationsFruits,
     t,
@@ -393,22 +388,20 @@ export default function Forecast() {
   ]);
 
   const offerGroupColumns = useMemo(() => {
-    return (
-      offerGroups?.map((group) => ({
-        title: (
-          <>
-            {t("commissioning.for_offer_group", {
-              offer_group_number: group.number,
-            })}
-          </>
-        ),
-        dataIndex: `offer_group_${group.id}`,
-        inputType: "checkbox",
-        key: `offer_group_${group.id}`,
-        align: "center",
-        disabled: isResellerDisabled,
-      })) || []
-    );
+    return offerGroups.map((group) => ({
+      title: (
+        <>
+          {t("commissioning.for_offer_group", {
+            offer_group_number: group.number,
+          })}
+        </>
+      ),
+      dataIndex: `offer_group_${group.id}`,
+      inputType: "checkbox",
+      key: `offer_group_${group.id}`,
+      align: "center",
+      disabled: isResellerDisabled,
+    }));
   }, [offerGroups, isResellerDisabled, t]);
 
   const columns = useForecastColumns({

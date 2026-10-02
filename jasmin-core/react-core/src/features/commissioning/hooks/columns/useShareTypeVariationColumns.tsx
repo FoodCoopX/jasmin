@@ -72,7 +72,6 @@ export const useShareTypeVariationColumns = (
   const shareTypeGroups = useMemo<ShareTypeVariationGroup[]>(() => {
     const groups = new Map<string, ShareTypeVariationGroup>();
     for (const v of variations) {
-      if (!v.share_type) continue;
       let group = groups.get(v.share_type);
       if (!group) {
         group = {
@@ -93,12 +92,10 @@ export const useShareTypeVariationColumns = (
       g.variations.sort(
         (a, b) =>
           (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
-          (a.size ?? "").localeCompare(b.size ?? ""),
+          a.size.localeCompare(b.size),
       ),
     );
-    out.sort((a, b) =>
-      (a.share_type_name ?? "").localeCompare(b.share_type_name ?? ""),
-    );
+    out.sort((a, b) => a.share_type_name.localeCompare(b.share_type_name));
     return out;
   }, [variations]);
 

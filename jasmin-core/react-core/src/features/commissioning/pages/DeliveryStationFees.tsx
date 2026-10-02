@@ -138,7 +138,7 @@ export default function DeliveryStationFees() {
         t("commissioning.rate_net"),
         t("commissioning.total_net"),
       ];
-      const csvRows = (feeRows ?? []).map((row: DeliveryStationFees) => [
+      const csvRows = feeRows.map((row: DeliveryStationFees) => [
         row.delivery_station_name ?? row.delivery_station,
         feeTypeLabel(row.fee_type),
         `${row.quantity} ${row.quantity_unit}`,

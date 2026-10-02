@@ -83,7 +83,6 @@ class TestMov1CarriesTheoreticals:
         assert carries(Harvest(storage=short_term)) is True
         assert carries(Harvest(storage=long_term)) is True
         assert carries(Harvest(storage=other)) is False
-        assert carries(Harvest(storage=None)) is False
 
 
 @pytest.mark.django_db

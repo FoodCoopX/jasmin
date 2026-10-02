@@ -514,8 +514,7 @@ class _ShareDeliveryWriteChoreographyMixin:
             # the new delivery under-bills until some other change happens to
             # re-trigger charge regeneration.
             self._notify_subscription_changed_for(instance)
-            if instance.share_id:
-                recompute_shares([instance.share_id])
+            recompute_shares([instance.share_id])
 
     def perform_destroy(self, instance):
         from apps.shared.subscription_hooks import notify_subscription_changed
@@ -530,25 +529,24 @@ class _ShareDeliveryWriteChoreographyMixin:
             instance.delete()
             if subscription is not None:
                 notify_subscription_changed(subscription)
-            if share_id:
-                recompute_shares([share_id])
+            recompute_shares([share_id])
 
     @staticmethod
     def _assert_capacity_for_new_delivery(serializer) -> None:
         """Block creating a (harvest) delivery onto a full station-day.
 
         Resolves from ``validated_data`` (no instance yet); a fresh slot →
-        ``moving_delivery_id=None`` (incoming quantity 1). No-op for
-        non-harvest options / uncapped station-days; ``select_for_update``
-        inside is race-safe.
+        ``moving_delivery_id=None`` (incoming quantity 1). No-op without a
+        station-day, and the service skips additional share types;
+        ``select_for_update`` inside is race-safe.
         """
         from ..services import CapacityReservationService
 
-        share = serializer.validated_data.get("share")
+        share = serializer.validated_data["share"]
         target_delivery_station_day = serializer.validated_data.get(
             "delivery_station_day"
         )
-        if share is not None and target_delivery_station_day is not None:
+        if target_delivery_station_day is not None:
             CapacityReservationService.assert_share_delivery_fits(
                 delivery_station_day_id=target_delivery_station_day.id,
                 year=share.year,
@@ -573,14 +571,13 @@ class _ShareDeliveryWriteChoreographyMixin:
         to another week alone would otherwise walk straight into a full week.
 
         ``target_share`` is the Share the save will write (``None`` → the row
-        keeps its current one). No-op when neither half changes, when the
-        station-day is unset, or when the row has no share to derive
-        year/week/option from. Call BEFORE ``serializer.save()`` — it reads the
+        keeps its current one). No-op when neither half changes or when the
+        station-day is unset. Call BEFORE ``serializer.save()`` — it reads the
         pre-save instance.
         """
         from ..services import CapacityReservationService
 
-        if target_delivery_station_day is None or not instance.share_id:
+        if target_delivery_station_day is None:
             return
 
         share = target_share or instance.share
@@ -667,7 +664,7 @@ class ShareDeliveryViewSet(
     _MEMBER_ACTIONS = frozenset({"toggle_optin", "pending_optin", "exception_gaps"})
 
     def get_permissions(self):
-        if getattr(self, "action", None) in self._MEMBER_ACTIONS:
+        if self.action in self._MEMBER_ACTIONS:
             base = [permission() for permission in self.permission_classes]
             return base + [IsOfficeOrMember()]
         return super().get_permissions()
@@ -1029,12 +1026,9 @@ class ShareDeliveryViewSet(
             "delivery_station_day", instance.delivery_station_day
         )
         # Same share type across the subscription → one flag drives the capacity
-        # check for the primary delivery and any future ones. No share to place
-        # → treat as non-capacity-consuming so the check is skipped.
+        # check for the primary delivery and any future ones.
         is_additional_share_type = (
             instance.share.share_type_variation.share_type.is_additional_share_type
-            if instance.share_id
-            else True
         )
         # The serializer's BooleanField has already parsed the flag, so
         # "false"/0/"no" are False here; reading the raw body instead would
@@ -1046,7 +1040,7 @@ class ShareDeliveryViewSet(
             # The delivery's ORIGINAL day/week — captured before we re-point the
             # Share, so the apply-to-future scan still finds this member's other
             # deliveries on their existing weekday.
-            original_share = instance.share if instance.share_id else None
+            original_share = instance.share
             affected_share_ids: set = set()
 
             # The Share the save will write: an explicit reassignment in the
@@ -1061,12 +1055,10 @@ class ShareDeliveryViewSet(
             # capacity gate below sees the slot the save actually writes.
             if (
                 target_delivery_station_day
-                and target_share
                 and target_delivery_station_day.delivery_day_id
                 != target_share.delivery_day_id
             ):
-                if original_share:
-                    affected_share_ids.add(original_share.id)
+                affected_share_ids.add(original_share.id)
                 target_share = self._share_for_delivery_day(
                     target_share, target_delivery_station_day.delivery_day
                 )
@@ -1083,12 +1075,11 @@ class ShareDeliveryViewSet(
             )
 
             instance = serializer.save()
-            if instance.share_id:
-                affected_share_ids.add(instance.share_id)
+            affected_share_ids.add(instance.share_id)
 
             self._notify_subscription_changed_for(instance)
 
-            if not apply_to_future or not instance.subscription or not original_share:
+            if not apply_to_future or instance.subscription_id is None:
                 recompute_shares(affected_share_ids)
                 return
 
@@ -1162,8 +1153,7 @@ class ShareDeliveryViewSet(
                         )
                     delivery.delivery_station_day = matching_delivery_station_day
                     delivery.save(update_fields=["delivery_station_day", "share"])
-                    if delivery.share_id:
-                        affected_share_ids.add(delivery.share_id)
+                    affected_share_ids.add(delivery.share_id)
 
             recompute_shares(affected_share_ids)
 
@@ -1183,16 +1173,14 @@ class ShareContentViewSet(BaseArchivableViewSet):
         with transaction.atomic():
             # Authorship is read-only on the serializer — stamp it here.
             instance = serializer.save(created_by=auth_user(self.request))
-            if instance.share_id:
-                recompute_shares([instance.share_id])
+            recompute_shares([instance.share_id])
 
     def perform_update(self, serializer):
         from ..services.recompute import recompute_shares
 
         with transaction.atomic():
             instance = serializer.save()
-            if instance.share_id:
-                recompute_shares([instance.share_id])
+            recompute_shares([instance.share_id])
 
     def perform_destroy(self, instance):
         from ..models import MovementShareArticle
@@ -1214,8 +1202,7 @@ class ShareContentViewSet(BaseArchivableViewSet):
                 MovementShareArticle.objects.for_share_contents(instance)
             )
             instance.delete()
-            if share_id:
-                recompute_shares([share_id])
+            recompute_shares([share_id])
             if deleted_movements:
                 SnapshotService.cascade_for_movements(deleted_movements)
                 recalculate_actual_corrections(deleted_movements)
@@ -1325,8 +1312,7 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             .select_related("delivery_day")
             .order_by("id")
         ):
-            if share.delivery_day is not None:
-                shares_by_day.setdefault(share.delivery_day.day_number, share)
+            shares_by_day.setdefault(share.delivery_day.day_number, share)
 
         result = []
         for day_number in days_to_process:
@@ -1444,7 +1430,7 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 week_start = week_day_to_date(share.year, share.delivery_week, 0)
                 if start <= week_start <= end:
                     filtered.append(share)
-            except (ValueError, TypeError):
+            except ValueError:
                 continue
 
         # Collect all unique variations (sorted)
@@ -1820,7 +1806,6 @@ class ShareDeliveryOverviewViewSet(
         effective_share = serializer.validated_data.get("share") or instance.share
         if (
             target_delivery_station_day
-            and effective_share
             and target_delivery_station_day.delivery_day_id
             != effective_share.delivery_day_id
         ):
@@ -1972,7 +1957,7 @@ class ShareDeliveryDetailsViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # canonical ship predicate, the same rule demand/billing enforce.
         # Without it a jokered or not-confirmed delivery prints at full quantity.
         queryset = ShareDelivery.objects.shippable()
-        list_route = getattr(self, "action", None) == "list"
+        list_route = self.action == "list"
         params = validate_query_params(
             self.request,
             # The week scope is required on the list route, as the schema
@@ -2197,14 +2182,11 @@ class VirtualComponentsViewSet(RolePermissionsMixin, viewsets.ViewSet):
 
         created_components = []
         for component_data in components:
-            physical_variation_id = component_data.get("physical_variation")
+            physical_variation_id = component_data["physical_variation"]
             # The item serializer defaults ``quantity``, so the key is always
             # present on validated data. A literal fallback here would put a
             # float on the path to a Decimal column.
             quantity = component_data["quantity"]
-
-            if not physical_variation_id:
-                continue
 
             try:
                 physical_variation = ShareTypeVariation.objects.get(

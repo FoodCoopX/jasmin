@@ -85,13 +85,11 @@ const SharesDeliveryDaySelector = ({
         (d) => d.id === selectedSharesDeliveryDay,
       );
       if (!selectedSharesDeliveryDay || !currentExists) {
-        const defaultValue = include_null_option
-          ? null
-          : (enrichedDays[0]?.id ?? null);
+        const defaultValue = include_null_option ? null : enrichedDays[0].value;
         setSelectedSharesDeliveryDay(defaultValue);
       }
     } else {
-      setSelectedSharesDeliveryDay(enrichedDays[0]?.id ?? null);
+      setSelectedSharesDeliveryDay(enrichedDays[0].value);
     }
   }, [
     enrichedDays,

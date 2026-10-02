@@ -91,13 +91,13 @@ export default function DeliveryStationsDetails() {
     shareDeliveryDaysFilters,
   );
 
-  // Select the first valid day when dayNumbers change
+  // Select the first delivery day when the selected day isn't one of them
   useEffect(() => {
-    if (dayNumbers && dayNumbers.length > 0) {
-      const validDays = dayNumbers.filter((day) => day !== null) as number[];
-      if (validDays.length > 0 && !validDays.includes(selectedDeliveryDay!)) {
-        setSelectedDeliveryDay(validDays[0]);
-      }
+    if (
+      dayNumbers.length > 0 &&
+      !dayNumbers.some((day) => day === selectedDeliveryDay)
+    ) {
+      setSelectedDeliveryDay(dayNumbers[0]);
     }
   }, [dayNumbers, selectedDeliveryDay]);
 
@@ -153,7 +153,7 @@ export default function DeliveryStationsDetails() {
 
   // Compute selectedDeliveryDayId early (needed for station selector and bulk PDFs)
   const selectedDeliveryDayId = useMemo(() => {
-    if (selectedDeliveryDay === null || selectedDeliveryDay === undefined) {
+    if (selectedDeliveryDay === null) {
       return null;
     }
     const deliveryDay = shareDeliveryDays.find(
@@ -212,18 +212,16 @@ export default function DeliveryStationsDetails() {
       matrixRows.length > 0 &&
       dayNumbers.length > 0 &&
       deliveryStations.length > 0
-        ? dayNumbers
-            .filter((d) => d !== null)
-            .flatMap((dayNum) =>
-              deliveryStations.map((station) =>
-                getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
-                  year: selectedYear,
-                  delivery_week: selectedWeek!,
-                  day_number: dayNum,
-                  delivery_station: station.value,
-                }),
-              ),
-            )
+        ? dayNumbers.flatMap((dayNum) =>
+            deliveryStations.map((station) =>
+              getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
+                year: selectedYear,
+                delivery_week: selectedWeek!,
+                day_number: dayNum,
+                delivery_station: station.value,
+              }),
+            ),
+          )
         : [],
   });
 
@@ -233,19 +231,17 @@ export default function DeliveryStationsDetails() {
       matrixRows.length > 0 &&
       dayNumbers.length > 0 &&
       deliveryStations.length > 0
-        ? dayNumbers
-            .filter((d) => d !== null)
-            .flatMap((dayNum) =>
-              deliveryStations.map((station) =>
-                getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
-                  year: selectedYear,
-                  delivery_week: selectedWeek!,
-                  day_number: dayNum,
-                  delivery_station: station.value,
-                  is_packed_bulk: true,
-                }),
-              ),
-            )
+        ? dayNumbers.flatMap((dayNum) =>
+            deliveryStations.map((station) =>
+              getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
+                year: selectedYear,
+                delivery_week: selectedWeek!,
+                day_number: dayNum,
+                delivery_station: station.value,
+                is_packed_bulk: true,
+              }),
+            ),
+          )
         : [],
   });
 
@@ -315,10 +311,9 @@ export default function DeliveryStationsDetails() {
       dayNumbers.length === 0
     )
       return null;
-    const validDays = dayNumbers.filter((d) => d !== null);
     const pages: StationPageData[] = [];
     let queryIdx = 0;
-    for (const dayNum of validDays) {
+    for (const dayNum of dayNumbers) {
       const dayLabel = getDayName(dayNum, t);
       for (const station of deliveryStations) {
         const stationMatrix = allStationsWeekQueries[queryIdx]?.data as

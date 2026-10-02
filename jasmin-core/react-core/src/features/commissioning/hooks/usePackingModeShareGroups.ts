@@ -60,7 +60,6 @@ export const usePackingModeShareGroups = (
 
     for (const variation of shareTypeVariations) {
       const shareTypeId = variation.share_type;
-      if (!shareTypeId) continue;
       const option = optionByShareType.get(shareTypeId);
       if (variation.is_packed_bulk) {
         bulkShareTypeIds.add(shareTypeId);

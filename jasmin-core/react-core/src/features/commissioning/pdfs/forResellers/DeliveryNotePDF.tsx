@@ -106,7 +106,7 @@ export default function DeliveryNotePDF({
   previewMode = false,
 }: DeliveryNotePDFProps) {
   const { deliveryNote, lineItems, crateItems } = data;
-  const locale = tenantSettings?.number_locale ?? "de-DE";
+  const locale = tenantSettings.number_locale ?? "de-DE";
   const getUnitLabel = (value: string) => getUnitLabelPure(value, t);
   const getVegetableSizeLabel = (value: string) => getVegetableSizeLabelPure(value, t);
 

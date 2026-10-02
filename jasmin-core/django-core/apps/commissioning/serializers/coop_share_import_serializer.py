@@ -83,7 +83,7 @@ class CoopShareImportSerializer(serializers.Serializer):
             member=validated_data["_member"],
             amount_of_coop_shares=validated_data["amount_of_coop_shares"],
             value_one_coop_share=validated_data["value_one_coop_share"],
-            is_increase=bool(validated_data.get("is_increase")),
+            is_increase=validated_data["is_increase"],
             due_date=validated_data.get("due_date"),
             paid_at=validated_data.get("paid_at"),
             note=validated_data.get("note") or "",

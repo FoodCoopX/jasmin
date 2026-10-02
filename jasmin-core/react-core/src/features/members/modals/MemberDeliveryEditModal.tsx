@@ -41,7 +41,7 @@ const MemberDeliveryEditModal: FC<MemberDeliveryEditModalProps> = ({
   // Compute the delivery date from year + week + day_number to filter the
   // active delivery station days
   const deliveryDate = useMemo(() => {
-    if (!delivery?.year || !delivery?.delivery_week) return undefined;
+    if (!delivery?.year || !delivery.delivery_week) return undefined;
     const d = dayjs()
       .year(delivery.year)
       .isoWeek(delivery.delivery_week)
@@ -67,7 +67,7 @@ const MemberDeliveryEditModal: FC<MemberDeliveryEditModalProps> = ({
       num_weeks?: number;
     } = {};
     if (deliveryDate) params.active_at_date = deliveryDate;
-    if (delivery?.year && delivery?.delivery_week) {
+    if (delivery?.year && delivery.delivery_week) {
       params.year = delivery.year;
       params.delivery_week = delivery.delivery_week;
       params.num_weeks = 1;
@@ -80,7 +80,7 @@ const MemberDeliveryEditModal: FC<MemberDeliveryEditModalProps> = ({
 
   // Build week key for capacity lookup
   const weekKey =
-    delivery?.year && delivery?.delivery_week
+    delivery?.year && delivery.delivery_week
       ? `${delivery.year}-${delivery.delivery_week}`
       : undefined;
 
@@ -140,14 +140,14 @@ const MemberDeliveryEditModal: FC<MemberDeliveryEditModalProps> = ({
 
   const handleSave = () => {
     saveDelivery(() => {
-      if (onSuccess) onSuccess();
-      if (onCancel) onCancel();
+      onSuccess();
+      onCancel();
     });
   };
 
   const handleCancel = () => {
     closeModal();
-    if (onCancel) onCancel();
+    onCancel();
   };
 
   const handleKeyDown = useEnterToSubmit(handleSave);

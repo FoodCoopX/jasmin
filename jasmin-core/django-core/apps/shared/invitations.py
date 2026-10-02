@@ -57,9 +57,9 @@ def _tenant_default_language(default: str = DEFAULT_LANGUAGE_CODE) -> str:
     (``de-DE`` -> ``de``) and a code the platform ships no UI or email
     templates for falls back to `default`.
     """
-    from django.db import connection
+    from core.tenant_db import connection
 
-    schema = getattr(connection, "schema_name", None)
+    schema = connection.schema_name
     if not schema or schema == "public":
         return default
     try:
@@ -70,7 +70,7 @@ def _tenant_default_language(default: str = DEFAULT_LANGUAGE_CODE) -> str:
         # No tenant row, or DB unreachable / unmigrated. Best-effort
         # lookup → fall back to the caller's default.
         return default
-    code = (getattr(tenant, "tenant_language", "") or "").strip().lower()
+    code = tenant.tenant_language.strip().lower()
     base = code.split("-")[0].split("_")[0]
     return base if base in SUPPORTED_LANGUAGE_CODES else default
 

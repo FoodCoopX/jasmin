@@ -199,7 +199,7 @@ export default function ImportShares() {
 
   const errorRows = useMemo(() => {
     if (!activeBatch) return [];
-    return Object.entries(activeBatch.validation_report || {}).map(
+    return Object.entries(activeBatch.validation_report).map(
       ([row, errs]) => ({ key: row, row, errors: errs.join("; ") }),
     );
   }, [activeBatch]);
@@ -374,7 +374,7 @@ export default function ImportShares() {
             </Card>
           )}
 
-          {activeBatch.diff_report?.totals && (
+          {activeBatch.diff_report.totals && (
             <Alert
               type="info"
               showIcon
@@ -388,15 +388,15 @@ export default function ImportShares() {
           )}
           {diffSection(
             t("import_shares.added"),
-            activeBatch.diff_report?.added,
+            activeBatch.diff_report.added,
           )}
           {diffSection(
             t("import_shares.updated"),
-            activeBatch.diff_report?.updated,
+            activeBatch.diff_report.updated,
           )}
           {diffSection(
             t("import_shares.removed"),
-            activeBatch.diff_report?.removed,
+            activeBatch.diff_report.removed,
           )}
         </Card>
       )}

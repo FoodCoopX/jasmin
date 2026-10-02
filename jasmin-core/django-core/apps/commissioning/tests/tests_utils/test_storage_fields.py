@@ -91,13 +91,16 @@ class TestBuildStorageFields:
         Storage.objects.all().delete()
 
     def test_builds_fields_for_active_storages(self, tenant):
+        from types import SimpleNamespace
+
         from apps.commissioning.tests.factories import StorageFactory
 
         s1 = StorageFactory(is_active=True)
         s2 = StorageFactory(is_active=True)
-        StorageFactory(is_active=False)  # inactive — should be excluded
+        inactive = StorageFactory(is_active=False)  # should be excluded
 
-        result = build_storage_fields()
+        entry = SimpleNamespace(storage_id=inactive.id)
+        result = build_storage_fields(entry)
         assert f"storage_{s1.id}" in result
         assert f"storage_{s2.id}" in result
         assert all(v is False for v in result.values())
@@ -115,15 +118,13 @@ class TestBuildStorageFields:
         assert result[f"storage_{s1.id}"] is True
         assert result[f"storage_{s2.id}"] is False
 
-    def test_entry_none_all_false(self, tenant):
+    def test_no_active_storages_returns_empty(self, tenant):
+        from types import SimpleNamespace
+
         from apps.commissioning.tests.factories import StorageFactory
 
-        StorageFactory(is_active=True)
-        result = build_storage_fields(None)
-        assert all(v is False for v in result.values())
-
-    def test_no_active_storages_returns_empty(self, tenant):
-        result = build_storage_fields()
+        inactive = StorageFactory(is_active=False)
+        result = build_storage_fields(SimpleNamespace(storage_id=inactive.id))
         assert result == {}
 
 

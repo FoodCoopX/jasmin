@@ -155,7 +155,7 @@ export default function Invoices() {
 
   const handleFinalizeInvoicesSuccess = useCallback(
     async (responseData: BulkOperationResponse) => {
-      const invoiceIds = (responseData?.results ?? [])
+      const invoiceIds = responseData.results
         .filter((r) => r.success && r.invoice_id)
         .map((r) => r.invoice_id!);
 
@@ -191,10 +191,7 @@ export default function Invoices() {
   );
 
   const filteredData = useMemo(() => {
-    return data.filter(
-      (item) =>
-        item.delivery_note_id !== null && item.delivery_note_id !== undefined,
-    );
+    return data.filter((item) => item.delivery_note_id !== null);
   }, [data]);
 
   // Invoice ids of the selected rows that carry a finalized invoice — the
@@ -533,7 +530,7 @@ export default function Invoices() {
               )}
               {!record.has_finalized_invoice && record.has_invoice && (
                 <BulkActionButton
-                  selectedIds={record.id ? [record.id as string] : []}
+                  selectedIds={[record.id as string]}
                   apiFunction={(payload) =>
                     commissioningBulkFinalizeDocumentsCreate({
                       ids: payload.ids as string[],
@@ -548,7 +545,7 @@ export default function Invoices() {
               )}
               {!record.has_finalized_invoice && record.has_invoice && (
                 <BulkActionButton
-                  selectedIds={record.id ? [record.id as string] : []}
+                  selectedIds={[record.id as string]}
                   apiFunction={(payload) =>
                     commissioningBulkDeleteDocumentsCreate({
                       ids: payload.ids as string[],
@@ -586,7 +583,7 @@ export default function Invoices() {
               )}
               {!record.has_invoice && (
                 <BulkActionButton
-                  selectedIds={record.id ? [record.id as string] : []}
+                  selectedIds={[record.id as string]}
                   apiFunction={(payload) =>
                     commissioningBulkCreateDocumentsFromOrdersCreate({
                       ids: payload.ids as string[],

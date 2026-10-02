@@ -74,12 +74,11 @@ export default function ExportCsvAtDateModal({
   const { rows: rawRows, isLoading: loading } = useRows(loadedDate);
 
   const rows = useMemo<Record<string, unknown>[] | null>(
-    () => (loadedDate ? (rawRows ?? null) : null),
+    () => (loadedDate ? rawRows : null),
     [rawRows, loadedDate],
   );
 
   const fetchRows = useCallback(() => {
-    if (!selectedDate) return;
     setLoadedDate(toApiDate(selectedDate));
   }, [selectedDate]);
 

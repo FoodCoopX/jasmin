@@ -105,7 +105,7 @@ export default function BackupModal({
       builtForIdRef.current = null; // reset so a reopen rebuilds from fresh data
       return;
     }
-    if (!data || !shareDeliveryDays || !shareTypeVariations) return;
+    if (!data) return;
     if (builtForIdRef.current === (data.id as Key)) return;
     builtForIdRef.current = data.id as Key;
 
@@ -137,8 +137,6 @@ export default function BackupModal({
   }, []);
 
   const columns = useMemo(() => {
-    if (!shareDeliveryDays || !shareTypeVariations) return [];
-
     const baseColumns: EditableColumnConfig<TableRecord>[] = [
       {
         title: t("commissioning.vegetable"),
@@ -184,9 +182,7 @@ export default function BackupModal({
     };
     // Match the base table's size label (the dynamic commissioning.<size> key).
     const variationTitle = (variation: ShareTypeVariationOption): ReactNode =>
-      variation.size
-        ? getShareTypeVariationSizeLabelPure(variation.size, t)
-        : ((variation.label ?? "") as ReactNode);
+      getShareTypeVariationSizeLabelPure(variation.size, t);
 
     // Mirror the base planning table's nesting so the backup grid matches it
     // column-for-column. ``showDaysTogether`` = variation-major (size group,
@@ -334,7 +330,7 @@ export default function BackupModal({
       >
         {t("commissioning.backup_modal_info")}
       </p>
-      {data && backupData && shareDeliveryDays && shareTypeVariations ? (
+      {data && backupData ? (
         <div>
           <EditableTable
             key={data.id as string}

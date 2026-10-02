@@ -27,7 +27,7 @@ const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
  */
 export function currencyCodeToSymbol(code: string | null | undefined): string {
   if (!code) return "€";
-  return CURRENCY_SYMBOLS[code] ?? code ?? "€";
+  return CURRENCY_SYMBOLS[code] ?? code;
 }
 
 /** Currency symbols that render BEFORE the amount (e.g. ``$12.00``); every

@@ -214,7 +214,7 @@ class CurrentBalanceService:
             key = _normalize(
                 agg["share_article_id"], agg["unit"], agg["size"], agg["storage_id"]
             )
-            ledger_sums[key] = agg["total"] or Decimal("0")
+            ledger_sums[key] = agg["total"]
 
         drift: list[dict] = []
         seen: set[EntityKey] = set()

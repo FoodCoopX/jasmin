@@ -229,9 +229,10 @@ class ShareContentService:
             )
 
             if station_id is not None:
-                resolved_stations = [station_by_id.get(station_id)]
-                if resolved_stations[0] is None:
-                    resolved_stations = [DeliveryStation.objects.get(id=station_id)]
+                station = station_by_id.get(station_id)
+                if station is None:
+                    station = DeliveryStation.objects.get(id=station_id)
+                resolved_stations = [station]
             elif tour is not None:
                 resolved_stations = [
                     share_delivery.delivery_station
@@ -249,8 +250,6 @@ class ShareContentService:
                 ]
 
             for delivery_station in resolved_stations:
-                if delivery_station is None:
-                    continue
                 key = (share.id, delivery_station.id)
                 if key in seen_share_station:
                     raise ShareContentError(
@@ -560,9 +559,7 @@ class ShareContentService:
             share_content.share.delivery_day_id for share_content in all_share_contents
         }
         station_ids = {
-            share_content.delivery_station_id
-            for share_content in all_share_contents
-            if share_content.delivery_station_id
+            share_content.delivery_station_id for share_content in all_share_contents
         }
         tour_number_lookup: dict[tuple, int | None] = {}
         if station_ids and delivery_day_ids:
@@ -681,7 +678,7 @@ class ShareContentService:
             "unit": share_content.unit,
             "size": share_content.size,
             "note": share_content.note,
-            "seller": (share_content.seller_id if share_content.seller_id else None),
+            "seller": share_content.seller_id,
             "cleaning": share_content.cleaning,
             "washing": share_content.washing,
             "forecast_available_amount": forecast_available_amount,
@@ -699,11 +696,7 @@ class ShareContentService:
             "basic_variations": {},
             "tour_variations": {},
             "day_planned_amounts": {},
-            "backup_share_article": (
-                share_content.backup_share_article_id
-                if share_content.backup_share_article_id
-                else None
-            ),
+            "backup_share_article": share_content.backup_share_article_id,
             "backup_share_article_name": (
                 share_content.backup_share_article.name
                 if share_content.backup_share_article
@@ -736,7 +729,7 @@ class ShareContentService:
 
         amount_str = str(share_content.amount) if share_content.amount else 0
 
-        if share_content.delivery_station_id and share_content.amount:
+        if share_content.amount:
             total_quantity = self._total_quantity_for(
                 share_content, variation_totals_by_week
             )
@@ -757,16 +750,12 @@ class ShareContentService:
             )
             group_row["backup_variations"][backup_key] = backup_amount
 
-        if share_content.delivery_station_id:
-            station_key = f"{base_key}_station_{share_content.delivery_station_id}"
-            group_row["variations"][station_key] = amount_str
+        station_key = f"{base_key}_station_{share_content.delivery_station_id}"
+        group_row["variations"][station_key] = amount_str
 
-            tour_number = tour_number_lookup.get(
-                (share_content.delivery_station_id, share.delivery_day_id)
-            )
-        else:
-            tour_number = None
-
+        tour_number = tour_number_lookup.get(
+            (share_content.delivery_station_id, share.delivery_day_id)
+        )
         if tour_number:
             tour_key = f"{base_key}_tour_{tour_number}"
             if tour_key not in group_row["tour_variations"]:
@@ -1478,29 +1467,20 @@ class ShareContentService:
     ) -> int:
         """The subscribed-share quantity this content's amount is multiplied by.
 
-        Station-scoped contents key into the ``"station"`` bucket (day,
-        variation, station); basic contents into ``"basic"`` (day, variation).
-        This is THE keying contract between the theoretical builder and the
-        SHARECONTENT movement builder — both MUST resolve the identical
-        quantity for a row or planned harvest and packed stock silently
-        diverge, so it lives in exactly one place.
+        Every content is station-scoped, so it keys into the ``"station"``
+        bucket (day, variation, station). This is THE keying contract between
+        the theoretical builder and the SHARECONTENT movement builder — both
+        MUST resolve the identical quantity for a row or planned harvest and
+        packed stock silently diverge, so it lives in exactly one place.
         """
         week_totals = variation_totals_by_week.get(
             (share_content.share.year, share_content.share.delivery_week), {}
         )
-        if share_content.delivery_station_id:
-            return week_totals.get("station", {}).get(
-                (
-                    share_content.share.delivery_day_id,
-                    share_content.share.share_type_variation_id,
-                    share_content.delivery_station_id,
-                ),
-                0,
-            )
-        return week_totals.get("basic", {}).get(
+        return week_totals.get("station", {}).get(
             (
                 share_content.share.delivery_day_id,
                 share_content.share.share_type_variation_id,
+                share_content.delivery_station_id,
             ),
             0,
         )

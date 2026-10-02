@@ -54,7 +54,7 @@ export function CsvImportModal({
   // Only the columns the template will actually emit — mirrors the filter in
   // DownloadCsvTemplateButton so the docs can't advertise a column the file
   // won't contain.
-  const documented = (columns ?? []).filter(
+  const documented = columns.filter(
     (col) =>
       typeof col.dataIndex === "string" &&
       col.hidden !== true &&

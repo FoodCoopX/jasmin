@@ -174,9 +174,7 @@ class OrderContentService:
             "offer_available_amount": offer.amount if offer else None,
             "amount_per_pu": offer.amount_per_pu if offer else None,
             "offer_share_article_name": (offer.share_article.name if offer else None),
-            "share_article": (
-                order_content.share_article_id if order_content.share_article else None
-            ),
+            "share_article": order_content.share_article_id,
             "share_article_name": (
                 order_content.share_article.name
                 if order_content.share_article
@@ -201,13 +199,7 @@ class OrderContentService:
             "price_2": offer.price_2 if offer else None,
             "price_3": offer.price_3 if offer else None,
             "rabatt": order_content.rabatt,
-            "tax_rate": (
-                order_content.tax_rate
-                if order_content.tax_rate is not None
-                else resolve_article_tax_rate(
-                    order_content, date_from_order(order_content.order)
-                )
-            ),
+            "tax_rate": order_content.tax_rate,
             "washing": order_content.washing,
             "cleaning": order_content.cleaning,
             "comes_from_long_term_storage": order_content.comes_from_long_term_storage,
@@ -558,7 +550,7 @@ class OrderContentService:
                 code="order_content.insufficient_stock",
                 details={
                     "offer_id": str(offer.id),
-                    "available": float(offer.amount or 0),
+                    "available": float(offer.amount),
                     "requested": float(requested_pu),
                 },
             )
@@ -647,7 +639,7 @@ class OrderContentService:
                 # Also skip entirely when the tenant keeps crates OFF documents
                 # (the wipe above still runs, so flipping the setting off cleans
                 # up as lines are re-saved).
-                if amount and amount > 0 and crates_should_be_on_documents():
+                if amount > 0 and crates_should_be_on_documents():
                     # Same canonical chain as above:
                     # crate pricing → tenant default → hardcoded constant.
                     crate_tax_rate = resolve_crate_tax_rate(
@@ -738,9 +730,7 @@ class OrderContentService:
                 # this order's own already-committed amount — those units are
                 # this reseller's to keep, so only the *increase* needs new
                 # stock. Both figures reported in VPE, like ``requested``.
-                max_orderable_pu = (
-                    offer.amount or Decimal("0")
-                ) + old_amount / pu_divisor
+                max_orderable_pu = offer.amount + old_amount / pu_divisor
                 requested_pu = new_amount / pu_divisor
                 raise NotEnoughStock(
                     f"Not enough stock available. Available: {max_orderable_pu}, "
@@ -832,7 +822,7 @@ class OrderContentService:
         amount_to_restore = order_content.amount
         order = order_content.order
 
-        if offer and offer.amount is not None:
+        if offer:
             # Lock the offer row to prevent race conditions on availability
             offer = Offer.objects.select_for_update().get(pk=offer.pk)
             # ``Offer.amount`` is in PU. The create/update paths debit it by
@@ -982,9 +972,7 @@ class OrderContentService:
         )
 
         # Ensure related objects are prefetched to avoid N+1
-        order_content_ids = [
-            order_content.id for order_content in order_contents if order_content.id
-        ]
+        order_content_ids = [order_content.id for order_content in order_contents]
         if order_content_ids:
             order_contents = list(
                 OrderContent.objects.filter(id__in=order_content_ids).select_related(

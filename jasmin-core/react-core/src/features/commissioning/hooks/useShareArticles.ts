@@ -28,7 +28,7 @@ export const useShareArticles = (params: UseShareArticlesParams = {}) => {
 
   const shareArticles: ShareArticleOption[] = toOptions(
     source.data,
-    (sa) => sa.name ?? "",
+    (sa) => sa.name,
   );
 
   return {

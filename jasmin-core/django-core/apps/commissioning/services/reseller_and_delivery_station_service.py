@@ -17,17 +17,14 @@ class ResellerAndDeliveryStationService:
     @transaction.atomic
     def create_reseller(self, validated_data: dict[str, Any]) -> Reseller:
         contact_data = self._extract_contact_data(validated_data)
-        contact = None
-
-        if contact_data:
-            contact = self._create_contact_from_data(contact_data)
+        contact = self._create_contact_from_data(contact_data)
 
         validated_data["contact"] = contact
         # Transient flag from the serializer — not a model field.
         is_also_delivery_station = validated_data.pop("is_also_delivery_station", False)
         reseller = Reseller.objects.create(**validated_data)
 
-        if is_also_delivery_station and contact:
+        if is_also_delivery_station:
             delivery_station, _ = DeliveryStation.objects.get_or_create(contact=contact)
             delivery_station.linked_reseller = reseller
             delivery_station.is_also_reseller = reseller.is_reseller
@@ -81,7 +78,7 @@ class ResellerAndDeliveryStationService:
             setattr(instance, attr, value)
         instance.save()
 
-        if is_also_delivery_station is True and instance.contact:
+        if is_also_delivery_station is True:
             delivery_station, _ = DeliveryStation.objects.get_or_create(
                 contact=instance.contact
             )
@@ -89,7 +86,7 @@ class ResellerAndDeliveryStationService:
             delivery_station.is_also_reseller = True
             delivery_station.linked_reseller = instance
             delivery_station.save()
-        elif is_also_delivery_station is False and instance.contact:
+        elif is_also_delivery_station is False:
             try:
                 delivery_station = DeliveryStation.objects.get(linked_reseller=instance)
                 can_delete, _ = can_delete_instance(
@@ -136,14 +133,11 @@ class ResellerAndDeliveryStationService:
         explicitly when they need them.
         """
         contact = reseller.contact
-        if not contact:
-            return
-
         fallback_name = contact.company_name or (
             f"{contact.first_name or ''} {contact.last_name or ''}".strip()
         )
         mapping = {
-            "invoice_name": fallback_name or "",
+            "invoice_name": fallback_name,
             "invoice_address": contact.address,
             "invoice_plz": contact.zip_code,
             "invoice_city": contact.city,
@@ -271,8 +265,7 @@ class ResellerAndDeliveryStationService:
         except DeliveryStation.DoesNotExist:
             contact = instance.contact
             instance.delete()
-            if contact:
-                contact.delete()
+            contact.delete()
 
     def _create_contact_from_data(self, contact_data: dict[str, Any]) -> ContactEntity:
         """Create a fresh ContactEntity from validated data.

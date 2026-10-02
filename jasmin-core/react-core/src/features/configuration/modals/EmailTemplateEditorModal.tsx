@@ -109,7 +109,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
 
   const labelByName = useMemo(() => {
     const map: Record<string, string> = {};
-    detail?.variables?.forEach((v) => {
+    detail?.variables.forEach((v) => {
       map[v.name] = v.label;
     });
     return map;

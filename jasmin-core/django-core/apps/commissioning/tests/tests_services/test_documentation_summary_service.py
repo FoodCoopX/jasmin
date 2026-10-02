@@ -124,7 +124,7 @@ class TestCalculateTheoreticalStock:
             share_stock,
             order_stock,
         ) = DocumentationSummaryService._calculate_theoretical_stock(
-            1, "KG", "M", None, {}
+            1, "KG", "M", "stor-1", {}
         )
         assert total == 0
         assert share_stock == 0.0
@@ -132,7 +132,7 @@ class TestCalculateTheoreticalStock:
 
     def test_share_only_entry(self):
         stock_map = {
-            (1, "KG", "M", None): {
+            (1, "KG", "M", "stor-1"): {
                 "current_stock_amount": 50,
                 "for_shares": True,
                 "for_resellers": False,
@@ -143,7 +143,7 @@ class TestCalculateTheoreticalStock:
             share_stock,
             order_stock,
         ) = DocumentationSummaryService._calculate_theoretical_stock(
-            1, "KG", "M", None, stock_map
+            1, "KG", "M", "stor-1", stock_map
         )
         assert total == 50
         assert share_stock == 50
@@ -151,7 +151,7 @@ class TestCalculateTheoreticalStock:
 
     def test_order_only_entry(self):
         stock_map = {
-            (1, "KG", "M", None): {
+            (1, "KG", "M", "stor-1"): {
                 "current_stock_amount": 30,
                 "for_shares": False,
                 "for_resellers": True,
@@ -162,7 +162,7 @@ class TestCalculateTheoreticalStock:
             share_stock,
             order_stock,
         ) = DocumentationSummaryService._calculate_theoretical_stock(
-            1, "KG", "M", None, stock_map
+            1, "KG", "M", "stor-1", stock_map
         )
         assert total == 30
         assert order_stock == 30
@@ -269,24 +269,6 @@ class TestGetGroupingKey:
         key = DocumentationSummaryService._get_grouping_key(entry)
         assert key == ("art-1", "KG", "M", 1, "stor-1")
 
-    def test_key_falls_back_to_storage_object_when_id_missing(self):
-        """Rare path: ``entry`` exposes ``storage`` but no ``storage_id``
-        attribute (some annotated querysets). The grouping must still use
-        the storage's primary key so rows don't collapse incorrectly."""
-        from unittest.mock import MagicMock
-
-        entry = MagicMock(
-            spec=["share_article", "unit", "size", "day_number", "storage"]
-        )
-        entry.share_article.id = "art-2"
-        entry.unit = "PCS"
-        entry.size = "L"
-        entry.day_number = None
-        entry.storage.id = "stor-fallback"
-
-        key = DocumentationSummaryService._get_grouping_key(entry)
-        assert key[-1] == "stor-fallback"
-
 
 # ---------------------------------------------------------------------------
 # _group_entries — combines theoretical / additional / actual under same key
@@ -294,7 +276,7 @@ class TestGetGroupingKey:
 class TestGroupEntries:
     """``_group_entries`` is pure: it only reads attributes off each entry
     (``share_article.id`` / ``.name``, ``unit``, ``size``, ``day_number``,
-    ``storage_id`` / ``storage.id``). MagicMocks are sufficient and avoid
+    ``storage_id``). MagicMocks are sufficient and avoid
     the factory-chain TimeBoundMixin overlap that bites real instances.
     """
 

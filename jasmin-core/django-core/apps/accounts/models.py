@@ -84,7 +84,7 @@ class JasminModel(models.Model):
         (PostgreSQL convention: ``<table>_pkey``) and falls back to a
         narrower string match.
         """
-        cause = getattr(exc, "__cause__", None)
+        cause = exc.__cause__
         constraint_name = getattr(getattr(cause, "diag", None), "constraint_name", None)
         if constraint_name:
             return constraint_name.endswith("_pkey")
@@ -327,14 +327,12 @@ class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
         # ``activated_at`` / ``inactivated_at`` fields when the status
         # actually changes (or on the first save with a terminal status).
         update_fields = kwargs.get("update_fields")
-        previous_status: str | None = None
-        if self.pk is not None:
-            previous_status = (
-                type(self)
-                .objects.filter(pk=self.pk)
-                .values_list("account_status", flat=True)
-                .first()
-            )
+        previous_status: str | None = (
+            type(self)
+            .objects.filter(pk=self.pk)
+            .values_list("account_status", flat=True)
+            .first()
+        )
         now = timezone.now()
         stamped: list[str] = []
         if self.account_status == "active" and previous_status != "active":

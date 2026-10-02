@@ -165,7 +165,7 @@ export default function ConsentBlock({
         `@media print{body{margin:24px}}` +
         `</style></head><body>` +
         `<h1>${escape(document.title || "")}</h1>` +
-        `<div class="meta">${escape(t("consent.block.version_label"))} ${escape(String(document.version ?? ""))}</div>` +
+        `<div class="meta">${escape(t("consent.block.version_label"))} ${escape(document.version)}</div>` +
         `<div class="doc">${bodyHtml}</div>` +
         `<div class="hint">${escape(t("consent.print.paper_required_hint"))}<div class="address">${addressHtml}</div></div>` +
         `<div class="signature"><div class="line">${escape(t("consent.print.signature_line"))}</div></div>` +

@@ -1,6 +1,6 @@
 import type { FormInstance } from "antd";
 import { Button } from "antd";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   commissioningBulkFinalizeCreate,
@@ -55,7 +55,6 @@ const shareArticleFilters = {
 
 export default function DocumentationHarvest() {
   const { isStaff } = useRoles();
-  const [columnsLoaded, setColumnsLoaded] = useState(false);
   const [csvExportVisible, setCsvExportVisible] = useState(false);
 
   const { t } = useTranslation();
@@ -118,8 +117,8 @@ export default function DocumentationHarvest() {
 
   // Shared year/week/day/is_past + summary query + storage selector/filter +
   // storage-stamped customSave + remount key. Harvest-specific bits (columns,
-  // mutation endpoints, bulk actions) stay below. The query is gated until the
-  // dynamic columns have loaded AND a storage is picked.
+  // mutation endpoints, bulk actions) stay below. The query is gated until a
+  // storage is picked.
   const {
     selectedYear,
     setSelectedYear,
@@ -140,7 +139,6 @@ export default function DocumentationHarvest() {
     customSave,
   } = useStorageDocumentationPage({
     model: "harvest",
-    extraQueryEnabled: columnsLoaded,
     rowHasData,
   });
 
@@ -155,16 +153,6 @@ export default function DocumentationHarvest() {
     const storage = storages.find((s) => s.id === selectedStorage);
     return storage?.is_short_term_harvest_storage ?? false;
   }, [storages, selectedStorage]);
-
-  useEffect(() => {
-    if (
-      shareArticleColumn &&
-      amountUnitSizeColumns &&
-      amountUnitSizeColumns.length > 0
-    ) {
-      setColumnsLoaded(true);
-    }
-  }, [shareArticleColumn, amountUnitSizeColumns]);
 
   const customEdit = useCallback((record: TableRecord, form: FormInstance) => {
     if (record.key === -1) {
@@ -331,7 +319,7 @@ export default function DocumentationHarvest() {
               commissioningBulkFinalizeCreate({
                 model: "harvest",
                 app_label: "commissioning",
-                ids: (payload.ids as string[]) ?? [],
+                ids: payload.ids as string[],
               })
             }
             buttonText={t("commissioning.finalize")}
@@ -383,8 +371,8 @@ export default function DocumentationHarvest() {
                   const rowData = row as Record<string, unknown> | undefined;
                   return (
                     rowData?.theoretical_harvest_amount == null ||
-                    rowData?.theoretical_harvest_amount === 0 ||
-                    (rowData?.harvest_amount as number) > 0
+                    rowData.theoretical_harvest_amount === 0 ||
+                    (rowData.harvest_amount as number) > 0
                   );
                 })
               }

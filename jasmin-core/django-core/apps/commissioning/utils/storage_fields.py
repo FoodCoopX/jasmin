@@ -53,16 +53,16 @@ def clean_storage_fields(data: dict[str, Any]) -> None:
 
 
 def build_storage_fields(
-    entry: Any | None = None, active_storages: Any | None = None
+    entry: Any, active_storages: Any | None = None
 ) -> dict[str, bool]:
     """
     Build storage fields dictionary for serializer/response.
 
-    Creates a dictionary with one boolean field per active storage.
-    If an entry is provided and has a storage, that storage's field is set to True.
+    Creates a dictionary with one boolean field per active storage; the
+    field of the storage the entry is stored in is set to True.
 
     Args:
-        entry: Optional model instance with storage_id attribute
+        entry: A Harvest, Purchase or Waste row (anything with a storage_id)
         active_storages: Optional pre-fetched active Storage list. Pass this
             when building fields for many rows so the active-storage query runs
             once for the batch instead of once per call (the per-row N+1).
@@ -79,9 +79,7 @@ def build_storage_fields(
         active_storages = _get_active_storages()
     storage_fields = {}
 
-    entry_storage_id = (
-        entry.storage_id if entry and hasattr(entry, "storage_id") else None
-    )
+    entry_storage_id = entry.storage_id
 
     for storage in active_storages:
         storage_key = f"storage_{storage.id}"

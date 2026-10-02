@@ -71,8 +71,7 @@ export function useDeliveryDayColumns({
       variationId: string,
     ) => {
       const numValue = Number(value);
-      const isEmpty =
-        !value || value === 0 || isNaN(numValue) || numValue === 0;
+      const isEmpty = !value || isNaN(numValue) || numValue === 0;
       const shouldHighlight =
         shouldHighlightEmpty(record, variationId) && isEmpty;
 
@@ -299,7 +298,7 @@ export function useDeliveryDayColumns({
     const withGroupStart = (
       columns: EditableColumnConfig<TableRecord>[],
     ): EditableColumnConfig<TableRecord>[] => {
-      if (!columns || columns.length === 0) return columns;
+      if (columns.length === 0) return columns;
       const first = columns[0];
       if (first.children) {
         return [

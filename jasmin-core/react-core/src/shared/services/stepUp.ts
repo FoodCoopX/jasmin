@@ -93,14 +93,9 @@ export async function runStepUpFlow(args: {
 
   inFlight = (async () => {
     try {
-      // ``registeredPrompt`` is non-null here (checked above) but TS narrows
-      // through closures conservatively — re-check + rethrow if it
-      // raced. The provider only unregisters on unmount so this is
-      // effectively never hit at runtime.
+      // The IIFE runs synchronously up to its first ``await``, so this is
+      // still the prompt checked above.
       const prompt = registeredPrompt;
-      if (!prompt) {
-        throw new Error("Step-up prompt was unregistered mid-flow.");
-      }
 
       let newToken: string | null = null;
       // The modal calls ``verify`` on submit and stays open (showing

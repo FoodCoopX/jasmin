@@ -129,10 +129,7 @@ export default function DeliveryTours() {
     useShareDeliveryDays(futureShareDeliveryDaysParams);
 
   const shareDeliveryDays = useMemo(() => {
-    return [
-      ...(currentlyActiveDeliveryDays || []),
-      ...(futureDeliveryDays || []),
-    ];
+    return [...currentlyActiveDeliveryDays, ...futureDeliveryDays];
   }, [currentlyActiveDeliveryDays, futureDeliveryDays]);
 
   // Make distinct by day_number, prioritizing records with valid_until null/blank
@@ -198,12 +195,12 @@ export default function DeliveryTours() {
     if (!toursData || stations.length === 0) return;
 
     const tours = toursData as DeliveryTourResponse[];
-    const maxPositions = (stations.length || 10) + 5;
+    const maxPositions = stations.length + 5;
     const emptyTourPlans: StationSlot[][] = Array(numberOfTours)
       .fill(null)
       .map(() => Array(maxPositions).fill(null));
 
-    if (tours && tours.length > 0) {
+    if (tours.length > 0) {
       tours.forEach((tour) => {
         const tourIndex = tour.tour_number - 1;
         if (tourIndex >= 0 && tourIndex < emptyTourPlans.length) {

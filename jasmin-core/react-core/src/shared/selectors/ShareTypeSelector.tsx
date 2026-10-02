@@ -56,7 +56,7 @@ const ShareTypeSelector = ({
     if (include_null_option) opts.push({ value: "none", label: "-" });
     shareTypes
       .filter((st) => !allowedShareTypeIds || allowedShareTypeIds.has(st.value))
-      .forEach((st) => opts.push({ value: st.value, label: st.label ?? "" }));
+      .forEach((st) => opts.push({ value: st.value, label: st.label }));
     return opts;
   }, [shareTypes, include_null_option, allowedShareTypeIds]);
 

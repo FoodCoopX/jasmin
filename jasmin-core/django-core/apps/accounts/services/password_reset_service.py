@@ -150,7 +150,7 @@ def _send_password_reset_email(*, user: JasminUser, uid: str, token: str) -> Non
         context=context,
         related_object_type="user",
         related_object_id=str(user.id),
-        language=user.user_language or None,  # user's language
+        language=user.user_language,
         logger=logger,
         log_error_event="password_reset.email_failed",
         log_not_sent_event="password_reset.email_not_sent",

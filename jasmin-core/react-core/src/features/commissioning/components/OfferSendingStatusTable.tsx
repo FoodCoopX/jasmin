@@ -6,6 +6,7 @@
 
 import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
+import type { OfferSendingStatus } from "@shared/api/generated/models";
 import { EditableTable, READ_ONLY_PERMISSION } from "@shared/tables";
 import type {
   EditableColumnConfig,
@@ -17,7 +18,7 @@ export default function OfferSendingStatusTable({
   sendingStatus,
   loading,
 }: {
-  sendingStatus: Record<string, unknown>[];
+  sendingStatus: OfferSendingStatus[];
   loading: boolean;
 }) {
   const { t } = useTranslation();
@@ -25,7 +26,7 @@ export default function OfferSendingStatusTable({
 
   const rows: TableRecord[] = sendingStatus.map((record) => ({
     ...record,
-    key: (record.id as string) ?? (record.name as string),
+    key: record.id,
   }));
 
   const columns: EditableColumnConfig<TableRecord>[] = [

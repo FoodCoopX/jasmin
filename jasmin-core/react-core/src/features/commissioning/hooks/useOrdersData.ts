@@ -421,7 +421,7 @@ export function useOrdersData() {
 
   const daysWithOrders = useMemo(() => {
     if (!rawDaysData) return [] as number[];
-    return rawDaysData.days ?? [];
+    return rawDaysData.days;
   }, [rawDaysData]);
 
   // Sync order data from query to local DRAFT state. Unlike a plain
@@ -431,7 +431,7 @@ export function useOrdersData() {
   // without splitting "loaded vs draft" first.
   useEffect(() => {
     if (!rawOrderData) return;
-    const orderData: OrderContentRow[] = rawOrderData.items ?? [];
+    const orderData: OrderContentRow[] = rawOrderData.items;
     const defaults = rawOrderData.orders_delivery_day_defaults;
 
     setData(orderData);
@@ -451,27 +451,27 @@ export function useOrdersData() {
         orderId: order.order_id,
         orderNumber: order.order_number,
         usedOrderNumberPrefix: order.order_number_prefix,
-        isOrderFinalized: order.order_is_finalized || false,
-        deliveryNoteId: order.delivery_note_id ?? null,
+        isOrderFinalized: order.order_is_finalized,
+        deliveryNoteId: order.delivery_note_id,
         deliveryNoteNumber: order.delivery_note_number,
         deliveryNotePrefix: order.delivery_note_prefix,
-        isDeliveryNoteFinalized: order.delivery_note_is_finalized || false,
-        invoiceId: order.invoice_id ?? null,
+        isDeliveryNoteFinalized: order.delivery_note_is_finalized,
+        invoiceId: order.invoice_id,
         invoiceNumber: order.invoice_number,
         invoicePrefix: order.invoice_prefix,
         hasInvoice: order.has_invoice,
         hasFinalizedInvoice: order.has_finalized_invoice,
       });
 
-      const serverNote = order.order_note || "";
+      const serverNote = order.order_note;
       lastServerNote.current = serverNote;
       setOrderNote(serverNote);
 
       setOrderDays({
-        harvesting_day: order.harvesting_day ?? null,
-        packing_day: order.packing_day ?? null,
-        washing_day: order.washing_day ?? null,
-        cleaning_day: order.cleaning_day ?? null,
+        harvesting_day: order.harvesting_day,
+        packing_day: order.packing_day,
+        washing_day: order.washing_day,
+        cleaning_day: order.cleaning_day,
       });
     } else {
       setDataCrates([]);
@@ -551,7 +551,7 @@ export function useOrdersData() {
       setOrderState((prev) => ({
         ...prev,
         ...(row.order_id !== undefined
-          ? { orderId: (row.order_id as string | number | null) ?? null }
+          ? { orderId: row.order_id as string | number | null }
           : {}),
         // Guarded like the sibling fields below: a row that omits these must
         // not clobber a known prefix to ``undefined`` ("undefined-39").
@@ -566,7 +566,7 @@ export function useOrdersData() {
           : {}),
         ...(row.delivery_note_id !== undefined
           ? {
-              deliveryNoteId: (row.delivery_note_id as string | null) ?? null,
+              deliveryNoteId: row.delivery_note_id as string | null,
             }
           : {}),
         ...(row.delivery_note_number !== undefined
@@ -585,7 +585,7 @@ export function useOrdersData() {
             }
           : {}),
         ...(row.invoice_id !== undefined
-          ? { invoiceId: (row.invoice_id as string | null) ?? null }
+          ? { invoiceId: row.invoice_id as string | null }
           : {}),
         ...(row.invoice_number !== undefined
           ? {
@@ -613,7 +613,7 @@ export function useOrdersData() {
       );
       setData(dataWithTotals);
 
-      if (newData && newData.length > 0 && newData[0].order_number) {
+      if (newData.length > 0 && newData[0].order_number) {
         syncOrderStateFromRow(newData[0]);
       }
     },
@@ -635,7 +635,7 @@ export function useOrdersData() {
       // OrderInfoPanel's BulkActionButton stays disabled because
       // ``orderState.orderId`` is still null (its ``selectedIds``
       // collapses to ``[]`` and the button gates on that).
-      if (newData && newData.length > 0 && newData[0].order_number) {
+      if (newData.length > 0 && newData[0].order_number) {
         syncOrderStateFromRow(newData[0]);
       }
     },
@@ -748,7 +748,7 @@ export function useOrdersData() {
   // --- Filtering & sorting ---
 
   const { filteredDataOffers, filteredDataArticles, filteredDataArticlesCount, filteredDataOffersCount } = useMemo(() => {
-    if (data && data.length > 0) {
+    if (data.length > 0) {
       let offersData = data.filter((item) => item.offer);
 
       if (showOnlyOrderedOffers) {

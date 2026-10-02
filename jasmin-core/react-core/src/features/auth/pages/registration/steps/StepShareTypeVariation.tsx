@@ -98,7 +98,7 @@ export default function StepShareTypeVariation({
               <Text strong>
                 {data.quantity ?? 1} ×{" "}
                 {chosenVariation
-                  ? `${chosenVariation.share_type_name} ${getShareTypeVariationSizeLabel(chosenVariation.size ?? "")}`
+                  ? `${chosenVariation.share_type_name} ${getShareTypeVariationSizeLabel(chosenVariation.size)}`
                   : t("auth.registration.variation.selected")}
               </Text>
               {price != null && (

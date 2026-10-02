@@ -379,8 +379,9 @@ time.
   gap rather than a real defect, fix it at the source with one narrow, named
   accessor: `core/tenant_db.py` (django-tenants' `connection.schema_name` /
   `.tenant`), `apps/shared/request_utils.py` (`body`, `auth_user`,
-  `request_tenant`), `core/throttling.py` (`set_throttle_scope`). Those exist so
-  the untyped read happens once, with the reason written down.
+  `request_tenant`), `apps/shared/super_admin/permissions.py`
+  (`super_admin_user`), `core/throttling.py` (`set_throttle_scope`). Those
+  exist so the untyped read happens once, with the reason written down.
 - **Widening a type to silence mypy is a defect.** If the checker is right that
   a value can be `None`, handle the `None`.
 
@@ -1097,8 +1098,9 @@ e.g. `MemberFactory(user=user)` creates a Member with a linked `JasminUser`.
 - Security: CSRF, CORS, rate limiting (django-axes)
 - Email: Django SMTP backend config (host, port, TLS), per-tenant overrides
 - JWT: token lifetime (access 15m, refresh 7d), rotation enabled
-- Logging: three rotating files — `app.log`, `auth.log`, `security.log` (the
-  `tenants` logger writes into `app.log`)
+- Logging: on bare metal, three rotating files — `app.log`, `auth.log`,
+  `security.log` (the `tenants` logger writes into `app.log`); in any container
+  every logger writes to stdout only
 
 **Frontend config** — `jasmin-core/react-core/vite.config.js` (dev server) **and
 `vite.config.production.js`** (the production build — `npm run build` uses this
@@ -1175,7 +1177,10 @@ python manage.py tenant_command showmigrations --schema=test
 
 ## Debugging & logs
 
-- **Backend**: logs in `jasmin-core/django-core/logs/` (app.log, auth.log, security.log)
+- **Backend**: on bare metal, logs in `jasmin-core/django-core/logs/` (app.log,
+  auth.log, security.log); in Docker, container stdout — `make dev-logs` in dev,
+  and in prod the host's journal (`docker compose logs backend`, or
+  `journalctl CONTAINER_NAME=<container>` for older entries)
 - **Frontend**: browser console + Vite HMR logs
 - **Docker Compose**: `make dev-logs` tails all services
 - **Database**: `docker exec -it jasmin-postgres-1 psql -U jasmin -d jasmin`

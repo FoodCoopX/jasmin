@@ -445,7 +445,7 @@ const MemberDetail = () => {
             onEditDelivery={handleDeliveryEdit}
             onToggleOptin={handleToggleOptin}
             togglingOptinId={
-              isTogglingOptin ? (togglingOptinVariables?.id ?? null) : null
+              isTogglingOptin ? togglingOptinVariables.id : null
             }
           />
         </Col>

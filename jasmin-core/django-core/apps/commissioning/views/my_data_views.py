@@ -43,7 +43,7 @@ def _notify_office_of_self_cancel(member: Member) -> None:
     from apps.shared.deferred_email import send_email_best_effort
     from apps.shared.tenant_urls import frontend_base_url, tenant_name
 
-    tenant = getattr(connection, "tenant", None)
+    tenant = connection.tenant
     office_email = getattr(tenant, "email", None)
     if not office_email:
         logger.info(
@@ -329,7 +329,7 @@ class MyCoopShareSubscribeView(APIView):
         # record consent against the wrong-language body. FAIL CLOSED: if the
         # tenant has ANY current COOP_CONTRACT document, agreement is mandatory —
         # a locale gap must never silently drop the requirement.
-        member_locale = getattr(member.user, "user_language", None) or "de"
+        member_locale = auth_user(request).user_language
         contract_doc = None
         for loc in dict.fromkeys([member_locale, "de"]):
             try:

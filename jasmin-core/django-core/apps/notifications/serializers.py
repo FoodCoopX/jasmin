@@ -23,7 +23,7 @@ def _reject_unsafe_placeholders(value: str, field: str) -> str:
     renderer already refuses to resolve these, but rejecting at write time
     gives the editor a clear error instead of a silently-blank render — and
     keeps the malicious string from ever being persisted."""
-    unsafe = find_unsafe_placeholders(value or "")
+    unsafe = find_unsafe_placeholders(value)
     if unsafe:
         raise serializers.ValidationError(
             "Disallowed placeholders (private/dunder paths are not "
@@ -65,7 +65,7 @@ class _SafeTemplateFieldsMixin:
         for field in self._EDITABLE_FIELDS:
             if field not in attrs:
                 continue
-            offending.extend(find_undeclared_placeholders(attrs[field] or "", declared))
+            offending.extend(find_undeclared_placeholders(attrs[field], declared))
         if offending:
             # De-duplicate, preserve first-seen order.
             seen: set[str] = set()

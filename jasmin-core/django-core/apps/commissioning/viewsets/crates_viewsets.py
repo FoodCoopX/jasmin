@@ -60,12 +60,10 @@ from ..utils.tax_rate_utils import resolve_crate_tax_rate
 from .base_viewsets import CanBeDeletedDestroyMixin
 
 
-def _get_tax_rate(crate: Crate | None, date: datetime.date) -> float:
+def _get_tax_rate(crate: Crate, date: datetime.date) -> float:
     """Resolve a crate tax rate, falling back to the configured default."""
     return float(
         resolve_crate_tax_rate(crate, date, default=get_default_tax_rate_crates())
-        if crate is not None
-        else get_default_tax_rate_crates()
     )
 
 
@@ -124,9 +122,11 @@ def _crate_update_fields(
     return update_fields, new_row_defaults
 
 
-def _reject_finalized(obj: Any, kind: str, action: str) -> None:
+def _reject_finalized(
+    obj: DeliveryNoteReseller | InvoiceReseller, kind: str, action: str
+) -> None:
     """Raise ``FinalizedError`` if ``obj`` is finalized; otherwise do nothing."""
-    if getattr(obj, "is_finalized", False):
+    if obj.is_finalized:
         raise FinalizedError(
             f"Cannot {action} {kind}",
             code=f"{kind.replace(' ', '_')}.finalized",
@@ -171,11 +171,7 @@ class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSe
         ).select_related("crate_type")
         # Group by (crate_type, price, rabatt, tax) and sum per-row line_netto so
         # the per-line figure matches the document footer — not a lossy max().
-        summary = summarize_crate_items(
-            rows,
-            resolve_tax_rate=lambda ct: _get_tax_rate(ct, date),
-            extras=extras,
-        )
+        summary = summarize_crate_items(rows, extras=extras)
         return (
             summary[0]
             if summary
@@ -207,13 +203,11 @@ class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSe
             "Delivery note",
         )
 
-        date = date_from_order(delivery_note.order)
         rows = CrateDeliveryNoteContent.objects.filter(
             delivery_note=delivery_note
         ).select_related("crate_type")
         summary = summarize_crate_items(
             rows,
-            resolve_tax_rate=lambda crate_type: _get_tax_rate(crate_type, date),
             extras={
                 "delivery_note_id": str(delivery_note.id),
                 "delivery_note_number": delivery_note.display_number,
@@ -429,11 +423,7 @@ class CrateContentInvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelVie
         rows = CrateContentInvoiceReseller.objects.filter(
             invoice=invoice, crate_type=crate_type
         ).select_related("crate_type")
-        summary = summarize_crate_items(
-            rows,
-            resolve_tax_rate=lambda ct: get_default_tax_rate_crates(),
-            extras=extras,
-        )
+        summary = summarize_crate_items(rows, extras=extras)
         return (
             summary[0]
             if summary
@@ -470,7 +460,6 @@ class CrateContentInvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelVie
         ).select_related("crate_type")
         summary = summarize_crate_items(
             rows,
-            resolve_tax_rate=lambda crate_type: get_default_tax_rate_crates(),
             extras={
                 "invoice_id": str(invoice.id),
                 "invoice_number": invoice.display_number,

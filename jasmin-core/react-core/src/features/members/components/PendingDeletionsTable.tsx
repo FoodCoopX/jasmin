@@ -102,13 +102,12 @@ export default function PendingDeletionsTable({
         title: t("gdpr.blockers"),
         dataIndex: "blockers",
         key: "blockers",
-        render: (blockers: string[] | undefined) => {
-          const list = blockers ?? [];
-          return list.length === 0 ? (
+        render: (blockers: string[]) => {
+          return blockers.length === 0 ? (
             <Tag color="green">{t("gdpr.ready")}</Tag>
           ) : (
             <Space direction="vertical" size={2}>
-              {list.map((reason, i) => (
+              {blockers.map((reason, i) => (
                 <Tag key={i} color="orange" style={{ whiteSpace: "normal" }}>
                   {reason}
                 </Tag>
@@ -122,7 +121,7 @@ export default function PendingDeletionsTable({
         key: "actions",
         align: "right" as const,
         render: (_: unknown, row: AdminPendingDeletion) => {
-          const blocked = (row.blockers?.length ?? 0) > 0;
+          const blocked = row.blockers.length > 0;
           const acting = approvingId === row.id;
           return (
             <Space>

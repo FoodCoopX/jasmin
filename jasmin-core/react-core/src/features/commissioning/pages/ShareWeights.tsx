@@ -55,7 +55,7 @@ export default function ShareWeights() {
   const [csvExportVisible, setCsvExportVisible] = useState(false);
 
   const activeAtDate = useMemo(() => {
-    if (!selectedYear || !selectedWeek) return undefined;
+    if (!selectedWeek) return undefined;
     return toApiDate(
       dayjs().year(selectedYear).isoWeek(selectedWeek).startOf("isoWeek"),
     )!;
@@ -70,7 +70,7 @@ export default function ShareWeights() {
     [selectedYear, selectedWeek, selectedDay],
   );
 
-  const canFetch = !!selectedYear && !!selectedWeek && !!selectedDay;
+  const canFetch = !!selectedWeek && !!selectedDay;
   const queryClient = useQueryClient();
 
   // React Query — failures route through the global queryCache.onError

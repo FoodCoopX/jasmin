@@ -94,7 +94,7 @@ export function usePlanningAxes({
       [...shareTypeVariations].sort(
         (a, b) =>
           (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
-          (a.size ?? "").localeCompare(b.size ?? ""),
+          a.size.localeCompare(b.size),
       ),
     [shareTypeVariations],
   );

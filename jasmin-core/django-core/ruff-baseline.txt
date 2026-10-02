@@ -2,11 +2,10 @@
 # Managed by scripts/ruff_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/ruff_baseline.py freeze
-# 199 finding(s).
+# 197 finding(s).
 
 apps/accounts/backends.py: N806 Variable `UserModel` in function should be lowercase
 apps/accounts/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
-apps/accounts/services/auth_service.py: C901 `refresh_access_token` is too complex (11 > 10)
 apps/accounts/services/registration_service.py: C901 `register_public_applicant` is too complex (13 > 10)
 apps/accounts/services/registration_service.py: PLR0915 Too many statements (57 > 50)
 apps/accounts/services/user_admin_service.py: C901 `update_user_admin` is too complex (13 > 10)
@@ -96,11 +95,11 @@ apps/commissioning/services/packing_list_service.py: PLR0913 Too many arguments 
 apps/commissioning/services/packing_list_service.py: PLR0913 Too many arguments in function definition (9 > 5)
 apps/commissioning/services/share_content_service.py: C901 `_build_stock_only_rows` is too complex (12 > 10)
 apps/commissioning/services/share_content_service.py: C901 `_extract_day_variations` is too complex (12 > 10)
-apps/commissioning/services/share_content_service.py: C901 `process_share_planning_data` is too complex (14 > 10)
+apps/commissioning/services/share_content_service.py: C901 `process_share_planning_data` is too complex (13 > 10)
 apps/commissioning/services/share_content_service.py: C901 `replace_share_planning` is too complex (14 > 10)
 apps/commissioning/services/share_content_service.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/commissioning/services/share_content_service.py: PLR0913 Too many arguments in function definition (7 > 5)
-apps/commissioning/services/share_content_service.py: PLR0915 Too many statements (62 > 50)
+apps/commissioning/services/share_content_service.py: PLR0915 Too many statements (61 > 50)
 apps/commissioning/services/share_demand_service.py: C901 `aggregated_rows` is too complex (11 > 10)
 apps/commissioning/services/share_demand_service.py: C901 `aggregated_rows` is too complex (14 > 10)
 apps/commissioning/services/share_demand_service.py: PLR0913 Too many arguments in function definition (11 > 5)
@@ -113,8 +112,8 @@ apps/commissioning/services/shares_day_change_service.py: C901 `apply` is too co
 apps/commissioning/services/shares_delivery_day_service.py: C901 `update_share_deliveries_for_delivery_day` is too complex (12 > 10)
 apps/commissioning/services/snapshot_service.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/commissioning/services/snapshot_service.py: PLR0913 Too many arguments in function definition (8 > 5)
-apps/commissioning/services/statistics.py: C901 `_compute_variation_averages` is too complex (15 > 10)
-apps/commissioning/services/statistics.py: PLR0915 Too many statements (63 > 50)
+apps/commissioning/services/statistics.py: C901 `_compute_variation_averages` is too complex (14 > 10)
+apps/commissioning/services/statistics.py: PLR0915 Too many statements (61 > 50)
 apps/commissioning/services/stock_service.py: C901 `get_theoretical_current_stock` is too complex (11 > 10)
 apps/commissioning/services/theoretical_objects.py: C901 `_create_theoretical_movements` is too complex (16 > 10)
 apps/commissioning/services/theoretical_objects.py: C901 `create_theoretical_objects` is too complex (21 > 10)
@@ -148,7 +147,6 @@ apps/commissioning/tests/tests_viewsets/test_member_detail_scoping.py: N801 Clas
 apps/commissioning/tests/tests_viewsets/test_member_detail_scoping.py: N801 Class name `TestMember_CannotAccessResellerEndpoints` should use CapWords convention
 apps/commissioning/tests/tests_viewsets/test_member_detail_scoping.py: N801 Class name `TestShareDelivery_MemberRoleScoping` should use CapWords convention
 apps/commissioning/utils/composite_id_utils.py: PLR0913 Too many arguments in function definition (7 > 5)
-apps/commissioning/utils/deletion_utils.py: C901 `can_delete_instance` is too complex (11 > 10)
 apps/commissioning/utils/lookup.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/commissioning/utils/packing_divergence.py: PLR0913 Too many arguments in function definition (7 > 5)
 apps/commissioning/utils/packing_queries.py: PLR0913 Too many arguments in function definition (7 > 5)
@@ -164,11 +162,11 @@ apps/commissioning/views/reseller_views.py: C901 `post` is too complex (12 > 10)
 apps/commissioning/views/stock_views.py: C901 `patch` is too complex (14 > 10)
 apps/commissioning/views/stock_views.py: PLR0915 Too many statements (54 > 50)
 apps/commissioning/viewsets/basics_viewsets.py: C901 `get_queryset` is too complex (11 > 10)
-apps/commissioning/viewsets/delivery_viewsets.py: C901 `_migrate_succession_children` is too complex (16 > 10)
+apps/commissioning/viewsets/delivery_viewsets.py: C901 `_migrate_succession_children` is too complex (14 > 10)
 apps/commissioning/viewsets/resellers_viewsets.py: C901 `_verify_einvoice_xml_matches` is too complex (15 > 10)
 apps/commissioning/viewsets/resellers_viewsets.py: N817 CamelCase `ElementTree` imported as acronym `ET`
 apps/commissioning/viewsets/shares_viewsets.py: C901 `export_csv` is too complex (15 > 10)
-apps/commissioning/viewsets/shares_viewsets.py: C901 `perform_update` is too complex (14 > 10)
+apps/commissioning/viewsets/shares_viewsets.py: C901 `perform_update` is too complex (11 > 10)
 apps/commissioning/viewsets/shares_viewsets.py: PLR0915 Too many statements (54 > 50)
 apps/cultivation/models/basics.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
 apps/gdpr/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase

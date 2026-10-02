@@ -60,11 +60,11 @@ def schedule_member_email(
     # Render in the linked user's stored language when known
     # (captured as a plain scalar before the on_commit closure; None →
     # tenant-language fallback inside send_email).
-    recipient_language = (
-        language
-        if language is not None
-        else getattr(getattr(member, "user", None), "user_language", None) or None
-    )
+    recipient_language = language
+    if recipient_language is None:
+        user = member.user
+        if user is not None:
+            recipient_language = user.user_language or None
     schedule_deferred_email(
         slug=slug,
         to_emails=[member.email],

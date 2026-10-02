@@ -34,8 +34,6 @@ def _resolve_tenant_setting(attr_name: str):
     * ``OperationalError`` / ``ProgrammingError`` — DB unreachable or
       ``shared_tenants_tenantsettings`` table doesn't exist yet
       (initial migrations, test setup).
-    * ``AttributeError`` — ``connection.tenant`` is missing entirely
-      (running outside django-tenants).
 
     Everything else (model errors, attribute typos in the settings
     field, etc.) bubbles up so the bug gets seen.
@@ -47,16 +45,7 @@ def _resolve_tenant_setting(attr_name: str):
     from core.tenant_db import connection
 
     try:
-        tenant = connection.tenant
-    except AttributeError:
-        logger.debug(
-            "tax_rate.no_tenant_context attr=%s — falling back to constant",
-            attr_name,
-        )
-        return None
-
-    try:
-        settings = TenantSettings.get_current_settings(tenant)
+        settings = TenantSettings.get_current_settings(connection.tenant)
     except (ImproperlyConfigured, OperationalError, ProgrammingError) as exc:
         logger.warning(
             "tax_rate.lookup_failed attr=%s error=%s — falling back to constant",
@@ -67,7 +56,7 @@ def _resolve_tenant_setting(attr_name: str):
 
     if settings is None:
         return None
-    return getattr(settings, attr_name, None)
+    return getattr(settings, attr_name)
 
 
 def get_default_tax_rate_articles():

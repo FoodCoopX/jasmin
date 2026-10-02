@@ -222,7 +222,6 @@ const EditableTable = <T extends TableRecord = TableRecord>({
       );
     }
     if (
-      baseParams &&
       Object.keys(baseParams).length > 0 &&
       !apiFunctions?.list
     ) {
@@ -351,7 +350,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
   // `apiEndpoints` / `onDataChange` would re-fetch on every parent render
   // unless the parent memoises them — most callers don't, so it would loop.
   useEffect(() => {
-    if (!showSearchBar || (!apiFunctions?.list && !apiEndpoints?.list)) return;
+    if (!showSearchBar || (!apiFunctions?.list && !apiEndpoints.list)) return;
 
     let cancelled = false;
     const fetchInitialData = async () => {
@@ -371,7 +370,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
             baseParams as Record<string, string>,
           ).toString();
           const response = await axiosService.get(
-            `${apiEndpoints!.list}?${params}`,
+            `${apiEndpoints.list}?${params}`,
           );
           if (cancelled) return;
           rows = response.data;
@@ -389,7 +388,6 @@ const EditableTable = <T extends TableRecord = TableRecord>({
           (item) => ({ ...item, key: item.id }) as T,
         );
 
-        if (cancelled) return;
         setDataWithTransform(transformedData);
 
         if (onDataChange) {
@@ -733,7 +731,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
           // Reach back into previous local state for recently-added
           // rows that the refetched list doesn't include yet. They
           // stay pinned at the top until the next refetch catches up.
-          if (prev && prev.length > 0) {
+          if (prev.length > 0) {
             const prevById = new Map<string, T>();
             for (const row of prev) {
               if (typeof row.id === "string") {
@@ -751,10 +749,10 @@ const EditableTable = <T extends TableRecord = TableRecord>({
             (a, b) =>
               pinIds.indexOf(a.id as string) - pinIds.indexOf(b.id as string),
           );
-          return preserveDraft([...pinned, ...rest], prev ?? []);
+          return preserveDraft([...pinned, ...rest], prev);
         });
       } else {
-        setDataWithTransform((prev) => preserveDraft(mapped, prev ?? []));
+        setDataWithTransform((prev) => preserveDraft(mapped, prev));
       }
       return;
     }
@@ -1208,8 +1206,8 @@ const EditableTable = <T extends TableRecord = TableRecord>({
               {permissions.canAdd && (
                 <Button
                   size="small"
-                  icon={permissions.canAdd ? <PlusOutlined /> : undefined}
-                  onClick={permissions.canAdd ? handleAddClick : undefined}
+                  icon={<PlusOutlined />}
+                  onClick={handleAddClick}
                   style={{ width: "2em" }}
                 >
                   {t("table.add_plus_icon")}
@@ -1219,7 +1217,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
             <div>
               {showSearchBar && (
                 <Input
-                  placeholder={t("table.search_placeholder") || "Search..."}
+                  placeholder={t("table.search_placeholder")}
                   aria-label={t("table.search_placeholder")}
                   type="search"
                   value={searchText}

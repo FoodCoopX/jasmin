@@ -203,7 +203,7 @@ export default function ConfigurationUsers() {
     const customers: UserRow[] = [];
     const memberOnly: UserRow[] = [];
     for (const u of users) {
-      const roles = u.roles || [];
+      const { roles } = u;
       const isStaff = roles.some((r) => (STAFF_ROLES as string[]).includes(r));
       const isCustomer = roles.includes(ROLES.CUSTOMER);
 
@@ -219,12 +219,8 @@ export default function ConfigurationUsers() {
         (STATUS_SORT_ORDER[a.account_status] ?? 99) -
         (STATUS_SORT_ORDER[b.account_status] ?? 99);
       if (diff !== 0) return diff;
-      const na = `${a.last_name || ""} ${a.first_name || ""}`
-        .trim()
-        .toLocaleLowerCase();
-      const nb = `${b.last_name || ""} ${b.first_name || ""}`
-        .trim()
-        .toLocaleLowerCase();
+      const na = `${a.last_name} ${a.first_name}`.trim().toLocaleLowerCase();
+      const nb = `${b.last_name} ${b.first_name}`.trim().toLocaleLowerCase();
       return na.localeCompare(nb);
     };
     staff.sort(sortByStatusThenName);
@@ -249,7 +245,7 @@ export default function ConfigurationUsers() {
         readOnly: true,
         render: (_: unknown, record: TableRecord) => {
           const u = record as UserRow;
-          const name = `${u.first_name || ""} ${u.last_name || ""}`.trim();
+          const name = `${u.first_name} ${u.last_name}`.trim();
           return name || "—";
         },
       },
@@ -272,7 +268,7 @@ export default function ConfigurationUsers() {
         render: (s: unknown) => {
           const status = s as UserRow["account_status"];
           const color = STATUS_BADGE_COLOR[status] ?? "default";
-          const label = status ? t(`users.status_${status}`) : "";
+          const label = t(`users.status_${status}`);
           return <Badge status={color as never} text={label} />;
         },
       },

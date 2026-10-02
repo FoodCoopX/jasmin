@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import logging
 
+from rest_framework.exceptions import NotAuthenticated
 from rest_framework.permissions import BasePermission
+from rest_framework.request import Request
+
+from .models import SuperAdmin
 
 logger = logging.getLogger("super_admin")
 
@@ -28,9 +34,26 @@ class IsSuperAdmin(BasePermission):
         if not getattr(request.user, "is_super_admin", False):
             logger.warning(
                 "superadmin.permission.denied user=%s path=%s reason=not_superadmin",
-                getattr(request.user, "email", "-"),
+                request.user.email,
                 request.path,
             )
             return False
 
         return True
+
+
+def super_admin_user(request: Request) -> SuperAdmin:
+    """Return the super-admin behind an ``IsSuperAdmin``-gated endpoint.
+
+    The stubs declare ``request.user`` as the tenant ``AUTH_USER_MODEL`` or
+    ``AnonymousUser``. Behind ``SuperAdminJWTAuthentication`` it is the
+    ``SuperAdmin`` row loaded from the public schema, and ``IsSuperAdmin`` has
+    turned every other caller away before the view runs — a fact the declared
+    union cannot express, so the ``isinstance`` check proves it instead. An
+    endpoint moved off that authentication answers ``401`` rather than reading
+    the wrong user.
+    """
+    user: object = request.user
+    if not isinstance(user, SuperAdmin):
+        raise NotAuthenticated
+    return user

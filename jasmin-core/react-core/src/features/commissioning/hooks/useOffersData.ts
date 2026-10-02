@@ -62,12 +62,12 @@ export function useOffersData({
 
   const { offerGroupsCount, offerGroups } = useOfferGroups();
 
-  const currentOfferGroup = offerGroups?.find(
+  const currentOfferGroup = offerGroups.find(
     (og) => og.id === selectedOfferGroup,
   );
 
   const otherOfferGroups = useMemo(() => {
-    if (!selectedOfferGroup || !offerGroups) return [];
+    if (!selectedOfferGroup) return [];
     return offerGroups.filter((og) => og.id !== selectedOfferGroup);
   }, [selectedOfferGroup, offerGroups]);
 
@@ -131,7 +131,7 @@ export function useOffersData({
     });
 
   const sendingStatus = useMemo(
-    () => (sendingStatusData as unknown as Record<string, unknown>[]) ?? [],
+    () => sendingStatusData ?? [],
     [sendingStatusData],
   );
 
@@ -143,8 +143,7 @@ export function useOffersData({
   }, [queryClient, sendingStatusParams]);
 
   const resellersForPdf = useMemo(() => {
-    if (!usePersonalizedOffers || !sendingStatus || sendingStatus.length === 0)
-      return undefined;
+    if (!usePersonalizedOffers || sendingStatus.length === 0) return undefined;
     return sendingStatus.map((s) => ({
       reseller_name: String(s.name ?? ""),
       reseller_address: String(s.address ?? ""),

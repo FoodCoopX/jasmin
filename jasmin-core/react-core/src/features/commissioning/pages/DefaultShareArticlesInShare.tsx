@@ -107,7 +107,7 @@ export default function DefaultShareArticlesInShare() {
   // --- Pivot --------------------------------------------------------------
 
   const filteredShareArticles = useMemo<ShareArticleListRow[]>(() => {
-    const list = (shareArticles ?? []) as unknown as ShareArticleListRow[];
+    const list = shareArticles as unknown as ShareArticleListRow[];
     return list.filter(
       (sa) => sa.share_option || sa.share_option2 || sa.share_option3,
     );

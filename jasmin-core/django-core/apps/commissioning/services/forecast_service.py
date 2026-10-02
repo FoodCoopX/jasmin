@@ -648,15 +648,9 @@ class ForecastService:
                 default_share_content = default_share_contents.get(
                     (share_type_variation_id, share_article.id)
                 )
-                if (
-                    article_in_share is not None
-                    and article_in_share.quantity is not None
-                ):
+                if article_in_share is not None:
                     amount = article_in_share.quantity
-                elif (
-                    default_share_content is not None
-                    and default_share_content.amount is not None
-                ):
+                elif default_share_content is not None:
                     amount = default_share_content.amount
                 else:
                     amount = 0
@@ -728,7 +722,7 @@ class ForecastService:
         """
         if not ForecastService._distribute_forecast_by_weight_enabled():
             return {}
-        if forecast is None or not forecast.amount:
+        if not forecast.amount:
             return {}
         weights = {
             variation.share_type_variation_id: (
@@ -748,16 +742,11 @@ class ForecastService:
     def _distribute_forecast_by_weight_enabled() -> bool:
         """True iff the active tenant opted into the weighted forecast split.
 
-        False when there is no real tenant context (a FakeTenant under
-        ``schema_context``) or no settings row — the feature is simply off."""
-        from django.db import connection
-
+        False when the tenant has no settings row — the feature is simply off."""
         from apps.shared.tenants.models import TenantSettings
+        from core.tenant_db import connection
 
-        tenant = getattr(connection, "tenant", None)
-        if tenant is None:
-            return False
-        settings = TenantSettings.get_current_settings(tenant)
+        settings = TenantSettings.get_current_settings(connection.tenant)
         return bool(settings and settings.distribute_forecast_by_weight)
 
     @transaction.atomic

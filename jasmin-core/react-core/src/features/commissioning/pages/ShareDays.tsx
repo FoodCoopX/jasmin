@@ -75,7 +75,7 @@ export default function ShareDays() {
       key: Key,
       formData: Record<string, unknown>,
     ): Promise<TableRecord> => {
-      if (!key || !formData) return {} as TableRecord;
+      if (!key) return {} as TableRecord;
 
       try {
         // Convert key (id) back to delivery_day

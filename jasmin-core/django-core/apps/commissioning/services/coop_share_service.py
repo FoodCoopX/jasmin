@@ -205,14 +205,12 @@ class CoopShareService:
         Mirror this check on every entry-point that calls
         ``assert_within_min_max``.
         """
-        return bool(getattr(member, "admin_confirmed", False)) and not bool(
-            getattr(member, "is_trial", False)
-        )
+        return member.admin_confirmed and not member.is_trial
 
     @staticmethod
     def assert_within_min_max(
         *,
-        member: Member | None,
+        member: Member,
         new_amount: Decimal | None,
         exclude_pk=None,
     ) -> None:
@@ -224,7 +222,7 @@ class CoopShareService:
         Skips the check entirely for trial members and not-yet-confirmed
         applicants — see :meth:`_bounds_apply_to`.
         """
-        if new_amount is None or member is None:
+        if new_amount is None:
             return
         if not CoopShareService._bounds_apply_to(member):
             return
@@ -242,16 +240,16 @@ class CoopShareService:
         current_total = CoopShareService.member_total_shares(
             member, exclude_pk=exclude_pk
         )
-        new_total = current_total + (new_amount or 0)
+        new_total = current_total + new_amount
 
-        if min_coop_shares is not None and new_total < min_coop_shares:
+        if new_total < min_coop_shares:
             raise MemberCoopSharesOutOfRange(
                 total=new_total,
                 minimum=min_coop_shares,
                 maximum=max_coop_shares,
                 member_id=str(member.pk),
             )
-        if max_coop_shares is not None and new_total > max_coop_shares:
+        if new_total > max_coop_shares:
             raise MemberCoopSharesOutOfRange(
                 total=new_total,
                 minimum=min_coop_shares,
@@ -277,7 +275,7 @@ class CoopShareService:
         from apps.shared.tenants.models import TenantSettings
 
         current_settings = TenantSettings.get_current_settings(connection.tenant)
-        if not current_settings or current_settings.min_number_coop_shares is None:
+        if not current_settings:
             return
 
         total = CoopShareService.member_total_shares(
@@ -316,7 +314,7 @@ class CoopShareService:
         """
         from apps.shared.tenants.models import TenantSettings
 
-        if member is None or member.is_trial:
+        if member.is_trial:
             return
 
         tenant = connection.tenant
@@ -326,20 +324,18 @@ class CoopShareService:
 
         min_coop_shares = current_settings.min_number_coop_shares
         max_coop_shares = current_settings.max_number_coop_shares
-        if min_coop_shares is None and max_coop_shares is None:
-            return
 
         total = CoopShareService.member_total_shares(
             member, only_confirmed=only_confirmed
         )
-        if min_coop_shares is not None and total < min_coop_shares:
+        if total < min_coop_shares:
             raise MemberCoopSharesOutOfRange(
                 total=total,
                 minimum=min_coop_shares,
                 maximum=max_coop_shares,
                 member_id=str(member.pk),
             )
-        if max_coop_shares is not None and total > max_coop_shares:
+        if total > max_coop_shares:
             raise MemberCoopSharesOutOfRange(
                 total=total,
                 minimum=min_coop_shares,

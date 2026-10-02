@@ -70,7 +70,7 @@ export default function SuperAdminDashboard() {
     queryFn: async () => {
       try {
         const response = await axiosService.get(SUPER_ADMIN_ENDPOINTS.backups);
-        return (response.data.backups || []) as Backup[];
+        return response.data.backups as Backup[];
       } catch {
         return [];
       }

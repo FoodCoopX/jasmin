@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from decimal import Decimal
-
 from django.db import transaction
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
@@ -26,6 +24,7 @@ from apps.shared.money import round_money
 from apps.shared.openapi_params import catalogue_parameter
 from apps.shared.pii_logging import PIIReadLoggingMixin
 from apps.shared.query_params import YEAR_PARAM, ParamSpec, validate_query_params
+from apps.shared.request_utils import auth_user
 from core.errors import InvalidQueryParam
 from core.pagination import OptionalLimitOffsetPagination
 from core.serializers import ErrorResponseSerializer
@@ -195,11 +194,9 @@ class BillingProfileViewSet(
         # reads — so serve member-role callers the narrowed serializer on the
         # read actions. Staff keep the full serializer; writes are office-only;
         # anonymous / schema-generation fall through to the office shape.
-        request = getattr(self, "request", None)
+        request = self.request
         if (
             self.action in {"list", "retrieve"}
-            and request is not None
-            and getattr(request, "user", None)
             and request.user.is_authenticated
             and not IsStaff().has_permission(request, self)
         ):
@@ -520,7 +517,7 @@ class ChargeScheduleViewSet(RolePermissionsMixin, viewsets.ReadOnlyModelViewSet)
         data = [
             {
                 "month": row["month"].strftime("%Y-%m"),
-                "amount": str(round_money(row["total"] or Decimal("0"))),
+                "amount": str(round_money(row["total"])),
             }
             for row in rows
         ]
@@ -587,7 +584,7 @@ class BillingRunViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = BillingRun.objects.all()
-        if getattr(self, "action", None) != "list":
+        if self.action != "list":
             # ``?year=`` scopes the list. retrieve / destroy / export each
             # address one run by id through ``get_object``, where a stray year
             # would 404 a run that exists.
@@ -630,7 +627,7 @@ class BillingRunViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             period_start=serializer.validated_data["period_start"],
             period_end=serializer.validated_data["period_end"],
             collection_date=serializer.validated_data["collection_date"],
-            created_by=getattr(request, "user", None),
+            created_by=auth_user(request),
             payment_method=serializer.validated_data["payment_method"],
         )
         return Response(

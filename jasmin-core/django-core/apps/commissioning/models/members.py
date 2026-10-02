@@ -264,7 +264,7 @@ class Member(
         # leave an offboarded/relinked user still carrying MEMBER.
         prev_user_id = (
             Member.objects.filter(pk=self.pk).values_list("user_id", flat=True).first()
-            if self.pk
+            if not self._state.adding
             else None
         )
         super().save(*args, **kwargs)
@@ -370,7 +370,8 @@ class Member(
         # non-trial member may only enter the Mitgliederliste with total equity
         # inside the configured min/max window. Checked BEFORE flipping
         # admin_confirmed so a violation never leaves a half-admitted row. The
-        # service no-ops for trial members and when no min/max is configured.
+        # service no-ops for trial members and when the tenant has no settings
+        # row.
         from apps.commissioning.services.coop_share_service import CoopShareService
 
         CoopShareService.assert_member_total_within_bounds(self)
@@ -411,11 +412,7 @@ class Member(
                 # lock; once it returns the row is up to date.
                 self._generate_member_number()
             if not self.entry_date:
-                self.entry_date = (
-                    _timezone.localdate(self.admin_confirmed_at)
-                    if self.admin_confirmed_at is not None
-                    else _timezone.localdate()
-                )
+                self.entry_date = _timezone.localdate(self.admin_confirmed_at)
                 updated_fields.append("entry_date")
             if updated_fields:
                 self.save(update_fields=updated_fields)
@@ -535,7 +532,7 @@ class CoopShare(JasminModel, PayableMixin, AdminConfirmableMixin, CancellableMix
         # re-validate the LOSING member — the share leaving could drop their
         # live equity below the GenG minimum, which the new-member check above
         # never sees. exclude_pk so this departing share isn't counted for them.
-        if self.pk:
+        if not self._state.adding:
             prev_member_id = (
                 CoopShare.objects.filter(pk=self.pk)
                 .values_list("member_id", flat=True)
@@ -586,7 +583,7 @@ class CoopShare(JasminModel, PayableMixin, AdminConfirmableMixin, CancellableMix
         # action in onboarding mode, where the office records a membership
         # that has already ended; the caller then cancels the confirmed share
         # with the member's exit date.
-        if self.member_id and self.member.cancelled_at is not None:
+        if self.member.cancelled_at is not None:
             if not allow_cancelled:
                 from apps.commissioning.errors import MemberAlreadyCancelled
 
@@ -600,7 +597,7 @@ class CoopShare(JasminModel, PayableMixin, AdminConfirmableMixin, CancellableMix
             assert_confirmation_not_after_exit(self.member, confirmed_at=confirmed_at)
         with transaction.atomic():
             super().confirm(admin_user, save=save, confirmed_at=confirmed_at)
-            if save and self.member_id:
+            if save:
                 from apps.commissioning.services.trial_conversion import (
                     convert_trial_member_on_first_coop_share,
                 )
@@ -843,7 +840,7 @@ class Subscription(
         # orphan that data (deliveries still reference the OLD variation). Lock
         # it after confirmation — an unconfirmed draft (incl. an auto-renewal the
         # office is still reviewing) may still be re-pointed.
-        if self.pk and not self._state.adding and self.admin_confirmed:
+        if not self._state.adding and self.admin_confirmed:
             old_variation_id = (
                 Subscription.objects.filter(pk=self.pk)
                 .values_list("share_type_variation_id", flat=True)
@@ -983,7 +980,7 @@ class Subscription(
         # a leftover subscription. The confirm endpoint refuses such a
         # subscription, or in onboarding mode requires the member to be
         # confirmed already; the guard covers any other confirm() caller.
-        if member and not member.admin_confirmed and member.cancelled_at is None:
+        if not member.admin_confirmed and member.cancelled_at is None:
             member.confirm(admin_user)
 
         SubscriptionService().materialize_confirmed_subscription(
@@ -1020,8 +1017,6 @@ class Subscription(
     def is_current(self) -> bool:
         """Check if this subscription period is currently active"""
         today = timezone.now().date()
-        if not self.valid_from:
-            return False
         if self.valid_until is None:
             return today >= self.valid_from
         return self.valid_from <= today <= self.valid_until

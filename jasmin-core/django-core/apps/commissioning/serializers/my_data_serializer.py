@@ -293,7 +293,7 @@ class MyCustomerDataUpdateSerializer(serializers.ModelSerializer):
         changed = sorted(
             name
             for name in self.STATION_IDENTITY_FIELDS & set(attrs)
-            if attrs[name] != getattr(self.instance, name, None)
+            if attrs[name] != getattr(self.instance, name)
         )
         if changed and DeliveryStation.objects.filter(contact=self.instance).exists():
             raise SharedStationIdentityLocked(

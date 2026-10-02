@@ -59,9 +59,8 @@ class TestCancelMemberWithShares:
         officer = JasminUserFactory(roles=["admin"])
         before = timezone.now()
 
-        result = cancel_member_with_coop_shares(member, cancelled_by=officer)
+        cancel_member_with_coop_shares(member, cancelled_by=officer)
 
-        assert result.pk == member.pk
         member.refresh_from_db()
         assert member.cancelled_at is not None
         assert member.cancelled_at >= before
@@ -221,8 +220,8 @@ class TestMemberCancellationEndsSubscriptions:
         assert sub.cancelled_at is not None
         assert sub.valid_until == datetime.date(2026, 4, 12)
         # The force-cancel reports it as ended (no live mandate left behind).
-        assert sub.id in result.cancellation_result["subscriptions_ended"]
-        assert result.cancellation_result["subscriptions_not_ended"] == []
+        assert sub.id in result.subscriptions_ended
+        assert result.subscriptions_not_ended == []
 
     @time_machine.travel(datetime.date(2026, 3, 30), tick=False)  # Monday
     def test_active_subscription_refuses_cancel_without_force(self, tenant):
@@ -299,8 +298,8 @@ class TestMemberCancellationEndsSubscriptions:
         # Ended leniently — stamped cancelled, reported as ended (NOT a silent
         # failure), and its future deliveries dropped.
         assert sub.cancelled_at is not None
-        assert sub.id in result.cancellation_result["subscriptions_ended"]
-        assert result.cancellation_result["subscriptions_not_ended"] == []
+        assert sub.id in result.subscriptions_ended
+        assert result.subscriptions_not_ended == []
 
     @time_machine.travel(datetime.date(2026, 3, 30), tick=False)  # Monday
     def test_force_end_business_error_is_recorded_not_aborts_exit(self, tenant):
@@ -366,7 +365,7 @@ class TestMemberCancellationEndsSubscriptions:
         share.refresh_from_db()
         assert share.cancelled_at is not None
         # ...and the failed subscription is recorded for manual attention.
-        assert sub.id in result.cancellation_result["subscriptions_not_ended"]
+        assert sub.id in result.subscriptions_not_ended
 
     @time_machine.travel(datetime.date(2026, 3, 30), tick=False)  # Monday
     def test_draft_subscription_is_wound_down(self, tenant):
@@ -515,7 +514,7 @@ class TestMemberCancellationEndsSubscriptions:
         assert sub.cancelled_at is None
         # The failure is surfaced, not silent — the office can see this
         # subscription still holds a live mandate.
-        assert sub.id in result.cancellation_result["subscriptions_not_ended"]
+        assert sub.id in result.subscriptions_not_ended
 
 
 @pytest.mark.django_db(transaction=True)

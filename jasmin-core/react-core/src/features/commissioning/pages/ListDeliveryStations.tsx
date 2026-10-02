@@ -120,10 +120,7 @@ export default function ListDeliveryStations() {
   );
 
   const shareDeliveryDays = useMemo(
-    () => [
-      ...(currentlyActiveDeliveryDays || []),
-      ...(futureDeliveryDays || []),
-    ],
+    () => [...currentlyActiveDeliveryDays, ...futureDeliveryDays],
     [currentlyActiveDeliveryDays, futureDeliveryDays],
   );
 

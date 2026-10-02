@@ -189,12 +189,13 @@ def _validated_additional_theoretical_body(
 def _optional_summary_scope(instance: Any) -> dict[str, Any]:
     """``day_number``/``seller`` summary filters for an additional-theoretical row.
 
-    The four discriminated models don't all carry both fields, so each is
-    included only when the instance has a non-null value — mirroring the
-    summary action's "filter only when provided" semantics.
+    All four discriminated models carry a nullable ``day_number``; only the
+    purchase one carries a ``seller``. Each is included only when the instance
+    has a non-null value — mirroring the summary action's "filter only when
+    provided" semantics.
     """
     scope: dict[str, Any] = {}
-    if getattr(instance, "day_number", None) is not None:
+    if instance.day_number is not None:
         scope["day_number"] = instance.day_number
     if getattr(instance, "seller", None) is not None:
         scope["seller"] = instance.seller

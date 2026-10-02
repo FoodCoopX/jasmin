@@ -254,14 +254,12 @@ export default function ConsentDocumentModal({
         </Form.Item>
       </Form>
 
-      {mode === "create" && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginTop: 8 }}
-          message={t("consent.admin.append_only_notice")}
-        />
-      )}
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginTop: 8 }}
+        message={t("consent.admin.append_only_notice")}
+      />
     </Modal>
   );
 }

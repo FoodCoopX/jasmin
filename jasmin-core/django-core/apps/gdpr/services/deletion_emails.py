@@ -56,8 +56,8 @@ def send_deletion_confirmation_email(
         related_object_id=str(deletion_request.pk),
         priority="high",
         # Render in the recipient's own language (explicit >
-        # tenant-default > DEFAULT_LANGUAGE). None preserves today's default.
-        language=getattr(user, "user_language", None) or None,
+        # tenant-default > DEFAULT_LANGUAGE).
+        language=user.user_language,
         logger=logger,
         log_error_event="gdpr.deletion_email_failed",
         log_not_sent_event="gdpr.deletion_email_not_sent",
@@ -143,13 +143,12 @@ def send_deletion_pending_admin_office_email(
     transition. The office can still find the request in
     ConfigurationGDPR — they just don't get the push.
     """
-    from django.db import connection
-
     from apps.shared.deferred_email import send_email_best_effort
     from apps.shared.tenant_urls import frontend_base_url, tenant_name
+    from core.tenant_db import connection
 
-    tenant = getattr(connection, "tenant", None)
-    office_email = getattr(tenant, "email", None)
+    # A FakeTenant (schema_context in a worker) carries no ``email``.
+    office_email = getattr(connection.tenant, "email", None)
     if not office_email:
         # No address configured → skip silently. The office still
         # sees pending rows in ConfigurationGDPR; this just means
@@ -210,7 +209,7 @@ def send_deletion_rejected_email(
 
     user = deletion_request.user
     context = {
-        "user": {"first_name": getattr(user, "first_name", "") if user else ""},
+        "user": {"first_name": user.first_name if user else ""},
         "tenant_name": tenant_name(),
         "reason": reason,
     }

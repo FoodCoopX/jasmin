@@ -245,15 +245,15 @@ const EditableModal = <T extends TableRecord = TableRecord>({
     <Modal
       title={
         record?.key === -1
-          ? t("table.add_record") || "Add Record"
-          : t("table.edit_record") || "Edit Record"
+          ? t("table.add_record")
+          : t("table.edit_record")
       }
       open={visible}
       onOk={handleSave}
       onCancel={onCancel}
       width="30em"
-      okText={t("table.save") || "Save"}
-      cancelText={t("table.cancel") || "Cancel"}
+      okText={t("table.save")}
+      cancelText={t("table.cancel")}
       confirmLoading={loading}
     >
       <Form form={form} layout="vertical" onKeyDown={handleKeyDown}>
@@ -264,7 +264,6 @@ const EditableModal = <T extends TableRecord = TableRecord>({
             if (column.type === "section-header") return true;
             if (column.readOnly === true) return false;
             if (!column.inputType) return false;
-            if (column.render && !column.inputType) return false;
             return true;
           })
           .map((column) => {

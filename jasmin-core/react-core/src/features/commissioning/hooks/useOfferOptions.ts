@@ -20,7 +20,7 @@ export const useOfferOptions = (params: CommissioningOffersListParams) => {
   const offers: OfferOption[] = toOptions(
     data,
     (o) =>
-      `${o.share_article_name} [${getUnitLabel(o.unit)}] - (${format(Number(o.amount_per_pu ?? 0), 0)} ${getUnitLabel(o.unit)}/VPE)`,
+      `${o.share_article_name} [${getUnitLabel(o.unit)}] - (${format(Number(o.amount_per_pu), 0)} ${getUnitLabel(o.unit)}/VPE)`,
   );
 
   return {

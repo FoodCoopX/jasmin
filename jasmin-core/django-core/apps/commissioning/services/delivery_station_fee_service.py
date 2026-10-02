@@ -165,7 +165,7 @@ class DeliveryStationFeeService:
             if date is None or not (start <= date <= end):
                 continue
             key = (row["year"], row["delivery_week"])
-            counts[key] = counts.get(key, 0) + (row["quantity"] or 0)
+            counts[key] = counts.get(key, 0) + row["quantity"]
 
         return [
             {"year": year, "delivery_week": week, "boxes": boxes}
@@ -177,9 +177,9 @@ class DeliveryStationFeeService:
         station: DeliveryStation, start: datetime.date, end: datetime.date
     ) -> dict:
         """Owed-amount breakdown for one station over [start, end]."""
-        box_rate = station.fee_per_box_net or Decimal("0")
-        month_rate = station.fee_per_month_net or Decimal("0")
-        year_rate = station.fee_per_year_net or Decimal("0")
+        box_rate = station.fee_per_box_net
+        month_rate = station.fee_per_month_net
+        year_rate = station.fee_per_year_net
 
         lines: list[dict] = []
         if box_rate > 0:

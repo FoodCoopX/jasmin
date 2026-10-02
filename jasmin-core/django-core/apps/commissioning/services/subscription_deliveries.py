@@ -39,8 +39,7 @@ def truncate_future_deliveries(subscription, *, cutoff_date) -> None:
         delivery_date = share_delivery_date(share_delivery)
         if delivery_date and delivery_date > cutoff_date:
             future_delivery_ids.append(share_delivery.pk)
-            if share_delivery.share_id:
-                affected_share_ids.add(share_delivery.share_id)
+            affected_share_ids.add(share_delivery.share_id)
     if future_delivery_ids:
         ShareDelivery.objects.filter(pk__in=future_delivery_ids).delete()
         recompute_shares(affected_share_ids)

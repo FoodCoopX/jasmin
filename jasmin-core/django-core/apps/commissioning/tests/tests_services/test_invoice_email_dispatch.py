@@ -119,10 +119,8 @@ class TestInvoiceEmailContextTotal:
     """The invoice/reminder email total is the formatted
     ``sum_brutto`` — never blank.
 
-    ``sum_brutto`` is a @property; calling it as ``sum_brutto()`` raises a
-    ``TypeError`` that the surrounding ``except`` swallows to an empty
-    string, rendering a blank ``Gesamtbetrag`` in every invoice and
-    overdue-reminder email.
+    ``sum_brutto`` is a @property: the context formats its value, and calling
+    it as ``sum_brutto()`` would raise a ``TypeError``.
     """
 
     def test_total_is_formatted_sum_brutto_not_blank(

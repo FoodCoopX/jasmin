@@ -796,7 +796,7 @@ class PackingListBoxesMatrixService:
                 {
                     "key": cls._column_key(base_variation_id, addon_ids),
                     "base_variation_id": base_variation_id,
-                    "base_size": base_variation.size or "",
+                    "base_size": base_variation.size,
                     "base_sort_order": base_variation.sort_order,
                     "base_share_type_id": base_share_type.id,
                     "base_share_type_name": base_share_type.name or "",
@@ -864,7 +864,7 @@ class PackingListBoxesMatrixService:
         share_type = variation.share_type
         return {
             "variation_id": variation.id,
-            "size": variation.size or "",
+            "size": variation.size,
             "sort_order": variation.sort_order,
             "share_type_id": share_type.id,
             "share_type_short_name": share_type.short_name or share_type.name or "",
@@ -897,9 +897,9 @@ class PackingListBoxesMatrixService:
             article_meta.items(),
             key=lambda item: (
                 not item[1]["_has_base"],
-                (item[1]["share_article_name"] or "").lower(),
-                item[1]["unit"] or "",
-                item[1]["size"] or "",
+                item[1]["share_article_name"].lower(),
+                item[1]["unit"],
+                item[1]["size"],
             ),
         )
 

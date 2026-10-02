@@ -155,11 +155,11 @@ export default function DeliveryStationsOverview() {
 
   // Select first day by default
   useEffect(() => {
-    if (dayNumbers && dayNumbers.length > 0) {
-      const validDays = dayNumbers.filter((day) => day !== null) as number[];
-      if (validDays.length > 0 && !validDays.includes(selectedDeliveryDay!)) {
-        setSelectedDeliveryDay(validDays[0]);
-      }
+    if (
+      dayNumbers.length > 0 &&
+      !dayNumbers.some((day) => day === selectedDeliveryDay)
+    ) {
+      setSelectedDeliveryDay(dayNumbers[0]);
     }
   }, [dayNumbers, selectedDeliveryDay]);
 

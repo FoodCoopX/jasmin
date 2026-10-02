@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import dayjs from "dayjs";
 import type { Key } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { dateForWeekDayNumber, isWeekInPast, toApiDate } from "@shared/utils";
 import { useTranslation } from "react-i18next";
 import {
@@ -72,7 +72,6 @@ export default function DocumentationCurrentStock() {
     [selectedYear, selectedWeek],
   );
   const queryClient = useQueryClient();
-  const [columnsLoaded, setColumnsLoaded] = useState(false);
 
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -121,22 +120,10 @@ export default function DocumentationCurrentStock() {
     [selectedYear, selectedWeek, selectedDay, selectedStorage],
   );
 
-  useEffect(() => {
-    if (
-      shareArticleColumn &&
-      amountUnitSizeColumns &&
-      amountUnitSizeColumns.length > 0
-    ) {
-      setColumnsLoaded(true);
-    }
-  }, [shareArticleColumn, amountUnitSizeColumns]);
-
   // React Query — failures route through the global queryCache.onError
   // toast. Writes call `invalidateData()` to trigger a refetch.
   const { data: rawData, isFetching } =
-    useCommissioningCurrentStockComparisonList(listParams, {
-      query: { enabled: columnsLoaded },
-    });
+    useCommissioningCurrentStockComparisonList(listParams);
   const data = useMemo<TableRecord[]>(
     () =>
       ((rawData ?? []) as StockComparison[]).map((item) => ({
@@ -236,7 +223,7 @@ export default function DocumentationCurrentStock() {
         transformedRow as unknown as CommissioningCurrentStockComparisonPartialUpdateBody,
       );
       const entry = result as InventoryEntry;
-      return { ...entry, key: entry?.id ?? compositeId };
+      return { ...entry, key: entry.id };
     },
     [buildCompositeId],
   );
@@ -383,7 +370,7 @@ export default function DocumentationCurrentStock() {
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningCurrentStockBulkFinalizeCreate({
-                ids: (payload.ids as string[]) ?? [],
+                ids: payload.ids as string[],
               })
             }
             buttonText={t("commissioning.finalize")}
@@ -400,7 +387,7 @@ export default function DocumentationCurrentStock() {
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningCurrentStockBulkSetAsExpectedCreate({
-                ids: (payload.ids as string[]) ?? [],
+                ids: payload.ids as string[],
               })
             }
             buttonText={t("commissioning.set_as_expected_stock")}
@@ -413,7 +400,7 @@ export default function DocumentationCurrentStock() {
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningCurrentStockBulkSetToZeroCreate({
-                ids: (payload.ids as string[]) ?? [],
+                ids: payload.ids as string[],
               })
             }
             buttonText={t("commissioning.set_to_zero")}

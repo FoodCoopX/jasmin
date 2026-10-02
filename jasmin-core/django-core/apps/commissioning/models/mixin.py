@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 from django.conf import settings
 from django.contrib.postgres.fields import DateRangeField
@@ -503,7 +503,7 @@ def tax_breakdown(*item_iterables) -> list[dict]:
     buckets: dict[Decimal, Decimal] = {}
     for items in item_iterables:
         for item in items:
-            rate = _to_decimal(getattr(item, "tax_rate", None))
+            rate = _to_decimal(item.tax_rate)
             buckets[rate] = buckets.get(rate, _PRICE_ZERO) + item.line_netto
 
     breakdown = []
@@ -521,6 +521,20 @@ def tax_breakdown(*item_iterables) -> list[dict]:
     return breakdown
 
 
+class _PricedLineItem(Protocol):
+    """The line model ``LinePricingMixin`` is mixed into: its four pricing
+    columns, plus the mixin's own ``line_netto``. Typing ``self`` with it lets
+    the mixin read the columns without declaring them."""
+
+    amount: Any
+    price_per_unit: Any
+    rabatt: Any
+    tax_rate: Any
+
+    @property
+    def line_netto(self) -> Decimal: ...
+
+
 class LinePricingMixin:
     """Adds ``line_netto`` / ``line_brutto`` properties to a line-item model.
 
@@ -533,18 +547,16 @@ class LinePricingMixin:
     """
 
     @property
-    def line_netto(self) -> Decimal:
+    def line_netto(self: _PricedLineItem) -> Decimal:
         return _calc_line_netto(
-            amount=getattr(self, "amount", None),
-            price_per_unit=getattr(self, "price_per_unit", None),
-            rabatt=getattr(self, "rabatt", None),
+            amount=self.amount,
+            price_per_unit=self.price_per_unit,
+            rabatt=self.rabatt,
         )
 
     @property
-    def line_brutto(self) -> Decimal:
-        return _calc_line_brutto(
-            self.line_netto, tax_rate=getattr(self, "tax_rate", None)
-        )
+    def line_brutto(self: _PricedLineItem) -> Decimal:
+        return _calc_line_brutto(self.line_netto, tax_rate=self.tax_rate)
 
 
 class ArchivableMixin(models.Model):
@@ -568,7 +580,7 @@ class ArchivableMixin(models.Model):
 
     def is_archived(self, months_back: int = 2) -> bool:
         cutoff_date = self.get_archive_cutoff_date(months_back)
-        return self.created_at < cutoff_date if self.created_at else False
+        return self.created_at < cutoff_date
 
 
 class CreatedMixin(models.Model):
@@ -868,12 +880,12 @@ class FinalizedProtectedMixin:
         from apps.commissioning.errors import FinalizedError
 
         for field_name in self.PARENT_FK_FIELDS:
-            # ``PARENT_FK_FIELDS`` lists real FKs on the model — drop
-            # the default so a typo in the class-level allowlist
-            # crashes during insert rather than silently letting the
-            # write past the finalized-parent guard.
+            # ``PARENT_FK_FIELDS`` lists real FKs to finalizable parents, so
+            # neither read takes a default: a typo in the class-level
+            # allowlist crashes during insert rather than silently letting
+            # the write past the finalized-parent guard.
             parent = getattr(self, field_name)
-            if parent is not None and getattr(parent, "is_finalized", False):
+            if parent is not None and parent.is_finalized:
                 raise FinalizedError(
                     f"Cannot add {self.__class__.__name__} to a finalized "
                     f"{parent.__class__.__name__} (id={parent.pk})."
@@ -1130,9 +1142,9 @@ class NumberedDocumentMixin(models.Model):
 
         if current_settings:
             year_based_field, prefix_setting_field = self._get_tenant_settings_fields()
-            prefix_value = getattr(current_settings, prefix_setting_field, None)
+            prefix_value = getattr(current_settings, prefix_setting_field)
 
-            if getattr(current_settings, year_based_field, False):
+            if getattr(current_settings, year_based_field):
                 qs = qs.filter(**self._get_filter_for_year_based())
                 # Year-reset bakes the year INTO the prefix so the per-year
                 # counter (which resets to 1 each January) can't collide across

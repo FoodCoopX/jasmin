@@ -60,8 +60,7 @@ export default function AbosBulkActions({
     mutation: {
       onSuccess: (result) => {
         setModalOpen(false);
-        const skipped = result.skipped ?? [];
-        const failed = result.failed ?? [];
+        const { skipped, failed } = result;
         if (skipped.length === 0 && failed.length === 0) {
           notify.success(
             t("abos.bulk_renew_all_created", { created: result.created }),

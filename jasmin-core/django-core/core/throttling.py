@@ -32,8 +32,7 @@ class TenantScopedRateThrottle(ScopedRateThrottle):
         key = super().get_cache_key(request, view)
         if key is None:
             return None
-        schema = getattr(connection, "schema_name", "") or ""
-        return f"{schema}:{key}"
+        return f"{connection.schema_name}:{key}"
 
 
 def set_throttle_scope(view_func: Any, scope: str) -> None:

@@ -54,7 +54,7 @@ export default function DaySelector({
   };
 
   const nextDay = useCallback(() => {
-    if (!days || days.length === 0) return;
+    if (days.length === 0) return;
 
     const validDays = days.filter((day): day is number => day !== null);
     const currentIndex = validDays.indexOf(selectedDay!);
@@ -65,7 +65,7 @@ export default function DaySelector({
   }, [selectedDay, days, setSelectedDay]);
 
   const prevDay = useCallback(() => {
-    if (!days || days.length === 0) return;
+    if (days.length === 0) return;
 
     const validDays = days.filter((day): day is number => day !== null);
     const currentIndex = validDays.indexOf(selectedDay!);
@@ -83,7 +83,7 @@ export default function DaySelector({
       options.push(null);
     }
 
-    const validDays = days ? days.filter((day): day is number => day !== null) : [];
+    const validDays = days.filter((day): day is number => day !== null);
 
     const sortedValidDays = [...validDays].sort((a, b) => {
       if (customDateCalculator) {
@@ -103,7 +103,7 @@ export default function DaySelector({
     return options;
   }, [days, include_null_option, customDateCalculator, selectedYear, selectedWeek]);
 
-  const validDays = days ? days.filter((day): day is number => day !== null) : [];
+  const validDays = days.filter((day): day is number => day !== null);
 
   // Check if we can navigate (only consider non-null days for navigation)
   const currentIndex = validDays.indexOf(selectedDay!);

@@ -29,7 +29,7 @@ interface LeafRoute {
 /** The route a leaf navigates to, read from its `<Link to>` label. */
 function leafTo(label: unknown): string | undefined {
   if (isValidElement(label)) {
-    const to = (label.props as { to?: unknown })?.to;
+    const to = (label.props as { to?: unknown }).to;
     if (typeof to === "string") return to;
   }
   return undefined;

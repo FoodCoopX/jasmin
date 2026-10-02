@@ -167,11 +167,9 @@ export default function ListResellers() {
         notify.success(t("users.invitation_resent"));
         handleCloseUserInfoModal();
         // Patch only this row so we don't lose sort/scroll position.
-        if (updatedUser) {
-          patchRowById((record as TableRecord).id, {
-            linked_user_info: updatedUser,
-          });
-        }
+        patchRowById((record as TableRecord).id, {
+          linked_user_info: updatedUser,
+        });
       } catch (error) {
         console.error("Operation failed:", error);
         notify.error(t("users.resend_failed"));

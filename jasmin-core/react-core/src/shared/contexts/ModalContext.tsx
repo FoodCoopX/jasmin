@@ -107,7 +107,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 
   const saveEditMode = useCallback(
     async (newMode: EditMode) => {
-      if (!newMode || newMode === editMode) {
+      if (newMode === editMode) {
         return;
       }
       await savePreferences({ edit_mode: newMode });

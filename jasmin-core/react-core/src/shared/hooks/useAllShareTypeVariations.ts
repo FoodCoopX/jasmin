@@ -85,7 +85,7 @@ export const useAllShareTypeVariations = (
         ...toOptions(
           q.data,
           (variation) =>
-            `${variation.share_type_name} ${getShareTypeVariationSizeLabel(variation.size ?? "")}`,
+            `${variation.share_type_name} ${getShareTypeVariationSizeLabel(variation.size)}`,
         ),
       );
     }

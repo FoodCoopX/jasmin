@@ -117,7 +117,7 @@ class BaseArchivableViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self) -> QuerySet:
-        is_list = getattr(self, "action", None) == "list"
+        is_list = self.action == "list"
 
         if is_list:
             is_past = validate_query_params(self.request, optional=["is_past"])[

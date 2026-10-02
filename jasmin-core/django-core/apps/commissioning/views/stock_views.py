@@ -57,14 +57,13 @@ from ..utils.query_params import validate_query_params
 from ..utils.validation_utils import parse_bulk_ids
 
 
-def _ywd_to_datetime(year: int, delivery_week: int, day_number: int | None) -> datetime:
+def _ywd_to_datetime(year: int, delivery_week: int, day_number: int) -> datetime:
     """Convert (year, week, day_number-index) to a tz-aware datetime at 23:00.
 
     INVENTORY movements use 23:00 so they sort after all operational
     movements (harvests, allocations, etc.) which are recorded at noon.
     """
-    day_index = day_number if day_number is not None else 0
-    cal_date = week_day_to_date(year, delivery_week, day_index)
+    cal_date = week_day_to_date(year, delivery_week, day_number)
     return timezone.make_aware(datetime.combine(cal_date, dt_time(23, 0, 0)))
 
 
@@ -414,7 +413,7 @@ class CurrentStockComparisonView(APIViewRolePermissionsMixin, APIView):
                 # get the balance *before* this INVENTORY movement.
                 # All Decimal so the result stored back to ``DecimalField``
                 # carries no binary-fp drift.
-                old_correction = existing.amount or Decimal("0")
+                old_correction = existing.amount
                 balance_before = running_balance - old_correction
                 existing.amount = amount - balance_before
                 existing.counted_amount = amount
@@ -566,7 +565,7 @@ def _is_inventory_race(exc: IntegrityError | DjangoValidationError) -> bool:
     commits between that validation and the INSERT it's a DB ``IntegrityError``.
     Any OTHER error (an FK violation from a stale composite id, a genuine
     ``clean()`` failure) must propagate, not be swallowed."""
-    cause = getattr(exc, "__cause__", None)
+    cause = exc.__cause__
     constraint_name = getattr(getattr(cause, "diag", None), "constraint_name", "") or ""
     return (
         constraint_name.endswith("one_inventory_per_entity_day")
@@ -661,9 +660,6 @@ def _process_grouped_stock_with_theoretical(
             DjangoValidationError,
             DRFValidationError,
             ValueError,
-            TypeError,
-            KeyError,
-            AttributeError,
         ) as exc:
             # Whole-group failure (StockService.get_theoretical_current_stock).
             # Re-attribute to each composite_id so the bulk response can show
@@ -702,9 +698,6 @@ def _process_grouped_stock_with_theoretical(
                 DjangoValidationError,
                 DRFValidationError,
                 ValueError,
-                TypeError,
-                KeyError,
-                AttributeError,
             ) as exc:
                 # Per-item failure collection inside a bulk operation.
                 errors.append({"id": composite_id, "error": str(exc)})
@@ -792,8 +785,7 @@ def _get_or_create_inventory(
         # (winner committed between validate and INSERT). A different error —
         # e.g. an FK violation from a stale composite id (bad share_article/
         # storage), or a genuine clean() failure — must NOT be swallowed as a
-        # lost race (that returned None → a cryptic AttributeError downstream).
-        # Re-raise anything else.
+        # lost race, which would hand the caller None. Re-raise anything else.
         if not _is_inventory_race(exc):
             raise
 
@@ -814,9 +806,9 @@ def _get_or_create_inventory(
             .first()
         )
         if existing is None:
-            # The unique violation fired but no row is visible on re-fetch —
-            # don't return None (it surfaces as an opaque AttributeError per
-            # item). Surface the original error instead.
+            # The unique violation fired but no row is visible on re-fetch:
+            # re-raise the original error rather than return None, which the
+            # caller can't use.
             raise
         return existing, False
 
@@ -898,7 +890,7 @@ def _record_counted_amount(
     )
     # All Decimal so the value stored back to the DecimalField carries no
     # binary-fp drift.
-    balance_before = running_balance - (inventory.amount or Decimal("0"))
+    balance_before = running_balance - inventory.amount
     inventory.amount = counted - balance_before
     inventory.counted_amount = counted
     inventory.save()
@@ -1169,9 +1161,6 @@ def bulk_set_to_zero_current_stock(request: Request) -> Response:
             DatabaseError,
             DjangoValidationError,
             DRFValidationError,
-            TypeError,
-            KeyError,
-            AttributeError,
         ) as exc:
             # Per-item failure collection inside a bulk operation.
             errors.append({"id": composite_id, "error": str(exc)})
@@ -1292,7 +1281,7 @@ class StorageLoggingView(APIViewRolePermissionsMixin, APIView):
         self,
         storage: Storage,
         share_article_id: str | None,
-        start_date: datetime | None,
+        start_date: datetime,
         end_date: datetime | None,
     ) -> list[dict]:
         events: list[dict] = []
@@ -1305,8 +1294,7 @@ class StorageLoggingView(APIViewRolePermissionsMixin, APIView):
 
         if share_article_id:
             movement_qs = movement_qs.filter(share_article_id=share_article_id)
-        if start_date:
-            movement_qs = movement_qs.filter(date__gte=start_date)
+        movement_qs = movement_qs.filter(date__gte=start_date)
         if end_date:
             movement_qs = movement_qs.filter(date__lte=end_date)
 
@@ -1320,9 +1308,7 @@ class StorageLoggingView(APIViewRolePermissionsMixin, APIView):
                     "type": movement.movement_type or "MOVEMENT",
                     "share_article": str(movement.share_article.id),
                     "share_article_name": movement.share_article.name,
-                    "amount": (
-                        movement.amount if movement.amount is not None else Decimal("0")
-                    ),
+                    "amount": movement.amount,
                     "unit": movement.unit,
                     "size": movement.size,
                     "year": year,
@@ -1330,7 +1316,7 @@ class StorageLoggingView(APIViewRolePermissionsMixin, APIView):
                     "day_number": day_number,
                     "storage_name": storage_name,
                     "note": movement.note,
-                    "cultivation_origin": getattr(movement, "cultivation_origin", None),
+                    "cultivation_origin": movement.cultivation_origin,
                     "washed": movement.washed if is_inventory else None,
                     "cleaned": movement.cleaned if is_inventory else None,
                     "for_shares": movement.for_shares if is_inventory else None,

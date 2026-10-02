@@ -56,7 +56,7 @@ class OptinService:
         toggled. ``None`` if the variation isn't on-off or the
         delivery date can't be resolved (malformed Share row)."""
         variation = share_delivery.share.share_type_variation
-        if not variation or not variation.requires_optin:
+        if not variation.requires_optin:
             return None
         delivery_date = share_delivery_date(share_delivery)
         if delivery_date is None:
@@ -107,7 +107,7 @@ class OptinService:
             when the deadline has lapsed.
         """
         variation = share_delivery.share.share_type_variation
-        if not variation or not variation.requires_optin:
+        if not variation.requires_optin:
             raise OptinNotApplicable(
                 f"ShareDelivery {share_delivery.pk}: variation is not on-off."
             )
@@ -144,10 +144,9 @@ class OptinService:
         # computed off the pre-toggle demand. Mirrors the joker_taken handling
         # in ShareDeliveryViewSet.perform_update; the billing notify above is
         # not enough on its own.
-        if share_delivery.share_id:
-            from .recompute import recompute_shares
+        from .recompute import recompute_shares
 
-            recompute_shares([share_delivery.share_id])
+        recompute_shares([share_delivery.share_id])
 
         return share_delivery
 

@@ -474,7 +474,7 @@ class OfferService:
 
         # Convert to PU
         pu_attr = _PU_CONVERSION_ATTRS.get(offer_unit)
-        pu_conversion = getattr(share_article, pu_attr, None) if pu_attr else None
+        pu_conversion = getattr(share_article, pu_attr) if pu_attr else None
         if not pu_conversion or pu_conversion <= 0:
             return (
                 None,
@@ -791,7 +791,6 @@ class OfferService:
             "share",
             "share_article",
             "share__share_type_variation",
-            "delivery_station",
         )
 
         share_content_amounts: dict[tuple, Decimal] = {}
@@ -802,11 +801,10 @@ class OfferService:
             if key not in share_content_amounts:
                 share_content_amounts[key] = Decimal("0")
 
-            station_id = (
-                content.delivery_station.id if content.delivery_station else None
-            )
             station_quantities = share_station_quantities.get(content.share.id, {})
-            total_quantity = station_quantities.get(station_id, Decimal("0"))
+            total_quantity = station_quantities.get(
+                content.delivery_station_id, Decimal("0")
+            )
             amount_needed = Decimal(content.amount or 0) * total_quantity
 
             share_content_amounts[key] += amount_needed
@@ -824,9 +822,9 @@ class OfferService:
             return None, None, None
 
         return (
-            getattr(pricing, f"net_price_for_orders_{unit_name}_1", None),
-            getattr(pricing, f"net_price_for_orders_{unit_name}_2", None),
-            getattr(pricing, f"net_price_for_orders_{unit_name}_3", None),
+            getattr(pricing, f"net_price_for_orders_{unit_name}_1"),
+            getattr(pricing, f"net_price_for_orders_{unit_name}_2"),
+            getattr(pricing, f"net_price_for_orders_{unit_name}_3"),
         )
 
     @staticmethod
@@ -944,7 +942,7 @@ class OfferService:
         for reseller in resellers:
             reseller_name = reseller.contact.name or "Unknown"
 
-            if not reseller.contact or not reseller.contact.email:
+            if not reseller.contact.email:
                 results.append(
                     {
                         "reseller_id": str(reseller.id),
@@ -968,8 +966,6 @@ class OfferService:
                 _emit_progress(results)
                 continue
 
-            # ``reseller.contact`` is guaranteed non-None here (the
-            # no-contact/no-email case already `continue`d above).
             offer_url = (
                 f"{ctx['frontend_base_url']}"
                 f"/commissioning/customer-orders/{reseller.id}"
@@ -996,7 +992,7 @@ class OfferService:
                     },
                     language=ctx["tenant_language"] or None,
                     related_object_type="offer_group",
-                    related_object_id=str(getattr(offer_group, "id", "") or ""),
+                    related_object_id=str(offer_group.id),
                 )
             except (
                 smtplib.SMTPException,

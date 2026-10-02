@@ -40,7 +40,7 @@ from ..utils.iso_week_utils import previous_day_stock_coordinates
 # Type definitions
 ModelType = Literal["harvest", "purchase", "washamount", "cleanamount"]
 GroupingKey = tuple[
-    int, str, str | None, int | None, int | None
+    int, str, str | None, int | None, str
 ]  # (share_article_id, unit, size, day_number, storage_id)
 
 
@@ -159,17 +159,12 @@ class DocumentationSummaryService:
     @staticmethod
     def _get_grouping_key(entry: Any) -> GroupingKey:
         """Create grouping key from an entry."""
-        storage_id = None
-        if hasattr(entry, "storage_id") and entry.storage_id:
-            storage_id = entry.storage_id
-        elif hasattr(entry, "storage") and entry.storage:
-            storage_id = entry.storage.id
         return (
             entry.share_article.id,
             entry.unit,
             entry.size,
             entry.day_number,
-            storage_id,
+            entry.storage_id,
         )
 
     @staticmethod
@@ -405,7 +400,7 @@ class DocumentationSummaryService:
         share_article_id: str,
         unit: str,
         size: str | None,
-        storage_id: str | None,
+        storage_id: str,
         theoretical_stock_map: dict[
             tuple[str, str, str | None, str | None], dict[str, Any]
         ],
@@ -418,22 +413,15 @@ class DocumentationSummaryService:
         Falls back from current_stock_amount to theoretical_current_stock.
         Negative values are clamped to 0.
         """
-        if storage_id is None:
-            matching_keys = [
-                key
-                for key in theoretical_stock_map.keys()
-                if key[0] == share_article_id and key[1] == unit and key[2] == size
-            ]
-        else:
-            candidate = (share_article_id, unit, size, storage_id)
-            matching_keys = [candidate] if candidate in theoretical_stock_map else []
+        candidate = (share_article_id, unit, size, storage_id)
+        matching_keys = [candidate] if candidate in theoretical_stock_map else []
 
         if not matching_keys:
             return 0, 0.0, 0.0
 
         share_stock = 0.0
         order_stock = 0.0
-        theoretical_sum_share = float(theoretical_sum_share or 0)
+        theoretical_sum_share = float(theoretical_sum_share)
 
         for key in matching_keys:
             entry = theoretical_stock_map[key]
@@ -513,14 +501,8 @@ class DocumentationSummaryService:
             ),
             "harvesting_crate_name": (
                 entry.harvesting_crate.short_name
-                if model == "harvest"
-                and entry.harvesting_crate
-                and hasattr(entry.harvesting_crate, "short_name")
-                else (
-                    entry.harvesting_crate
-                    if model == "harvest" and entry.harvesting_crate
-                    else None
-                )
+                if model == "harvest" and entry.harvesting_crate
+                else None
             ),
             "seller": (
                 entry.seller.id if model == "purchase" and entry.seller else None
@@ -555,9 +537,7 @@ class DocumentationSummaryService:
                     f"additional_theoretical_{field_prefix}_amount_order_content": additional_sum_order,
                     "theoretical_current_stock_share_content": theoretical_current_stock_share_content,
                     "theoretical_current_stock_order_content": theoretical_current_stock_order_content,
-                    "is_finalized": (
-                        entry.is_finalized if hasattr(entry, "is_finalized") else None
-                    ),
+                    "is_finalized": entry.is_finalized,
                 }
             )
 

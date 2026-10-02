@@ -167,7 +167,7 @@ class DocumentationOverviewView(APIViewRolePermissionsMixin, APIView):
                 "share_article_name": result["share_article__name"],
                 "unit": result["unit"],
                 "size": result["size"],
-                "amount": result["sum_amount"] or 0,
+                "amount": result["sum_amount"],
             }
             for result in results
         ]

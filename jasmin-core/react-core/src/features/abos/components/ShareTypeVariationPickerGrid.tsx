@@ -125,16 +125,12 @@ export default function ShareTypeVariationPickerGrid({
                           />
                         ) : (
                           <div className="new-subscription-card-placeholder">
-                            {getShareTypeVariationSizeLabel(
-                              variation.size ?? "",
-                            )}
+                            {getShareTypeVariationSizeLabel(variation.size)}
                           </div>
                         )}
                         <div className="flex-min">
                           <Text strong style={{ fontSize: 14 }}>
-                            {getShareTypeVariationSizeLabel(
-                              variation.size ?? "",
-                            )}
+                            {getShareTypeVariationSizeLabel(variation.size)}
                           </Text>
                           {variation.active_price_per_delivery && (
                             <div>

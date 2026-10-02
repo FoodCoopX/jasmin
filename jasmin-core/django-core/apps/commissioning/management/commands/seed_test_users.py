@@ -30,9 +30,10 @@ render the user as a real member / reseller:
     from the user (the model duplicates these on purpose; see
     ``members.py:42``).
   * ``Reseller`` — ``is_reseller=True`` AND ``is_active_reseller=True``
-    so the office Offers / OrderContent pages actually surface them.
-    The contact / customer-number / invoice address fields are left
-    blank; ``Reseller.__str__`` falls back to ``Reseller #<id>``.
+    so the office Offers / OrderContent pages actually surface them. Its
+    required ``contact`` is a placeholder ``ContactEntity`` (the user's
+    name and email, a dummy address); the customer number and invoice
+    address fields are left blank.
 """
 
 from __future__ import annotations

@@ -244,7 +244,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
   const liveVariation = useMemo(
     () =>
       selectedVariation
-        ? (shareTypeVariations?.find(
+        ? (shareTypeVariations.find(
             (v) => v.value === selectedVariation.value,
           ) ?? selectedVariation)
         : null,
@@ -353,7 +353,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
   const explicitSolidarityFloor =
     effectiveIsTrial &&
     liveVariation?.active_price_per_delivery_if_trial != null
-      ? (liveVariation?.active_solidarity_min_price_per_delivery_if_trial ?? null)
+      ? (liveVariation.active_solidarity_min_price_per_delivery_if_trial ?? null)
       : (liveVariation?.active_solidarity_min_price_per_delivery ?? null);
   const solidarityFloor = explicitSolidarityFloor ?? referencePrice;
 
@@ -424,7 +424,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
         sub.share_type_variation
       ) {
         map[sub.share_type_variation] =
-          (map[sub.share_type_variation] ?? 0) + (sub.quantity ?? 1);
+          (map[sub.share_type_variation] ?? 0) + sub.quantity;
       }
     }
     return map;
@@ -796,7 +796,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                 aria-label={t("common.back")}
               />
               {selectedVariation.share_type_name} –{" "}
-              {getShareTypeVariationSizeLabel(selectedVariation.size ?? "")}
+              {getShareTypeVariationSizeLabel(selectedVariation.size)}
             </Space>
           ) : (
             t("members.additional_subscription")

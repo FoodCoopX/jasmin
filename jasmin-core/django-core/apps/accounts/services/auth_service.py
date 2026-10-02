@@ -140,7 +140,7 @@ def _issue_login_tokens(*, user: JasminUser, tenant) -> LoginResult:
     access["tenant_name"] = str(tenant.name)
     refresh["tenant_id"] = str(tenant.schema_name)
     user_roles = user.roles or ["member"]
-    access["user_role"] = user_roles[0] if user_roles else "member"
+    access["user_role"] = user_roles[0]
 
     member_profile = getattr(user, "member_profile", None)
     linked_reseller = getattr(user, "linked_reseller", None)
@@ -208,15 +208,12 @@ def refresh_access_token(
     if tenant_name is not None:
         access["tenant_name"] = str(tenant_name)
     user_roles = user.roles or ["member"]
-    access["user_role"] = user_roles[0] if user_roles else "member"
+    access["user_role"] = user_roles[0]
     new_refresh: RefreshToken | None = None
 
     if settings.SIMPLE_JWT.get("ROTATE_REFRESH_TOKENS"):
-        try:
-            if settings.SIMPLE_JWT.get("BLACKLIST_AFTER_ROTATION"):
-                refresh.blacklist()
-        except AttributeError:
-            pass
+        if settings.SIMPLE_JWT.get("BLACKLIST_AFTER_ROTATION"):
+            refresh.blacklist()
         refresh.set_jti()
         refresh.set_exp()
         refresh.set_iat()
@@ -269,10 +266,7 @@ def blacklist_refresh(refresh_token: str) -> str | None:
         token = RefreshToken(refresh_token)
     except TokenError:
         return None
-    try:
-        token.blacklist()
-    except AttributeError:
-        pass
+    token.blacklist()
     user_id = token.get(jwt_settings.USER_ID_CLAIM)
     return str(user_id) if user_id is not None else None
 

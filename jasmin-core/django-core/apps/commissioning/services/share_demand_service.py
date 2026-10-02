@@ -142,11 +142,7 @@ class SubscriptionDemandBackend:
             .values("share__share_type_variation_id")
             .annotate(n=Sum("subscription__quantity"))
         )
-        return {
-            r["share__share_type_variation_id"]: int(r["n"] or 0)
-            for r in rows
-            if r["share__share_type_variation_id"]
-        }
+        return {r["share__share_type_variation_id"]: int(r["n"] or 0) for r in rows}
 
     def quantity_for_station_day(
         self,
@@ -340,9 +336,7 @@ class SubscriptionDemandBackend:
         for row in rows:
             year_week = (row["share__year"], row["share__delivery_week"])
             if year_week in wanted:
-                out[(row["delivery_station_day_id"], *year_week)] = int(
-                    row["count"] or 0
-                )
+                out[(row["delivery_station_day_id"], *year_week)] = int(row["count"])
 
         # Add active draft reservations (one more grouped query).
         reservation_rows = (
@@ -359,7 +353,7 @@ class SubscriptionDemandBackend:
             year_week = (row["year"], row["week"])
             if year_week in wanted:
                 key = (row["delivery_station_day_id"], *year_week)
-                out[key] = out.get(key, 0) + int(row["count"] or 0)
+                out[key] = out.get(key, 0) + int(row["count"])
         return out
 
     def peak_occupied_from_week(
@@ -391,7 +385,7 @@ class SubscriptionDemandBackend:
         )
         for row in delivery_rows:
             per_week[(row["share__year"], row["share__delivery_week"])] += int(
-                row["count"] or 0
+                row["count"]
             )
 
         future_reservations = Q(year__gt=from_year) | Q(
@@ -407,7 +401,7 @@ class SubscriptionDemandBackend:
             .annotate(count=Sum(Coalesce("subscription__quantity", 1)))
         )
         for row in reservation_rows:
-            per_week[(row["year"], row["week"])] += int(row["count"] or 0)
+            per_week[(row["year"], row["week"])] += int(row["count"])
 
         if not per_week:
             return (0, None, None)
@@ -444,10 +438,7 @@ class ExternalDemandBackend:
         )
         out: DemandByStation = defaultdict(int)
         for r in rows:
-            station_id = r["delivery_station_day__delivery_station_id"]
-            if station_id is None:
-                continue
-            out[station_id] += int(r["n"] or 0)
+            out[r["delivery_station_day__delivery_station_id"]] += int(r["n"])
         return dict(out)
 
     def variation_totals(self, year: int, delivery_week: int) -> DemandByVariation:
@@ -456,7 +447,7 @@ class ExternalDemandBackend:
             .values("share_type_variation_id")
             .annotate(n=Sum("quantity"))
         )
-        return {r["share_type_variation_id"]: int(r["n"] or 0) for r in rows}
+        return {r["share_type_variation_id"]: int(r["n"]) for r in rows}
 
     def quantity_for_station_day(
         self,
@@ -539,7 +530,7 @@ class ExternalDemandBackend:
                 "station_day_id": r["delivery_station_day_id"],
                 "tour_number": r["delivery_station_day__tour_number"],
                 "station_id": r["delivery_station_day__delivery_station_id"],
-                "count": int(r["count"] or 0),
+                "count": int(r["count"]),
             }
             for r in rows
         ]
@@ -594,7 +585,7 @@ class ExternalDemandBackend:
         for row in rows:
             year_week = (row["year"], row["delivery_week"])
             if year_week in wanted:
-                out[(row["delivery_station_day_id"], *year_week)] = int(row["n"] or 0)
+                out[(row["delivery_station_day_id"], *year_week)] = int(row["n"])
         return out
 
     def peak_occupied_from_week(
@@ -618,7 +609,7 @@ class ExternalDemandBackend:
         )
         peak, peak_year, peak_week = 0, None, None
         for row in rows:
-            n = int(row["n"] or 0)
+            n = int(row["n"])
             if n > peak:
                 peak, peak_year, peak_week = n, row["year"], row["delivery_week"]
         return (peak, peak_year, peak_week)
@@ -635,22 +626,15 @@ def _resolve_backend() -> _DemandBackend:
     Planning & Management UI).
     """
     # Local import to keep this app loosely coupled from the tenants app.
-    from apps.shared.tenants.models import Tenant, TenantSettings
+    from apps.shared.tenants.models import TenantSettings
 
-    # On the Huey worker (deferred recompute), ``connection.tenant`` under
-    # ``schema_context`` is a django-tenants FakeTenant, NOT a real Tenant row —
-    # ``get_current_settings(FakeTenant)`` then filters a CharField-PK FK against
-    # a non-Model and matches nothing, silently falling back to the subscription
-    # backend and WIPING an external-CSV tenant's theoreticals. Resolve the real
-    # Tenant by schema_name (the payments ``_current_tenant`` pattern) so the
-    # deferred path picks the same backend as every request-context call.
-    tenant = getattr(connection, "tenant", None)
-    if not isinstance(tenant, Tenant):
-        tenant = Tenant.objects.filter(schema_name=connection.schema_name).first()
-    if tenant is not None:
-        settings = TenantSettings.get_current_settings(tenant)
-        if settings and getattr(settings, "uploads_weekly_share_amount", False):
-            return ExternalDemandBackend()
+    # On the Huey worker (deferred recompute) ``connection.tenant`` is a
+    # django-tenants FakeTenant; ``get_current_settings`` resolves it to the
+    # real Tenant by schema_name, so the deferred path picks the same backend
+    # as a request and never wipes an external-CSV tenant's theoreticals.
+    settings = TenantSettings.get_current_settings(connection.tenant)
+    if settings and settings.uploads_weekly_share_amount:
+        return ExternalDemandBackend()
     return SubscriptionDemandBackend()
 
 

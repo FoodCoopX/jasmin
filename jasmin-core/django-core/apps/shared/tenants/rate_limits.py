@@ -87,7 +87,7 @@ def resolve_action_rate_limit(tenant: Any, action: str) -> tuple[int, int]:
     non-int) is ignored in favour of the default rather than crashing the guard.
     """
     default = DEFAULT_ACTION_RATE_LIMITS[action]
-    overrides = getattr(tenant, "action_rate_limit_overrides", None) or {}
+    overrides = tenant.action_rate_limit_overrides
     override = overrides.get(action) if isinstance(overrides, dict) else None
     if not isinstance(override, dict):
         override = {}
@@ -243,10 +243,10 @@ def _resolve_guarded_tenant(tenant: Any) -> tuple[Any, str | None]:
     operator-initiated, not the attack surface — so they pass through uncapped.
     """
     if tenant is None:
-        tenant = getattr(connection, "tenant", None)
+        tenant = connection.tenant
     if tenant is None or getattr(tenant, "pk", None) is None:
         return tenant, None
-    return tenant, (getattr(tenant, "schema_name", None) or None)
+    return tenant, tenant.schema_name
 
 
 def _maybe_alert(

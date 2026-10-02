@@ -139,7 +139,6 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
       { peakOccupied: number; peakWeekKey: string | null }
     >();
     for (const record of data) {
-      if (!record.id) continue;
       const { peakOccupied, peakWeekKey } = stationDayTermCapacity(
         record.capacity ?? null,
         record.capacity_by_week,
@@ -157,10 +156,6 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
   }, [queryClient, listParams]);
 
   const deliveryDayOptions = useMemo(() => {
-    if (!shareDeliveryDays || shareDeliveryDays.length === 0) {
-      return [];
-    }
-
     const dayNumberMap = new Map<number, ShareDeliveryDayOption>();
 
     shareDeliveryDays.forEach((day) => {
@@ -238,7 +233,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
   const availableDeliveryDayOptions = useMemo(() => {
     const usedActiveDayIds = new Set<string>(
       data
-        .filter((row) => !row.valid_until && row.delivery_day)
+        .filter((row) => !row.valid_until)
         .map((row) => row.delivery_day as string),
     );
     return deliveryDayOptions.filter(

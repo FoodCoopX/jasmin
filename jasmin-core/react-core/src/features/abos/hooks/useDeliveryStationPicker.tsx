@@ -161,8 +161,7 @@ export function useDeliveryStationPicker({
         stationDay.coords_lon != null ? Number(stationDay.coords_lon) : NaN;
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
-      const stationId = String(stationDay.delivery_station ?? "");
-      if (!stationId) continue;
+      const stationId = stationDay.delivery_station;
       const capacity = capacityByStationDay.get(stationDay.value);
       // Members / public don't see full stations at all when the list is off.
       if (simplified && !allowsWaitingList && capacity?.isFull) continue;

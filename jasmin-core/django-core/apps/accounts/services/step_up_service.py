@@ -94,7 +94,7 @@ def verify_and_issue_step_up_token(
         # global handler to a canonical Jasmin error response.
         logger.warning(
             "step_up.verify_failed user=%s reason=password",
-            getattr(user, "email", "-"),
+            user.email,
         )
         raise InvalidCredentials("Incorrect password.")
 
@@ -109,7 +109,7 @@ def verify_and_issue_step_up_token(
         except TwoFactorInvalidCode:
             logger.warning(
                 "step_up.verify_failed user=%s reason=totp",
-                getattr(user, "email", "-"),
+                user.email,
             )
             raise TwoFactorInvalidCode("Invalid two-factor code.") from None
 
@@ -122,7 +122,7 @@ def verify_and_issue_step_up_token(
 
     logger.info(
         "step_up.verified user=%s ttl=%ss",
-        getattr(user, "email", "-"),
+        user.email,
         settings.STEP_UP_TTL_SECONDS,
     )
     return str(new_access)

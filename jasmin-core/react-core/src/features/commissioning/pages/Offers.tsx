@@ -187,14 +187,14 @@ export default function Offers() {
       // lands in a terminal state, at which point we refresh the
       // sending-status table so the office sees the freshly-stamped
       // OfferSending rows.
-      const resp = (await commissioningBulkSendOffersViaEmailCreate({
+      const resp = await commissioningBulkSendOffersViaEmailCreate({
         reseller_ids: resellerIds,
         year: selectedYear,
         delivery_week: selectedWeek,
         offer_group: selectedOfferGroup,
-      })) as unknown as { job_id?: string };
+      });
 
-      if (resp?.job_id) {
+      if (resp.job_id) {
         setActiveJobId(resp.job_id);
       }
     },

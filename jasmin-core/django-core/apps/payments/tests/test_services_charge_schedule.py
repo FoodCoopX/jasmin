@@ -522,14 +522,6 @@ class TestIdempotency:
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
 class TestEdgeCases:
-    def test_no_valid_from_returns_zero(self, tenant, tenant_settings, subscription):
-        # The DB requires valid_from NOT NULL, so simulate the guard branch by
-        # blanking the attribute in-memory only (don't .save()).
-        subscription.valid_from = None
-        n = ChargeScheduleService.regenerate_for_subscription(subscription)
-        assert n == 0
-        assert ChargeSchedule.objects.filter(subscription=subscription).count() == 0
-
     def test_waiting_list_subscription_is_not_billed(
         self, tenant, tenant_settings, subscription
     ):

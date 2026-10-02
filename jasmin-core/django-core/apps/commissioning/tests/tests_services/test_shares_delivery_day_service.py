@@ -59,15 +59,15 @@ class TestIsFutureAndWithinValidity:
 
     def test_after_valid_until(self):
         tb = MagicMock()
-        tb.valid_from = None
+        tb.valid_from = datetime.date(2026, 1, 1)
         tb.valid_until = datetime.date(2026, 3, 1)
         assert not _is_future_and_within_validity(
             datetime.date(2026, 6, 1), datetime.date(2026, 1, 1), tb
         )
 
-    def test_no_bounds(self):
+    def test_open_ended(self):
         tb = MagicMock()
-        tb.valid_from = None
+        tb.valid_from = datetime.date(2026, 1, 1)
         tb.valid_until = None
         assert _is_future_and_within_validity(
             datetime.date(2026, 6, 1), datetime.date(2026, 1, 1), tb

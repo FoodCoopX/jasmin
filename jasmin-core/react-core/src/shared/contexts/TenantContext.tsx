@@ -505,7 +505,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     const previousHref = link.href;
     link.href = faviconUrl;
     return () => {
-      if (link) link.href = previousHref;
+      link.href = previousHref;
     };
   }, [faviconUrl]);
 
@@ -541,7 +541,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     const previousHref = link.href;
     link.href = `/api/tenants/app-icon.png?v=${appIconVersion}`;
     return () => {
-      if (link) link.href = previousHref;
+      link.href = previousHref;
     };
   }, [appIconVersion]);
 

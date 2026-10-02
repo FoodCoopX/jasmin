@@ -1,4 +1,3 @@
-import logging
 from typing import TypedDict
 
 from rest_framework import serializers
@@ -20,8 +19,6 @@ from .serializers_mixin import (
     NameFieldMixin,
     StorageFieldsMixin,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class _DecKwargs(TypedDict):
@@ -77,31 +74,13 @@ class ForecastSerializer(NameFieldMixin, DeletableMixin, serializers.ModelSerial
         # Now we always have a model instance
         data = super().to_representation(instance)
 
-        # Add variation fields. The AttributeError catch handles the
-        # dict-instance path above where ``instance`` lacks the related
-        # manager — that's expected. Anything else (e.g. a real schema
-        # regression) should leave a breadcrumb instead of silently
-        # dropping variation_X keys from the response.
-        try:
-            for variation_rel in instance.forecastsharetypevariation_set.all():
-                data[f"variation_{variation_rel.share_type_variation.id}"] = True
-        except AttributeError as exc:
-            logger.debug(
-                "forecast.variation_fields.skipped instance=%r error=%s",
-                type(instance).__name__,
-                exc,
-            )
+        # Add variation fields.
+        for variation_rel in instance.forecastsharetypevariation_set.all():
+            data[f"variation_{variation_rel.share_type_variation.id}"] = True
 
-        # Add offer group fields — same rationale as variation fields above.
-        try:
-            for offer_group_rel in instance.forecastoffergroup_set.all():
-                data[f"offer_group_{offer_group_rel.offer_group.id}"] = True
-        except AttributeError as exc:
-            logger.debug(
-                "forecast.offer_group_fields.skipped instance=%r error=%s",
-                type(instance).__name__,
-                exc,
-            )
+        # Add offer group fields.
+        for offer_group_rel in instance.forecastoffergroup_set.all():
+            data[f"offer_group_{offer_group_rel.offer_group.id}"] = True
 
         return data
 

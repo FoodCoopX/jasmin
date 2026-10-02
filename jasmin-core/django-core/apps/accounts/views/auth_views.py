@@ -10,6 +10,7 @@ when they need to enrich a log line with request-scoped context
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth.signals import user_login_failed
@@ -35,7 +36,7 @@ from apps.shared.auth_cookies import (
     set_tenant_refresh_cookie,
 )
 from apps.shared.deferred_email import schedule_deferred_email
-from apps.shared.request_utils import auth_user, client_ip
+from apps.shared.request_utils import auth_user, client_ip, request_tenant
 from core.serializers import ErrorResponseSerializer
 from core.throttling import set_throttle_scope
 
@@ -47,7 +48,6 @@ from ..errors import (
     RefreshTokenMissing,
     RegistrationCodeInvalid,
     RegistrationError,
-    TenantMissing,
 )
 from ..models import JasminUser
 from ..serializers import (
@@ -83,6 +83,9 @@ from ..services import (
     verify_and_issue_step_up_token,
     verify_captcha,
 )
+
+if TYPE_CHECKING:
+    from apps.shared.tenants.models import Tenant
 
 logger = logging.getLogger("authentication")
 
@@ -129,9 +132,7 @@ def user_login_view(request):
     data = serializer.validated_data
     email = data["email"]
     password = data["password"]
-    tenant = getattr(request, "tenant", None)
-    if not tenant:
-        raise TenantMissing("Tenant not found")
+    tenant = request_tenant(request)
 
     # Friendly Captcha — no-op when FRIENDLY_CAPTCHA_ENABLED is off.
     verify_captcha(data.get("frc_captcha_solution"), scope="login")
@@ -192,9 +193,9 @@ def _login_payload(*, result, tenant) -> dict:
         "user": {
             "id": user.id,
             "email": user.email,
-            "first_name": user.first_name or "",
-            "last_name": user.last_name or "",
-            "user_language": getattr(user, "user_language", "en"),
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "user_language": user.user_language,
             "roles": user.roles or ["member"],
             "member_id": result.member_id,
             "reseller_id": result.reseller_id,
@@ -225,14 +226,13 @@ def user_token_refresh_view(request):
     refresh_token = get_tenant_refresh_token(request)
     if not refresh_token:
         raise RefreshTokenMissing("Refresh token is required")
-    tenant = getattr(request, "tenant", None)
-    schema_name = tenant.schema_name if tenant else None
+    tenant = request_tenant(request)
 
     try:
         result = refresh_access_token(
             refresh_token=refresh_token,
-            tenant_schema=schema_name,
-            tenant_name=tenant.name if tenant else None,
+            tenant_schema=tenant.schema_name,
+            tenant_name=tenant.name,
         )
     except AuthError as exc:
         logger.warning(
@@ -240,13 +240,14 @@ def user_token_refresh_view(request):
         )
         raise
 
-    response_data = {"access": result["access"]}
-    if tenant:
-        response_data["tenant"] = {
+    response_data = {
+        "access": result["access"],
+        "tenant": {
             "id": tenant.id,
             "name": tenant.name,
             "schema_name": tenant.schema_name,
-        }
+        },
+    }
     response = Response(response_data, status=status.HTTP_200_OK)
     if result["refresh"]:
         set_tenant_refresh_cookie(response, result["refresh"])
@@ -335,7 +336,7 @@ def user_profile_update_view(request, user_id):
             "email": user.email,
             "first_name": user.first_name,
             "last_name": user.last_name,
-            "user_language": getattr(user, "user_language", "en"),
+            "user_language": user.user_language,
         },
         status=status.HTTP_200_OK,
     )
@@ -362,12 +363,11 @@ def invitation_verify_view(request, token):
     invitation = get_invitation(token)
     if invitation is None:
         raise InvitationInvalid("This invitation link is invalid or expired.")
-    tenant = getattr(request, "tenant", None)
     return Response(
         {
             "email": invitation.email,
             "first_name": invitation.user.first_name if invitation.user else "",
-            "tenant_name": getattr(tenant, "name", "") or "",
+            "tenant_name": request_tenant(request).name,
         }
     )
 
@@ -527,9 +527,10 @@ def step_up_view(request: Request) -> Response:
     password = serializer.validated_data["password"]
     totp_code = serializer.validated_data.get("totp_code") or None
     payload = getattr(request.auth, "payload", None) if request.auth else None
+    user = auth_user(request)
     try:
         access = verify_and_issue_step_up_token(
-            user=auth_user(request),
+            user=user,
             password=password,
             totp_code=totp_code,
             current_access_payload=payload,
@@ -541,8 +542,8 @@ def step_up_view(request: Request) -> Response:
         # wrong-password grind locks the (username, ip) pair exactly as
         # repeated login failures do — closing the lockout-bypass hole.
         user_login_failed.send(
-            sender=request.user.__class__,
-            credentials={"username": getattr(request.user, "email", "")},
+            sender=user.__class__,
+            credentials={"username": user.email},
             request=request,
         )
         raise
@@ -562,11 +563,11 @@ set_throttle_scope(step_up_view, "step_up")
 # --------------------------------------------------------------------------- #
 
 
-def _reject_public_schema(request) -> object:
+def _reject_public_schema(request) -> Tenant:
     """Guard shared by the registration endpoints: registration only makes
     sense on a tenant host, never the public/platform schema."""
-    tenant = getattr(request, "tenant", None)
-    if tenant is None or getattr(tenant, "schema_name", None) == "public":
+    tenant = request_tenant(request)
+    if tenant.schema_name == "public":
         raise RegistrationError(
             "Registration is not available on this host.",
             code="registration.host_disabled",

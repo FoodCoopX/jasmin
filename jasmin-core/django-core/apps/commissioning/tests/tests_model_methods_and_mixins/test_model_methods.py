@@ -458,13 +458,6 @@ class TestOfferAvailability:
         offer = OfferFactory(share_article=article, amount=Decimal("10.000"))
         assert offer.check_availability(20) is False
 
-    def test_check_availability_none_amount(self, tenant):
-        article = ShareArticleFactory()
-        # ``amount`` is NOT NULL at the DB level; build an unsaved instance
-        # to exercise the defensive ``None`` branch in ``check_availability``.
-        offer = OfferFactory.build(share_article=article, amount=None)
-        assert offer.check_availability(1) is False
-
     def test_update_decrements(self, tenant):
         article = ShareArticleFactory()
         offer = OfferFactory(share_article=article, amount=Decimal("100.000"))
@@ -477,13 +470,6 @@ class TestOfferAvailability:
         offer = OfferFactory(share_article=article, amount=Decimal("10.000"))
         with pytest.raises(ValidationError, match="Not enough stock"):
             offer.update_available_amount(20)
-
-    def test_update_none_amount_raises(self, tenant):
-        article = ShareArticleFactory()
-        # See ``test_check_availability_none_amount``: build unsaved.
-        offer = OfferFactory.build(share_article=article, amount=None)
-        with pytest.raises(ValidationError, match="No available amount"):
-            offer.update_available_amount(1)
 
 
 # ---------------------------------------------------------------------------

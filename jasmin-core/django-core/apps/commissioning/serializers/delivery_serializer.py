@@ -37,7 +37,8 @@ class CapacityWeekEntrySerializer(serializers.Serializer):
     {occupied, free} shape instead of ``{[key: string]: unknown}``."""
 
     occupied = serializers.IntegerField()
-    # ``None`` when the station-day has no capacity limit.
+    # Always an int, since every capacity is NOT NULL; the published schema
+    # declares it nullable.
     free = serializers.IntegerField(allow_null=True)
 
 
@@ -167,7 +168,7 @@ class DeliveryStationSerializer(
         """Check if this instance can be deleted"""
         # List path: the parent ListSerializer precomputed deletability for
         # every station on the page in one batch.
-        parent = getattr(self, "parent", None)
+        parent = self.parent
         if (
             isinstance(parent, DeliveryStationListSerializer)
             and not parent._station_failed
@@ -184,7 +185,7 @@ class DeliveryStationSerializer(
             return True
         # List path: the parent ListSerializer precomputed linked-reseller
         # deletability for every station on the page in one batch.
-        parent = getattr(self, "parent", None)
+        parent = self.parent
         if (
             isinstance(parent, DeliveryStationListSerializer)
             and not parent._linked_reseller_failed
@@ -200,12 +201,12 @@ class DeliveryStationSerializer(
     def get_iban_masked(self, obj) -> str:
         from apps.shared.pii_masking import mask_iban
 
-        contact = getattr(obj, "contact", None)
-        return mask_iban(getattr(contact, "iban", None) if contact else None)
+        contact = obj.contact
+        return mask_iban(contact.iban if contact else None)
 
     def get_iban_stored(self, obj) -> bool:
-        contact = getattr(obj, "contact", None)
-        return bool(getattr(contact, "iban", None) if contact else None)
+        contact = obj.contact
+        return bool(contact and contact.iban)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -281,10 +282,10 @@ class DeliveryStationDaySerializer(
         The field stays freely editable up and down — the only constraint is
         that you can't drop the cap below the number of shares already booked
         (confirmed deliveries + active draft reservations) for any current or
-        future week. ``None`` clears the limit (always allowed); on create
-        there's nothing booked yet so the check is skipped.
+        future week. On create there's nothing booked yet so the check is
+        skipped.
         """
-        if value is None or self.instance is None:
+        if self.instance is None:
             return value
 
         from django.utils import timezone
@@ -346,7 +347,7 @@ class DeliveryStationDaySerializer(
             instances = list(self.parent.instance)
         else:
             instances = [self.instance]
-        station_day_ids = [obj.id for obj in instances if getattr(obj, "id", None)]
+        station_day_ids = [obj.id for obj in instances]
 
         counts = ShareDemandService.capacity_counts_by_week(
             station_day_ids=station_day_ids,
@@ -369,10 +370,7 @@ class DeliveryStationDaySerializer(
             return None
         year_weeks = self._build_year_weeks(year, start_week, num_weeks)
         counts = self._batched_capacity_counts(year_weeks)
-        # Station-days may have no cap → ``free`` is None (capacity_nullable).
-        return build_capacity_by_week(
-            year_weeks, counts, obj.id, obj.capacity, capacity_nullable=True
-        )
+        return build_capacity_by_week(year_weeks, counts, obj.id, obj.capacity)
 
     def to_representation(self, instance):
         """Re-attach the dynamic variation_* keys (via the mixin), then mask."""
@@ -619,7 +617,7 @@ class DeliveryExceptionPeriodSerializer(
     # the subscription it affects.
 
     def get_is_locked(self, obj: DeliveryExceptionPeriod) -> bool:
-        return obj.has_started() if obj.valid_from else False
+        return obj.has_started()
 
     def to_representation(self, instance: DeliveryExceptionPeriod) -> dict:
         data = super().to_representation(instance)

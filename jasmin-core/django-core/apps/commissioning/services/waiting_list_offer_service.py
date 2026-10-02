@@ -138,7 +138,7 @@ class WaitingListOfferService:
         assert_price_meets_solidarity_floor(
             price=offered_price,
             share_type_variation_id=subscription.share_type_variation_id,
-            effective_date=subscription.valid_from or timezone.localdate(),
+            effective_date=subscription.valid_from,
             is_trial=subscription.is_trial,
         )
         subscription.price_per_delivery = offered_price
@@ -284,8 +284,7 @@ class WaitingListOfferService:
         from apps.shared.tenant_urls import frontend_base_url, tenant_name
 
         member = subscription.member
-        variation = subscription.share_type_variation
-        share_type = getattr(variation, "share_type", None) if variation else None
+        share_type = subscription.share_type_variation.share_type
         station_day = subscription.default_delivery_station_day
         base_url = frontend_base_url()
         accept_url = f"{base_url}/waiting-list-offer/{subscription.notification_token}"
@@ -295,24 +294,19 @@ class WaitingListOfferService:
         context = {
             "tenant_name": tenant_name(),
             "member": {
-                "first_name": getattr(member, "first_name", "") or "",
-                "email": getattr(member, "email", "") or "",
+                "first_name": member.first_name or "",
+                "email": member.email or "",
             },
-            "variation_name": getattr(share_type, "name", "") or "",
+            "variation_name": share_type.name or "",
             "delivery_station_name": offer_station_name(station_day),
-            "valid_from": (
-                subscription.valid_from.strftime("%d.%m.%Y")
-                if subscription.valid_from
-                else ""
-            ),
-            "expires_at": (
-                subscription.notification_expires_at.strftime("%d.%m.%Y, %H:%M")
-                if subscription.notification_expires_at
-                else ""
+            "valid_from": subscription.valid_from.strftime("%d.%m.%Y"),
+            # Set by ``notify_spot_available`` just before this email.
+            "expires_at": subscription.notification_expires_at.strftime(
+                "%d.%m.%Y, %H:%M"
             ),
             "accept_url": accept_url,
         }
-        member_email = getattr(member, "email", "") or ""
+        member_email = member.email or ""
         if not member_email:
             logger.warning(
                 "waiting_list.offer_no_email subscription=%s member=%s",

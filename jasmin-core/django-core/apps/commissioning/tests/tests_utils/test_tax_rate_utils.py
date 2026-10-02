@@ -167,11 +167,6 @@ class TestResolveCrateTaxRate:
 
         assert resolve_crate_tax_rate(crate, PRICING_DATE, default=99) == 99
 
-    def test_returns_default_when_crate_is_none(self):
-        """Guard for the OrderInfoPanel-style call where no crate is selected
-        yet — see crates_viewsets._get_tax_rate."""
-        assert resolve_crate_tax_rate(None, PRICING_DATE, default=19) == 19
-
 
 # ---------------------------------------------------------------------------
 # Tenant-default helpers (third resolution layer)

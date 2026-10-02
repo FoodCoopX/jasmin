@@ -163,11 +163,7 @@ export default function PackingListBulk() {
 
   // The packing day(s) derived from the selected delivery day (informational).
   const packingDaysForDelivery = useMemo<number[]>(() => {
-    if (
-      !isLoaded ||
-      selectedDeliveryDay === null ||
-      !getRelatedDays?.getPackingDaysForDelivery
-    ) {
+    if (!isLoaded || selectedDeliveryDay === null) {
       return [];
     }
     return getRelatedDays.getPackingDaysForDelivery(selectedDeliveryDay);
@@ -177,7 +173,7 @@ export default function PackingListBulk() {
     (packingDayNum: number | null) => {
       if (packingDayNum === null) return "";
       const deliveryDays =
-        getRelatedDays?.getDeliveryDaysForPacking(packingDayNum) || [];
+        getRelatedDays.getDeliveryDaysForPacking(packingDayNum);
       const deliveryDay = deliveryDays[0];
       let date = dateForWeekDayNumber(
         selectedYear,

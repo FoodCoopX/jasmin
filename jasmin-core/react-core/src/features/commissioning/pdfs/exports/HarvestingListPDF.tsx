@@ -19,7 +19,7 @@ const FirstPageOnlyTable = ({
   t,
   styles,
 }: FirstPageOnlyTableProps) => {
-  if (!dataFirstPageOnly || dataFirstPageOnly.length === 0) return null;
+  if (dataFirstPageOnly.length === 0) return null;
 
   return (
     <View style={{ marginBottom: 24 }}>
@@ -46,14 +46,14 @@ const FirstPageOnlyTable = ({
           <View style={styles.tableRow} key={index}>
             <View style={[styles.tableCol, { width: "70%" }]}>
               <Text style={[styles.tableCell, styles.tableCellLeft]}>
-                {crate.crate_name || "—"}
+                {crate.crate_name}
               </Text>
             </View>
             <View
               style={[styles.tableCol, styles.tableColLast, { width: "30%" }]}
             >
               <Text style={[styles.tableCell, styles.tableCellAmount]}>
-                {crate.quantity || 0}
+                {crate.quantity}
               </Text>
             </View>
           </View>

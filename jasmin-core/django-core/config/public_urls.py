@@ -21,7 +21,7 @@ def debug_schema(request):
         tenant_info.update(
             {
                 "tenant_schema": request.tenant.schema_name,
-                "tenant_name": getattr(request.tenant, "name", "No name"),
+                "tenant_name": request.tenant.name,
                 "is_public_schema": request.tenant.schema_name == "public",
             }
         )

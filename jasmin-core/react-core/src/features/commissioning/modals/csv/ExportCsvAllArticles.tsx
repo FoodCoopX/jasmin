@@ -80,10 +80,10 @@ function useAllArticleRowsAtDate(loadedDate: string | null) {
     const result: CrateNetPrice[] = [];
     for (const row of rows) {
       const crateId = row.crate;
-      if (!crateId || seen.has(crateId)) continue;
-      const from = row.valid_from ?? "";
+      if (seen.has(crateId)) continue;
+      const from = row.valid_from;
       const until = row.valid_until ?? "";
-      if (from && from > loadedDate) continue;
+      if (from > loadedDate) continue;
       if (until && until < loadedDate) continue;
       seen.add(crateId);
       result.push(row);
@@ -100,9 +100,9 @@ function useAllArticleRowsAtDate(loadedDate: string | null) {
     }));
     const crateRows: Record<string, unknown>[] = activeCratePrices.map((p) => ({
       __row_type: "crate",
-      name: p.name ?? p.short_name ?? "",
-      tax_rate: p.tax_rate ?? "",
-      crate_price: p.price ?? "",
+      name: p.name,
+      tax_rate: p.tax_rate,
+      crate_price: p.price,
     }));
     return [...articleRows, ...crateRows];
   }, [isReady, articleData, activeCratePrices]);

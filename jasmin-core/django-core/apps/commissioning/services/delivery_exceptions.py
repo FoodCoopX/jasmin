@@ -41,14 +41,14 @@ def _weeks_matching_periods(
 ) -> Iterator[tuple[YearWeek, tuple]]:
     """Yield ``(year_week, first_matching_period)`` for each candidate week whose
     ISO Monday falls inside a period. Owns the Monday calc and the None-safe
-    range test shared by the paused-week resolvers: an open-ended pause (either
-    bound NULL) is rejected at the API boundary, but a stray legacy row is
-    guarded here so ``<=`` against None can't raise a TypeError."""
+    range test shared by the paused-week resolvers: an open-ended pause
+    (``valid_until`` NULL) is rejected at the API boundary, but a stray legacy row
+    is guarded here so ``<=`` against None can't raise a TypeError."""
     for year, week in candidate_weeks:
         monday = Week(year, week).monday()
         for period in periods:
             valid_from, valid_until = period[0], period[1]
-            if valid_from and valid_until and valid_from <= monday <= valid_until:
+            if valid_until is not None and valid_from <= monday <= valid_until:
                 yield (year, week), period
                 break
 
@@ -147,11 +147,7 @@ def member_exception_gaps(member_id: str, years: set[int]) -> list[dict]:
     for subscription in subscriptions:
         variation = subscription.share_type_variation
         default_station_day = subscription.default_delivery_station_day
-        if (
-            not default_station_day
-            or not subscription.valid_from
-            or not subscription.valid_until
-        ):
+        if not default_station_day or not subscription.valid_until:
             continue
         periods = list(
             DeliveryExceptionPeriod.objects.filter(
@@ -237,7 +233,8 @@ def resync_delivery_exception(
             Q(valid_from__isnull=True) | Q(valid_from__lte=latest_sunday),
         )
         .select_related(
-            "share_type_variation", "default_delivery_station_day__delivery_day"
+            "share_type_variation__share_type",
+            "default_delivery_station_day__delivery_day",
         )
     )
 
@@ -289,11 +286,7 @@ def _suppress_weeks(subscription: Subscription, weeks: set[YearWeek]) -> set:
     ]
     if not to_delete:
         return set()
-    affected = {
-        share_delivery.share_id
-        for share_delivery in to_delete
-        if share_delivery.share_id
-    }
+    affected = {share_delivery.share_id for share_delivery in to_delete}
     ShareDelivery.objects.filter(
         pk__in=[share_delivery.pk for share_delivery in to_delete]
     ).delete()
@@ -324,9 +317,7 @@ def _restore_weeks(subscription: Subscription, weeks: set[YearWeek]) -> set:
     # bulk_create bypasses ShareDelivery.save(), which stamps is_opted_in from
     # the variation default — mirror _create_share_deliveries so an on-by-default
     # opt-in variation isn't born opted-OUT.
-    is_opted_in = bool(
-        variation and variation.requires_optin and variation.default_optin_state
-    )
+    is_opted_in = variation.requires_optin and variation.default_optin_state
 
     # While the pause was active the freed station-day slots may have been
     # taken by new confirmed subscriptions, so restoring a paused delivery can
@@ -336,11 +327,7 @@ def _restore_weeks(subscription: Subscription, weeks: set[YearWeek]) -> set:
     # (packed-along) shares and for unlimited station-days.
     from .capacity_reservation_service import CapacityReservationService
 
-    # Unknown share_type (defensive) → treat as additional so the check is
-    # skipped.
-    is_additional_share_type = getattr(
-        getattr(variation, "share_type", None), "is_additional_share_type", True
-    )
+    is_additional_share_type = variation.share_type.is_additional_share_type
     quantity = subscription.quantity or 1
 
     existing_weeks = {

@@ -26,7 +26,7 @@ const makeBarShape =
     const raw = props.value;
     const numeric = Array.isArray(raw) ? raw[1] - raw[0] : raw;
     if (!numeric) {
-      const baselineY = props.y ?? 0;
+      const baselineY = props.y;
       return (
         <Rectangle
           {...props}

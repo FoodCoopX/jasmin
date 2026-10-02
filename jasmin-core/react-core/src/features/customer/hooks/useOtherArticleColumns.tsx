@@ -47,7 +47,7 @@ export function useOtherArticleColumns() {
           const amount = record.amount;
           const unit = record.unit;
           return amount != null
-            ? `${format(Number(amount), 2)} ${getUnitLabel(unit ?? "")}`
+            ? `${format(Number(amount), 2)} ${getUnitLabel(unit)}`
             : "-";
         },
       },
@@ -59,7 +59,7 @@ export function useOtherArticleColumns() {
         render: (val: string | null, record) => {
           const unit = record.unit;
           return val != null
-            ? `${formatCurrency(Number(val))}/${getUnitLabel(unit ?? "")}`
+            ? `${formatCurrency(Number(val))}/${getUnitLabel(unit)}`
             : "-";
         },
       },

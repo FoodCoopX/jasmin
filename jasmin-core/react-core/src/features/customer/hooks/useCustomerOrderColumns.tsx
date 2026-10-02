@@ -101,7 +101,7 @@ export function useCustomerOrderColumns({
         render: (val: string | null, record) => {
           const unit = record.unit;
           return val
-            ? `${format(Number(val), 2)} ${getUnitLabel(unit ?? "")}/${t("commissioning.pu")}`
+            ? `${format(Number(val), 2)} ${getUnitLabel(unit)}/${t("commissioning.pu")}`
             : "-";
         },
       },
@@ -116,7 +116,7 @@ export function useCustomerOrderColumns({
         render: (price: string | null | undefined, record) => {
           const unit = record.unit;
           return price && Number(price)
-            ? `${formatCurrency(Number(price))}/${getUnitLabel(unit ?? "")}`
+            ? `${formatCurrency(Number(price))}/${getUnitLabel(unit)}`
             : "-";
         },
       });

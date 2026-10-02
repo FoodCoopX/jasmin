@@ -80,10 +80,6 @@ export function useOffersColumns({
   });
 
   const tierColumns = useMemo(() => {
-    if (!finalTiers || finalTiers.length === 0) {
-      return [];
-    }
-
     const result = [
       {
         title: (
@@ -103,7 +99,7 @@ export function useOffersColumns({
             width: "6em",
             suffix: currencySymbol,
             disabled: (record: TableRecord) => {
-              return record?.is_finalized === true;
+              return record.is_finalized === true;
             },
             render: (_: unknown, record: TableRecord) => {
               const currentPrice = record[
@@ -113,7 +109,7 @@ export function useOffersColumns({
                 currentPrice ? Number(currentPrice) : 0,
               );
 
-              const shareArticle = shareArticles?.find(
+              const shareArticle = shareArticles.find(
                 (sa) => sa.value === record.share_article,
               );
 
@@ -330,7 +326,7 @@ export function useOffersColumns({
           if (record.amount_ordered === undefined) return "";
 
           const amountPerPu = Number(record.amount_per_pu);
-          if (!amountPerPu || amountPerPu === 0 || isNaN(amountPerPu)) {
+          if (!amountPerPu) {
             return (
               <div className="read-only-amounts-planning">
                 {format(Number(record.amount_ordered), 1)}{" "}

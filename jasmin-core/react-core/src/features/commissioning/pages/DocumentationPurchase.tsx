@@ -355,8 +355,8 @@ export default function DocumentationPurchase() {
                 const rowData = row as Record<string, unknown> | undefined;
                 return (
                   rowData?.theoretical_purchase_amount == null ||
-                  rowData?.theoretical_purchase_amount === 0 ||
-                  (rowData?.purchase_amount as number) > 0
+                  rowData.theoretical_purchase_amount === 0 ||
+                  (rowData.purchase_amount as number) > 0
                 );
               })
             }

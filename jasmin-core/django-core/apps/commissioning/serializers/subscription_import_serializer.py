@@ -255,9 +255,9 @@ class SubscriptionImportSerializer(serializers.Serializer):
             default_delivery_station_day=validated_data["_station_day"],
             valid_from=validated_data["valid_from"],
             valid_until=validated_data.get("valid_until"),
-            quantity=validated_data.get("quantity") or 1,
+            quantity=validated_data["quantity"],
             price_per_delivery=validated_data.get("price_per_delivery"),
-            is_trial=bool(validated_data.get("is_trial")),
+            is_trial=validated_data["is_trial"],
             subscription_number=validated_data.get("subscription_number"),
             admin_confirmed=False,
         )

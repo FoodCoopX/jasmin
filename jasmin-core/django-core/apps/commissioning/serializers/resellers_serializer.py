@@ -3,7 +3,6 @@ from datetime import date
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
-from ..constants import get_default_tax_rate_crates
 from ..errors import OrderableItemReferenceInvalid
 from ..models import (
     CrateContentInvoiceReseller,
@@ -130,8 +129,7 @@ class ResellerListSerializer(DeletableListSerializer):
                 delivery_station = reseller.linked_delivery_station
             except DeliveryStation.DoesNotExist:
                 continue
-            if delivery_station is not None:
-                ds_pks.append(delivery_station.pk)
+            ds_pks.append(delivery_station.pk)
 
         if not ds_pks:
             self._linked_delivery_station_deletable_pks = set()
@@ -222,14 +220,13 @@ class ResellerSerializer(
         """Customize the output representation to include contact fields"""
         data = super().to_representation(instance)
 
-        if instance.contact:
-            contact_fields = self._get_contact_field_names(exclude_fields={"id"})
-            for field_name in contact_fields:
-                # No ``, None`` default: ``field_name`` comes from
-                # ``_get_contact_field_names`` walking the model meta —
-                # if a name in that list doesn't resolve, that's a real
-                # bug to surface, not silently render as null.
-                data[field_name] = getattr(instance.contact, field_name)
+        contact_fields = self._get_contact_field_names(exclude_fields={"id"})
+        for field_name in contact_fields:
+            # No ``, None`` default: ``field_name`` comes from
+            # ``_get_contact_field_names`` walking the model meta —
+            # if a name in that list doesn't resolve, that's a real
+            # bug to surface, not silently render as null.
+            data[field_name] = getattr(instance.contact, field_name)
 
         # NEVER echo the decrypted IBAN — ``ContactEntity.iban`` is an
         # EncryptedCharField, so the copy loop above would undo encryption-at-
@@ -239,27 +236,19 @@ class ResellerSerializer(
         # write). Full reveal, if ever needed, belongs on a step-up-gated surface.
         data.pop("iban", None)
 
-        # Derived flag for the frontend checkbox.
-        from ..models import DeliveryStation
-
-        try:
-            data["is_also_delivery_station"] = (
-                instance.linked_delivery_station is not None
-            )
-        except DeliveryStation.DoesNotExist:
-            data["is_also_delivery_station"] = False
+        # Derived flag for the frontend checkbox. The reverse one-to-one raises
+        # RelatedObjectDoesNotExist, an AttributeError, when no station is linked.
+        data["is_also_delivery_station"] = hasattr(instance, "linked_delivery_station")
 
         return data
 
     def get_iban_masked(self, obj) -> str:
         from apps.shared.pii_masking import mask_iban
 
-        contact = getattr(obj, "contact", None)
-        return mask_iban(getattr(contact, "iban", None) if contact else None)
+        return mask_iban(obj.contact.iban)
 
     def get_iban_stored(self, obj) -> bool:
-        contact = getattr(obj, "contact", None)
-        return bool(getattr(contact, "iban", None) if contact else None)
+        return bool(obj.contact.iban)
 
     def get_linked_delivery_station_can_be_deleted(self, obj) -> bool:
         """True iff unlinking would not orphan a DS that's still in use.
@@ -273,12 +262,10 @@ class ResellerSerializer(
             delivery_station = obj.linked_delivery_station
         except DeliveryStation.DoesNotExist:
             return True
-        if delivery_station is None:
-            return True
 
         # List path: the parent ListSerializer precomputed deletability for
         # every linked delivery station on the page in one batch.
-        parent = getattr(self, "parent", None)
+        parent = self.parent
         if (
             isinstance(parent, ResellerListSerializer)
             and not parent._linked_delivery_station_failed
@@ -383,7 +370,7 @@ class OfferGroupSerializer(DeletableMixin, serializers.ModelSerializer):
     def get_can_be_deleted(self, obj) -> bool:
         # The seeded default offer group is protected — never deletable,
         # regardless of FK references.
-        if getattr(obj, "is_default", False):
+        if obj.is_default:
             return False
         return super().get_can_be_deleted(obj)
 
@@ -789,10 +776,7 @@ class InvoiceResellerSerializer(
         for content in obj.items.all():
             # iterate over all delivery_note_contents
             for delivery_note_content in content.delivery_note_contents.all():
-                if delivery_note_content.delivery_note:
-                    delivery_note = delivery_note_content.delivery_note
-                    delivery_note_str = delivery_note.full_number
-                    delivery_notes.add(delivery_note_str)
+                delivery_notes.add(delivery_note_content.delivery_note.full_number)
 
         # Crate-only invoices have no article items — their delivery-note
         # provenance lives on the crate-line M2M, so walk that too (else the
@@ -820,7 +804,6 @@ class InvoiceResellerSerializer(
 
         return summarize_crate_items(
             obj.crate_items.all(),
-            resolve_tax_rate=lambda _crate_type: get_default_tax_rate_crates(),
             extras={
                 "invoice_id": str(obj.id),
                 "invoice_number": obj.display_number,
@@ -891,36 +874,30 @@ class DeliveryNoteResellerSerializer(
     sum_brutto = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
-    # Flat snapshot of the reseller's contact, hopping through ``order``.
-    # See InvoiceResellerSerializer for the rationale on ``source=`` +
-    # ``default=None`` (handles unset segments cleanly, no method needed).
+    # Flat snapshot of the reseller's contact, hopping through ``order`` (every
+    # hop is NOT NULL). The contact's ``name`` and ``country`` can be None.
     reseller_name = serializers.CharField(
         source="order.reseller.contact.name",
-        default=None,
         read_only=True,
         allow_null=True,
     )
     reseller_address = serializers.CharField(
         source="order.reseller.contact.address",
-        default=None,
         read_only=True,
         allow_null=True,
     )
     reseller_zip = serializers.CharField(
         source="order.reseller.contact.zip_code",
-        default=None,
         read_only=True,
         allow_null=True,
     )
     reseller_city = serializers.CharField(
         source="order.reseller.contact.city",
-        default=None,
         read_only=True,
         allow_null=True,
     )
     reseller_country = serializers.CharField(
         source="order.reseller.contact.country",
-        default=None,
         read_only=True,
         allow_null=True,
     )
@@ -931,14 +908,12 @@ class DeliveryNoteResellerSerializer(
     delivery_note_date = serializers.DateField(source="date", read_only=True)
     order_number = serializers.CharField(
         source="order.display_number",
-        default=None,
         read_only=True,
         allow_null=True,
     )
     order_date = serializers.SerializerMethodField()
     order_prefix = serializers.CharField(
         source="order.prefix",
-        default=None,
         read_only=True,
         allow_null=True,
     )
@@ -969,8 +944,6 @@ class DeliveryNoteResellerSerializer(
 
     def get_order_date(self, obj) -> date | None:
         """Order date via the shared ISO-week resolver (year/week/day_number)."""
-        if not obj.order:
-            return None
         return date_from_order(obj.order)
 
     @extend_schema_field(CrateItemSummarySerializer(many=True))
@@ -981,9 +954,7 @@ class DeliveryNoteResellerSerializer(
         Consumes the prefetched ``obj.crate_items.all()`` (configured on
         ``DeliveryNoteResellerViewSet.queryset`` via
         ``prefetch_related("crate_items__crate_type")``) and aggregates
-        in Python. A delivery note is not a tax document (the PDF carries
-        no totals / VAT), so the stored ``tax_rate`` is passed through as-is
-        — no date-based fallback resolution.
+        in Python.
         """
         from ..services.crate_summary import summarize_crate_items
 

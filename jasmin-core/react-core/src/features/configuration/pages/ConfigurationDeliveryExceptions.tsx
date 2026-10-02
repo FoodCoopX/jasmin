@@ -84,7 +84,7 @@ export default function ConfigurationDeliveryExceptions() {
     () =>
       shareTypeVariations.map((variation) => ({
         value: String(variation.value),
-        label: `${variation.share_type_name ?? ""} – ${variation.size ?? ""}`,
+        label: `${variation.share_type_name ?? ""} – ${variation.size}`,
       })),
     [shareTypeVariations],
   );

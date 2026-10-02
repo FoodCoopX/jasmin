@@ -117,7 +117,7 @@ export default function JasminApp() {
   }
 
   const hasOnlyRole = (role: string) =>
-    user?.roles?.length === 1 && user?.roles[0] === role;
+    user?.roles?.length === 1 && user.roles[0] === role;
 
   // Derived from the canonical list rather than spelled out, so a role added
   // there is recognised here and a name that is not a role cannot be tested

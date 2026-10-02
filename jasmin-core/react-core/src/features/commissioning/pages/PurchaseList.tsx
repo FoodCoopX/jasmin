@@ -75,7 +75,7 @@ export default function PurchaseList() {
   const { sellers } = useSellers();
   const { noteColumn } = useNoteColumn();
   const selectedResellerLabel = useMemo(() => {
-    if (!selectedReseller || !sellers) return null;
+    if (!selectedReseller) return null;
     const reseller = sellers.find(
       (seller: { value: string; label: string }) =>
         seller.value === selectedReseller,

@@ -22,10 +22,6 @@ from ..models import (
     InvoiceResellerContent,
 )
 from ..utils.iso_week_utils import coerce_document_date
-from ..utils.tax_rate_utils import (
-    effective_article_tax_rate,
-    effective_crate_tax_rate,
-)
 from .email_dispatch import load_pdf_attachments, send_document_email
 from .finalize_utils import finalize_children
 
@@ -39,8 +35,10 @@ def _payment_due_date(invoice_date, reseller):
     if invoice_date is None:
         return None
     try:
-        terms_days = reseller.get_payment_terms_days() if reseller else 14
-    except (AttributeError, TypeError):
+        terms_days = reseller.get_payment_terms_days()
+    except TypeError:
+        # The tenant-settings lookup refuses a connection tenant without a
+        # ``schema_name``; fall back to the default terms.
         terms_days = 14
     return invoice_date + timedelta(days=terms_days)
 
@@ -144,7 +142,7 @@ class InvoiceService:
         legitimately diverges from the coerced ``rabatt or 0`` on the create
         path) stay at the CALL SITE:
 
-          * create-from-DN passes the positive amount + stored-else-resolved tax
+          * create-from-DN passes the positive amount + the DN content's tax
             + the single source DN content on the M2M;
           * storno passes the negated amount + the copied tax and wires NO M2M;
           * summary passes the merged total + the merged tax, omits
@@ -263,7 +261,7 @@ class InvoiceService:
         # document_type / storno linkage) shows up as drift. v1 documents
         # keep the original payload so their stored hash still validates —
         # legacy invoices must not all suddenly report as tampered.
-        if (getattr(invoice, "document_hash_version", 1) or 1) >= 2:
+        if invoice.document_hash_version >= 2:
             recipient = invoice.resolved_recipient()
             payload["recipient"] = {
                 key: (str(value) if value is not None else None)
@@ -351,7 +349,7 @@ class InvoiceService:
         invoice_date = coerce_document_date(
             date,
             fallback_date=delivery_note.date,
-            fallback_order=getattr(delivery_note, "order", None),
+            fallback_order=delivery_note.order,
         )
         reseller = delivery_note.order.reseller
         invoice = InvoiceReseller.objects.create(
@@ -365,7 +363,7 @@ class InvoiceService:
         )
 
         for delivery_note_content in delivery_note.items.select_related(
-            "offer", "offer__share_article", "share_article"
+            "offer", "share_article"
         ):
             InvoiceService._create_invoice_article_content(
                 invoice,
@@ -377,9 +375,7 @@ class InvoiceService:
                 # when accumulating ``total_amount``), so both paths accept the same
                 # data. ``rabatt`` below is coerced too.
                 amount=delivery_note_content.amount or 0,
-                tax_rate=effective_article_tax_rate(
-                    delivery_note_content, invoice.date
-                ),
+                tax_rate=delivery_note_content.tax_rate,
                 rabatt=delivery_note_content.rabatt or 0,
                 source_rabatt=delivery_note_content.rabatt,
                 order_content=delivery_note_content.order_content,
@@ -399,13 +395,7 @@ class InvoiceService:
                 invoice,
                 crate_delivery_note_content,
                 amount=crate_delivery_note_content.amount,
-                tax_rate=(
-                    crate_delivery_note_content.tax_rate
-                    if crate_delivery_note_content.tax_rate is not None
-                    else effective_crate_tax_rate(
-                        crate_delivery_note_content.crate_type, invoice.date
-                    )
-                ),
+                tax_rate=crate_delivery_note_content.tax_rate,
                 rabatt=crate_delivery_note_content.rabatt or 0,
                 source_rabatt=crate_delivery_note_content.rabatt,
                 crate_delivery_note_contents=(crate_delivery_note_content,),
@@ -513,7 +503,7 @@ class InvoiceService:
             if delivery_note_contents:
                 for delivery_note_content in delivery_note_contents:
                     delivery_note = delivery_note_content.delivery_note
-                    if delivery_note is not None and not delivery_note.is_finalized:
+                    if not delivery_note.is_finalized:
                         delivery_notes[delivery_note.pk] = delivery_note
             elif item.order_content_id:
                 manual_line_order_ids.add(item.order_content.order_id)
@@ -710,19 +700,15 @@ class InvoiceService:
         rates (e.g. a VAT-rate change where the net price is held constant
         across the change date) or different discounts; merging them under
         one rate/discount would misstate the VAT on the issued, finalized
-        invoice. The effective rate is RESOLVED (stored value, else the
-        date-based default) before keying so the key matches the value that
-        is actually written to the line.
+        invoice.
         """
         content_groups: dict[tuple, dict] = {}
 
         for delivery_note in delivery_notes:
             for delivery_note_content in delivery_note.items.select_related(
-                "offer", "offer__share_article", "share_article"
+                "offer", "share_article"
             ):
-                resolved_tax_rate = effective_article_tax_rate(
-                    delivery_note_content, invoice.date
-                )
+                resolved_tax_rate = delivery_note_content.tax_rate
                 resolved_rabatt = delivery_note_content.rabatt or 0
                 key = (
                     delivery_note_content.share_article_id,
@@ -782,13 +768,7 @@ class InvoiceService:
                 else delivery_note.crate_items.none()
             )
             for delivery_note_crate_content in crate_items:
-                resolved_crate_tax_rate = (
-                    delivery_note_crate_content.tax_rate
-                    if delivery_note_crate_content.tax_rate is not None
-                    else effective_crate_tax_rate(
-                        delivery_note_crate_content.crate_type, invoice.date
-                    )
-                )
+                resolved_crate_tax_rate = delivery_note_crate_content.tax_rate
                 resolved_crate_rabatt = delivery_note_crate_content.rabatt or 0
                 key = (
                     delivery_note_crate_content.crate_type_id,
@@ -806,9 +786,7 @@ class InvoiceService:
                         "dn_crate_contents": [],
                     }
 
-                crate_groups[key]["total_amount"] += (
-                    delivery_note_crate_content.amount or 0
-                )
+                crate_groups[key]["total_amount"] += delivery_note_crate_content.amount
                 crate_groups[key]["dn_crate_contents"].append(
                     delivery_note_crate_content
                 )
@@ -904,14 +882,10 @@ class InvoiceService:
         """The tenant's accounting inbox (typically a DATEV import address),
         or ``None`` when none is configured — a fine setup for a tenant
         without such a pipeline."""
-        from django.db import connection
-
         from apps.shared.tenants.models import TenantEmailConfig
+        from core.tenant_db import connection
 
-        schema_name = getattr(getattr(connection, "tenant", None), "schema_name", None)
-        if not schema_name:
-            return None
-        config = TenantEmailConfig.get_active_for_schema(schema_name)
+        config = TenantEmailConfig.get_active_for_schema(connection.tenant.schema_name)
         return (config.accounting_email or None) if config else None
 
     @staticmethod
@@ -972,8 +946,10 @@ class InvoiceService:
         tenant_context = capture_tenant_email_context()
 
         try:
-            terms_days = reseller.get_payment_terms_days() if reseller else 14
-        except (AttributeError, TypeError):
+            terms_days = reseller.get_payment_terms_days()
+        except TypeError:
+            # The tenant-settings lookup refuses a connection tenant without a
+            # ``schema_name``; fall back to the default terms.
             terms_days = 14
 
         # A storno / correction is a credit note — it has no payment "due
@@ -989,10 +965,7 @@ class InvoiceService:
             due_date_str = ""
             period_str = ""
 
-        try:
-            total_str = f"{invoice.sum_brutto:.2f}"
-        except (AttributeError, TypeError):
-            total_str = ""
+        total_str = f"{invoice.sum_brutto:.2f}"
 
         invoice_number = invoice.full_number
 

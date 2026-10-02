@@ -38,11 +38,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.shared.auth_cookies import set_tenant_refresh_cookie
-from apps.shared.request_utils import body, client_ip
+from apps.shared.request_utils import body, client_ip, request_tenant
 from core.serializers import ErrorResponseSerializer
 from core.throttling import set_throttle_scope
 
-from ..errors import AuthError, TenantMissing, TwoFactorChallengeInvalid
+from ..errors import AuthError, TwoFactorChallengeInvalid
 from ..serializers import (
     LoginResponseSerializer,
     MessageResponseSerializer,
@@ -64,7 +64,7 @@ def _resolve_enrolling_user(request):
     role-mandated-2FA gate presents the ``enrolment_token`` issued on that
     path instead — so the gate can't deadlock (those users have no session
     yet). Raises ``AuthError`` when neither is present."""
-    if getattr(request, "user", None) and request.user.is_authenticated:
+    if request.user.is_authenticated:
         return request.user
     raw_token = body(request).get("enrolment_token")
     if raw_token is not None and not isinstance(raw_token, str):
@@ -75,11 +75,8 @@ def _resolve_enrolling_user(request):
     token = (raw_token or "").strip()
     if not token:
         raise AuthError("Authentication or an enrolment token is required.")
-    tenant = getattr(request, "tenant", None)
-    if not tenant:
-        raise TenantMissing("Tenant not found")
     return two_factor_service.consume_enrolment_token(
-        enrolment=token, tenant_schema=tenant.schema_name
+        enrolment=token, tenant_schema=request_tenant(request).schema_name
     )
 
 
@@ -131,9 +128,7 @@ def two_factor_enroll_start_view(request):
     # role-mandated-2FA gate (no session) can enrol via their enrolment_token;
     # a logged-in user still enrols via their session. See _resolve_enrolling_user.
     user = _resolve_enrolling_user(request)
-    tenant = getattr(request, "tenant", None)
-    if not tenant:
-        raise TenantMissing("Tenant not found")
+    tenant = request_tenant(request)
     issuer = f"Jasmin — {tenant.name}" if tenant.name else "Jasmin"
     start = two_factor_service.start_enrollment(user=user, issuer=issuer)
     return Response(
@@ -188,9 +183,7 @@ def two_factor_verify_view(request):
     serializer.is_valid(raise_exception=True)
     challenge_token = serializer.validated_data["challenge_token"].strip()
     code = serializer.validated_data["code"].strip()
-    tenant = getattr(request, "tenant", None)
-    if not tenant:
-        raise TenantMissing("Tenant not found")
+    tenant = request_tenant(request)
 
     user = None
     try:
@@ -212,7 +205,7 @@ def two_factor_verify_view(request):
         if user is not None:
             user_login_failed.send(
                 sender=user.__class__,
-                credentials={"username": getattr(user, "email", "")},
+                credentials={"username": user.email},
                 request=request,
             )
         raise

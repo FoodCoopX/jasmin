@@ -81,13 +81,12 @@ class ShareTypeSerializer(DeletableMixin, serializers.ModelSerializer):
         # open predecessor. Drop it; the real "one OPEN per share_option"
         # invariant is still enforced by the DB partial constraint and the
         # model's ``full_clean()`` (which runs in ``save()`` AFTER succession).
-        share_option_field = self.fields.get("share_option")
-        if share_option_field is not None:
-            share_option_field.validators = [
-                validator
-                for validator in share_option_field.validators
-                if not isinstance(validator, UniqueValidator)
-            ]
+        share_option_field = self.fields["share_option"]
+        share_option_field.validators = [
+            validator
+            for validator in share_option_field.validators
+            if not isinstance(validator, UniqueValidator)
+        ]
 
     def get_share_type_variation_sizes_in_use(self, obj: ShareType) -> str:
         # Precomputed once per request by ``ShareTypeViewSet.list`` (single
@@ -174,7 +173,7 @@ class ShareTypeVariationSerializer(
             instances = list(self.parent.instance)
         else:
             instances = [self.instance]
-        variation_ids = [obj.id for obj in instances if getattr(obj, "id", None)]
+        variation_ids = [obj.id for obj in instances]
 
         counts = VariationCapacityService.capacity_counts_by_week(
             variation_ids=variation_ids,
@@ -199,7 +198,7 @@ class ShareTypeVariationSerializer(
             instances = list(self.parent.instance)
         else:
             instances = [self.instance]
-        variation_ids = [obj.id for obj in instances if getattr(obj, "id", None)]
+        variation_ids = [obj.id for obj in instances]
 
         bounds = {
             row["share_type_variation_id"]: {
@@ -248,7 +247,6 @@ class ShareTypeVariationSerializer(
             return None
         year_weeks = iso_week_range(year, start_week, num_weeks)
         counts = self._batched_variation_counts(year_weeks)
-        # Variations always carry a numeric cap → no capacity_nullable guard.
         return build_capacity_by_week(year_weeks, counts, obj.id, obj.capacity)
 
     def to_representation(self, instance):

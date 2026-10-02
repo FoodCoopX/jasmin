@@ -244,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = meta?.user;
       if (!currentUser) return;
       const mergedUser = { ...currentUser, ...partial } as AuthUser;
-      persistMeta({ ...(meta ?? {}), user: mergedUser });
+      persistMeta({ ...meta, user: mergedUser });
     },
     [meta, persistMeta],
   );
@@ -277,8 +277,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSuperAdminHost(window.location.hostname)) {
       navigate("/admin");
     } else {
-      const roles = user?.roles || [];
-      const memberId = user?.member_id;
+      const roles = user.roles;
+      const memberId = user.member_id;
       if (roles.length === 1 && roles[0] === "member" && memberId) {
         navigate(`/members/members/${memberId}`);
       } else if (roles.length === 1 && roles[0] === "customer") {

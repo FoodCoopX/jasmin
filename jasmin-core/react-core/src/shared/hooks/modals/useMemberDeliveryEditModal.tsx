@@ -28,16 +28,14 @@ export const useMemberDeliveryEditModal = () => {
 
   const openModal = useCallback(
     (delivery: DeliveryRecord) => {
-      if (delivery) {
-        setDeliveryId(delivery.id ?? null);
-        setCurrentDelivery(delivery);
-        form.setFieldsValue({
-          delivery_station_day: delivery.delivery_station_day || undefined,
-          joker_taken: delivery.joker_taken || false,
-          donation_joker_taken: delivery.donation_joker_taken || false,
-          apply_to_future: false,
-        });
-      }
+      setDeliveryId(delivery.id ?? null);
+      setCurrentDelivery(delivery);
+      form.setFieldsValue({
+        delivery_station_day: delivery.delivery_station_day || undefined,
+        joker_taken: delivery.joker_taken || false,
+        donation_joker_taken: delivery.donation_joker_taken || false,
+        apply_to_future: false,
+      });
       setIsVisible(true);
     },
     [form]

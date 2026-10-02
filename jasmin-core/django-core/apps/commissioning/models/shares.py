@@ -128,7 +128,9 @@ class ShareType(JasminModel, TimeBoundMixin):
         # opt-OUT) and on-off opt-in (per-period opt-IN) are mutually
         # exclusive, so block adding jokers to a share type that already has
         # an on-off variation.
-        if (self.amount_of_jokers or self.amount_of_donation_jokers) and self.pk:
+        if (
+            self.amount_of_jokers or self.amount_of_donation_jokers
+        ) and not self._state.adding:
             if self.sharetypevariation_set.filter(requires_optin=True).exists():
                 raise ValidationError(
                     {
@@ -309,7 +311,7 @@ class ShareTypeVariation(JasminModel, TimeBoundMixin):
     def clean(self) -> None:
         super().clean()
 
-        if self.share_type and self.valid_from:
+        if self.valid_from:
             if self.valid_from < self.share_type.valid_from:
                 raise ValidationError(
                     {
@@ -337,7 +339,10 @@ class ShareTypeVariation(JasminModel, TimeBoundMixin):
 
         # The components M2M check requires a saved row. Skip only that part
         # on first insert; date checks above always run.
-        if self.variation_type == self.VariationType.PHYSICAL and self.pk:
+        if (
+            self.variation_type == self.VariationType.PHYSICAL
+            and not self._state.adding
+        ):
             if self.physical_components.exists():
                 raise ValidationError("Physical variations cannot have components")
 
@@ -374,9 +379,7 @@ class ShareTypeVariation(JasminModel, TimeBoundMixin):
             # jokers. Forbid the combination (mirror guard on ShareType.clean
             # for the reverse direction).
             share_type = self.share_type
-            if share_type and (
-                share_type.amount_of_jokers or share_type.amount_of_donation_jokers
-            ):
+            if share_type.amount_of_jokers or share_type.amount_of_donation_jokers:
                 raise ValidationError(
                     {
                         "requires_optin": (
@@ -873,9 +876,6 @@ class ShareContent(CreatedMixin, FinalizableMixin, ArchivableMixin, JasminModel)
     washing_backup = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
-        # ``unit`` and ``size`` are nullable, so the unique check only runs
-        # when both are set — otherwise NULL != NULL in Postgres makes the
-        # constraint useless.
         constraints = [
             models.UniqueConstraint(
                 fields=["share", "share_article", "delivery_station", "unit", "size"],
@@ -1128,7 +1128,7 @@ class ShareDelivery(JasminModel):
             raise ValidationError(
                 "A delivery cannot be both a joker (skip) and a donation joker."
             )
-        if self.delivery_station_day and self.share:
+        if self.delivery_station_day and self.share_id:
             if self.delivery_station_day.delivery_day != self.share.delivery_day:
                 raise ValidationError(
                     "Delivery day of Share and DeliveryStationDay must match."
@@ -1156,7 +1156,7 @@ class ShareDelivery(JasminModel):
         # ``OptinService.toggle``.
         if self._state.adding and self.share_id:
             variation = self.share.share_type_variation
-            if variation and variation.requires_optin:
+            if variation.requires_optin:
                 self.is_opted_in = variation.default_optin_state
         self.full_clean()
         super().save(*args, **kwargs)

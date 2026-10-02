@@ -121,18 +121,13 @@ def _most_recent_reference_price(
 
 
 def _current_tenant_settings():
-    """The active tenant's current ``TenantSettings``, or ``None`` when there is
-    no tenant/settings context (bound connection has no tenant, no settings row).
-    Read ONCE by the batch callers and threaded into ``create_renewal_draft`` to
-    avoid re-reading it per renewed row."""
+    """The active tenant's current ``TenantSettings``, or ``None`` when no
+    settings row is in force. Read ONCE by the batch callers and threaded into
+    ``create_renewal_draft`` to avoid re-reading it per renewed row."""
     from apps.shared.tenants.models import TenantSettings
     from core.tenant_db import connection
 
-    try:
-        tenant = connection.tenant
-    except AttributeError:
-        return None
-    return TenantSettings.get_current_settings(tenant)
+    return TenantSettings.get_current_settings(connection.tenant)
 
 
 def _anchored_term_end(valid_from: datetime.date, settings) -> datetime.date | None:

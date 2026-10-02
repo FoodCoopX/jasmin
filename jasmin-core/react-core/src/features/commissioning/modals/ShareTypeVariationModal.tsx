@@ -615,10 +615,7 @@ export default function ShareTypeVariationModal({
       const editingId = transformedData.id;
       if (sortOrder != null && sortOrder !== "") {
         const duplicate = (data as Array<Record<string, unknown>>).some(
-          (row) =>
-            row.id != null &&
-            row.id !== editingId &&
-            row.sort_order === sortOrder,
+          (row) => row.id !== editingId && row.sort_order === sortOrder,
         );
         if (duplicate) {
           const msg = t("validation.unique.sort_order");

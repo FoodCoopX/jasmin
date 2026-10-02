@@ -41,7 +41,7 @@ class SelfRegistrationEnabled(BasePermission):
         if current is None or not current.allows_self_registration:
             logger.info(
                 "auth.self_registration_refused tenant=%s path=%s",
-                getattr(connection.tenant, "schema_name", "?"),
+                connection.tenant.schema_name,
                 request.path,
             )
             raise SelfRegistrationDisabled(
@@ -85,7 +85,7 @@ class RequiresStepUp(BasePermission):
         # the caller is anonymous we have nothing to inspect. Return
         # False (not raise) so the upstream auth-required response
         # wins and clients don't confuse "log in" with "step up".
-        if not getattr(request, "user", None) or not request.user.is_authenticated:
+        if not request.user.is_authenticated:
             return False
 
         # ``request.auth is None`` means the caller is authenticated but
@@ -105,7 +105,7 @@ class RequiresStepUp(BasePermission):
             logger.info(
                 "step_up.required path=%s user=%s reason=missing_claim",
                 request.path,
-                getattr(request.user, "email", "-"),
+                request.user.email,
             )
             raise StepUpRequired(
                 "This action requires fresh authentication.",
@@ -117,7 +117,7 @@ class RequiresStepUp(BasePermission):
             logger.info(
                 "step_up.required path=%s user=%s reason=expired age=%ss",
                 request.path,
-                getattr(request.user, "email", "-"),
+                request.user.email,
                 elapsed,
             )
             raise StepUpRequired(

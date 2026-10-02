@@ -39,7 +39,7 @@ export default function EditUserRolesModal({
   useEffect(() => {
     if (user)
       form.setFieldsValue({
-        roles: [...(user.roles || [])] as Role[],
+        roles: [...user.roles] as Role[],
         reseller_id: user.reseller_id ?? null,
       });
   }, [user, form]);

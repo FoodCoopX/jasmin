@@ -260,9 +260,7 @@ class MemberService:
         return member
 
     @staticmethod
-    def _deactivate_linked_user(
-        member: Member, *, admin_user: JasminUser | None
-    ) -> None:
+    def _deactivate_linked_user(member: Member, *, admin_user: JasminUser) -> None:
         """Flip the linked JasminUser (if any) to ``inactive`` and
         cancel any open invitations.
 
@@ -278,7 +276,7 @@ class MemberService:
           * the user is already ``inactive`` (idempotent on repeat
             calls).
         """
-        user = getattr(member, "user", None)
+        user = member.user
         if user is None:
             return
         if user.account_status == "inactive":
@@ -311,7 +309,7 @@ class MemberService:
             member.id,
             user.id,
             previous_status,
-            getattr(admin_user, "id", None),
+            admin_user.id,
         )
 
     # --- Invitations -----------------------------------------------------

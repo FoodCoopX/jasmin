@@ -3,11 +3,7 @@ import { useCommissioningSharesList } from '@shared/api/generated/commissioning/
 import type { Share } from '@shared/api/generated/models';
 import dayjs from 'dayjs';
 
-// Extend Share to account for nested fields the API actually returns.
-// Share's generated type has `share_type_variation: string`, but the list
-// endpoint serializes it as a nested object; use `Omit` so the override wins.
-type ShareWithExtras = Omit<Share, "share_type_variation"> & {
-  share_type_variation: string | { id: string; [key: string]: unknown };
+type ShareWithExtras = Share & {
   [key: string]: unknown;
 };
 
@@ -114,17 +110,6 @@ export const useCurrentDays = (delivery_week?: number, year?: number) => {
     )].sort((a, b) => a - b);
   }, [currentDays, delivery_week]);
 
-  const uniqueShareTypeVariations = useMemo(() => {
-    const variationsMap = new Map<string, unknown>();
-    currentDays.forEach(share => {
-      const variation = share.share_type_variation;
-      if (variation && typeof variation === 'object' && 'id' in variation) {
-        variationsMap.set(variation.id, variation);
-      }
-    });
-    return Array.from(variationsMap.values());
-  }, [currentDays]);
-
   // Create lookup maps for activity-delivery relationships
   const dayLookupMaps = useMemo(() => {
     const packingToDelivery = new Map<number, Set<number>>();
@@ -198,7 +183,6 @@ export const useCurrentDays = (delivery_week?: number, year?: number) => {
     dayNumbersHarvesting,
     dayNumbersWashing,
     dayNumbersCleaning,
-    uniqueShareTypeVariations,
     dayLookupMaps,
     getRelatedDays,
     loading,

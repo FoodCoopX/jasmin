@@ -51,9 +51,9 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
     () =>
       deliveryStation
         ? {
-            fee_per_box_net: deliveryStation.fee_per_box_net ?? "0",
-            fee_per_month_net: deliveryStation.fee_per_month_net ?? "0",
-            fee_per_year_net: deliveryStation.fee_per_year_net ?? "0",
+            fee_per_box_net: deliveryStation.fee_per_box_net,
+            fee_per_month_net: deliveryStation.fee_per_month_net,
+            fee_per_year_net: deliveryStation.fee_per_year_net,
             fees_billing_period: deliveryStation.fees_billing_period ?? null,
           }
         : null,

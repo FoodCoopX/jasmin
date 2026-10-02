@@ -108,7 +108,7 @@ export const CancelMembershipModal: FC<CancelMembershipModalProps> = ({
             force,
           },
         );
-        const notEnded = result?.subscriptions_not_ended ?? [];
+        const notEnded = result.subscriptions_not_ended;
         if (notEnded.length > 0) {
           notify.warning(
             t("members.cancel_membership_partial_warning", {

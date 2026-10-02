@@ -143,7 +143,7 @@ const CONTEXTS: Record<
     prices: {
       tiers: 3,
       source: (unit, tier) =>
-        `net_price_for_orders_${RESELLER_ORDER_PRICE_SUFFIX[unit] ?? "kg"}_${tier}`,
+        `net_price_for_orders_${RESELLER_ORDER_PRICE_SUFFIX[unit]}_${tier}`,
       target: (tier) => `price_${tier}`,
     },
     // Reseller tables (Offer / Order / Invoice / DeliveryNote line items)
@@ -174,7 +174,6 @@ function buildAmountPatch(
 ): Record<string, unknown> {
   if (!unitKey) return {};
   const field = bindings.amountPerPu[unitKey];
-  if (!field) return {};
   const value = readField(article, field);
   if (value == null || value === "") return {};
   return { [bindings.amountPerPuFormKey]: value };

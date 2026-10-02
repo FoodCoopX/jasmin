@@ -51,10 +51,10 @@ def capture_tenant_email_context() -> dict:
     from apps.shared.tenant_urls import frontend_base_url, tenant_name
     from core.tenant_db import connection
 
-    tenant = getattr(connection, "tenant", None)
-    language = ((getattr(tenant, "tenant_language", "") or "").strip().lower())[:2]
-    iban = (getattr(tenant, "iban", "") or "") if tenant else ""
-    bic = (getattr(tenant, "sepa_creditor_bic", "") or "") if tenant else ""
+    tenant = connection.tenant
+    language = getattr(tenant, "tenant_language", "").strip().lower()[:2]
+    iban = getattr(tenant, "iban", "") or ""
+    bic = getattr(tenant, "sepa_creditor_bic", "")
     bank_details = " / ".join(part for part in [iban, bic] if part)
 
     return {
@@ -417,16 +417,13 @@ class EmailService:
         language = normalize_language(language)
         language_explicit = language is not None
         if language is None:
-            try:
-                from core.tenant_db import connection
+            from core.tenant_db import connection
 
-                tenant = getattr(connection, "tenant", None)
-                language = normalize_language(getattr(tenant, "tenant_language", None))
-            except (AttributeError, ValueError, TypeError):
-                # Tenant context missing / mis-shaped (test setup, public
-                # schema, ...). Any other exception is a real bug worth
-                # crashing on.
-                language = None
+            # Under ``schema_context`` (Huey tasks, management commands) the
+            # tenant is a FakeTenant without ``tenant_language``, which falls
+            # through to DEFAULT_LANGUAGE.
+            tenant = connection.tenant
+            language = normalize_language(getattr(tenant, "tenant_language", None))
         if language is None:
             language = DEFAULT_LANGUAGE
         return language, language_explicit
@@ -487,7 +484,7 @@ class EmailService:
         # The rendered subject must fit EmailLog.subject / EmailTemplate.subject
         # (CharField max_length=512). Truncate + warn rather than let the DB
         # silently cut it, which would corrupt the audit trail with no signal.
-        if subject and len(subject) > _SUBJECT_MAX_LENGTH:
+        if len(subject) > _SUBJECT_MAX_LENGTH:
             logger.warning(
                 "Email subject truncated to %d chars (slug=%r)",
                 _SUBJECT_MAX_LENGTH,
@@ -572,7 +569,7 @@ class EmailService:
                     recipient=addr,
                     subject=subject,
                     template=log_template_name,
-                    purpose=purpose or (slug or ""),
+                    purpose=purpose or slug,
                     related_object_type=related_object_type,
                     related_object_id=related_object_id,
                     provider_message_id=message_id,

@@ -214,7 +214,7 @@ axiosInstance.interceptors.response.use(
       originalRequest._stepUpRetry = true;
       try {
         // ``details`` is a free-form record — narrow the TTL before use.
-        const ttlSeconds = error.response?.data?.details?.ttl_seconds;
+        const ttlSeconds = error.response.data.details?.ttl_seconds;
         const access = await runStepUpFlow({
           ttlSeconds: typeof ttlSeconds === "number" ? ttlSeconds : 300,
         });

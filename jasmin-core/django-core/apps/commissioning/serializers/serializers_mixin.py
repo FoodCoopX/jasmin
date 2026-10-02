@@ -67,12 +67,12 @@ def mask_capacity_for_anonymous(
     ``internal_fields`` are removed. No-op for authenticated requests —
     office/member keep the exact numbers.
     """
-    if request is None or getattr(request.user, "is_authenticated", False):
+    if request is None or request.user.is_authenticated:
         return
     capacity_by_week = data.get("capacity_by_week")
     if isinstance(capacity_by_week, dict):
         data["capacity_by_week"] = {
-            key: {"occupied": 0, "free": 99 if (entry or {}).get("free", 0) > 0 else 0}
+            key: {"occupied": 0, "free": 99 if entry["free"] > 0 else 0}
             for key, entry in capacity_by_week.items()
         }
     data["capacity"] = None
@@ -222,8 +222,6 @@ class MemberStringFieldMixin:
 
     @staticmethod
     def _format_member_string(member) -> str:
-        if member is None:
-            return ""
         first = member.first_name or ""
         last = member.last_name or ""
         if member.member_number is not None:
@@ -248,8 +246,6 @@ class ShareTypeVariationStringMixin:
 
     @staticmethod
     def _format_variation_string(variation) -> str:
-        if variation is None:
-            return ""
         return f"{variation.share_type.name} - {variation.size}"
 
     def get_share_type_variation_string(self, obj) -> str:
@@ -373,8 +369,7 @@ class CreatedByNameMixin:
         user = obj.created_by
         if not user:
             return None
-        full_name = (getattr(user, "get_full_name", lambda: "")() or "").strip()
-        return full_name or getattr(user, "username", None) or str(user)
+        return user.get_full_name() or user.username
 
 
 class ShareArticleResolutionMixin:
@@ -402,14 +397,14 @@ class ShareArticleResolutionMixin:
         """Get share article name from direct relation or through offer."""
         if obj.share_article:
             return obj.share_article.name
-        if obj.offer and obj.offer.share_article:
+        if obj.offer:
             return obj.offer.share_article.name
         return None
 
     def get_organic_status(self, obj) -> str | None:
         if obj.share_article:
             return obj.share_article.organic_status
-        if obj.offer and obj.offer.share_article:
+        if obj.offer:
             return obj.offer.share_article.organic_status
         return None
 
@@ -558,7 +553,7 @@ class DifferenceTrackingMixin:
         the original delivery-note row is misleading.
         """
         invoice = getattr(obj, "invoice", None)
-        if invoice and getattr(invoice, "document_type", "") in (
+        if invoice and invoice.document_type in (
             "storno",
             "correction",
         ):

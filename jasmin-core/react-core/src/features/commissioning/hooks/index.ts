@@ -24,7 +24,6 @@ export { usePlanningAxes } from './usePlanningAxes';
 export type { PlanningAxes, UsePlanningAxesParams } from './usePlanningAxes';
 export { useShareOptions } from './useShareOptions';
 export { useShareTypeVariations } from './useShareTypeVariations';
-export { useShareTypeVariationsAmounts } from './useShareTypeVariationsAmounts';
 export { useStorages } from './useStorages';
 // columns
 export { useAmountUnitSizeColumns } from './columns/useAmountUnitSizeColumns';

@@ -73,17 +73,13 @@ def _invoice_to_dict(invoice) -> dict[str, Any]:
     """Flatten an ``InvoiceReseller`` into the template/registry shape the
     ``commissioning.invoice_reminder`` template expects: ``number``,
     ``total``, ``issue_date``, ``due_date``, ``days_overdue``."""
-    issue_date = getattr(invoice, "date", None)
-    due_date = getattr(invoice, "due_date", None)
+    issue_date = invoice.date
+    due_date = invoice.due_date
     today = timezone.localdate()
     days_overdue = (today - due_date).days if due_date and today > due_date else 0
-    try:
-        total = f"{invoice.sum_brutto:.2f}"
-    except (AttributeError, TypeError):
-        total = ""
     return {
         "number": invoice.full_number,
-        "total": total,
+        "total": f"{invoice.sum_brutto:.2f}",
         "issue_date": issue_date.isoformat() if issue_date else "",
         "due_date": due_date.isoformat() if due_date else "",
         "days_overdue": days_overdue,
@@ -182,7 +178,7 @@ def bulk_send_invoice_reminders(
                 )
                 continue
             reseller = order.reseller
-            if not reseller or not reseller.invoice_email:
+            if not reseller.invoice_email:
                 errors.append(
                     format_order_error(order, "No email address found for reseller")
                 )
@@ -279,7 +275,7 @@ def bulk_send_invoice_reminders(
                 },
                 language=ctx["tenant_language"] or None,
                 related_object_type="reseller",
-                related_object_id=str(getattr(reseller, "id", "") or ""),
+                related_object_id=str(reseller.id),
             )
         except (DatabaseError, ValueError, TypeError, AttributeError) as exc:
             for order, _inv in invoices_with_orders:

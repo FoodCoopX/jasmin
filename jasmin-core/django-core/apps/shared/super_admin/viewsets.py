@@ -66,7 +66,7 @@ from .errors import (
     UserEmailExists,
 )
 from .models import OpsChecklistItem, OpsChecklistRun
-from .permissions import IsSuperAdmin
+from .permissions import IsSuperAdmin, super_admin_user
 from .query_params import PARAM_CATALOGUE, validate_query_params
 from .serializers import (
     CreateTenantAdminRequestSerializer,
@@ -163,7 +163,7 @@ class TenantManagementViewSet(ViewSet):
         # high-blast-radius mutation a stolen session must not fire un-confirmed;
         # name/description edits via partial_update stay ungated.
         elif self.action == "partial_update" and "is_active" in (
-            getattr(self.request, "data", None) or {}
+            self.request.data or {}
         ):
             perms.append(RequiresStepUp())
         return perms
@@ -330,7 +330,7 @@ class TenantManagementViewSet(ViewSet):
             # to DRF's exception handler.
             logger.error(
                 "tenant.create_failed actor=%s schema=%s ip=%s error=%s",
-                getattr(request.user, "id", "-"),
+                request.user.id,
                 schema_name,
                 client_ip(request),
                 exc,
@@ -343,7 +343,7 @@ class TenantManagementViewSet(ViewSet):
         tenant = result["tenant"]
         logger.info(
             "tenant.created actor=%s schema=%s domain=%s admin_email=%s ip=%s",
-            getattr(request.user, "id", "-"),
+            request.user.id,
             tenant.schema_name,
             domain,
             admin_email,
@@ -436,7 +436,7 @@ class TenantManagementViewSet(ViewSet):
 
                 logger.info(
                     "tenant.updated actor=%s schema=%s ip=%s fields=%s",
-                    getattr(request.user, "id", "-"),
+                    request.user.id,
                     tenant.schema_name,
                     client_ip(request),
                     sorted(
@@ -622,7 +622,7 @@ class TenantManagementViewSet(ViewSet):
                 logger.info(
                     "tenant.admin_created actor=%s tenant=%s target_user=%s "
                     "target_email=%s ip=%s",
-                    getattr(request.user, "id", "-"),
+                    request.user.id,
                     tenant.schema_name,
                     user.id,
                     email,
@@ -736,7 +736,7 @@ class TenantManagementViewSet(ViewSet):
                 logger.info(
                     "tenant.user_created actor=%s tenant=%s target_user=%s "
                     "target_email=%s roles=%s ip=%s",
-                    getattr(request.user, "id", "-"),
+                    request.user.id,
                     tenant.schema_name,
                     user.id,
                     email,
@@ -748,7 +748,7 @@ class TenantManagementViewSet(ViewSet):
                     {
                         "id": user.id,
                         "email": user.email,
-                        "roles": user.roles or [],
+                        "roles": user.roles,
                         "reseller_id": linked_reseller_id,
                         "message": f"User created for tenant '{tenant.name}'",
                     },
@@ -856,7 +856,7 @@ class TenantManagementViewSet(ViewSet):
                 logger.info(
                     "user.roles_changed actor=%s tenant=%s target_user=%s "
                     "target_email=%s before=%s after=%s ip=%s",
-                    getattr(request.user, "id", "-"),
+                    request.user.id,
                     tenant.schema_name,
                     user.id,
                     user.email,
@@ -1032,15 +1032,16 @@ class OpsChecklistViewSet(ViewSet):
         serializer = OpsChecklistMarkDoneRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         notes = serializer.validated_data["notes"].strip()
+        actor = super_admin_user(request)
         run = OpsChecklistRun.objects.create(
             item=item,
-            completed_by=request.user if request.user.is_authenticated else None,
+            completed_by=actor,
             notes=notes,
         )
         logger.info(
             "ops.checklist.marked_done item=%s actor=%s run=%s",
             item.kind,
-            getattr(request.user, "email", "?"),
+            actor.email,
             run.id,
         )
         item.refresh_from_db()
@@ -1110,7 +1111,7 @@ class OpsChecklistViewSet(ViewSet):
         logger.info(
             "ops.rotation.executed kind=%s actor=%s dry_run=%s items_affected=%s",
             item.kind,
-            getattr(request.user, "email", "?"),
+            super_admin_user(request).email,
             dry_run,
             result.items_affected,
         )
