@@ -2,7 +2,7 @@
 # Managed by scripts/mypy_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/mypy_baseline.py freeze
-# 348 finding(s).
+# 346 finding(s).
 
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
@@ -198,8 +198,6 @@ apps/commissioning/services/theoretical_objects.py: "type" has no attribute "obj
 apps/commissioning/services/theoretical_objects.py: Argument 1 to "add" of "set" has incompatible type "str | None"; expected "str"  [arg-type]
 apps/commissioning/services/theoretical_objects.py: Argument 1 to "get" of "dict" has incompatible type "str | None"; expected "str"  [arg-type]
 apps/commissioning/services/theoretical_objects.py: Set comprehension has incompatible type Set[str | None]; expected Set[str]  [misc]
-apps/commissioning/services/theoretical_objects.py: Unsupported operand types for - ("None" and "Decimal")  [operator]
-apps/commissioning/services/theoretical_objects.py: Unsupported operand types for - ("None" and "Literal[0]")  [operator]
 apps/commissioning/services/variation_capacity_service.py: Need type annotation for "paused_weeks"  [var-annotated]
 apps/commissioning/utils/capacity_window.py: Unsupported operand types for - ("None" and "int")  [operator]
 apps/commissioning/utils/composite_id_utils.py: "type[Model]" has no attribute "objects"  [attr-defined]

@@ -395,7 +395,6 @@ class MemberService:
             first_name=member.first_name or "",
             last_name=member.last_name or "",
             roles=[Role.MEMBER],
-            user_language=getattr(member, "preferred_language", None),
             member=member,
             created_by=admin_user,
             email_category=EmailCategory.MEMBER_LIFECYCLE,

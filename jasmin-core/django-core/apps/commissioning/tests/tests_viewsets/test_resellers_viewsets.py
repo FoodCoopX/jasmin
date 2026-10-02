@@ -992,6 +992,33 @@ class TestCommissioningListResellersViewSet:
         assert resp.status_code == status.HTTP_200_OK
         assert len(resp.data) >= 1
 
+    @pytest.mark.parametrize(
+        "contact, name",
+        [
+            ({"company_name": "Hofladen GmbH"}, "Hofladen GmbH"),
+            (
+                {"company_name": None, "first_name": "Anna", "last_name": "Beispiel"},
+                "Anna Beispiel",
+            ),
+            ({"company_name": None, "first_name": "", "last_name": ""}, ""),
+        ],
+    )
+    def test_names_the_reseller(self, api_client, tenant, contact, name):
+        reseller = ResellerFactory(
+            **{f"contact__{field}": value for field, value in contact.items()}
+        )
+        order = OrderFactory(
+            reseller=reseller, year=2026, delivery_week=20, day_number=3
+        )
+        OrderContentFactory(order=order)
+
+        resp = api_client.get(
+            self.URL, {"year": 2026, "delivery_week": 20, "day_number": 3}
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert [entry["name"] for entry in resp.data] == [name]
+
 
 # ---------------------------------------------------------------------------
 # CrateOrderContentViewSet — write-body validation

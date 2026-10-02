@@ -48,6 +48,7 @@ from apps.commissioning.tests.factories import (
 )
 from apps.shared.tenants.email_service import EmailService
 from apps.shared.tenants.models import TenantEmailConfig
+from core.tenant_db import connection
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -131,6 +132,30 @@ class TestInvoiceEmailContextTotal:
         ctx = InvoiceService._build_invoice_email_context(invoice)
         assert ctx["invoice"]["total"] == f"{invoice.sum_brutto:.2f}"
         assert ctx["invoice"]["total"] != ""
+
+
+@pytest.mark.django_db
+class TestInvoiceEmailContextNames:
+    def test_bank_details_carry_the_iban_and_the_creditor_bic(
+        self, tenant, monkeypatch
+    ):
+        monkeypatch.setattr(connection.tenant, "iban", "DE89370400440532013000")
+        monkeypatch.setattr(connection.tenant, "sepa_creditor_bic", "COBADEFFXXX")
+        invoice = InvoiceResellerFactory()
+
+        ctx = InvoiceService._build_invoice_email_context(invoice)
+
+        assert ctx["tenant"]["bank_details"] == ("DE89370400440532013000 / COBADEFFXXX")
+
+    def test_a_reseller_without_any_name_is_greeted_without_one(self, tenant):
+        reseller = ResellerFactory(
+            contact__company_name="", contact__first_name="", contact__last_name=""
+        )
+        invoice = InvoiceResellerFactory(reseller=reseller)
+
+        ctx = InvoiceService._build_invoice_email_context(invoice)
+
+        assert ctx["reseller"]["name"] == ""
 
 
 @pytest.mark.django_db

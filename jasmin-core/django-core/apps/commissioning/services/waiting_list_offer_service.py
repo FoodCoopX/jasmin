@@ -42,7 +42,7 @@ from ..errors import (
     WaitingListOfferInvalid,
     WaitingListOfferNotAvailable,
 )
-from ..models import Subscription
+from ..models import DeliveryStationDay, Subscription
 from .capacity_reservation_service import CapacityReservationService
 from .solidarity_pricing import assert_price_meets_solidarity_floor
 from .variation_capacity_service import VariationCapacityService
@@ -72,6 +72,16 @@ def offer_price_fits_column(amount: Decimal) -> bool:
         max_digits=field.max_digits,
         decimal_places=field.decimal_places,
     )
+
+
+def offer_station_name(station_day: DeliveryStationDay | None) -> str:
+    """The pick-up station as a waiting-list offer names it: by its contact,
+    else by its short name; "" without a station-day."""
+    if station_day is None:
+        return ""
+    station = station_day.delivery_station
+    contact_name = station.contact.name if station.contact else None
+    return contact_name or station.short_name or ""
 
 
 class WaitingListOfferService:
@@ -289,11 +299,7 @@ class WaitingListOfferService:
                 "email": getattr(member, "email", "") or "",
             },
             "variation_name": getattr(share_type, "name", "") or "",
-            "delivery_station_name": (
-                getattr(station_day, "delivery_station_short_name", "") or ""
-                if station_day
-                else ""
-            ),
+            "delivery_station_name": offer_station_name(station_day),
             "valid_from": (
                 subscription.valid_from.strftime("%d.%m.%Y")
                 if subscription.valid_from
@@ -320,7 +326,8 @@ class WaitingListOfferService:
             context=context,
             related_object_type="subscription",
             related_object_id=str(subscription.pk),
-            language=getattr(member, "preferred_language", None) or None,
+            # The linked user's language, else the tenant's.
+            language=(member.user.user_language or None) if member.user_id else None,
             logger=logger,
             log_error_event="waiting_list_offer.email_failed",
             log_not_sent_event="waiting_list_offer.email_not_sent",

@@ -85,11 +85,13 @@ vi.mock("@shared/ui", () => ({
 
 import { useAbosColumns } from "../columns/useAbosColumns";
 
-function renderColumns() {
+function renderColumns(
+  paymentCycles: { value: string; label: string }[] = [],
+) {
   return renderHook(() =>
     useAbosColumns({
       members: [],
-      paymentCycles: [],
+      paymentCycles,
       allShareTypeVariations: [],
       variationDeliveryCycleById: new Map(),
       getDeliveryStationDaysForRow: () => [],
@@ -124,5 +126,34 @@ describe("useAbosColumns start-date rule", () => {
     renderColumns();
 
     expect(hookState.termOptions).toEqual({ allowPastStart: true });
+  });
+});
+
+describe("useAbosColumns payment cycle", () => {
+  function paymentCycleDisabled(cycleCount: number) {
+    const cycles = Array.from({ length: cycleCount }, (_, index) => ({
+      value: `cycle-${index}`,
+      label: `Cycle ${index}`,
+    }));
+    const column = renderColumns(cycles).result.current.columns.find(
+      (candidate: { key?: unknown }) => candidate.key === "payment_cycle_name",
+    );
+    return column?.disabled as (record: Record<string, unknown>) => boolean;
+  }
+
+  it("is fixed on a saved abo when only one cycle is allowed", () => {
+    const disabled = paymentCycleDisabled(1);
+
+    expect(disabled({ key: "abo-1", admin_confirmed: false })).toBe(true);
+    // The new row still picks it: it has no stored cycle to save.
+    expect(disabled({ key: -1 })).toBe(false);
+  });
+
+  it("stays editable with several cycles until the abo is confirmed", () => {
+    const disabled = paymentCycleDisabled(2);
+
+    expect(disabled({ key: "abo-1", admin_confirmed: false })).toBe(false);
+    expect(disabled({ key: "abo-1", admin_confirmed: true })).toBe(true);
+    expect(disabled({ key: -1 })).toBe(false);
   });
 });

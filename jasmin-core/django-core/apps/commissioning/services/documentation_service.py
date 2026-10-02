@@ -37,6 +37,13 @@ _MODEL_REGISTRY: dict[type[models.Model], str] = {
     Waste: "waste",
 }
 
+# The movement type each source FK writes.
+_MOVEMENT_TYPE_BY_FK: dict[str, str] = {
+    "harvest": MovementTypeOptions.HARVEST,
+    "purchase": MovementTypeOptions.PURCHASE,
+    "waste": MovementTypeOptions.WASTE,
+}
+
 
 class GenericDocumentationService:
     """Service for Harvest / Purchase / Waste CRUD with automatic Movement creation."""
@@ -169,6 +176,17 @@ class GenericDocumentationService:
     _CORRECTION_TYPES: set[str] = {"harvest", "purchase"}
 
     @staticmethod
+    def movement_day_number(day_number: int | None, movement_type: str) -> int:
+        """The weekday a movement is dated on. The office records purchases per
+        week, without one: a purchase lands on ``PURCHASE_DAY`` with its planned
+        purchase, so the two net. Anything else without a weekday is dated
+        Monday.
+        """
+        if day_number is not None:
+            return day_number
+        return PURCHASE_DAY if movement_type == MovementTypeOptions.PURCHASE else 0
+
+    @staticmethod
     def _movement_kwargs(instance: DocumentationModel) -> dict[str, Any]:
         """Return the common fields for creating a ``MovementShareArticle``.
 
@@ -176,6 +194,8 @@ class GenericDocumentationService:
         as a *correction* against existing theoretical movements:
           ``counted_amount`` = the actual number entered by the user
           ``amount`` = counted_amount − Σ(theoretical movements for same dimension)
+        (``_create_movement`` then re-nets the day's corrections, so the day's
+        theoretical is subtracted from only one of them.)
 
         For Waste the amount is always negated and used directly.
         """
@@ -183,15 +203,10 @@ class GenericDocumentationService:
         if fk_field is None:
             raise ValueError(f"Unsupported model: {type(instance).__name__}")
 
-        # Purchase model has no `day_number` field — default to PURCHASE_DAY
-        day_number: int | None = getattr(instance, "day_number", PURCHASE_DAY)
-
-        movement_type_map: dict[str, str] = {
-            "harvest": MovementTypeOptions.HARVEST,
-            "purchase": MovementTypeOptions.PURCHASE,
-            "waste": MovementTypeOptions.WASTE,
-        }
-        mtype = movement_type_map[fk_field]
+        mtype = _MOVEMENT_TYPE_BY_FK[fk_field]
+        day_number = GenericDocumentationService.movement_day_number(
+            instance.day_number, mtype
+        )
 
         base = {
             "date": GenericDocumentationService._movement_datetime(
@@ -308,13 +323,33 @@ class GenericDocumentationService:
 
         kwargs = GenericDocumentationService._movement_kwargs(instance)
         movement = MovementShareArticle.objects.create(**kwargs)
-        SnapshotService.cascade_for_movements([movement])
+        corrected: list[MovementShareArticle] = []
+        if movement.counted_amount is not None:
+            from .theoretical_objects import recalculate_actual_corrections
+
+            # Another correction of the day may have carried its theoretical
+            # so far, and this one may take it over.
+            recalculate_actual_corrections([movement], collect_movements=corrected)
+            movement.refresh_from_db(fields=["amount"])
+        SnapshotService.cascade_for_movements([movement, *corrected])
         return movement
 
     @staticmethod
     @transaction.atomic
     def _upsert_movement(instance: DocumentationModel) -> MovementShareArticle | None:
-        """Delete the existing movement (if any) and recreate it from current data."""
+        """Delete the existing movement (if any) and recreate it from current data.
+
+        The day the old correction leaves is re-netted, as it may have carried
+        that day's theoretical. A purchase without a weekday also has the
+        movements of its additional planned amounts re-synced, so they stay on
+        its day.
+        """
+        from .theoretical_objects import (
+            correction_dimension,
+            lock_theoretical_sums,
+            recalculate_actual_corrections,
+        )
+
         fk_field = _MODEL_REGISTRY.get(type(instance))
         if fk_field is None:
             raise ValueError(f"Unsupported model: {type(instance).__name__}")
@@ -324,13 +359,69 @@ class GenericDocumentationService:
         old_movements = list(
             MovementShareArticle.objects.filter(**{fk_field: instance})
         )
+        old_corrections = [m for m in old_movements if m.counted_amount is not None]
+        dimensions = {correction_dimension(m) for m in old_corrections}
+        if fk_field in GenericDocumentationService._CORRECTION_TYPES:
+            dimensions.add(
+                (
+                    str(instance.share_article_id),
+                    instance.unit,
+                    instance.size,
+                    str(instance.storage_id) if instance.storage_id else None,
+                    _MOVEMENT_TYPE_BY_FK[fk_field],
+                )
+            )
+        lock_theoretical_sums(dimensions)
 
         MovementShareArticle.objects.filter(**{fk_field: instance}).delete()
+
+        if isinstance(instance, Purchase) and instance.day_number is None:
+            GenericDocumentationService._resync_additional_purchases(instance)
 
         # _create_movement may return None for placeholder Harvest/Purchase.
         new_movement = GenericDocumentationService._create_movement(instance)
 
         if old_movements:
-            SnapshotService.cascade_for_movements(old_movements)
+            corrected: list[MovementShareArticle] = []
+            if old_corrections:
+                recalculate_actual_corrections(
+                    old_corrections, collect_movements=corrected
+                )
+            SnapshotService.cascade_for_movements([*old_movements, *corrected])
 
         return new_movement
+
+    @staticmethod
+    def _resync_additional_purchases(instance: Purchase) -> None:
+        """Re-sync the movements of the purchase's additional planned amounts
+        (``AdditionalTheoreticalPurchase`` rows with its key, its seller and no
+        weekday either), so they are dated on its day."""
+        from ..models import AdditionalTheoreticalPurchase
+        from .documentation_summary_service import DocumentationSummaryService
+
+        additional_entries = AdditionalTheoreticalPurchase.objects.filter(
+            year=instance.year,
+            delivery_week=instance.delivery_week,
+            day_number__isnull=True,
+            share_article_id=instance.share_article_id,
+            unit=instance.unit,
+            size=instance.size,
+            storage_id=instance.storage_id,
+            seller_id=instance.seller_id,
+        )
+        for additional_entry in additional_entries:
+            DocumentationSummaryService._sync_additional_movement(
+                additional_entry,
+                additional_entry.amount,
+                {
+                    "year": additional_entry.year,
+                    "delivery_week": additional_entry.delivery_week,
+                    "day_number": None,
+                    "unit": additional_entry.unit,
+                    "size": additional_entry.size,
+                },
+                additional_entry.share_article,
+                additional_entry.storage,
+                "additional_theoretical_purchase",
+                MovementTypeOptions.PURCHASE,
+            )

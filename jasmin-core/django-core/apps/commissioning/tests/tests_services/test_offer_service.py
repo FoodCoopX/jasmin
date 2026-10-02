@@ -816,6 +816,60 @@ class TestBulkSendOffersViaEmailContext:
         )
 
 
+@pytest.mark.django_db
+class TestBulkSendOffersToANamelessReseller:
+    EMAIL_CTX = {
+        "tenant_name": "Test Coop",
+        "tenant_language": "de",
+        "bank_details": "",
+        "frontend_base_url": "https://test.example.org",
+    }
+
+    def test_the_email_greets_without_a_name(self, tenant):
+        offer_group = OfferGroupFactory()
+        reseller = ResellerFactory(
+            offer_group=offer_group,
+            contact__company_name="",
+            contact__first_name="",
+            contact__last_name="",
+        )
+        OfferFactory(year=2026, delivery_week=15, offer_group=offer_group)
+
+        with mock.patch(
+            "apps.shared.tenants.email_service.EmailService.send_email",
+            autospec=True,
+            return_value=True,
+        ) as send_email:
+            OfferService.bulk_send_offers_via_email(
+                reseller_ids=[str(reseller.id)],
+                year=2026,
+                delivery_week=15,
+                offer_group=offer_group,
+                email_ctx=self.EMAIL_CTX,
+            )
+
+        assert send_email.call_args.kwargs["context"]["reseller"] == {"name": ""}
+
+    def test_the_results_name_it_unknown(self, tenant):
+        offer_group = OfferGroupFactory()
+        reseller = ResellerFactory(
+            offer_group=offer_group,
+            contact__company_name="",
+            contact__first_name="",
+            contact__last_name="",
+        )
+
+        result = OfferService.bulk_send_offers_via_email(
+            reseller_ids=[str(reseller.id)],
+            year=2026,
+            delivery_week=15,
+            offer_group=offer_group,
+            email_ctx=self.EMAIL_CTX,
+        )
+
+        assert [entry["reseller_name"] for entry in result["results"]] == ["Unknown"]
+
+
 # ---------------------------------------------------------------------------
 # bulk_send_offers_via_email — progress denominator reconciliation
 # ---------------------------------------------------------------------------

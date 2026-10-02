@@ -2,7 +2,7 @@
 # Managed by scripts/ruff_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/ruff_baseline.py freeze
-# 200 finding(s).
+# 199 finding(s).
 
 apps/accounts/backends.py: N806 Variable `UserModel` in function should be lowercase
 apps/accounts/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
@@ -118,7 +118,6 @@ apps/commissioning/services/statistics.py: PLR0915 Too many statements (63 > 50)
 apps/commissioning/services/stock_service.py: C901 `get_theoretical_current_stock` is too complex (11 > 10)
 apps/commissioning/services/theoretical_objects.py: C901 `_create_theoretical_movements` is too complex (16 > 10)
 apps/commissioning/services/theoretical_objects.py: C901 `create_theoretical_objects` is too complex (21 > 10)
-apps/commissioning/services/theoretical_objects.py: C901 `recalculate_actual_corrections` is too complex (11 > 10)
 apps/commissioning/services/theoretical_objects.py: PLR0913 Too many arguments in function definition (22 > 5)
 apps/commissioning/services/theoretical_objects.py: PLR0915 Too many statements (56 > 50)
 apps/commissioning/tasks.py: PLR0913 Too many arguments in function definition (7 > 5)

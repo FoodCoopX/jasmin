@@ -34,6 +34,7 @@ from apps.accounts.errors import (
     TwoFactorNotEnrolled,
 )
 from apps.accounts.services import two_factor_service
+from apps.accounts.services.step_up_service import verify_and_issue_step_up_token
 from apps.commissioning.tests.factories import JasminUserFactory
 
 pytestmark = pytest.mark.django_db
@@ -542,3 +543,60 @@ class TestTwoFactorCodeEndpointValidation:
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
         assert resp.data["code"] == "validation_error"
         assert "code" in resp.data["details"]
+
+
+# --------------------------------------------------------------------------- #
+# Step-up with STEP_UP_REQUIRES_TOTP                                           #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.django_db
+class TestStepUpWithTotp:
+    PASSWORD = "Step!Up42xyz"
+
+    @pytest.fixture(autouse=True)
+    def _requires_totp(self, settings):
+        settings.STEP_UP_REQUIRES_TOTP = True
+
+    def _user(self):
+        user = JasminUserFactory()
+        _set_password(user, self.PASSWORD)
+        return user
+
+    def _step_up(self, user, totp_code):
+        return verify_and_issue_step_up_token(
+            user=user,
+            password=self.PASSWORD,
+            totp_code=totp_code,
+            current_access_payload=None,
+        )
+
+    def test_a_valid_code_issues_the_token(self, tenant):
+        user = self._user()
+        device = _enrol(user)
+
+        assert self._step_up(user, _current_totp(device))
+
+    @pytest.mark.parametrize("wrong", [False, True], ids=["missing", "wrong"])
+    def test_a_missing_or_wrong_code_is_logged_and_refused(self, tenant, wrong):
+        user = self._user()
+        device = _enrol(user)
+        # Every digit shifted: not this window's code.
+        code = (
+            "".join(str((int(d) + 5) % 10) for d in _current_totp(device))
+            if wrong
+            else None
+        )
+
+        with (
+            patch("apps.accounts.services.step_up_service.logger") as logger,
+            pytest.raises(TwoFactorInvalidCode),
+        ):
+            self._step_up(user, code)
+
+        logger.warning.assert_called_once_with(
+            "step_up.verify_failed user=%s reason=totp", user.email
+        )
+
+    def test_without_an_active_device_the_password_is_enough(self, tenant):
+        assert self._step_up(self._user(), None)

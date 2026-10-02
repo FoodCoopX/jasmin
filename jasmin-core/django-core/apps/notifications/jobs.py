@@ -25,7 +25,7 @@ from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
-from django_tenants.utils import schema_context
+from django_tenants.utils import get_public_schema_name, schema_context
 
 from core.tenant_db import connection
 
@@ -81,14 +81,15 @@ def enqueue_job(
 
 
 def _current_schema_name() -> str:
-    tenant = getattr(connection, "tenant", None)
-    name = getattr(tenant, "schema_name", None)
-    if not name:
+    # Outside a tenant, django-tenants is on the public schema, which has no
+    # ``BackgroundJob`` table: there is always a schema name.
+    schema_name = connection.schema_name
+    if schema_name == get_public_schema_name():
         raise RuntimeError(
             "enqueue_job called outside a tenant schema — "
             "wrap the caller in schema_context()."
         )
-    return name
+    return schema_name
 
 
 def mark_running(job_id: str) -> None:

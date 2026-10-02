@@ -1,20 +1,23 @@
-// Forecast is a heavy page with a TWO-PHASE gated render: ~10 hooks compose an
-// ``isComponentReady`` gate, and the main forecast list query is only enabled
-// once five gating queries (share options, share articles, plots, offer groups,
-// share-type variations + their derived columns) have resolved. Until the gate
-// opens the page renders an empty placeholder div — so this test mocks every
-// gating hook to return RESOLVED, non-undefined data synchronously, then asserts
-// the page mounts past the gate (the stubbed EditableTable testid is the anchor)
-// and doesn't re-render in a loop. We mock the API boundary + every heavy child
-// rather than going through MSW.
+// Forecast is a heavy page whose table columns are built from the share-type
+// variations, offer groups and plots: the forecast list query waits until those
+// have loaded, and the table shows its loading state meanwhile. This test mocks
+// every hook to return resolved data synchronously (or, in one case, the
+// variations still loading), asserts what the page renders and that it doesn't
+// re-render in a loop. We mock the API boundary + every heavy child rather than
+// going through MSW.
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { profileRenders, flushMicrotasks } from "@/test/profileRenders";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
+
+const pageState = vi.hoisted(() => ({
+  variationsLoading: false,
+  listEnabled: [] as unknown[],
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -27,9 +30,8 @@ vi.mock("react-i18next", () => ({
 }));
 
 // The generated API boundary. Forecast imports five operation fns + the
-// query-key helper + the list hook. The list hook is gated behind
-// ``isComponentReady`` but we still return a fully-resolved (non-undefined)
-// shape so the page never sits in a loading state.
+// query-key helper + the list hook. The list hook records whether the page
+// enabled it, and returns a fully-resolved shape.
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   commissioningBulkFinalizeCreate: vi.fn().mockResolvedValue({}),
   commissioningForecastBulkCopyToNextWeekCreate: vi.fn().mockResolvedValue({}),
@@ -37,13 +39,19 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   commissioningForecastDestroy: vi.fn().mockResolvedValue({}),
   commissioningForecastPartialUpdate: vi.fn().mockResolvedValue({}),
   getCommissioningForecastListQueryKey: () => ["forecast-list"],
-  useCommissioningForecastList: () => ({
-    data: [],
-    isLoading: false,
-    isFetching: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useCommissioningForecastList: (
+    _params: unknown,
+    options?: { query?: { enabled?: boolean } },
+  ) => {
+    pageState.listEnabled.push(options?.query?.enabled);
+    return {
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  },
 }));
 
 // The models module is type-only for ``Forecast`` / ``CommissioningForecastListParams``
@@ -89,16 +97,20 @@ vi.mock("@hooks/index", async () => {
   };
 });
 
-// Commissioning feature hooks — the GATING hooks. Every one must resolve to a
-// non-undefined value (and ``amountUnitSizeColumns`` must be a NON-EMPTY array)
-// or ``isComponentReady`` never flips and the page stays an empty div.
+// Commissioning feature hooks. The variations, offer groups and plots report
+// ``loading``: while any of them loads, the forecast rows wait.
 vi.mock("@features/commissioning/hooks", () => ({
   useShareArticles: () => ({ shareArticles: [], refetch: vi.fn() }),
-  usePlots: () => ({ plots: [], countPlots: 0 }),
-  useOfferGroups: () => ({ offerGroups: [], offerGroupsCount: 0 }),
+  usePlots: () => ({ plots: [], countPlots: 0, loading: false }),
+  useOfferGroups: () => ({
+    offerGroups: [],
+    offerGroupsCount: 0,
+    loading: false,
+  }),
   useShareTypeVariations: () => ({
     shareTypeVariations: [],
     shareTypeVariationsCount: 0,
+    loading: pageState.variationsLoading,
   }),
   useFinalColumn: () => ({
     finalColumn: { title: "final", dataIndex: "is_finalized", key: "final" },
@@ -132,7 +144,9 @@ vi.mock("@shared/contexts/AuthContext", () => ({
 // module as plain passthroughs so the page's ``gatedByPermission`` /
 // ``wrapApiFunctions`` calls don't blow up.
 vi.mock("@shared/tables", () => ({
-  EditableTable: () => <div data-testid="editable-table" />,
+  EditableTable: ({ loading }: { loading?: boolean }) => (
+    <div data-testid="editable-table" data-loading={String(Boolean(loading))} />
+  ),
   gatedByPermission: (canEdit: boolean) => ({ canEdit }),
   wrapApiFunctions: (fns: unknown) => fns,
 }));
@@ -142,7 +156,7 @@ vi.mock("@shared/selectors", () => ({
   WeekSelector: () => <div data-testid="week-selector" />,
 }));
 
-// Shared UI widgets used past the gate.
+// Shared UI widgets on the page.
 vi.mock("@shared/ui", () => ({
   BulkActionButton: () => <div data-testid="bulk-action-button" />,
   ExplainerText: ({ children }: { children?: React.ReactNode }) => (
@@ -183,8 +197,13 @@ function makeQueryClient() {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+beforeEach(() => {
+  pageState.variationsLoading = false;
+  pageState.listEnabled = [];
+});
+
 describe("Forecast (smoke)", () => {
-  it("renders without crashing once the gating data resolves", async () => {
+  it("renders without crashing once the column data resolves", async () => {
     const client = makeQueryClient();
 
     render(
@@ -193,20 +212,35 @@ describe("Forecast (smoke)", () => {
       </QueryClientProvider>,
     );
 
-    // The stubbed EditableTable only mounts AFTER the isComponentReady gate
-    // opens — it's the most reliable "past the gate" anchor.
-    expect(await screen.findByTestId("editable-table")).toBeInTheDocument();
+    const table = await screen.findByTestId("editable-table");
+    expect(table).toHaveAttribute("data-loading", "false");
+    expect(pageState.listEnabled.at(-1)).toBe(true);
     expect(screen.getByTestId("week-selector")).toBeInTheDocument();
     expect(
       screen.getByTestId("add-share-article-entry"),
     ).toBeInTheDocument();
   });
 
+  it("holds the rows back while the column data loads, page still shown", async () => {
+    pageState.variationsLoading = true;
+    const client = makeQueryClient();
+
+    render(
+      <QueryClientProvider client={client}>
+        <Forecast />
+      </QueryClientProvider>,
+    );
+
+    const table = await screen.findByTestId("editable-table");
+    expect(table).toHaveAttribute("data-loading", "true");
+    expect(pageState.listEnabled.at(-1)).toBe(false);
+    expect(screen.getByTestId("week-selector")).toBeInTheDocument();
+  });
+
   // Render-loop smoke test — Forecast composes ~10 hooks + builds a large memo'd
-  // column config gated behind isComponentReady. A healthy mount commits a
-  // handful of times (initial + the gate flipping + memo settling). 80 is a
-  // generous ceiling that still catches a real setState-in-render loop (which
-  // produces thousands of commits).
+  // column config. A healthy mount commits a handful of times (initial + memo
+  // settling). 80 is a generous ceiling that still catches a real
+  // setState-in-render loop (which produces thousands of commits).
   it("does not re-render in a loop on initial mount (Profiler smoke test)", async () => {
     const profiler = profileRenders();
     const client = makeQueryClient();

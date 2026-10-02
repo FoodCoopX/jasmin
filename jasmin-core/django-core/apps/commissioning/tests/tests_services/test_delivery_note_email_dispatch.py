@@ -78,6 +78,18 @@ def finalized_dn_with_pdf(reseller_with_email):
 
 
 @pytest.mark.django_db
+def test_a_reseller_without_any_name_is_greeted_without_one(tenant):
+    reseller = ResellerFactory(
+        contact__company_name="", contact__first_name="", contact__last_name=""
+    )
+    delivery_note = DeliveryNoteResellerFactory(order=OrderFactory(reseller=reseller))
+
+    ctx = DeliveryNoteService._build_delivery_note_email_context(delivery_note)
+
+    assert ctx["reseller"]["name"] == ""
+
+
+@pytest.mark.django_db
 class TestSendToReseller:
     def test_short_circuits_when_reseller_has_no_invoice_email(self, tenant):
         reseller = ResellerFactory(invoice_email=None)

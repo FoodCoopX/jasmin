@@ -192,8 +192,8 @@ class DeliveryNoteService:
         ``commissioning.delivery_note`` template."""
         from django.db import connection
 
-        reseller = delivery_note.order.reseller if delivery_note.order else None
-        reseller_name = reseller.contact.name if reseller and reseller.contact else ""
+        # ``name`` is None for a contact with no company, first or last name.
+        reseller_name = delivery_note.order.reseller.contact.name or ""
 
         tenant = getattr(connection, "tenant", None)
         tenant_name = getattr(tenant, "name", "") if tenant else ""

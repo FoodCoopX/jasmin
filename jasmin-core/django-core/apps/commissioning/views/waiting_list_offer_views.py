@@ -17,7 +17,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..errors import WaitingListOfferInvalid
-from ..services.waiting_list_offer_service import WaitingListOfferService
+from ..services.waiting_list_offer_service import (
+    WaitingListOfferService,
+    offer_station_name,
+)
 
 
 def _format_address(contact) -> str:
@@ -47,11 +50,7 @@ def _offer_payload(subscription) -> dict:
         # can't be re-localized downstream — hence name + size here.
         "variation_name": getattr(share_type, "name", "") or "",
         "variation_size": getattr(variation, "size", "") or "",
-        "delivery_station_name": (
-            getattr(contact, "name", "")
-            or getattr(station_day, "delivery_station_short_name", "")
-            or ""
-        ),
+        "delivery_station_name": offer_station_name(station_day),
         "delivery_station_address": _format_address(contact),
         "valid_from": (
             subscription.valid_from.isoformat() if subscription.valid_from else None

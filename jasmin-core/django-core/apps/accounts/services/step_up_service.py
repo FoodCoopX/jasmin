@@ -68,8 +68,9 @@ def verify_and_issue_step_up_token(
     password:
         The password the user typed into the step-up modal.
     totp_code:
-        The 6-digit TOTP code, when ``STEP_UP_REQUIRES_TOTP`` is on
-        and the user has an active device. Ignored otherwise.
+        The 6-digit TOTP code (or a recovery code), when
+        ``STEP_UP_REQUIRES_TOTP`` is on and the user has an active
+        device. Ignored otherwise.
     current_access_payload:
         Claim dict from the caller's existing access token. Pass
         ``request.auth.payload`` from the view. The carry-along
@@ -85,8 +86,8 @@ def verify_and_issue_step_up_token(
     InvalidCredentials
         Password didn't match.
     TwoFactorInvalidCode
-        ``STEP_UP_REQUIRES_TOTP=True`` and the code was missing or
-        wrong.
+        ``STEP_UP_REQUIRES_TOTP=True``, the user has an active device,
+        and the code was missing or wrong.
     """
     if not password or not user.check_password(password):
         # Log first, then raise — InvalidCredentials is mapped by the
@@ -97,17 +98,20 @@ def verify_and_issue_step_up_token(
         )
         raise InvalidCredentials("Incorrect password.")
 
-    if getattr(settings, "STEP_UP_REQUIRES_TOTP", False):
-        # Mirror the verify path used by the post-login 2FA flow so
-        # the recovery-code / TOTP semantics stay identical.
-        if not totp_code or not two_factor_service.verify_code(
-            user=user, code=totp_code
-        ):
+    if getattr(
+        settings, "STEP_UP_REQUIRES_TOTP", False
+    ) and two_factor_service.has_two_factor(user):
+        # The verify path of the post-login 2FA flow, so the TOTP and
+        # recovery-code semantics stay identical. It raises for a missing
+        # or wrong code rather than returning False.
+        try:
+            two_factor_service.verify_code(user=user, code=totp_code or "")
+        except TwoFactorInvalidCode:
             logger.warning(
                 "step_up.verify_failed user=%s reason=totp",
                 getattr(user, "email", "-"),
             )
-            raise TwoFactorInvalidCode("Invalid two-factor code.")
+            raise TwoFactorInvalidCode("Invalid two-factor code.") from None
 
     new_access = AccessToken.for_user(user)
     payload = current_access_payload or {}

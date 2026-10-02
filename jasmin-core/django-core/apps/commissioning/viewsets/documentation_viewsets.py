@@ -447,9 +447,9 @@ class _MovementSourceDestroyMixin:
 
     Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
     is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-    the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-    ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-    is needed because the deleted movement IS the actual correction.
+    the movement BEFORE the delete and re-cascade the affected entity. A deleted
+    correction may have carried its day's theoretical, which another correction
+    of that day then takes over (``recalculate_actual_corrections``).
     """
 
     movement_source_fk: str  # "harvest" / "purchase" / "waste"
@@ -458,13 +458,24 @@ class _MovementSourceDestroyMixin:
     def perform_destroy(self, instance) -> None:
         from ..models import MovementShareArticle
         from ..services.snapshot_service import SnapshotService
+        from ..services.theoretical_objects import (
+            correction_dimension,
+            lock_theoretical_sums,
+            recalculate_actual_corrections,
+        )
 
         affected_movements = list(
             MovementShareArticle.objects.filter(**{self.movement_source_fk: instance})
         )
+        corrections = [m for m in affected_movements if m.counted_amount is not None]
+        lock_theoretical_sums(correction_dimension(m) for m in corrections)
         super().perform_destroy(instance)
-        if affected_movements:
-            SnapshotService.cascade_for_movements(affected_movements)
+        if not affected_movements:
+            return
+        corrected: list[MovementShareArticle] = []
+        if corrections:
+            recalculate_actual_corrections(corrections, collect_movements=corrected)
+        SnapshotService.cascade_for_movements([*affected_movements, *corrected])
 
 
 class WasteViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):

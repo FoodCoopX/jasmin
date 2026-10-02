@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import update_last_login
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..errors import (
@@ -258,16 +259,22 @@ def _refresh_iat_still_valid(refresh: RefreshToken) -> bool:
 # --------------------------------------------------------------------------- #
 
 
-def blacklist_refresh(refresh_token: str) -> None:
-    """Best-effort blacklist for logout. Never raises."""
+def blacklist_refresh(refresh_token: str) -> str | None:
+    """Best-effort blacklist for logout. Never raises.
+
+    Returns the id of the user the token was issued to, or ``None`` for a token
+    that doesn't verify.
+    """
     try:
         token = RefreshToken(refresh_token)
-        try:
-            token.blacklist()
-        except AttributeError:
-            pass
     except TokenError:
+        return None
+    try:
+        token.blacklist()
+    except AttributeError:
         pass
+    user_id = token.get(jwt_settings.USER_ID_CLAIM)
+    return str(user_id) if user_id is not None else None
 
 
 def revoke_all_sessions(user: JasminUser) -> None:

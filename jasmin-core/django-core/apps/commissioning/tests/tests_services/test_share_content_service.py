@@ -555,6 +555,73 @@ class TestReplaceSharePlanningPreservesBackup:
         assert rebuilt.backup_amount == Decimal("4")  # backup preserved per station
 
 
+@pytest.mark.django_db
+class TestUpdateBackupFields:
+    @staticmethod
+    def _row_with_backup():
+        delivery_day = SharesDeliveryDayFactory(day_number=2)
+        variation = ShareTypeVariationFactory()
+        share = ShareFactory(
+            year=2026,
+            delivery_week=15,
+            delivery_day=delivery_day,
+            share_type_variation=variation,
+        )
+        row = ShareContentFactory(share=share, unit="KG", size="M")
+        row.backup_share_article = ShareArticleFactory()
+        row.backup_unit = "KG"
+        row.backup_size = "L"
+        row.backup_amount = Decimal("4")
+        row.save()
+        return row
+
+    @staticmethod
+    def _update(row, data):
+        return ShareContentService().update_backup_fields(
+            year=2026,
+            delivery_week=15,
+            share_article_id=str(row.share_article_id),
+            unit="KG",
+            size="M",
+            data=data,
+        )
+
+    def test_sets_the_backup(self, tenant):
+        row = self._row_with_backup()
+        backup_article = ShareArticleFactory()
+        cell = f"day_{row.share.delivery_day_id}_variation_{row.share.share_type_variation_id}"
+
+        self._update(
+            row,
+            {
+                "backup_share_article": str(backup_article.pk),
+                "backup_unit": "ST",
+                "backup_size": "S",
+                cell: "2.5",
+            },
+        )
+
+        row.refresh_from_db()
+        assert row.backup_share_article_id == backup_article.pk
+        assert row.backup_unit == "ST"
+        assert row.backup_size == "S"
+        assert row.backup_amount == Decimal("2.5")
+
+    @pytest.mark.parametrize(
+        "cleared", [{}, {"backup_size": None}, {"backup_size": ""}], ids=str
+    )
+    def test_a_cleared_backup_takes_the_default_size(self, tenant, cleared):
+        row = self._row_with_backup()
+
+        self._update(row, {"backup_share_article": None, "backup_unit": "", **cleared})
+
+        row.refresh_from_db()
+        assert row.backup_share_article_id is None
+        assert row.backup_unit is None
+        assert row.backup_size == "M"
+        assert row.backup_amount == Decimal("0")
+
+
 # ---------------------------------------------------------------------------
 # get_share_content_as_frontend_data
 # ---------------------------------------------------------------------------

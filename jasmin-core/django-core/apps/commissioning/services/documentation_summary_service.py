@@ -918,7 +918,9 @@ class DocumentationSummaryService:
                 date=_movement_datetime(
                     common_fields["year"],
                     common_fields["delivery_week"],
-                    common_fields["day_number"] or 0,
+                    GenericDocumentationService.movement_day_number(
+                        common_fields["day_number"], movement_type
+                    ),
                 ),
                 movement_type=movement_type,
                 **{fk_field: additional_entry},
@@ -932,8 +934,13 @@ class DocumentationSummaryService:
 
         affected = old_movements + ([new_movement] if new_movement else [])
         if affected:
-            SnapshotService.cascade_for_movements(affected)
-            recalculate_actual_corrections(affected, {movement_type})
+            # Re-net first, then one cascade: the theoretical_sum locks the
+            # re-net takes come before the current_balance locks of a cascade.
+            corrected: list[MovementShareArticle] = []
+            recalculate_actual_corrections(
+                affected, {movement_type}, collect_movements=corrected
+            )
+            SnapshotService.cascade_for_movements([*affected, *corrected])
 
     @staticmethod
     def _upsert_additional_and_movement(
@@ -1089,5 +1096,11 @@ class DocumentationSummaryService:
             movement_type=movement_type,
             partial=True,
         )
+        if model_key == "purchase":
+            from .documentation_service import GenericDocumentationService
+
+            # Re-derive the purchase's own movement too, so it is dated and
+            # netted with the additional amount just written.
+            GenericDocumentationService._upsert_movement(instance)
 
         return instance

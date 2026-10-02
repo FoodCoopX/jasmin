@@ -34,7 +34,7 @@ from ..models import (
     ShareTypeVariation,
     Storage,
 )
-from ..models.choices import UnitOptions
+from ..models.choices import UnitOptions, VegetableSizeOptions
 from ..utils import (
     batch_get_physical_variation_totals_for_weeks,
     sort_share_articles,
@@ -1396,7 +1396,8 @@ class ShareContentService:
                 ) from exc
 
         backup_unit = data.get("backup_unit") or None
-        backup_size = data.get("backup_size") or None
+        # The column can't be empty, so a cleared size takes its default.
+        backup_size = data.get("backup_size") or VegetableSizeOptions.M
 
         backup_amounts: dict[tuple[str, str], Decimal] = {}
         for key, value in data.items():

@@ -255,11 +255,8 @@ def bulk_send_invoice_reminders(
             _emit_progress()
             continue
 
-        reseller_name = (
-            reseller.contact.name
-            if getattr(reseller, "contact", None)
-            else (reseller.invoice_name or "")
-        )
+        # ``name`` is None for a contact with no company, first or last name.
+        reseller_name = reseller.contact.name or reseller.invoice_name or ""
         invoice_dicts = [_invoice_to_dict(inv) for _o, inv in invoices_with_orders]
         reminder_language = ctx["tenant_language"] or "en"
         try:

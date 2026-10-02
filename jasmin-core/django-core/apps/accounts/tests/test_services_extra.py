@@ -89,11 +89,10 @@ class TestRefreshAccessToken:
 
 
 class TestBlacklistRefresh:
-    def test_blacklists_valid_token_silently(self, tenant):
+    def test_blacklists_valid_token_and_names_its_user(self, tenant):
         user = JasminUserFactory()
         token = _refresh_for(user, tenant_id=tenant.schema_name)
-        # Returns None and does not raise.
-        assert blacklist_refresh(token) is None
+        assert blacklist_refresh(token) == str(user.pk)
 
     def test_garbage_token_does_not_raise(self, tenant):
         assert blacklist_refresh("nonsense") is None

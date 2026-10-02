@@ -16,7 +16,7 @@ import { editableOnlyOnCreate } from "@shared/utils";
 import type { PlotOption } from "../usePlots";
 
 interface UseForecastColumnsArgs {
-  isComponentReady: boolean;
+  columnsReady: boolean;
   finalColumn: EditableColumnConfig<TableRecord>;
   shareArticleColumn: EditableColumnConfig<TableRecord>;
   amountUnitSizeColumns: EditableColumnConfig<TableRecord>[];
@@ -43,7 +43,7 @@ interface UseForecastColumnsArgs {
 }
 
 export function useForecastColumns({
-  isComponentReady,
+  columnsReady,
   finalColumn,
   shareArticleColumn,
   amountUnitSizeColumns,
@@ -66,7 +66,7 @@ export function useForecastColumns({
   const { t } = useTranslation();
 
   return useMemo<EditableColumnConfig<TableRecord>[]>(() => {
-    if (!isComponentReady) return [];
+    if (!columnsReady) return [];
 
     return [
       finalColumn,
@@ -258,7 +258,7 @@ export function useForecastColumns({
       },
     ] as EditableColumnConfig<TableRecord>[];
   }, [
-    isComponentReady,
+    columnsReady,
     shareArticleColumn,
     amountUnitSizeColumns,
     fruit_and_veg_shares_are_separate,

@@ -72,6 +72,21 @@ function pricesEqual(a: unknown, b: unknown): boolean {
   return Number.isFinite(na) && Number.isFinite(nb) && Math.abs(na - nb) < 0.005;
 }
 
+/**
+ * The payment-cycle column's ``disabled``: read-only on a confirmed abo, and on
+ * a saved one when only one cycle is allowed — there is nothing to choose, so
+ * the cell shows it fixed instead of a one-option select. The new row still
+ * picks it: a disabled cell saves the cycle id stored on its record, and the
+ * new row has none yet.
+ */
+function paymentCycleLock(
+  isConfirmed: (record: AboRecord) => boolean,
+  cycleCount: number,
+): (record: AboRecord) => boolean {
+  return (record) =>
+    isConfirmed(record) || (record.key !== -1 && cycleCount <= 1);
+}
+
 export function useAbosColumns({
   members,
   paymentCycles,
@@ -701,10 +716,7 @@ export function useAbosColumns({
           valueField: "payment_cycle",
           displayField: "payment_cycle_name",
         },
-        // With exactly one allowed cycle there's nothing to choose — render it
-        // fixed (the cell falls back to the read-only label) instead of a
-        // one-option select. A finalized abo is likewise read-only.
-        disabled: aboIsConfirmed || paymentCycles.length <= 1,
+        disabled: paymentCycleLock(aboIsConfirmed, paymentCycles.length),
         render: (value: unknown, record: AboRecord) => {
           // ``payment_cycle_name`` is ``payment_cycle.choice`` (a code like
           // MONTHLY) as loaded, but an inline edit overwrites it with the select

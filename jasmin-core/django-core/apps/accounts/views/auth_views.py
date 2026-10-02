@@ -262,15 +262,15 @@ def user_token_refresh_view(request):
 @authentication_classes([])
 @permission_classes([AllowAny])
 def user_logout_view(request):
-    user_pk = request.user.pk if request.user.is_authenticated else "-"
     refresh_token = get_tenant_refresh_token(request)
     response = Response(
         {"message": "Successfully logged out"}, status=status.HTTP_200_OK
     )
     clear_tenant_refresh_cookie(response)
-    if refresh_token:
-        blacklist_refresh(refresh_token)
-    logger.info("logout.success user=%s", user_pk)
+    # Nobody is authenticated here (the access token may have expired by now):
+    # the user is the one the revoked refresh token was issued to.
+    user_id = blacklist_refresh(refresh_token) if refresh_token else None
+    logger.info("logout.success user=%s", user_id or "-")
     return response
 
 

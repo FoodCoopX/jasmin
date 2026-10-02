@@ -963,15 +963,13 @@ class InvoiceService:
         reseller-facing and accounting-facing sends today; if the
         wording ever needs to diverge, split into two slugs and pass
         different contexts here."""
-        from django.db import connection
+        from apps.shared.tenants.email_service import capture_tenant_email_context
 
         reseller = invoice.reseller
-        reseller_name = reseller.contact.name if reseller and reseller.contact else ""
-        tenant = getattr(connection, "tenant", None)
-        tenant_name = getattr(tenant, "name", "") if tenant else ""
-        iban = getattr(tenant, "iban", "") if tenant else ""
-        bic = getattr(tenant, "bic", "") if tenant else ""
-        bank_details = " / ".join(part for part in [iban, bic] if part)
+        # ``name`` is None for a contact with no company, first or last name.
+        reseller_name = reseller.contact.name or ""
+        # Invoices are sent from office requests, so the tenant is the real one.
+        tenant_context = capture_tenant_email_context()
 
         try:
             terms_days = reseller.get_payment_terms_days() if reseller else 14
@@ -999,7 +997,7 @@ class InvoiceService:
         invoice_number = invoice.full_number
 
         return {
-            "tenant_name": tenant_name,
+            "tenant_name": tenant_context["tenant_name"],
             "reseller": {"name": reseller_name},
             "invoice": {
                 "number": invoice_number,
@@ -1007,7 +1005,7 @@ class InvoiceService:
                 "total": total_str,
                 "due_date": due_date_str,
             },
-            "tenant": {"bank_details": bank_details},
+            "tenant": {"bank_details": tenant_context["bank_details"]},
         }
 
     @staticmethod

@@ -96,8 +96,12 @@ export default function Forecast() {
 
   const { shareArticles, refetch: refetchShareArticles } =
     useShareArticles(shareArticleFilters);
-  const { plots, countPlots } = usePlots();
-  const { offerGroups, offerGroupsCount } = useOfferGroups();
+  const { plots, countPlots, loading: plotsLoading } = usePlots();
+  const {
+    offerGroups,
+    offerGroupsCount,
+    loading: offerGroupsLoading,
+  } = useOfferGroups();
 
   const shareTypeVariationFilters = useMemo(() => {
     return {
@@ -111,8 +115,11 @@ export default function Forecast() {
       share_option: ShareTypeEnum.HARVEST_SHARE,
     };
   }, [selectedYear, selectedWeek]);
-  const { shareTypeVariations, shareTypeVariationsCount } =
-    useShareTypeVariations(shareTypeVariationFilters);
+  const {
+    shareTypeVariations,
+    shareTypeVariationsCount,
+    loading: shareTypeVariationsLoading,
+  } = useShareTypeVariations(shareTypeVariationFilters);
 
   const shareTypeVariationFiltersFruits = useMemo(() => {
     if (!fruit_and_veg_shares_are_separate) return null;
@@ -127,6 +134,7 @@ export default function Forecast() {
   const {
     shareTypeVariations: shareTypeVariationsFruits,
     shareTypeVariationsCount: shareTypeVariationsFruitsCount,
+    loading: shareTypeVariationsFruitsLoading,
   } = useShareTypeVariations(shareTypeVariationFiltersFruits);
 
   const { finalColumn } = useFinalColumn();
@@ -172,27 +180,14 @@ export default function Forecast() {
     [shareArticles],
   );
 
-  const isComponentReady = useMemo(() => {
-    return !!(
-      shareArticleColumn &&
-      amountUnitSizeColumns &&
-      amountUnitSizeColumns.length > 0 &&
-      shareTypeVariations !== undefined &&
-      (fruit_and_veg_shares_are_separate
-        ? shareTypeVariationsFruits !== undefined
-        : true) &&
-      offerGroups !== undefined &&
-      plots !== undefined
-    );
-  }, [
-    shareArticleColumn,
-    amountUnitSizeColumns,
-    shareTypeVariations,
-    shareTypeVariationsFruits,
-    offerGroups,
-    plots,
-    fruit_and_veg_shares_are_separate,
-  ]);
+  // The variation, offer-group and plot columns are built from these lists, so
+  // the rows wait for them too: the columns can't appear after the rows. (The
+  // lists are ``[]``, never undefined, while they load.)
+  const columnsReady =
+    !shareTypeVariationsLoading &&
+    !shareTypeVariationsFruitsLoading &&
+    !offerGroupsLoading &&
+    !plotsLoading;
 
   const {
     selectedRowKeys,
@@ -214,7 +209,7 @@ export default function Forecast() {
 
   const { data: rawData, isFetching } = useCommissioningForecastList(
     listParams,
-    { query: { enabled: isComponentReady } },
+    { query: { enabled: columnsReady } },
   );
   const data = useMemo(
     () =>
@@ -417,7 +412,7 @@ export default function Forecast() {
   }, [offerGroups, isResellerDisabled, t]);
 
   const columns = useForecastColumns({
-    isComponentReady,
+    columnsReady,
     finalColumn,
     shareArticleColumn,
     amountUnitSizeColumns,
@@ -459,17 +454,6 @@ export default function Forecast() {
       }),
     [],
   );
-
-  if (!isComponentReady) {
-    return (
-      <div
-        className="flex-center"
-        style={{
-          minHeight: "200px",
-        }}
-      ></div>
-    );
-  }
 
   return (
     <div>
@@ -563,7 +547,7 @@ export default function Forecast() {
         rowSelection={!isPast && !isMobile ? rowSelectionConfig : undefined}
         onSelectedRowsChange={handleRowSelectionChange}
         selectedRowKeys={selectedRowKeys}
-        loading={isFetching}
+        loading={isFetching || !columnsReady}
         keyboardAddShortcut={true}
         renderMobileCard={(
           record: TableRecord,

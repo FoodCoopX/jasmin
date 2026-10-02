@@ -222,6 +222,17 @@ class TestRefreshAfterLogout:
         resp = replay.post("/api/auth/refresh/", data={}, format="json")
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
+    def test_logout_logs_the_user_of_the_revoked_token(self, tenant):
+        user = JasminUserFactory(email="named@example.com")
+        _set_password(user, "Named!Pass42xyz")
+        client = APIClient()
+        _login(client, "named@example.com", "Named!Pass42xyz")
+
+        with patch("apps.accounts.views.auth_views.logger") as logger:
+            client.post("/api/auth/logout/", data={}, format="json")
+
+        logger.info.assert_called_with("logout.success user=%s", str(user.pk))
+
     def test_logout_then_login_then_refresh_works(self, tenant):
         """Logging out blacklists the OLD token only — a fresh login must
         get a brand-new refresh that still works."""

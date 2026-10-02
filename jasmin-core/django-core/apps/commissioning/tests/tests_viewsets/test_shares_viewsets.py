@@ -1847,6 +1847,40 @@ class TestShareDeliveryCreateCapacity:
 
 
 @pytest.mark.django_db
+class TestShareDeliveryWithoutStationDay:
+    def test_clearing_the_station_day_keeps_the_delivery_readable(
+        self, api_client, tenant
+    ):
+        day = SharesDeliveryDayFactory(day_number=4)
+        variation = ShareTypeVariationFactory()
+        station_day = DeliveryStationDayFactory(delivery_day=day)
+        share = ShareFactory(
+            year=2026,
+            delivery_week=15,
+            delivery_day=day,
+            share_type_variation=variation,
+        )
+        subscription = SubscriptionFactory(
+            share_type_variation=variation, default_delivery_station_day=station_day
+        )
+        delivery = ShareDeliveryFactory(
+            share=share, delivery_station_day=station_day, subscription=subscription
+        )
+        url = reverse("share_delivery-detail", args=[delivery.pk])
+
+        cleared = api_client.patch(url, {"delivery_station_day": None}, format="json")
+
+        assert cleared.status_code == status.HTTP_200_OK, cleared.data
+        assert cleared.data["delivery_station_day"] is None
+        # No station to pack for, so no share content.
+        assert cleared.data["share_content"] == []
+        assert api_client.get(url).status_code == status.HTTP_200_OK
+        listed = api_client.get(
+            reverse("share_delivery-list"), {"year": 2026, "delivery_week": 15}
+        )
+        assert listed.status_code == status.HTTP_200_OK, listed.data
+
+
 class TestShareDeliveryCrossDayMove:
     """Moving a delivery to a station-day on ANOTHER weekday re-points its Share
     to that day's planning unit (creating it), instead of failing the

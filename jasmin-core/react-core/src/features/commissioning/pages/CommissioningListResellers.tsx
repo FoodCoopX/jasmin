@@ -207,7 +207,7 @@ export default function CommissioningListResellers() {
           </PastWarningMessage>
         ) : (
           resellers
-            .filter((reseller) => reseller.order?.contents?.length ?? 0 > 0)
+            .filter((reseller) => reseller.order.contents.length > 0)
             .map((reseller) => (
               <Card
                 key={reseller.id}

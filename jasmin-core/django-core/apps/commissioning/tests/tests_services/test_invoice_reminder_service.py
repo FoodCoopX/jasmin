@@ -91,6 +91,48 @@ class TestBulkSendInvoiceReminders:
         assert invoice.full_number in ctx["invoices_table"]
         assert invoice.full_number in ctx["invoices_text"]
 
+    @pytest.mark.parametrize(
+        "invoice_name, greeting",
+        [("Hofladen Sonnenschein", "Hofladen Sonnenschein"), (None, "")],
+    )
+    def test_a_contact_without_a_name_falls_back_to_the_invoice_name(
+        self, tenant, invoice_name, greeting
+    ):
+        reseller = ResellerFactory(
+            invoice_email="reseller@example.org",
+            invoice_name=invoice_name,
+            contact__company_name="",
+            contact__first_name="",
+            contact__last_name="",
+        )
+        order = OrderFactory(reseller=reseller)
+        DeliveryNoteResellerFactory(order=order)
+        invoice = InvoiceResellerFactory(reseller=reseller, is_finalized=True)
+
+        with (
+            mock.patch(
+                "apps.commissioning.services.invoice_service."
+                "InvoiceService.get_invoices_for_delivery_notes",
+                side_effect=lambda dn_ids: {dn_id: invoice for dn_id in dn_ids},
+            ),
+            mock.patch(
+                "apps.shared.tenants.email_service.EmailService.send_email",
+                autospec=True,
+                return_value=True,
+            ) as send_email,
+        ):
+            bulk_send_invoice_reminders(
+                order_ids=[str(order.id)],
+                email_ctx={
+                    "tenant_name": "Test Coop",
+                    "tenant_language": "de",
+                    "bank_details": "",
+                    "frontend_base_url": "https://test.example.org",
+                },
+            )
+
+        assert send_email.call_args.kwargs["context"]["reseller"] == {"name": greeting}
+
     def test_multiple_invoices_for_same_reseller_send_one_email(self, tenant):
         """The consolidation guarantee: three overdue invoices for
         the SAME reseller produce ONE email listing all three — not

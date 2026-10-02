@@ -912,7 +912,7 @@ class OfferService:
 
         if not offers.exists():
             for reseller in resellers:
-                reseller_name = reseller.contact.name if reseller.contact else "Unknown"
+                reseller_name = reseller.contact.name or "Unknown"
                 results.append(
                     {
                         "reseller_id": str(reseller.id),
@@ -942,7 +942,7 @@ class OfferService:
         )
 
         for reseller in resellers:
-            reseller_name = reseller.contact.name if reseller.contact else "Unknown"
+            reseller_name = reseller.contact.name or "Unknown"
 
             if not reseller.contact or not reseller.contact.email:
                 results.append(
@@ -985,7 +985,8 @@ class OfferService:
                     # for the period string + log id, not as context keys.
                     context={
                         "tenant_name": ctx["tenant_name"],
-                        "reseller": {"name": reseller.contact.name},
+                        # None for a contact with no company, first or last name.
+                        "reseller": {"name": reseller.contact.name or ""},
                         # No single ``deadline``: the order cutoff is per
                         # delivery day (OrdersDeliveryDay.default_last_possible_
                         # ordering_day/time). The order sheet (offer_url) shows

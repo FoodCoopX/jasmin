@@ -1789,7 +1789,8 @@ def _build_commissioning_resellers_entry(order: Order) -> dict[str, Any]:
     contact = order.reseller.contact
     return {
         "id": str(order.reseller.id),
-        "name": contact.company_name if contact else "",
+        # The company, or the person a reseller without one is registered as.
+        "name": contact.name or "",
         "address": contact.address if contact else "",
         "order": {
             "id": str(order.id),

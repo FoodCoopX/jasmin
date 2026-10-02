@@ -11,11 +11,12 @@ that stock calculations include planning data automatically.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from decimal import Decimal
 from typing import Any, NamedTuple
 
 from django.db import transaction
+from django.db.models import Q
 
 from ..constants import PURCHASE_DAY
 from ..models import (
@@ -725,6 +726,111 @@ def _recalculate_actual_corrections_for_movements(
     )
 
 
+DimensionKey = tuple[str, str | None, str | None, str | None, str | None]
+
+
+def correction_dimension(movement: MovementShareArticle) -> DimensionKey:
+    """The (share_article, unit, size, storage, movement_type) a correction nets
+    in."""
+    return (
+        str(movement.share_article_id),
+        movement.unit,
+        movement.size,
+        str(movement.storage_id) if movement.storage_id else None,
+        movement.movement_type,
+    )
+
+
+def lock_theoretical_sums(dimension_keys: Iterable[DimensionKey]) -> None:
+    """Take the ``theoretical_sum`` lock of each dimension, the one
+    ``_sum_theoretical`` takes, in one canonical order so two takers can't
+    deadlock (AB/BA). Transaction-scoped, held to the outer commit.
+
+    A path that deletes or rewrites a correction takes these locks before
+    touching any movement row: a create re-nets the day's other corrections
+    under them, so a row lock taken first would deadlock with it.
+    """
+    from core.db_locks import acquire_advisory_xact_lock
+
+    for share_article_id, unit, size, storage_id, movement_type in sorted(
+        set(dimension_keys),
+        key=lambda k: (k[0], k[1] or "", k[2] or "", k[3] or "", k[4] or ""),
+    ):
+        acquire_advisory_xact_lock(
+            f"theoretical_sum:{share_article_id}:{unit or ''}:{size or ''}"
+            f":{storage_id or ''}:{movement_type}"
+        )
+
+
+def _correction_order(movement: MovementShareArticle) -> tuple[str, str]:
+    """Orders a day's corrections by their source document, which keeps its id
+    when a re-save recreates the movement: the same entry carries the day's
+    theoretical across edits."""
+    return (str(movement.harvest_id or movement.purchase_id or ""), str(movement.pk))
+
+
+def _dimension_filter(
+    share_article_id: str,
+    unit: str | None,
+    size: str | None,
+    storage_id: str | None,
+    movement_type: str | None,
+) -> Q:
+    """The movements of one stock dimension and movement type; an empty unit,
+    size or storage matches NULL."""
+    q = Q(share_article_id=share_article_id, movement_type=movement_type)
+    q &= Q(unit=unit) if unit else Q(unit__isnull=True)
+    q &= Q(size=size) if size else Q(size__isnull=True)
+    q &= Q(storage_id=storage_id) if storage_id else Q(storage__isnull=True)
+    return q
+
+
+def _renet_corrections(
+    actual_corrections: list[MovementShareArticle],
+    theoretical_movements: Sequence[tuple[Any, Decimal | None]],
+) -> list[MovementShareArticle]:
+    """Re-net one dimension's corrections against its theoretical movements
+    (``(date, amount)`` pairs) and save those whose amount changed; returns
+    them.
+
+    The day's actual entries together replace its theoretical, so it is
+    subtracted once, from a single carrier per date: the correction whose
+    source document sorts first. Several entries per day are normal for
+    purchases (one per seller); subtracting the theoretical from each would
+    remove one plan several times.
+
+    Netting is day-scoped: a correction nets ONLY the theoretical(s) for its OWN
+    day — theoretical and actual movements for a (year, week, day) dimension
+    share the same noon datetime. A cumulative ``date <= correction.date`` would
+    re-subtract an earlier day's theoretical from every later correction on the
+    same dimension, and even produce negative HARVEST rows.
+    """
+    carriers: dict[Any, MovementShareArticle] = {}
+    for correction in sorted(actual_corrections, key=_correction_order):
+        carriers.setdefault(correction.date, correction)
+
+    changed: list[MovementShareArticle] = []
+    for correction in actual_corrections:
+        if correction.counted_amount is None:
+            continue
+        theoretical_sum = Decimal("0")
+        if carriers[correction.date] is correction:
+            theoretical_sum = sum(
+                (
+                    theoretical_amount or Decimal("0")
+                    for movement_date, theoretical_amount in theoretical_movements
+                    if movement_date == correction.date
+                ),
+                Decimal("0"),
+            )
+        new_amount = correction.counted_amount - theoretical_sum
+        if correction.amount != new_amount:
+            correction.amount = new_amount
+            correction.save(update_fields=["amount"])
+            changed.append(correction)
+    return changed
+
+
 @transaction.atomic
 def recalculate_actual_corrections(
     reference_movements: list[MovementShareArticle],
@@ -738,110 +844,56 @@ def recalculate_actual_corrections(
     For each actual movement (``is_theoretical=False`` + ``counted_amount IS NOT NULL``)
     matching the same (share_article, unit, size, storage, movement_type):
         new_amount = counted_amount − Σ(theoretical amounts for same dimension & date)
+    for one actual movement per date, the carrier, and
+    new_amount = counted_amount for any other actual movement of that date
+    (see ``_renet_corrections``).
 
     ``collect_movements``: when given, the mutated corrections are appended to
     it instead of cascaded here — the caller runs one union cascade at the end
     of its transaction (single sorted advisory-lock pass; see
     ``create_theoretical_objects``). The correction rows are saved either way.
     """
-    from django.db.models import Q
-
-    from core.db_locks import acquire_advisory_xact_lock
-
     from .snapshot_service import SnapshotService
 
     if movement_types is None:
         movement_types = {movement.movement_type for movement in reference_movements}
 
-    # Build dimension keys from the reference movements
-    dimension_keys: set[tuple] = set()
-    for movement in reference_movements:
-        dimension_keys.add(
-            (
-                str(movement.share_article_id),
-                movement.unit,
-                movement.size,
-                str(movement.storage_id) if movement.storage_id else None,
-                movement.movement_type,
-            )
-        )
+    dimension_keys = {
+        correction_dimension(movement) for movement in reference_movements
+    }
 
     cascaded_movements: list[MovementShareArticle] = []
 
     # Serialize per-dimension with the count-entry path: a
     # concurrent recompute and an actual-count entry must net against the SAME
     # theoretical set, else write-skew leaves the correction permanently off.
-    # Take the same ``theoretical_sum:*`` transaction lock ``_sum_theoretical``
-    # takes, in canonical sorted dimension order so two acquirers can't deadlock
-    # (AB/BA). Held to the outer commit and acquired BEFORE the current_balance
-    # cascade below, preserving the global theoretical_sum → current_balance order.
+    # Taken BEFORE the current_balance cascade below, preserving the global
+    # theoretical_sum → current_balance order.
+    lock_theoretical_sums(dimension_keys)
     for share_article_id, unit, size, storage_id, movement_type in sorted(
         dimension_keys,
-        key=lambda k: (k[0], k[1] or "", k[2] or "", k[3] or "", k[4]),
+        key=lambda k: (k[0], k[1] or "", k[2] or "", k[3] or "", k[4] or ""),
     ):
-        acquire_advisory_xact_lock(
-            f"theoretical_sum:{share_article_id}:{unit or ''}:{size or ''}"
-            f":{storage_id or ''}:{movement_type}"
+        dimension = _dimension_filter(
+            share_article_id, unit, size, storage_id, movement_type
         )
-        # Find actual correction movements for this dimension
-        q = Q(
-            share_article_id=share_article_id,
-            movement_type=movement_type,
-            is_theoretical=False,
-            counted_amount__isnull=False,
-        )
-        q &= Q(unit=unit) if unit else Q(unit__isnull=True)
-        q &= Q(size=size) if size else Q(size__isnull=True)
-        if storage_id:
-            q &= Q(storage_id=storage_id)
-        else:
-            q &= Q(storage__isnull=True)
-
         actual_corrections = list(
-            MovementShareArticle.objects.filter(q).order_by("date")
+            MovementShareArticle.objects.filter(
+                dimension, is_theoretical=False, counted_amount__isnull=False
+            ).order_by("date")
         )
         if not actual_corrections:
             continue
 
         # Batch-fetch all theoretical movements for this dimension (one query)
-        tq_base = Q(
-            share_article_id=share_article_id,
-            movement_type=movement_type,
-            is_theoretical=True,
-        )
-        tq_base &= Q(unit=unit) if unit else Q(unit__isnull=True)
-        tq_base &= Q(size=size) if size else Q(size__isnull=True)
-        if storage_id:
-            tq_base &= Q(storage_id=storage_id)
-        else:
-            tq_base &= Q(storage__isnull=True)
-
         theoretical_movements = list(
-            MovementShareArticle.objects.filter(tq_base)
+            MovementShareArticle.objects.filter(dimension, is_theoretical=True)
             .order_by("date")
             .values_list("date", "amount")
         )
-
-        for actual_correction in actual_corrections:
-            # Day-scoped netting: a correction nets ONLY the theoretical(s)
-            # for its OWN harvesting day — theoretical and actual movements for a
-            # (year, week, day) dimension share the same noon datetime. A
-            # cumulative ``date <= actual_correction.date`` would re-subtract an
-            # earlier day's theoretical from EVERY later correction on the same
-            # dimension (the Harvest/Purchase constraints permit one actual per
-            # day), subtracting a single plan N times and even producing negative
-            # HARVEST rows.
-            theoretical_sum = sum(
-                (theoretical_amount or Decimal("0"))
-                for movement_date, theoretical_amount in theoretical_movements
-                if movement_date == actual_correction.date
-            )
-
-            new_amount = actual_correction.counted_amount - theoretical_sum
-            if actual_correction.amount != new_amount:
-                actual_correction.amount = new_amount
-                actual_correction.save(update_fields=["amount"])
-                cascaded_movements.append(actual_correction)
+        cascaded_movements.extend(
+            _renet_corrections(actual_corrections, theoretical_movements)
+        )
 
     if cascaded_movements:
         if collect_movements is not None:

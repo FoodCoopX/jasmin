@@ -474,7 +474,12 @@ class ShareDeliverySerializer(ReadOnlyOnUpdateMixin, serializers.ModelSerializer
         defeat the prefetch — so we filter in Python over the cached
         ``all()`` result instead. Locked by
         ``apps/payments/tests/test_query_count_locks.py``.
+
+        Share content is packed per station, so a delivery without a
+        station-day (the field is nullable and writable) has none.
         """
+        if obj.delivery_station_day is None:
+            return []
         target_station_id = obj.delivery_station_day.delivery_station_id
         share_contents = [
             share_content
