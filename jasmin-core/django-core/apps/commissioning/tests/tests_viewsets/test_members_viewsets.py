@@ -381,8 +381,8 @@ class TestMemberRegisterHoldings:
         member.refresh_from_db()
         return member
 
-    def _counts(self, api_client, date_from, date_to) -> dict[str, str]:
-        """Share count per member number in the register for the window."""
+    def _rows(self, api_client, date_from, date_to) -> dict[str, list[str]]:
+        """The register's rows for the window, by member number."""
         import csv
         import io
 
@@ -398,7 +398,21 @@ class TestMemberRegisterHoldings:
         content = b"".join(resp.streaming_content).decode("utf-8").lstrip("\ufeff")
         delimiter = get_csv_dialect().delimiter
         rows = list(csv.reader(io.StringIO(content), delimiter=delimiter))
-        return {row[0]: row[7] for row in rows[1:] if row}
+        return {row[0]: row for row in rows[1:] if row}
+
+    def _counts(self, api_client, date_from, date_to) -> dict[str, str]:
+        """Share count per member number in the register for the window."""
+        rows = self._rows(api_client, date_from, date_to)
+        return {number: row[7] for number, row in rows.items()}
+
+    def _capital(self, api_client, date_from, date_to) -> dict[str, str]:
+        """Geschäftsguthaben per member number in the register for the window."""
+        rows = self._rows(api_client, date_from, date_to)
+        return {number: row[8] for number, row in rows.items()}
+
+    @staticmethod
+    def _at_noon(day: datetime.date) -> datetime.datetime:
+        return datetime.datetime.combine(day, datetime.time(12), tzinfo=datetime.UTC)
 
     def _shares(self, count: str) -> str:
         from apps.commissioning.services.member_register_export import (
@@ -455,6 +469,59 @@ class TestMemberRegisterHoldings:
         assert day_before["8103"] == self._shares("5.00")
         # Still listed on the exit date, holding nothing.
         assert on_exit["8103"] == self._shares("0")
+
+    def test_a_share_taken_up_after_the_window_does_not_count(self, api_client, tenant):
+        self._member(
+            8105,
+            admin_confirmed_at=self._at_noon(datetime.date(2026, 2, 10)),
+            paid_at=self._at_noon(datetime.date(2026, 2, 15)),
+        )
+
+        january = self._counts(
+            api_client, datetime.date(2026, 1, 1), datetime.date(2026, 1, 31)
+        )
+        february = self._counts(
+            api_client, datetime.date(2026, 1, 1), datetime.date(2026, 2, 28)
+        )
+
+        assert january["8105"] == self._shares("0")
+        assert february["8105"] == self._shares("5.00")
+
+    def test_a_share_paid_before_it_was_confirmed_counts_from_payment(
+        self, api_client, tenant
+    ):
+        # A historic share, entered (and so confirmed) only now.
+        self._member(
+            8106,
+            admin_confirmed_at=self._at_noon(datetime.date(2026, 3, 20)),
+            paid_at=self._at_noon(datetime.date(2024, 3, 1)),
+        )
+
+        counts = self._counts(
+            api_client, datetime.date(2025, 1, 1), datetime.date(2025, 12, 31)
+        )
+
+        assert counts["8106"] == self._shares("5.00")
+
+    def test_geschaeftsguthaben_counts_only_shares_paid_by_the_window_end(
+        self, api_client, tenant
+    ):
+        self._member(
+            8107,
+            admin_confirmed_at=self._at_noon(datetime.date(2025, 1, 10)),
+            paid_at=self._at_noon(datetime.date(2026, 1, 15)),
+        )
+
+        unpaid = self._rows(
+            api_client, datetime.date(2025, 1, 1), datetime.date(2025, 12, 31)
+        )["8107"]
+        paid = self._capital(
+            api_client, datetime.date(2026, 1, 1), datetime.date(2026, 1, 31)
+        )
+
+        # Held since January 2025, but paid only in 2026.
+        assert (unpaid[7], unpaid[8]) == (self._shares("5.00"), self._shares("0.00"))
+        assert paid["8107"] == self._shares("500.00")
 
     def test_a_row_without_an_effective_date_ends_on_the_local_day_recorded(
         self, api_client, tenant, settings

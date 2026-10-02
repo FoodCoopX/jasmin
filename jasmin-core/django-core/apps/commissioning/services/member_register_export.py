@@ -48,27 +48,56 @@ def _member_name(member: Member) -> str:
     return " ".join(p for p in (member.last_name, member.first_name) if p)
 
 
+def _held_from(share: CoopShare) -> date | None:
+    """The day ``share`` starts counting toward its member's holding.
+
+    A row created by a coop share transfer counts from the transfer date. Any
+    other row counts from the day it was confirmed, or the day it was paid when
+    that is earlier: a historic share entered later is confirmed on the day it
+    was entered, but carries its real payment date. ``None`` (no lower bound)
+    for a row with neither.
+    """
+    if share.transfer is not None:
+        return share.transfer.transfer_date
+    days = [
+        timezone.localdate(stamp)
+        for stamp in (share.admin_confirmed_at, share.paid_at)
+        if stamp is not None
+    ]
+    return min(days, default=None)
+
+
 def _counts_on(share: CoopShare, day: date) -> bool:
     """Whether ``share`` counts toward its member's holding as of ``day``.
 
-    A cancelled row stops counting on the day its cancellation takes effect,
+    It counts from ``_held_from``. A cancelled row stops counting on the day its
+    cancellation takes effect,
     whenever the office recorded it: a member is still listed on their exit
     date, holding nothing. That day is ``cancelled_effective_at``, or the local
-    date the cancellation was recorded for a row without one. A row created by
-    a coop share transfer counts from the transfer date. A member's exit is
-    never dated before one of their transfers (``cancel_member_with_coop_shares``
-    refuses it), and a transfer that empties the giver cancels all of the
-    giver's rows, its negative transfer rows included, effective on the giver's
-    latest transfer date. So every share counts once: for the giver until a
-    transfer takes it, for the receiver from then on.
+    date the cancellation was recorded for a row without one. A member's exit
+    is never dated before one of their transfers
+    (``cancel_member_with_coop_shares`` refuses it), and a transfer that
+    empties the giver cancels all of the giver's rows, its negative transfer
+    rows included, effective on the giver's latest transfer date. So every
+    share counts once: for the giver until a transfer takes it, for the
+    receiver from then on.
     """
+    held_from = _held_from(share)
+    if held_from is not None and held_from > day:
+        return False
     if share.cancelled_at is not None:
         effective = share.cancelled_effective_at or timezone.localdate(
             share.cancelled_at
         )
         if effective <= day:
             return False
-    return share.transfer is None or share.transfer.transfer_date <= day
+    return True
+
+
+def _paid_by(share: CoopShare, day: date) -> bool:
+    """Whether ``share`` was paid by ``day``: only paid shares make up the
+    Geschäftsguthaben (paid-in capital)."""
+    return share.paid_at is not None and timezone.localdate(share.paid_at) <= day
 
 
 def build_member_register_csv_response(
@@ -79,7 +108,8 @@ def build_member_register_csv_response(
     A member is in the window if they were admitted by its end (``entry_date``
     set and ``<= date_to``) and had not yet left at its start (no exit date, or
     exit on/after ``date_from``). Holdings are reported AS OF ``date_to``; see
-    ``_counts_on`` for which rows count.
+    ``_counts_on`` for which rows count, and ``_paid_by`` for which of them make
+    up the Geschäftsguthaben.
     """
     members = list(
         Member.objects.filter(
@@ -109,6 +139,8 @@ def build_member_register_csv_response(
                 "member_id",
                 "amount_of_coop_shares",
                 "value_one_coop_share",
+                "admin_confirmed_at",
+                "paid_at",
                 "cancelled_at",
                 "cancelled_effective_at",
                 "transfer",
@@ -118,10 +150,11 @@ def build_member_register_csv_response(
         for share in coop_shares:
             if not _counts_on(share, date_to):
                 continue
-            amount = share.amount_of_coop_shares or Decimal("0")
+            amount = share.amount_of_coop_shares
             bucket = holdings[share.member_id]
             bucket[0] += amount
-            bucket[1] += amount * Decimal(share.value_one_coop_share)
+            if _paid_by(share, date_to):
+                bucket[1] += amount * Decimal(share.value_one_coop_share)
 
     dialect = get_csv_dialect()
     writer = csv.writer(CsvEchoBuffer(), delimiter=dialect.delimiter)
