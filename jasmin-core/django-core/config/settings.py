@@ -954,28 +954,32 @@ TWO_FACTOR_REQUIRED_ROLES: list[str] = [
     if _role.strip()
 ]
 
-# Friendly Captcha — bot / abuse protection on public auth endpoints
-# (login, register, password-reset-request, password-reset-confirm).
+# Friendly Captcha (v2) — bot / abuse protection on public auth endpoints
+# (login, register send-code, password-reset-request, password-reset-confirm).
 # Ships dormant: when ``FRIENDLY_CAPTCHA_ENABLED=False`` the verifier
 # is a no-op and the endpoints accept requests with no FC solution
 # token. To turn it on:
-#   1. Sign the Friendly Captcha DPA, create a Site, get sitekey + secret.
-#   2. Set ``FRIENDLY_CAPTCHA_SITEKEY`` and ``FRIENDLY_CAPTCHA_SECRET``
-#      in the prod env.
+#   1. Sign the Friendly Captcha DPA, create an application, and copy its
+#      sitekey and an API key.
+#   2. Set ``FRIENDLY_CAPTCHA_SITEKEY`` and ``FRIENDLY_CAPTCHA_SECRET`` (the
+#      API key) in the prod env.
 #   3. Flip ``FRIENDLY_CAPTCHA_ENABLED=True``.
+#   4. Restart the backend and log in on a tenant host: the widget should
+#      solve and the login go through.
 # The sitekey is a PUBLIC value and is shipped to anonymous callers
-# via ``CurrentTenantSerializer``; the secret is server-side only.
+# via ``CurrentTenantSerializer``; the API key is server-side only.
 FRIENDLY_CAPTCHA_ENABLED = (
     os.environ.get("FRIENDLY_CAPTCHA_ENABLED", "False").lower() == "true"
 )
 FRIENDLY_CAPTCHA_SITEKEY = os.environ.get("FRIENDLY_CAPTCHA_SITEKEY", "").strip()
 FRIENDLY_CAPTCHA_SECRET = os.environ.get("FRIENDLY_CAPTCHA_SECRET", "").strip()
-# Verification API. Documented at https://docs.friendlycaptcha.com/.
-# Configurable so we can point at the EU endpoint if FC ever exposes
-# a regional split (today it's a single global endpoint).
+# The v2 siteverify endpoint on the API the frontend widget talks to (the
+# SDK's default, global). The EU endpoint,
+# https://eu.frcapi.com/api/v2/captcha/siteverify, only verifies tokens from a
+# widget pointed at the EU API, which the frontend doesn't do.
 FRIENDLY_CAPTCHA_VERIFY_URL = os.environ.get(
     "FRIENDLY_CAPTCHA_VERIFY_URL",
-    "https://api.friendlycaptcha.com/api/v1/siteverify",
+    "https://global.frcapi.com/api/v2/captcha/siteverify",
 )
 # Hard timeout for the verification call. If FC's API is unreachable
 # within this window the verifier raises ``CaptchaVerificationFailed``

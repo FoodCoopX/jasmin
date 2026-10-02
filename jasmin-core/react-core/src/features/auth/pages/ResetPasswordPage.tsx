@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Card, Form, Input, Button, Alert, Typography, Space } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { authPasswordResetConfirmCreate } from "@shared/api/generated/auth/auth";
 import { getErrorMessage } from "@shared/utils/apiError";
-import { FriendlyCaptcha } from "@shared/auth/FriendlyCaptcha";
+import {
+  FriendlyCaptcha,
+  type FriendlyCaptchaHandle,
+} from "@shared/auth/FriendlyCaptcha";
 import { PasswordStrengthMeter } from "../components/PasswordStrengthMeter";
 import { passwordConfirmValidator } from "../utils/password";
 
@@ -43,6 +46,7 @@ const ResetPasswordPage = () => {
   const [success, setSuccess] = useState(false);
   const [password, setPassword] = useState("");
   const [captchaSolution, setCaptchaSolution] = useState("");
+  const captchaRef = useRef<FriendlyCaptchaHandle>(null);
 
   // Redirect to /login after a short success message. Driven by an effect
   // (not a bare setTimeout in the handler) so the timer is cleaned up if the
@@ -81,6 +85,8 @@ const ResetPasswordPage = () => {
       }
     } finally {
       setSubmitting(false);
+      // The captcha token is spent either way; a retry needs a fresh one.
+      captchaRef.current?.reset();
     }
   };
 
@@ -155,7 +161,10 @@ const ResetPasswordPage = () => {
                 <Input.Password prefix={<LockOutlined />} />
               </Form.Item>
 
-              <FriendlyCaptcha onSolution={setCaptchaSolution} />
+              <FriendlyCaptcha
+                ref={captchaRef}
+                onSolution={setCaptchaSolution}
+              />
 
               <Form.Item style={{ marginBottom: 0 }}>
                 <Button

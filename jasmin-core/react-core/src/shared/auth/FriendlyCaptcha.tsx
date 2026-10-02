@@ -2,9 +2,9 @@
  * Friendly Captcha widget wrapper.
  *
  * Renders the FC challenge on every anonymous auth form (login,
- * register, forgot-password, reset-password). Mounts the official
- * ``@friendlycaptcha/sdk`` web component and lifts the solution
- * string up to the parent form via ``onSolution``.
+ * register, forgot-password, reset-password) through the v2
+ * ``@friendlycaptcha/sdk`` and lifts the response token up to the parent
+ * form via ``onSolution``.
  *
  * Feature-flag-off behaviour
  * --------------------------
@@ -17,89 +17,97 @@
  *
  * Behaviour when enabled
  * ----------------------
- *   1. On mount, the FC widget starts solving its proof-of-work in
- *      the background. The user sees a small "verifying…" badge.
- *   2. When the solution is ready, ``onSolution(token)`` fires.
- *   3. The parent form should keep its submit button disabled until
- *      it has received a non-empty solution (or the form should
- *      submit the empty string and let the backend reject — same
- *      effect, slightly worse UX).
- *
- * Library: ``@friendlycaptcha/sdk`` registers ``<frc-captcha>`` as a
- * web component on import side-effect. We import it once at the
- * module level rather than per-mount.
+ *   1. On mount, the widget starts solving in the background
+ *      (``startMode: "auto"``).
+ *   2. When the token is ready, ``onSolution(token)`` fires; an expiry, an
+ *      error, a reset or an unmount clears it with ``onSolution("")``.
+ *   3. A token is single-use: the backend's verification spends it, success
+ *      or not. The parent calls ``reset()`` on the forwarded ref after every
+ *      submission, and the widget solves a fresh one.
  */
 
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { FriendlyCaptchaSDK, type WidgetHandle } from "@friendlycaptcha/sdk";
 
 import { useTenant } from "@hooks/index";
 
-// Side-effect import: registers the <frc-captcha> custom element on
-// the global registry. Safe to import multiple times; the SDK guards
-// against double-registration internally.
-import "@friendlycaptcha/sdk";
+// One SDK for the whole page; it runs the background agent iframe that every
+// widget shares. Created on first use, because constructing it starts that
+// agent.
+let sdk: FriendlyCaptchaSDK | undefined;
 
-// The <frc-captcha> element is a Web Component, not a React element —
-// declare it on JSX.IntrinsicElements so TS doesn't complain.
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      "frc-captcha": React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & { sitekey?: string },
-        HTMLElement
-      >;
-    }
-  }
+export interface FriendlyCaptchaHandle {
+  /** Discard the current token and solve a fresh one. */
+  reset: () => void;
 }
 
 interface FriendlyCaptchaProps {
   /**
-   * Called with the solution string when the FC widget completes its
-   * proof-of-work. Also called with the empty string on reset / error.
+   * Called with the token when the widget completes its challenge, and with
+   * the empty string when the token is gone (expired, error, reset).
    * Parent form should treat any non-empty value as "ready to submit".
    */
   onSolution: (solution: string) => void;
 }
 
-export function FriendlyCaptcha({ onSolution }: FriendlyCaptchaProps) {
+export const FriendlyCaptcha = forwardRef<
+  FriendlyCaptchaHandle,
+  FriendlyCaptchaProps
+>(function FriendlyCaptcha({ onSolution }, ref) {
   const { tenant } = useTenant();
   const sitekey =
     (tenant?.friendly_captcha_sitekey as string | undefined) ?? "";
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const widgetRef = useRef<WidgetHandle | null>(null);
+  // The widget lives as long as the sitekey; a new onSolution must not
+  // rebuild it (and restart the challenge).
+  const onSolutionRef = useRef(onSolution);
+  useEffect(() => {
+    onSolutionRef.current = onSolution;
+  }, [onSolution]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      reset: () => {
+        widgetRef.current?.reset();
+        onSolutionRef.current("");
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
-    if (!sitekey) return;
-    const el = containerRef.current?.querySelector("frc-captcha");
-    if (!el) return;
+    const container = containerRef.current;
+    if (!sitekey || !container) return;
 
-    // FC emits ``frc:widget.complete`` (solution ready) and
-    // ``frc:widget.error`` (challenge failed / expired). Both names
-    // are stable since SDK v0.1.x.
-    const handleComplete = (event: Event) => {
-      const detail = (event as CustomEvent<{ response?: string }>).detail;
-      onSolution(detail?.response ?? "");
-    };
-    const handleError = () => onSolution("");
+    // ``destroy()`` removes the element the widget is mounted on, so it gets
+    // a child React doesn't own.
+    const element = document.createElement("div");
+    container.appendChild(element);
+    sdk ??= new FriendlyCaptchaSDK();
+    const widget = sdk.createWidget({ element, sitekey, startMode: "auto" });
+    widgetRef.current = widget;
 
-    el.addEventListener("frc:widget.complete", handleComplete);
-    el.addEventListener("frc:widget.error", handleError);
+    const clearSolution = () => onSolutionRef.current("");
+    widget.addEventListener("frc:widget.complete", (event) =>
+      onSolutionRef.current(event.detail.response),
+    );
+    widget.addEventListener("frc:widget.expire", clearSolution);
+    widget.addEventListener("frc:widget.error", clearSolution);
+    widget.addEventListener("frc:widget.reset", clearSolution);
+
     return () => {
-      el.removeEventListener("frc:widget.complete", handleComplete);
-      el.removeEventListener("frc:widget.error", handleError);
+      widgetRef.current = null;
+      widget.destroy();
+      clearSolution();
     };
-  }, [sitekey, onSolution]);
+  }, [sitekey]);
 
   if (!sitekey) return null;
 
-  return (
-    <div ref={containerRef} className="frc-captcha-mount">
-      {/* The web component starts solving on mount. No props beyond
-          ``sitekey`` are needed for the default invisible flow. */}
-      <frc-captcha sitekey={sitekey} />
-    </div>
-  );
-}
+  return <div ref={containerRef} className="frc-captcha-mount" />;
+});
 
 export default FriendlyCaptcha;

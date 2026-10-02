@@ -6,7 +6,10 @@ import {
   useAuthRegisterSendCodeCreate,
   useAuthRegisterVerifyCodeCreate,
 } from "@shared/api/generated/auth/auth";
-import { FriendlyCaptcha } from "@shared/auth/FriendlyCaptcha";
+import {
+  FriendlyCaptcha,
+  type FriendlyCaptchaHandle,
+} from "@shared/auth/FriendlyCaptcha";
 import { isSupportedLanguageCode } from "@shared/i18n/languages";
 import { useTenant } from "@hooks/index";
 import { getErrorMessage } from "@shared/utils/apiError";
@@ -26,6 +29,7 @@ export default function StepConfirmEmail({ data, update, next, back }: StepProps
   const [form] = Form.useForm<{ code: string }>();
   const [error, setError] = useState("");
   const [captchaSolution, setCaptchaSolution] = useState("");
+  const captchaRef = useRef<FriendlyCaptchaHandle>(null);
 
   const sendCode = useAuthRegisterSendCodeCreate();
   const verifyCode = useAuthRegisterVerifyCodeCreate();
@@ -46,13 +50,17 @@ export default function StepConfirmEmail({ data, update, next, back }: StepProps
 
   const doSend = () => {
     setError("");
-    sendCode.mutate({
-      data: {
-        email,
-        first_name: data.first_name ?? "",
-        frc_captcha_solution: captchaSolution,
+    sendCode.mutate(
+      {
+        data: {
+          email,
+          first_name: data.first_name ?? "",
+          frc_captcha_solution: captchaSolution,
+        },
       },
-    });
+      // The captcha token is spent either way; a resend needs a fresh one.
+      { onSettled: () => captchaRef.current?.reset() },
+    );
   };
 
   useEffect(() => {
@@ -125,7 +133,7 @@ export default function StepConfirmEmail({ data, update, next, back }: StepProps
     <>
       <Paragraph>{t("auth.registration.confirm.intro", { email })}</Paragraph>
 
-      <FriendlyCaptcha onSolution={setCaptchaSolution} />
+      <FriendlyCaptcha ref={captchaRef} onSolution={setCaptchaSolution} />
 
       {sendCode.isError && (
         <Alert

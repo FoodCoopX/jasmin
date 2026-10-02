@@ -1,6 +1,9 @@
 import { LockOutlined, SafetyOutlined, UserOutlined } from "@ant-design/icons";
 import { useSubscriptionTerm, useTenant } from "@hooks/index";
-import { FriendlyCaptcha } from "@shared/auth/FriendlyCaptcha";
+import {
+  FriendlyCaptcha,
+  type FriendlyCaptchaHandle,
+} from "@shared/auth/FriendlyCaptcha";
 import { useAuth } from "@shared/contexts/AuthContext";
 import { AboutModal } from "@shared/modals";
 import { getErrorMessage } from "@shared/utils/apiError";
@@ -14,7 +17,7 @@ import {
   Space,
   Typography,
 } from "antd";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -40,6 +43,7 @@ const LoginPage = () => {
   // (sitekey absent) or while the widget is still solving. The
   // backend ignores the field when FRIENDLY_CAPTCHA_ENABLED=False.
   const [captchaSolution, setCaptchaSolution] = useState("");
+  const captchaRef = useRef<FriendlyCaptchaHandle>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
 
   const {
@@ -97,6 +101,9 @@ const LoginPage = () => {
     } catch (err: unknown) {
       console.error("Login error:", err);
       setLocalError(getErrorMessage(err, "Login failed"));
+    } finally {
+      // The captcha token is spent either way; a retry needs a fresh one.
+      captchaRef.current?.reset();
     }
   };
 
@@ -275,7 +282,10 @@ const LoginPage = () => {
                     </Link>
                   </div>
 
-                  <FriendlyCaptcha onSolution={setCaptchaSolution} />
+                  <FriendlyCaptcha
+                    ref={captchaRef}
+                    onSolution={setCaptchaSolution}
+                  />
 
                   <Form.Item>
                     <Button

@@ -17,14 +17,11 @@ expect.extend(axeMatchers);
 
 import { server } from "./msw/server";
 
-// Friendly Captcha SDK registers a ``<frc-captcha>`` custom element
-// on import side-effect. jsdom supports customElements but the SDK
-// also tries to set up a SharedWorker / Web Worker that jsdom doesn't
-// provide. Replace with a no-op module so importing pages that mount
-// the widget (LoginPage, RegisterPage, …) doesn't crash the suite.
-// The ``<FriendlyCaptcha>`` component additionally returns null when
-// ``tenant.friendly_captcha_sitekey`` is empty (the default in tests),
-// so nothing actually renders.
+// The Friendly Captcha SDK loads its widget and background agent in iframes
+// from Friendly Captcha's servers, which a test must never reach. Pages that
+// mount ``<FriendlyCaptcha>`` render nothing without
+// ``tenant.friendly_captcha_sitekey`` (empty in tests), so they never touch
+// the SDK; a test that renders the widget mocks the SDK itself.
 vi.mock("@friendlycaptcha/sdk", () => ({}));
 
 // MSW intercepts every HTTP call. Tests that don't expect any traffic stay

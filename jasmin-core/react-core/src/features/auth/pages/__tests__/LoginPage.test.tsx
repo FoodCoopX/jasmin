@@ -36,6 +36,21 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
+// The captcha widget renders nothing without a sitekey; this stand-in also
+// records when the page asks it for a fresh token.
+const captchaReset = vi.hoisted(() => vi.fn());
+vi.mock("@shared/auth/FriendlyCaptcha", async () => {
+  const { forwardRef, useImperativeHandle } = await import("react");
+  return {
+    FriendlyCaptcha: forwardRef<{ reset: () => void }, object>(
+      function FriendlyCaptcha(_props, ref) {
+        useImperativeHandle(ref, () => ({ reset: captchaReset }));
+        return null;
+      },
+    ),
+  };
+});
+
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual =
@@ -61,6 +76,7 @@ function renderLogin() {
 
 beforeEach(() => {
   navigateMock.mockReset();
+  captchaReset.mockClear();
   clearAccessToken();
   localStorage.clear();
   Object.defineProperty(window, "location", {
@@ -106,6 +122,38 @@ describe("LoginPage (integration)", () => {
     });
     await waitFor(() => expect(getAccessToken()).toBe("good-jwt"));
     expect(navigateMock).toHaveBeenCalledWith("/");
+  });
+
+  it("asks the captcha for a fresh token after a failed login", async () => {
+    // Verification spends the token, so the retry needs a new one.
+    server.use(
+      http.post("/api/auth/login/", () =>
+        HttpResponse.json(
+          { code: "auth.invalid", message: "Wrong email or password" },
+          { status: 401 },
+        ),
+      ),
+    );
+
+    renderLogin();
+
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByPlaceholderText("auth.login_card.email"),
+      "alice@example.com",
+    );
+    await user.type(
+      screen.getByPlaceholderText("auth.login_card.password"),
+      "nope",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "auth.login_card.sign_in" }),
+    );
+
+    expect(
+      await screen.findByText("Wrong email or password"),
+    ).toBeInTheDocument();
+    expect(captchaReset).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces a server error message and does NOT navigate on bad credentials", async () => {

@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, Form, Input, Button, Alert, Typography, Space } from "antd";
 import { MailOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { authPasswordResetRequestCreate } from "@shared/api/generated/auth/auth";
-import { FriendlyCaptcha } from "@shared/auth/FriendlyCaptcha";
+import {
+  FriendlyCaptcha,
+  type FriendlyCaptchaHandle,
+} from "@shared/auth/FriendlyCaptcha";
 
 const { Title, Text } = Typography;
 
@@ -21,6 +24,7 @@ const ForgotPasswordPage = () => {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [captchaSolution, setCaptchaSolution] = useState("");
+  const captchaRef = useRef<FriendlyCaptchaHandle>(null);
 
   const handleSubmit = async (values: ForgotPasswordValues) => {
     setError(null);
@@ -47,6 +51,8 @@ const ForgotPasswordPage = () => {
       }
     } finally {
       setSubmitting(false);
+      // The captcha token is spent either way; a retry needs a fresh one.
+      captchaRef.current?.reset();
     }
   };
 
@@ -96,7 +102,10 @@ const ForgotPasswordPage = () => {
                 <Input prefix={<MailOutlined />} autoFocus />
               </Form.Item>
 
-              <FriendlyCaptcha onSolution={setCaptchaSolution} />
+              <FriendlyCaptcha
+                ref={captchaRef}
+                onSolution={setCaptchaSolution}
+              />
 
               <Form.Item style={{ marginBottom: 0 }}>
                 <Button
