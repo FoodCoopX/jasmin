@@ -271,8 +271,9 @@ TOMS: list[dict[str, str]] = [
     {
         "label": "Backups",
         "value": (
-            "AES-256 GPG-encrypted pg_dump; restore replays the "
-            "DeletionLog so anonymised PII doesn't resurrect"
+            "AES-256 GPG-encrypted pg_dump; the DeletionLog is also kept "
+            "outside the database, with an encrypted off-host copy, and a "
+            "restore replays it so anonymised PII doesn't resurrect"
         ),
     },
     {

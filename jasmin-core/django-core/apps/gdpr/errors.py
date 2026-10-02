@@ -96,6 +96,20 @@ class MissingRejectionReason(BadRequestError):
     code = "gdpr.missing_rejection_reason"
 
 
+class SubjectAlreadyErased(GDPRError):
+    """The office asked to erase a member or reseller whose personal data is
+    already anonymized."""
+
+    code = "gdpr.subject_already_erased"
+
+
+class InvalidDeletionChannel(BadRequestError):
+    """An office-filed deletion request names no channel, or one that isn't
+    how a person can ask the office (email, letter, phone, in person)."""
+
+    code = "gdpr.invalid_channel"
+
+
 __all__ = [
     "GDPRError",
     "RetentionPeriodActive",
@@ -103,4 +117,6 @@ __all__ = [
     "DeletionTokenExpired",
     "DeletionRequestNotPending",
     "MissingRejectionReason",
+    "SubjectAlreadyErased",
+    "InvalidDeletionChannel",
 ]

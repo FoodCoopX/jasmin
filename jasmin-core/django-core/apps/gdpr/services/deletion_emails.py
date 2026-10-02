@@ -69,6 +69,16 @@ def send_deletion_confirmation_email(
     )
 
 
+def _log_no_requester_email(deletion_request: DeletionRequest, outcome: str) -> None:
+    """The office filed the request for someone without an email address,
+    so it tells them its outcome itself."""
+    logger.info(
+        "gdpr.deletion_%s_email_skipped request_id=%s reason=no_requester_email",
+        outcome,
+        deletion_request.pk,
+    )
+
+
 def send_deletion_approved_email(deletion_request: DeletionRequest) -> None:
     """Dispatch the "your deletion is complete" email after admin approve.
 
@@ -84,6 +94,10 @@ def send_deletion_approved_email(deletion_request: DeletionRequest) -> None:
     """
     from apps.shared.deferred_email import send_email_best_effort
     from apps.shared.tenant_urls import tenant_name
+
+    if not deletion_request.requested_email:
+        _log_no_requester_email(deletion_request, "approved")
+        return
 
     user = deletion_request.user
     context = {
@@ -206,6 +220,10 @@ def send_deletion_rejected_email(
     """
     from apps.shared.deferred_email import send_email_best_effort
     from apps.shared.tenant_urls import tenant_name
+
+    if not deletion_request.requested_email:
+        _log_no_requester_email(deletion_request, "rejected")
+        return
 
     user = deletion_request.user
     context = {

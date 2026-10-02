@@ -16,6 +16,7 @@ export interface AdminDecidedDeletion {
   id: string;
   state: string;
   requested_email: string;
+  channel: string;
   requested_at: string;
   /** @nullable */
   decided_at: string | null;

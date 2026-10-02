@@ -22,6 +22,7 @@
         "invoice_reminder": "Invoice reminder",
         "waiting_list_offer": "Waiting-list offer",
         "member_self_cancelled_office": "Self-cancellation (office notice)",
+        "consent_withdrawn_office": "Consent withdrawn (office notice)",
         "subscription_renewal_failures_office": "Failed renewals (office notice)"
     },
     "gdpr": {

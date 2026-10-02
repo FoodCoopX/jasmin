@@ -125,6 +125,59 @@ do_backup() {
     push_offsite "$FILEPATH"
 }
 
+# ── GDPR deletion ledger ───────────────────────────────────────
+# Every tenant's ``gdpr_deletionlog`` lives in the database, so restoring a
+# backup rolls it back together with the personal data the logged erasures
+# removed. This keeps a copy outside the database for the replay
+# (``manage.py replay_gdpr_deletions``): one JSON line per erasure, merged
+# into the existing file so that no entry is ever dropped, not even when a
+# restore took it out of the database. The email column leaves only as its
+# SHA-256; an encrypted copy goes off-host whenever the ledger changed.
+LEDGER_FILE="${BACKUP_DIR}/gdpr-deletion-ledger.jsonl"
+
+ledger_sql() {
+    # One row per erasure, keys sorted by jsonb: the same row always prints
+    # the same line, so ``sort -u`` merges repeated exports.
+    printf '%s' "SELECT ((to_jsonb(t) - 'user_email' - 'description') || jsonb_build_object(
+        'schema', '$1',
+        'email_sha256', CASE WHEN coalesce(t.user_email, '') <> ''
+            THEN encode(sha256(convert_to(lower(trim(t.user_email)), 'UTF8')), 'hex') END
+    ))::text FROM \"$1\".gdpr_deletionlog t"
+}
+
+export_gdpr_ledger() {
+    rows="${LEDGER_FILE}.rows"
+    merged="${LEDGER_FILE}.new"
+    : > "$rows"
+    schemas=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -At \
+        -c "SELECT schema_name FROM public.tenants_tenant WHERE schema_name <> 'public' ORDER BY schema_name") \
+        || { echo "[$(date)] ERROR: GDPR ledger: cannot list tenant schemas" >&2; rm -f "$rows"; return 1; }
+    for schema in $schemas; do
+        # UTC, so a timestamp prints the same way on every run.
+        if ! PGTZ=UTC psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -At \
+                -v ON_ERROR_STOP=1 -c "$(ledger_sql "$schema")" >> "$rows"; then
+            echo "[$(date)] WARN: GDPR ledger: could not read ${schema}.gdpr_deletionlog; its new entries wait for the next run" >&2
+        fi
+    done
+    { [ -f "$LEDGER_FILE" ] && cat "$LEDGER_FILE"; cat "$rows"; } | sort -u > "$merged"
+    rm -f "$rows"
+    if [ -f "$LEDGER_FILE" ] && cmp -s "$merged" "$LEDGER_FILE"; then
+        rm -f "$merged"
+        return 0
+    fi
+    # 644 like the dumps: the host user reads it for the restore drill, and it
+    # holds ids and hashes, no names or addresses.
+    chmod 644 "$merged"
+    mv "$merged" "$LEDGER_FILE"
+    echo "[$(date)] GDPR deletion ledger updated: $(wc -l < "$LEDGER_FILE") entries"
+    if encrypt_gpg "${LEDGER_FILE}.gpg" < "$LEDGER_FILE"; then
+        chmod 644 "${LEDGER_FILE}.gpg"
+        push_offsite "${LEDGER_FILE}.gpg"
+    else
+        echo "[$(date)] ERROR: GDPR ledger: encryption failed; no off-host copy this run" >&2
+    fi
+}
+
 # ── Media backup ───────────────────────────────────────────────
 do_media_backup() {
     # Media contains PII (invoice PDFs etc.) → encrypt with the same AES256 key.
@@ -174,13 +227,23 @@ case "${1:-scheduled}" in
         # Run a single backup immediately
         do_backup
         do_media_backup
+        export_gdpr_ledger || true
+        ;;
+    ledger)
+        # Refresh the GDPR deletion ledger (cron, and restore.sh before it
+        # restores).
+        export_gdpr_ledger
         ;;
     scheduled|*)
         # Run one backup on startup, then schedule via cron
         do_backup
         do_media_backup
+        export_gdpr_ledger || true
         echo "${SCHEDULE} ${SELF} now >> /var/log/backup.log 2>&1" > /etc/crontabs/root
-        echo "[$(date)] Cron scheduled: ${SCHEDULE}"
+        # The ledger every 10 minutes, so an erasure reaches it (and its
+        # off-host copy) long before the next nightly backup.
+        echo "*/10 * * * * ${SELF} ledger >> /var/log/backup.log 2>&1" >> /etc/crontabs/root
+        echo "[$(date)] Cron scheduled: ${SCHEDULE} (GDPR ledger every 10 minutes)"
         exec crond -f -l 2
         ;;
 esac

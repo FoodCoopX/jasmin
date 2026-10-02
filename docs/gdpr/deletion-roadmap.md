@@ -2,7 +2,7 @@
 
 **Owner:** Engineering
 **Started:** 2026-05-25
-**Status:** Steps 1 + 2 + 4 + 5 + 6 + 7 + 9 done; Step 3 effectively done (the command already delegates to `anonymize_user`; only the retention-skip-on-replay nuance is open). Remaining: Step 8 (retention cron), Step 10 (admin anonymize-other-user).
+**Status:** Steps 1 + 2 + 3 + 4 + 5 + 6 + 7 + 9 + 10 done. Remaining: Step 8 (retention cron).
 
 This is the step-by-step plan to bring GDPR-conformant deletion +
 anonymization from the current half-wired state to a defensible,
@@ -27,8 +27,8 @@ each merge.
 | Admin endpoint to anonymize OTHER users | ❌ missing | The view only handles self-deletion via JWT |
 
 **Snapshot of the 2026-05-25 starting point, not the current implementation.**
-Every ⚠ / "✅ basic" row above was superseded by the Steps below — except the
-missing admin anonymize-other-user endpoint, which is still open as Step 10.
+Every ⚠ / "✅ basic" / ❌ row above was superseded by the Steps below; the admin
+endpoint is Step 10.
 
 ## Identified gaps
 
@@ -95,9 +95,9 @@ runs once that link is followed and the admin-approval gate clears.
 
 Only re-sets `first_name`, `last_name`, `email` on the JasminUser. Misses everything else `anonymize_user` does (the Member fields, encrypted IBANs, etc.). A restore would resurrect those fields.
 
-→ **Effectively closed (see the Status line above):** the command now delegates
-to `GDPRService.anonymize_user()`, so a replay re-runs the full scrub. Only the
-retention-skip-on-replay nuance remains open as Step 3.
+→ **Closed (Step 3):** the replay re-runs the full scrub through the same
+anonymization engine, and reads the deletion log from a copy kept outside
+the database, which a restore can't roll back.
 
 ### 🟢 LOW — No retention-cron for cleanup
 
@@ -260,21 +260,29 @@ across 7 classes:
 question "can you show me what's left after we delete a member?" now
 has an answerable, tested response.
 
-### ☐ Step 3 — Bring `replay_gdpr_deletions` back in sync (MEDIUM, ~30m)
+### ☑ Step 3 — Bring `replay_gdpr_deletions` back in sync (DONE 2026-10-02)
 
-**What:** Stop duplicating anonymization logic. The command should
-re-call `GDPRService.anonymize_user()` (or a special variant that
-skips the retention check, since we already passed it before backup).
+The deletion log lives in every tenant schema, so a restore rolled it back
+together with the data it should have erased again. The backup container now
+keeps a copy outside the database: `backups/backup.sh ledger` merges every
+tenant's log into `/backups/gdpr-deletion-ledger.jsonl` every 10 minutes
+(no plaintext email: the address leaves only as its SHA-256), never drops an
+entry, and pushes an encrypted copy off-host. `backups/restore.sh` refreshes
+it before restoring, and `replay_gdpr_deletions --ledger -` reads it and
+re-runs the full anonymization for every subject that has personal data
+again, writing the log row back under its original id and time. Log rows
+name their subject by user, member and reseller id; older rows by the email
+hash, matched only to an account that existed at the time of the erasure.
 
-**Where:**
-- Modify: `apps/gdpr/management/commands/replay_gdpr_deletions.py`.
+The retention check stays on: a restore also undoes what the office did
+after the backup (a share paid back, an invoice settled), so a subject whose
+obligation came back is listed instead of erased, for the office to re-enter
+what was lost and then erase. `scripts/restore_drill.sh` dry-runs the replay
+against every drill.
 
-**Tests:**
-- `test_replay_calls_anonymize_user_for_each_logged_email`
-  (mock the service, assert called per log entry).
-
-**Acceptance:** Restoring a backup + running the replay yields the
-same DB state as if the deletions had happened post-restore.
+**Tests:** `apps/gdpr/tests/test_replay_gdpr_deletions.py`, which builds the
+state a restore leaves (subject back, log row gone, only the ledger knowing)
+and runs the ledger query from `backups/backup.sh` against Postgres.
 
 ### ☑ Step 4 — `FIELD_CLASSIFICATION` map + iterate-over-it refactor (DONE 2026-05-25)
 
@@ -615,19 +623,27 @@ separate command to remember.
 **Acceptance (met):** Old auditlog rows no longer leak the name/email
 of a deleted member via the `changes` column.
 
-### ☐ Step 10 — Admin endpoint to anonymize OTHER users (LOW, ~1h)
+### ☑ Step 10 — Admin endpoint to anonymize OTHER users (DONE 2026-10-02)
 
-**What:** Office / admin can act on a written deletion request from a
-member (e.g. paper form, phone call) — submits via API as the actor,
-the subject is identified by user_id.
+The office answers a request someone made by email, letter, phone or in
+person, also for a member or reseller without a login, keyed by the member or
+reseller record rather than a user:
 
-**Where:**
-- New endpoint: `POST /api/gdpr/admin/anonymize-user/<user_id>/`
-  (requires IsAdmin).
-- Reuses `execute_deletion()`.
+- `POST /api/gdpr/admin/members/<id>/erase/` and
+  `POST /api/gdpr/admin/resellers/<id>/erase/` (`IsAdmin` + step-up) file a
+  `DeletionRequest` that records who filed it (`requested_by`) and how the
+  person asked (`channel`), then run it through the same retention check and
+  anonymization as the self-service flow. When obligations block it, the
+  request waits in the pending inbox and the office approves it there later.
+- `GET /api/gdpr/admin/members/<id>/subject-access/` and
+  `GET /api/gdpr/admin/resellers/<id>/subject-access/` (`IsAdmin` + step-up)
+  return the Art. 15 bundle for such a person.
+- The anonymization engine takes a subject (`ErasureSubject`: a login user,
+  member or reseller, or any combination), so a member or reseller without a
+  login can be erased at all. The UI is on the member's page and in a
+  reseller's account dialog.
 
-**Acceptance:** Member who can't access their own account (e.g.
-already locked out) can still have their request honored via admin.
+**Tests:** `apps/gdpr/tests/test_office_requests.py`.
 
 ---
 

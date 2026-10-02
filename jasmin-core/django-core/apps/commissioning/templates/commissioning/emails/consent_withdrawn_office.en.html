@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8" /><title>Consent withdrawn</title></head>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1f1f1f; max-width: 560px; margin: 0 auto; padding: 24px;">
+    <h1 style="font-size: 22px; font-weight: 600;">A member withdrew a consent</h1>
+    <p>
+      A member
+      {% if tenant_name %}of <strong>{{ tenant_name }}</strong>{% endif %}
+      withdrew their consent to
+      {% if consent_kind == "withdrawal" %}the <strong>withdrawal terms</strong>{% else %}the <strong>privacy policy</strong>{% endif %}.
+    </p>
+    <p>
+      Please check whether processing their data may continue on another legal
+      basis (the contract, retention under the Cooperatives Act) or must be
+      restricted. This is not an automatic erasure; the member stays flagged
+      until they consent again.
+    </p>
+    <p><a href="{{ review_url }}">{{ review_url }}</a></p>
+    <p style="color: #666; font-size: 12px; margin-top: 32px;">
+      This email deliberately names nobody — the details are only visible
+      after signing in.
+    </p>
+  </body>
+</html>

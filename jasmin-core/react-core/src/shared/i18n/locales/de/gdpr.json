@@ -111,5 +111,28 @@
   "vvt_supervisory_authority": "Aufsichtsbehörde",
   "vvt_controller_saved": "Verantwortlichen-Angaben gespeichert",
   "vvt_controller_save_failed": "Speichern der Verantwortlichen-Angaben fehlgeschlagen",
-  "vvt_controller_save": "Speichern"
+  "vvt_controller_save": "Speichern",
+  "subject": "Person",
+  "filed_by_office": "Vom Büro erfasst: {{channel}}",
+  "channel": {
+    "self_service": "Selbst über das Konto",
+    "email": "E-Mail",
+    "letter": "Brief",
+    "phone": "Telefon",
+    "in_person": "Persönlich"
+  },
+  "office_actions": {
+    "title": "Datenschutz",
+    "description": "Für Anfragen per E-Mail, Brief, Telefon oder persönlich — auch von Personen ohne Login.",
+    "export": "Personenbezogene Daten exportieren",
+    "erase": "Personenbezogene Daten löschen",
+    "erase_title": "Personenbezogene Daten löschen",
+    "erase_intro": "Löscht die personenbezogenen Daten dieser Person endgültig (Art. 17 DSGVO). Datensätze mit gesetzlicher Aufbewahrungspflicht bleiben erhalten, aber ohne Namen.",
+    "channel_label": "Wie hat die Person die Löschung beantragt?",
+    "channel_placeholder": "Bitte wählen",
+    "erase_confirm": "Endgültig löschen",
+    "erased": "Personenbezogene Daten gelöscht.",
+    "blocked_title": "Noch nicht gelöscht",
+    "blocked_intro": "Diese Pflichten brauchen die Daten noch. Die Anfrage wartet bei den Löschanfragen, bis sie erledigt sind:"
+  }
 }

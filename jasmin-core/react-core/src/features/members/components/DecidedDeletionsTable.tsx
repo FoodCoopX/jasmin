@@ -77,6 +77,14 @@ export default function DecidedDeletionsTable() {
         title: t("gdpr.requested_email"),
         dataIndex: "requested_email",
         key: "requested_email",
+        render: (email: string, row: AdminDecidedDeletion) => (
+          <Space size={4} wrap>
+            {email || "—"}
+            {row.channel !== "self_service" && (
+              <Tag>{t(`gdpr.channel.${row.channel}`)}</Tag>
+            )}
+          </Space>
+        ),
       },
       {
         title: t("gdpr.requested_at"),

@@ -412,7 +412,9 @@
     "deletion_token_invalid": "Der Bestätigungslink zur Löschung ist ungültig.",
     "error": "DSGVO-Vorgang nicht möglich — bitte den aktuellen Status prüfen.",
     "missing_rejection_reason": "Ein Ablehnungsgrund ist erforderlich.",
-    "retention_active": "Anonymisierung nicht möglich — es besteht noch eine gesetzliche Aufbewahrungsfrist."
+    "retention_active": "Anonymisierung nicht möglich — es besteht noch eine gesetzliche Aufbewahrungsfrist.",
+    "subject_already_erased": "Die personenbezogenen Daten dieser Person sind bereits gelöscht.",
+    "invalid_channel": "Bitte angeben, wie die Person die Löschung beantragt hat (E-Mail, Brief, Telefon oder persönlich)."
   },
   "optin": {
     "deadline_passed": "Die Frist für die Anmeldung ist abgelaufen und kann nicht mehr geändert werden.",

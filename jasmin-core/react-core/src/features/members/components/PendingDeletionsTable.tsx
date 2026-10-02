@@ -68,22 +68,29 @@ export default function PendingDeletionsTable({
   const columns = useMemo(
     () => [
       {
-        title: t("gdpr.requested_email"),
-        dataIndex: "requested_email",
-        key: "requested_email",
-        render: (val: string, row: AdminPendingDeletion) =>
-          row.current_user_email && row.current_user_email !== val ? (
-            <Space direction="vertical" size={0}>
-              <span>{val}</span>
-              <Tag color="orange">
-                {t("gdpr.email_changed_since", {
-                  email: row.current_user_email,
+        title: t("gdpr.subject"),
+        dataIndex: "subject_label",
+        key: "subject_label",
+        render: (label: string, row: AdminPendingDeletion) => (
+          <Space direction="vertical" size={0}>
+            <span>{label}</span>
+            {row.channel !== "self_service" && (
+              <Tag>
+                {t("gdpr.filed_by_office", {
+                  channel: t(`gdpr.channel.${row.channel}`),
                 })}
               </Tag>
-            </Space>
-          ) : (
-            val
-          ),
+            )}
+            {row.current_user_email &&
+              row.current_user_email !== row.requested_email && (
+                <Tag color="orange">
+                  {t("gdpr.email_changed_since", {
+                    email: row.current_user_email,
+                  })}
+                </Tag>
+              )}
+          </Space>
+        ),
       },
       {
         title: t("gdpr.requested_at"),

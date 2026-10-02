@@ -73,6 +73,8 @@ GDPR_DATA_SUBJECT_SLUGS = frozenset(
         "gdpr.deletion_approved",
         "gdpr.deletion_rejected",
         "gdpr.deletion_pending_admin_office",
+        # Art. 7(3): the office has to act on a withdrawn processing consent.
+        "commissioning.consent_withdrawn_office",
     }
 )
 

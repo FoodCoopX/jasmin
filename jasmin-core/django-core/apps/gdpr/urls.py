@@ -50,6 +50,28 @@ urlpatterns = [
         views.gdpr_admin_preview_deletion_view,
         name="gdpr-admin-preview-deletion",
     ),
+    # Requests the office handles for a member or reseller (e.g. one without a
+    # login, or who wrote a letter). Admin + step-up.
+    path(
+        "admin/members/<str:member_id>/erase/",
+        views.gdpr_admin_erase_member_view,
+        name="gdpr-admin-erase-member",
+    ),
+    path(
+        "admin/resellers/<str:reseller_id>/erase/",
+        views.gdpr_admin_erase_reseller_view,
+        name="gdpr-admin-erase-reseller",
+    ),
+    path(
+        "admin/members/<str:member_id>/subject-access/",
+        views.gdpr_admin_member_subject_access_view,
+        name="gdpr-admin-member-subject-access",
+    ),
+    path(
+        "admin/resellers/<str:reseller_id>/subject-access/",
+        views.gdpr_admin_reseller_subject_access_view,
+        name="gdpr-admin-reseller-subject-access",
+    ),
     path("deletion-log/", views.gdpr_deletion_log_view, name="gdpr-deletion-log"),
     # Art. 30 Record of Processing Activities (VVT) — structured
     # export. See ``apps/gdpr/vvt.py`` for the code-level facts

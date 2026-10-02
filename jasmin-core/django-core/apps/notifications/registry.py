@@ -614,6 +614,45 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
             "review_url": "https://beispiel.example/members/members/204",
         },
     ),
+    "commissioning.consent_withdrawn_office": EmailTemplateSpec(
+        slug="commissioning.consent_withdrawn_office",
+        label="Einwilligung widerrufen (Büro)",
+        description=(
+            "Wird an das Büro gesendet, wenn ein Mitglied seine Einwilligung "
+            "in die Datenschutzerklärung oder die Widerrufsbelehrung "
+            "widerruft. Das Büro prüft, ob die Verarbeitung auf einer anderen "
+            "Rechtsgrundlage weiterlaufen darf oder eingeschränkt werden muss."
+            "\n\n"
+            "**Bewusst PII-arm**: Die Mail nennt weder Namen noch E-Mail noch "
+            "Mitgliedsnummer — nur die Art der Einwilligung und einen Link "
+            "zum Mitglied, der eine Anmeldung erfordert."
+        ),
+        default_template="commissioning/emails/consent_withdrawn_office",
+        default_subject="Einwilligung widerrufen — {{ tenant_name }}",
+        default_subject_en="Consent withdrawn — {{ tenant_name }}",
+        category="office",
+        variables=[
+            _TENANT_NAME,
+            EmailVariable(
+                name="consent_kind",
+                label="Art der Einwilligung",
+                description=(
+                    "``privacy`` (Datenschutzerklärung) oder ``withdrawal`` "
+                    "(Widerrufsbelehrung)."
+                ),
+            ),
+            EmailVariable(
+                name="review_url",
+                label="Link zum Mitglied",
+                description="Link zur Mitgliederseite für die Prüfung.",
+            ),
+        ],
+        sample={
+            "tenant_name": "Beispiel-Solawi",
+            "consent_kind": "privacy",
+            "review_url": "https://beispiel.example/members/members/aBc123XyZ456",
+        },
+    ),
     "commissioning.subscription_renewal_failures_office": EmailTemplateSpec(
         slug="commissioning.subscription_renewal_failures_office",
         label="Automatische Verlängerung: fehlgeschlagene Abos (Büro)",

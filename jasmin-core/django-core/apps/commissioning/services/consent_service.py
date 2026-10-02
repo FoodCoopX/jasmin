@@ -16,7 +16,8 @@ once, but costly when fanned out across a member list.
 
 from __future__ import annotations
 
-from django.core.mail import mail_admins
+import logging
+
 from django.db import models, transaction
 from django.utils import timezone
 
@@ -26,6 +27,8 @@ from ..errors import (
     ConsentRevokeReasonReserved,
 )
 from ..models import ConsentDocument, ConsentKind, ConsentRecord, Member
+
+logger = logging.getLogger(__name__)
 
 # Map ``ConsentKind`` → the cache column on ``Member`` that the record
 # updates as a side effect. Adding a new kind here makes
@@ -214,7 +217,7 @@ class ConsentService:
 
         # Privacy / withdrawal-terms consent is a processing legal basis:
         # withdrawing it needs a HUMAN review (not an automatic erasure). Flag
-        # the member for the office and email them. Emailed on_commit so a mail
+        # the member and email the tenant office. Emailed on_commit so a mail
         # hiccup can't roll back the (committed) revoke.
         if consent.document.kind in _FLAG_ON_REVOKE:
             ConsentService._flag_member_for_consent_review(consent)
@@ -223,20 +226,12 @@ class ConsentService:
 
     @staticmethod
     def _flag_member_for_consent_review(consent: ConsentRecord) -> None:
-        member = consent.member
-        Member.objects.filter(pk=member.pk).update(consent_withdrawn_at=timezone.now())
-        kind_label = ConsentKind(consent.document.kind).label
-        subject = f"[Consent withdrawn] {member} withdrew {kind_label}"
-        message = (
-            f"Member {member} (id={member.pk}) withdrew their '{kind_label}' "
-            f"consent.\n\n"
-            f"Withdrawing a processing-legal-basis consent needs an office "
-            f"review: confirm whether processing may continue on another legal "
-            f"basis (contract / GenG retention) or must be restricted. This is "
-            f"NOT an automatic erasure. The member stays flagged "
-            f"(consent_withdrawn_at) until they re-consent."
+        member_id = consent.member_id
+        kind = consent.document.kind
+        Member.objects.filter(pk=member_id).update(consent_withdrawn_at=timezone.now())
+        transaction.on_commit(
+            lambda: send_consent_withdrawn_office_email(member_id=member_id, kind=kind)
         )
-        transaction.on_commit(lambda: mail_admins(subject, message, fail_silently=True))
 
     # ------------------------------------------------------------------ #
     # Cache maintenance                                                  #
@@ -262,3 +257,45 @@ class ConsentService:
             .first()
         )
         Member.objects.filter(pk=member.pk).update(**{field_name: latest})
+
+
+def send_consent_withdrawn_office_email(*, member_id: str, kind: str) -> None:
+    """Tell the tenant office that a member withdrew a consent it must review
+    (the privacy policy or the withdrawal terms).
+
+    Goes to ``Tenant.email``, the office mailbox, and names nobody: no name, no
+    email address, no member number. That mailbox is often shared or forwarded,
+    so the mail only says which consent was withdrawn and links to the member's
+    page, which needs a sign-in. Best-effort: a failed send doesn't undo the
+    withdrawal, and a tenant without an office address is skipped and logged.
+    """
+    from apps.shared.deferred_email import send_email_best_effort
+    from apps.shared.tenant_urls import frontend_base_url, tenant_name
+    from core.tenant_db import connection
+
+    # A FakeTenant (schema_context in a worker) carries no ``email``.
+    office_email = getattr(connection.tenant, "email", None)
+    if not office_email:
+        logger.info(
+            "commissioning.consent_withdrawn_office_email_skipped member=%s "
+            "reason=no_office_email",
+            member_id,
+        )
+        return
+
+    send_email_best_effort(
+        slug="commissioning.consent_withdrawn_office",
+        to_emails=[office_email],
+        context={
+            "tenant_name": tenant_name(),
+            "consent_kind": kind,
+            "review_url": f"{frontend_base_url()}/members/members/{member_id}",
+        },
+        related_object_type="member",
+        related_object_id=str(member_id),
+        priority="normal",
+        logger=logger,
+        log_error_event="commissioning.consent_withdrawn_office_email_failed",
+        log_not_sent_event="commissioning.consent_withdrawn_office_email_not_sent",
+        log_ref=f"member={member_id}",
+    )

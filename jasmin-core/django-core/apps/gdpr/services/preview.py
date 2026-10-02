@@ -237,7 +237,7 @@ class PreviewMixin:
     @staticmethod
     def _contact_will_be_scrubbed(reseller: Reseller) -> bool:
         """True iff the reseller's ContactEntity is solo — mirrors the safety
-        branch in ``_anonymize_reseller_for_user`` (a contact shared with
+        branch in ``_anonymize_reseller`` (a contact shared with
         another Reseller or a DeliveryStation is kept, not scrubbed)."""
         contact = reseller.contact
         shared = (

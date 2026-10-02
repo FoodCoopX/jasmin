@@ -13,6 +13,8 @@ from apps.commissioning.models import CoopShare, InvoiceReseller, Member, Subscr
 from apps.payments.constants import OPEN_CHARGE_STATUSES
 from apps.payments.models import ChargeSchedule
 
+from .subjects import ErasureSubject
+
 if TYPE_CHECKING:
     # Type-only: the runtime path uses ``get_user_model()``, so this module
     # also works under a host project with a different ``AUTH_USER_MODEL``.
@@ -35,7 +37,15 @@ class RetentionChecksMixin:
 
     @staticmethod
     def check_retention_blocks(user: JasminUser) -> list[str]:
-        """Return human-readable reasons why anonymizing ``user`` is
+        """:meth:`check_retention_blocks_for_subject` for a login user and the
+        member and reseller records tied to it."""
+        return GDPRService.check_retention_blocks_for_subject(
+            ErasureSubject.of_user(user)
+        )
+
+    @staticmethod
+    def check_retention_blocks_for_subject(subject: ErasureSubject) -> list[str]:
+        """Return human-readable reasons why anonymizing ``subject`` is
         currently refused under Art. 17(3)(b) — empty list means OK.
 
         Refusal grounds (German law applied):
@@ -46,7 +56,7 @@ class RetentionChecksMixin:
           after the last share is paid back (handled by a
           retention cron once it's wired).
         - **HGB §257 / UStG §14b** — any **open** finalized invoice
-          (``has_been_paid=False``) on a reseller linked to the user
+          (``has_been_paid=False``) on the subject's reseller
           blocks anonymization. After payment + 10 years, retention
           is satisfied and a future cleanup cron will handle the
           historical rows.
@@ -68,8 +78,8 @@ class RetentionChecksMixin:
         # anonymisation. GenG §31 keeps the equity-history rows; anonymisation
         # scrubs the member's PII columns while leaving CoopShare.amount /
         # cancelled_at intact. Member-based obligations only apply when the
-        # user has a Member row.
-        member = Member.objects.filter(user=user).first()
+        # subject has a Member row.
+        member = subject.member
         coop_count = active_sub_count = open_charge_count = 0
         if member is not None:
             # Block while equity is live (open) OR cancelled-but-not-yet-paid-
@@ -92,12 +102,14 @@ class RetentionChecksMixin:
             ).count()
 
         # Reseller side — for Members who are ALSO B2B customers, plus
-        # pure-Reseller users with no Member row.
-        open_invoice_count = InvoiceReseller.objects.filter(
-            reseller__linked_user=user,
-            has_been_paid=False,
-            is_finalized=True,
-        ).count()
+        # pure Resellers with no Member row.
+        open_invoice_count = 0
+        if subject.reseller is not None:
+            open_invoice_count = InvoiceReseller.objects.filter(
+                reseller=subject.reseller,
+                has_been_paid=False,
+                is_finalized=True,
+            ).count()
 
         return GDPRService._retention_reasons(
             coop_count=coop_count,

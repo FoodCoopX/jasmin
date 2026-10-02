@@ -2,7 +2,7 @@
 # Managed by scripts/ruff_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/ruff_baseline.py freeze
-# 197 finding(s).
+# 196 finding(s).
 
 apps/accounts/backends.py: N806 Variable `UserModel` in function should be lowercase
 apps/accounts/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
@@ -170,7 +170,6 @@ apps/commissioning/viewsets/shares_viewsets.py: C901 `perform_update` is too com
 apps/commissioning/viewsets/shares_viewsets.py: PLR0915 Too many statements (54 > 50)
 apps/cultivation/models/basics.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
 apps/gdpr/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
-apps/gdpr/services/anonymization.py: C901 `_collect_known_emails` is too complex (13 > 10)
 apps/gdpr/tests/test_field_classification_guard.py: C901 `_gather_pii_field_violations` is too complex (11 > 10)
 apps/payments/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
 apps/payments/services.py: C901 `_build_pain008_xml` is too complex (12 > 10)

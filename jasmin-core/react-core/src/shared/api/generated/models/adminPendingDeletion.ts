@@ -12,6 +12,12 @@
 export interface AdminPendingDeletion {
   id: string;
   requested_email: string;
+  subject_label: string;
+  /** @nullable */
+  member_id: string | null;
+  /** @nullable */
+  reseller_id: string | null;
+  channel: string;
   requested_at: string;
   /** @nullable */
   email_confirmed_at: string | null;

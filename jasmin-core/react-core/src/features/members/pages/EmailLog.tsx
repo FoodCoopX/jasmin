@@ -42,6 +42,7 @@ const ALL_PURPOSES = [
   "commissioning.invoice_reminder",
   "commissioning.waiting_list_offer",
   "commissioning.member_self_cancelled_office",
+  "commissioning.consent_withdrawn_office",
   "commissioning.subscription_renewal_failures_office",
   "gdpr.deletion_confirm",
   "gdpr.deletion_approved",

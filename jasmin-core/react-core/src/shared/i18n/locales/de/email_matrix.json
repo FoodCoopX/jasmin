@@ -22,6 +22,7 @@
         "invoice_reminder": "Zahlungserinnerung",
         "waiting_list_offer": "Wartelisten-Angebot",
         "member_self_cancelled_office": "Selbstkündigung (Hinweis ans Büro)",
+        "consent_withdrawn_office": "Einwilligung widerrufen (Hinweis ans Büro)",
         "subscription_renewal_failures_office": "Fehlgeschlagene Verlängerungen (Hinweis ans Büro)"
     },
     "gdpr": {

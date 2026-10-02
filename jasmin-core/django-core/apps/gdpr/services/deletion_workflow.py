@@ -16,6 +16,7 @@ from ..errors import (
 )
 from ..models import DeletionRequest, DeletionRequestState
 from .deletion_emails import send_deletion_pending_admin_office_email
+from .subjects import ErasureSubject
 
 if TYPE_CHECKING:
     # Type-only: the runtime path uses ``get_user_model()``, so this module
@@ -97,6 +98,59 @@ class DeletionWorkflowMixin:
             "gdpr.deletion_requested user=%s request_id=%s",
             user.email,
             deletion_request.pk,
+        )
+        return deletion_request
+
+    @staticmethod
+    @transaction.atomic
+    def file_deletion_for_subject(
+        subject: ErasureSubject,
+        *,
+        admin_user: JasminUser,
+        channel: str,
+        requested_ip: str | None = None,
+    ) -> DeletionRequest:
+        """The office files a deletion request the subject made by email,
+        letter, phone or in person — for someone who can't, or doesn't, use
+        the self-service flow (no login, no account email).
+
+        Skips the email confirmation (the office received the request
+        directly) and lands in ``PENDING_ADMIN``, ready for
+        :meth:`admin_approve_deletion`. Supersedes the subject's open requests
+        like :meth:`request_deletion` does.
+        """
+        open_states = (
+            DeletionRequestState.PENDING_EMAIL,
+            DeletionRequestState.PENDING_ADMIN,
+            DeletionRequestState.APPROVED,
+        )
+        same_subject = DeletionRequest.objects.none()
+        if subject.user is not None:
+            same_subject |= DeletionRequest.objects.filter(user=subject.user)
+        if subject.member is not None:
+            same_subject |= DeletionRequest.objects.filter(member=subject.member)
+        if subject.reseller is not None:
+            same_subject |= DeletionRequest.objects.filter(reseller=subject.reseller)
+        same_subject.filter(state__in=open_states).update(
+            state=DeletionRequestState.CANCELLED, superseded_at=timezone.now()
+        )
+
+        deletion_request = DeletionRequest.objects.create(
+            user=subject.user,
+            member=subject.member,
+            reseller=subject.reseller,
+            requested_email=subject.email,
+            requested_by=admin_user,
+            channel=channel,
+            requires_admin_approval=True,
+            state=DeletionRequestState.PENDING_ADMIN,
+            requested_ip=requested_ip,
+        )
+        logger.info(
+            "gdpr.deletion_filed_by_office request_id=%s channel=%s actor=%s",
+            deletion_request.pk,
+            channel,
+            admin_user.email,
         )
         return deletion_request
 
@@ -311,23 +365,22 @@ class DeletionWorkflowMixin:
         the member could have re-opened a subscription, etc. Better to
         refuse late than to violate Art. 17(3)(b).
         """
-        # DeletionRequest.user is SET_NULL (NOT cascade) — this row IS the
-        # Art. 17 erasure audit trail and must outlive its subject. Guard the
-        # NULL-user case (defensive; anonymisation is in-place today so no path
-        # produces it) so we fail loudly instead of crashing in anonymize_user
-        # or silently mis-answering retention against a NULL FK.
-        user = deletion_request.user
-        if user is None:
+        # The subject FKs are SET_NULL (NOT cascade) — this row IS the
+        # Art. 17 erasure audit trail and must outlive its subject. A request
+        # whose subject rows are all gone fails loudly instead of answering
+        # retention against nothing.
+        subject = GDPRService.subject_of_request(deletion_request)
+        if subject is None:
             raise DeletionRequestNotPending(
-                "This deletion request has no linked user and cannot be executed."
+                "This deletion request has no subject left and cannot be executed."
             )
 
         # Late retention re-check — see docstring above.
-        reasons = GDPRService.check_retention_blocks(user)
+        reasons = GDPRService.check_retention_blocks_for_subject(subject)
         if reasons:
             raise RetentionPeriodActive(reasons)
 
-        deletion_log = GDPRService.anonymize_user(user)
+        deletion_log = GDPRService.anonymize_subject(subject)
         deletion_request.executed_at = timezone.now()
         deletion_request.deletion_log = deletion_log
         deletion_request.state = DeletionRequestState.EXECUTED
@@ -338,3 +391,15 @@ class DeletionWorkflowMixin:
             deletion_request.requested_email,
         )
         return deletion_request
+
+    @staticmethod
+    def subject_of_request(deletion_request: DeletionRequest) -> ErasureSubject | None:
+        """Whom ``deletion_request`` is about: its login user when it has one,
+        else the member or reseller the office filed it for."""
+        if deletion_request.user is not None:
+            return ErasureSubject.of_user(deletion_request.user)
+        if deletion_request.member is not None:
+            return ErasureSubject.of_member(deletion_request.member)
+        if deletion_request.reseller is not None:
+            return ErasureSubject.of_reseller(deletion_request.reseller)
+        return None

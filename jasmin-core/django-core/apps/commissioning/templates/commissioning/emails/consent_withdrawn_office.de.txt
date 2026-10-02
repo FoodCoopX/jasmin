@@ -1,0 +1,13 @@
+Hallo {{ tenant_name }}-Team,
+
+ein Mitglied hat seine Einwilligung in {% if consent_kind == "withdrawal" %}die Widerrufsbelehrung{% else %}die Datenschutzerklärung{% endif %} widerrufen.
+
+Bitte prüft, ob die Verarbeitung seiner Daten auf einer anderen
+Rechtsgrundlage (Vertrag, Aufbewahrungspflicht nach GenG) weiterlaufen darf
+oder eingeschränkt werden muss. Das ist keine automatische Löschung; das
+Mitglied bleibt markiert, bis es erneut einwilligt.
+
+{{ review_url }}
+
+Diese E-Mail nennt bewusst keine Angaben zur Person — die Details sind nur
+nach der Anmeldung sichtbar.

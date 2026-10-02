@@ -97,11 +97,22 @@ class DeletionLog(JasminModel):
     """
     GDPR Art. 17 — Logs every personal-data deletion request so that
     it can be replayed if a database backup is restored.
+
+    The subject keys are plain ids rather than foreign keys: after a restore
+    the replay finds the subject again by them, and they must stay readable
+    once the rows they point at are gone. A copy of every row is kept outside
+    the database (``backups/backup.sh ledger``), since a restore rolls this
+    table back with the data.
     """
 
     user_email = models.EmailField(
-        help_text="Email of the user whose data was deleted (for audit trail)."
+        blank=True,
+        help_text="Email of the user whose data was deleted (for audit trail). "
+        "Empty for a subject without an email address.",
     )
+    user_pk = models.CharField(max_length=ID_LENGTH, blank=True, default="")
+    member_pk = models.CharField(max_length=ID_LENGTH, blank=True, default="")
+    reseller_pk = models.CharField(max_length=ID_LENGTH, blank=True, default="")
     deleted_at = models.DateTimeField(auto_now_add=True)
     description = models.TextField(
         blank=True,
@@ -114,6 +125,25 @@ class DeletionLog(JasminModel):
 
     def __str__(self):
         return f"Deletion {self.user_email} @ {self.deleted_at}"
+
+
+class DeletionRequestChannel(models.TextChoices):
+    """How the data subject asked. Self-service requests come through the
+    account; the office records the others on the subject's behalf."""
+
+    SELF_SERVICE = "self_service", "Self-service"
+    EMAIL = "email", "Email"
+    LETTER = "letter", "Letter"
+    PHONE = "phone", "Phone"
+    IN_PERSON = "in_person", "In person"
+
+
+# The channels the office can record; self-service is the account's own.
+OFFICE_DELETION_CHANNELS = [
+    choice
+    for choice in DeletionRequestChannel.choices
+    if choice[0] != DeletionRequestChannel.SELF_SERVICE
+]
 
 
 # 24h is the standard click-to-confirm window — long enough for a user
@@ -190,11 +220,44 @@ class DeletionRequest(AdminConfirmableMixin, JasminModel):
         related_name="deletion_requests",
     )
 
+    # The subject when the office files the request for someone without a
+    # login: a member or a reseller. Set alongside ``user`` when the subject
+    # has one. SET_NULL for the same reason as ``user``.
+    member = models.ForeignKey(
+        "commissioning.Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    reseller = models.ForeignKey(
+        "commissioning.Reseller",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    # The office user who filed the request; empty for self-service.
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    channel = models.CharField(
+        max_length=20,
+        choices=DeletionRequestChannel.choices,
+        default=DeletionRequestChannel.SELF_SERVICE,
+    )
+
     # Captured at request time so the audit trail survives even if
     # ``user`` is later anonymized (email becomes ``deleted_<pk>@…``).
+    # Empty when the office files it for a subject without an email address.
     requested_email = models.EmailField(
+        blank=True,
         help_text="Email at the moment the request was made — captured "
-        "so the audit trail survives the anonymization itself."
+        "so the audit trail survives the anonymization itself.",
     )
     requested_at = models.DateTimeField(auto_now_add=True, db_index=True)
     # Captured at request time so the burst-alert Huey task

@@ -38,6 +38,8 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from .models import OFFICE_DELETION_CHANNELS
+
 # ---------------------------------------------------------------------------
 # Subject + Account
 # ---------------------------------------------------------------------------
@@ -605,6 +607,30 @@ class SubjectAccessBundleSerializer(serializers.Serializer):
     user_invitations = SarUserInvitationSerializer(many=True)
 
 
+class AdminSarSubjectSerializer(serializers.Serializer):
+    """Identity block of the bundle the office exports: whichever of the
+    login, member and reseller records make up the subject."""
+
+    user_id = serializers.CharField(allow_null=True)
+    member_id = serializers.CharField(allow_null=True)
+    reseller_id = serializers.CharField(allow_null=True)
+    email = serializers.CharField(allow_blank=True)
+
+
+class AdminSubjectAccessBundleSerializer(SubjectAccessBundleSerializer):
+    """The Art. 15 bundle the office exports for a member or reseller, who
+    may have no login: then ``account`` is None. A separate component, so
+    the self-service bundle keeps its non-null ``account``."""
+
+    def get_fields(self) -> dict[str, serializers.Field]:
+        # Replaced in place, so ``subject`` and ``account`` keep their spot at
+        # the top of the export.
+        fields = super().get_fields()
+        fields["subject"] = AdminSarSubjectSerializer()
+        fields["account"] = SarAccountSerializer(allow_null=True)
+        return fields
+
+
 # ---------------------------------------------------------------------------
 # Admin deletion-management endpoints
 #
@@ -621,7 +647,15 @@ class AdminPendingDeletionSerializer(serializers.Serializer):
     """One pending-deletion row for the admin inbox."""
 
     id = serializers.CharField()
-    requested_email = serializers.EmailField()
+    # Empty when the office filed the request for someone without an email.
+    requested_email = serializers.CharField(allow_blank=True)
+    # Who the request is about: the member or reseller name the office
+    # knows them by, else the requested email.
+    subject_label = serializers.CharField()
+    member_id = serializers.CharField(allow_null=True)
+    reseller_id = serializers.CharField(allow_null=True)
+    # How the subject asked; ``self_service`` unless the office filed it.
+    channel = serializers.CharField()
     requested_at = serializers.DateTimeField()
     email_confirmed_at = serializers.DateTimeField(allow_null=True)
     current_user_email = serializers.EmailField(allow_null=True)
@@ -648,7 +682,8 @@ class AdminDecidedDeletionSerializer(serializers.Serializer):
 
     id = serializers.CharField()
     state = serializers.CharField()
-    requested_email = serializers.EmailField()
+    requested_email = serializers.CharField(allow_blank=True)
+    channel = serializers.CharField()
     requested_at = serializers.DateTimeField()
     # NULL for cancelled / expired (those rows were never reviewed
     # by an admin); set to ``executed_at`` for executions and
@@ -658,13 +693,29 @@ class AdminDecidedDeletionSerializer(serializers.Serializer):
     rejection_reason = serializers.CharField(allow_null=True)
 
 
+class AdminFileDeletionRequestSerializer(serializers.Serializer):
+    """Body of the office endpoints that erase a member or reseller: how the
+    person asked."""
+
+    channel = serializers.ChoiceField(choices=OFFICE_DELETION_CHANNELS)
+
+
+class AdminFiledDeletionSerializer(serializers.Serializer):
+    """The deletion request an office endpoint filed, and the state it
+    reached: ``executed``, or ``pending_admin`` when retention obligations
+    still block it (the response is then a 409 naming them)."""
+
+    request_id = serializers.CharField()
+    state = serializers.CharField()
+
+
 class DeletionLogEntrySerializer(serializers.Serializer):
     """One ``apps.gdpr.models.DeletionLog`` row — the append-only
     record of executed personal-data deletions (kept so deletions
     can be replayed if a database backup is restored)."""
 
     id = serializers.CharField()
-    user_email = serializers.EmailField()
+    user_email = serializers.CharField(allow_blank=True)
     deleted_at = serializers.DateTimeField()
     description = serializers.CharField(allow_blank=True, allow_null=True)
 

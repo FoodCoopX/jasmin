@@ -159,8 +159,8 @@ measures, including:
 - **Confidentiality:** role-based access; per-tenant schema
   isolation
 - **Integrity:** auditlog on all writes; signed JWTs
-- **Availability:** AES-256 GPG-encrypted backups (daily) with
-  DeletionLog replay on restore
+- **Availability:** AES-256 GPG-encrypted backups (daily); the
+  DeletionLog is kept outside the database too and replayed on restore
 - **Resilience:** containerised deployment with health checks
 - **Regular testing:** pytest + ESLint + automated CI on every
   push (`.github/workflows/ci.yml`)

@@ -25,6 +25,7 @@ from apps.payments.models import BillingProfile, ChargeSchedule
 
 from ..models import DeletionRequest
 from .anonymization import _ci_recipient_q, _ci_username_q
+from .subjects import ErasureSubject
 
 if TYPE_CHECKING:
     # Type-only: the runtime path uses ``get_user_model()``, so this module
@@ -168,24 +169,33 @@ class SubjectAccessMixin:
           it, add a capped ``_sar_audit_history`` keyed off the member/reseller
           FK chains that ``_scrub_auditlog_entries`` already walks.
         """
-        member = Member.objects.filter(user=user).first()
-        reseller = Reseller.objects.filter(linked_user=user).first()
+        return GDPRService.get_subject_access_bundle_for(ErasureSubject.of_user(user))
+
+    @staticmethod
+    def get_subject_access_bundle_for(subject: ErasureSubject) -> dict:
+        """:meth:`get_subject_access_bundle` for any subject, including a
+        member or reseller without a login: the office answers their written
+        Art. 15 requests with it. ``account`` is None without a login, and
+        ``subject`` also names the member and reseller ids."""
+        user, member, reseller = subject.user, subject.member, subject.reseller
         # SAR side-channel (EmailLog + login history) must key ONLY on the
         # subject's UNIQUE addresses — a shared email_2/email_3 would pull in
         # another subject's records (Art. 15 forbids over-disclosing a third
         # party). Anonymization still scrubs every address (the default).
-        known_emails = GDPRService._collect_known_emails(
-            user, include_shared_secondaries=False
+        known_emails = GDPRService._collect_subject_emails(
+            subject, include_shared_secondaries=False
         )
 
         return {
             "format_version": GDPRService.SAR_FORMAT_VERSION,
             "exported_at": timezone.now(),
             "subject": {
-                "user_id": str(user.pk),
-                "email": user.email,
+                "user_id": str(user.pk) if user is not None else None,
+                "member_id": str(member.pk) if member is not None else None,
+                "reseller_id": str(reseller.pk) if reseller is not None else None,
+                "email": subject.email,
             },
-            "account": GDPRService._sar_account(user),
+            "account": GDPRService._sar_account(user) if user is not None else None,
             "member": GDPRService._sar_member(member),
             "billing_profile": GDPRService._sar_billing_profile(member),
             "reseller": GDPRService._sar_reseller(reseller),
@@ -199,8 +209,10 @@ class SubjectAccessMixin:
             "reseller_invoices": GDPRService._sar_reseller_invoices(reseller),
             "email_log": GDPRService._sar_email_log(known_emails),
             "login_history": GDPRService._sar_login_history(known_emails),
-            "deletion_requests": GDPRService._sar_deletion_requests(user),
-            "user_invitations": GDPRService._sar_user_invitations(user),
+            "deletion_requests": GDPRService._sar_deletion_requests(subject),
+            "user_invitations": (
+                GDPRService._sar_user_invitations(user) if user is not None else []
+            ),
         }
 
     # ---- SAR per-section helpers --------------------------------
@@ -732,11 +744,19 @@ class SubjectAccessMixin:
         }
 
     @staticmethod
-    def _sar_deletion_requests(user: JasminUser) -> list[dict]:
-        """The user's own Art. 17 history — every deletion request
-        they've ever filed, including superseded / rejected / expired
-        ones. Lets the user audit their own actions."""
-        rows = DeletionRequest.objects.filter(user=user).order_by("-requested_at")
+    def _sar_deletion_requests(subject: ErasureSubject) -> list[dict]:
+        """The subject's own Art. 17 history — every deletion request
+        they've ever filed or the office filed for them, including
+        superseded / rejected / expired ones. Lets the subject audit
+        their own actions."""
+        rows = DeletionRequest.objects.none()
+        if subject.user is not None:
+            rows |= DeletionRequest.objects.filter(user=subject.user)
+        if subject.member is not None:
+            rows |= DeletionRequest.objects.filter(member=subject.member)
+        if subject.reseller is not None:
+            rows |= DeletionRequest.objects.filter(reseller=subject.reseller)
+        rows = rows.order_by("-requested_at")
         return [
             {
                 "id": str(request.pk),

@@ -49,6 +49,7 @@ import CoopSharesCard from "../components/CoopSharesCard";
 import CurrentWeekDeliveryCard from "../components/CurrentWeekDeliveryCard";
 import DeliveryStationDaysCard from "../components/DeliveryStationDaysCard";
 import MemberConsentsCard from "../components/MemberConsentsCard";
+import { MemberDataProtectionCard } from "../components/GdprSubjectActions";
 import PaymentsCard from "../components/PaymentsCard";
 import UpcomingDeliveriesCard from "../components/UpcomingDeliveriesCard";
 
@@ -417,6 +418,7 @@ const MemberDetail = () => {
           <DeliveryStationDaysCard memberId={id!} />
           <PaymentsCard memberId={id!} />
           <MemberConsentsCard memberId={id!} />
+          <MemberDataProtectionCard memberId={id!} />
 
           {/* Member self-service membership cancellation. Only their own,
               confirmed, not-yet-cancelled membership. The endpoint refuses

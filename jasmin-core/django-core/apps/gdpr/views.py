@@ -18,11 +18,24 @@ from core.serializers import ErrorResponseSerializer
 from core.tenant_db import connection
 from core.throttling import set_throttle_scope
 
-from .errors import MissingRejectionReason
-from .models import DeletionLog, DeletionRequest, DeletionRequestState
+from .errors import (
+    InvalidDeletionChannel,
+    MissingRejectionReason,
+    RetentionPeriodActive,
+    SubjectAlreadyErased,
+)
+from .models import (
+    OFFICE_DELETION_CHANNELS,
+    DeletionLog,
+    DeletionRequest,
+    DeletionRequestState,
+)
 from .serializers import (
     AdminDecidedDeletionSerializer,
+    AdminFiledDeletionSerializer,
+    AdminFileDeletionRequestSerializer,
     AdminPendingDeletionListSerializer,
+    AdminSubjectAccessBundleSerializer,
     DeletionLogListSerializer,
     DeletionPreviewSerializer,
     MyDeletionStatusSerializer,
@@ -35,6 +48,7 @@ from .services import (
     send_deletion_confirmation_email,
     send_deletion_rejected_email,
 )
+from .services.subjects import ErasureSubject
 
 logger = logging.getLogger("gdpr")
 
@@ -450,7 +464,7 @@ def gdpr_admin_pending_deletions_view(request: Request) -> Response:
     ``email_confirmed_at``, ``current_user_email``, ``blockers``."""
     pending_requests = list(
         DeletionRequest.objects.filter(state=DeletionRequestState.PENDING_ADMIN)
-        .select_related("user")
+        .select_related("user", "member", "reseller__contact")
         .order_by("requested_at")
     )
     # Compute retention blockers for every pending user in a constant number
@@ -462,24 +476,45 @@ def gdpr_admin_pending_deletions_view(request: Request) -> Response:
             if deletion_request.user is not None
         ]
     )
+
+    def blockers(deletion_request: DeletionRequest) -> list[str]:
+        if deletion_request.user_id:
+            return blockers_by_user.get(deletion_request.user_id, [])
+        # Filed by the office for a member or reseller without a login: rare
+        # enough to check one at a time.
+        subject = GDPRService.subject_of_request(deletion_request)
+        if subject is None:
+            return []
+        return GDPRService.check_retention_blocks_for_subject(subject)
+
     pending = [
         {
             "id": deletion_request.id,
             "requested_email": deletion_request.requested_email,
+            "subject_label": _pending_subject_label(deletion_request),
+            "member_id": deletion_request.member_id,
+            "reseller_id": deletion_request.reseller_id,
+            "channel": deletion_request.channel,
             "requested_at": deletion_request.requested_at,
             "email_confirmed_at": deletion_request.email_confirmed_at,
             "current_user_email": (
                 deletion_request.user.email if deletion_request.user_id else None
             ),
-            "blockers": (
-                blockers_by_user.get(deletion_request.user_id, [])
-                if deletion_request.user_id
-                else []
-            ),
+            "blockers": blockers(deletion_request),
         }
         for deletion_request in pending_requests
     ]
     return Response({"pending": pending})
+
+
+def _pending_subject_label(deletion_request: DeletionRequest) -> str:
+    """Who a pending request is about, as the office knows them: the member
+    or reseller it was filed for, else the email it was requested from."""
+    if deletion_request.member is not None:
+        return str(deletion_request.member)
+    if deletion_request.reseller is not None:
+        return str(deletion_request.reseller)
+    return deletion_request.requested_email
 
 
 @extend_schema(
@@ -542,6 +577,7 @@ def gdpr_admin_decided_deletions_view(request: Request) -> Response:
             "id": deletion_request.id,
             "state": str(deletion_request.state),
             "requested_email": deletion_request.requested_email,
+            "channel": deletion_request.channel,
             "requested_at": deletion_request.requested_at,
             "decided_at": decided_at,
             "decided_by_email": (
@@ -678,3 +714,191 @@ def gdpr_processing_activities_view(request: Request) -> Response:
         client_ip(request),
     )
     return Response(payload)
+
+
+# ---------------------------------------------------------------------------
+# Requests the office handles for a member or reseller
+#
+# Someone without a login, or who asks by letter, email, phone or in person,
+# can't use the self-service endpoints above. The office answers them here,
+# keyed by the member or reseller record.
+# ---------------------------------------------------------------------------
+
+_SUBJECT_ID_PARAMETERS = {
+    "member": OpenApiParameter(
+        name="member_id", location=OpenApiParameter.PATH, type=str
+    ),
+    "reseller": OpenApiParameter(
+        name="reseller_id", location=OpenApiParameter.PATH, type=str
+    ),
+}
+
+
+def _member_subject(member_id: str) -> ErasureSubject:
+    from apps.commissioning.models import Member
+    from core.errors import NotFoundError
+
+    member = Member.objects.select_related("user").filter(pk=member_id).first()
+    if member is None:
+        raise NotFoundError("Member not found.")
+    return ErasureSubject.of_member(member)
+
+
+def _reseller_subject(reseller_id: str) -> ErasureSubject:
+    from apps.commissioning.models import Reseller
+    from core.errors import NotFoundError
+
+    reseller = (
+        Reseller.objects.select_related("linked_user", "contact")
+        .filter(pk=reseller_id)
+        .first()
+    )
+    if reseller is None:
+        raise NotFoundError("Reseller not found.")
+    return ErasureSubject.of_reseller(reseller)
+
+
+def _subject_log_ref(subject: ErasureSubject) -> str:
+    return " ".join(
+        f"{name}={record.pk}"
+        for name, record in (
+            ("user", subject.user),
+            ("member", subject.member),
+            ("reseller", subject.reseller),
+        )
+        if record is not None
+    )
+
+
+def _erase_subject(request: Request, subject: ErasureSubject) -> Response:
+    """File the subject's deletion request as the office received it, then
+    approve and run it straight away.
+
+    When retention obligations block the erasure, the request stays in the
+    pending inbox and the 409 names them along with ``request_id``: the
+    office approves it there once they are closed."""
+    channel = body(request).get("channel")
+    if not isinstance(channel, str) or channel not in {
+        value for value, _label in OFFICE_DELETION_CHANNELS
+    }:
+        raise InvalidDeletionChannel(
+            "Say how the person asked: email, letter, phone or in person."
+        )
+    if subject.is_erased:
+        raise SubjectAlreadyErased("This person's personal data is already erased.")
+
+    admin = auth_user(request)
+    deletion_request = GDPRService.file_deletion_for_subject(
+        subject, admin_user=admin, channel=channel, requested_ip=client_ip(request)
+    )
+    try:
+        deletion_request = GDPRService.admin_approve_deletion(
+            deletion_request, admin_user=admin
+        )
+    except RetentionPeriodActive as exc:
+        raise RetentionPeriodActive(
+            exc.details["reasons"], request_id=deletion_request.pk
+        ) from None
+
+    send_deletion_approved_email(deletion_request)
+    logger.warning(
+        "gdpr.deletion_executed_for_office request_id=%s %s channel=%s actor=%s "
+        "tenant=%s ip=%s",
+        deletion_request.pk,
+        _subject_log_ref(subject),
+        channel,
+        admin.email,
+        connection.schema_name,
+        client_ip(request),
+    )
+    return Response(
+        AdminFiledDeletionSerializer(
+            {"request_id": deletion_request.pk, "state": str(deletion_request.state)}
+        ).data
+    )
+
+
+def _subject_access_response(request: Request, subject: ErasureSubject) -> Response:
+    bundle = GDPRService.get_subject_access_bundle_for(subject)
+    logger.warning(
+        "gdpr.sar_exported_by_office %s actor=%s tenant=%s ip=%s",
+        _subject_log_ref(subject),
+        auth_user(request).email,
+        connection.schema_name,
+        client_ip(request),
+    )
+    return Response(AdminSubjectAccessBundleSerializer(bundle).data)
+
+
+_ERASE_RESPONSES = {
+    200: AdminFiledDeletionSerializer,
+    400: ErrorResponseSerializer,
+    401: ErrorResponseSerializer,
+    403: ErrorResponseSerializer,
+    404: ErrorResponseSerializer,
+    409: ErrorResponseSerializer,
+}
+_SUBJECT_ACCESS_RESPONSES = {
+    200: AdminSubjectAccessBundleSerializer,
+    401: ErrorResponseSerializer,
+    403: ErrorResponseSerializer,
+    404: ErrorResponseSerializer,
+}
+
+
+@extend_schema(
+    tags=["gdpr"],
+    summary="Admin: erase a member's personal data on their request (Art. 17)",
+    request=AdminFileDeletionRequestSerializer,
+    parameters=[_SUBJECT_ID_PARAMETERS["member"]],
+    responses=_ERASE_RESPONSES,
+)
+@api_view(["POST"])
+@permission_classes([IsAdmin, RequiresStepUp])
+def gdpr_admin_erase_member_view(request: Request, member_id: str) -> Response:
+    """Erase a member who asked the office, including one without a login.
+    Step-up like the inbox approve: the erasure is irreversible."""
+    return _erase_subject(request, _member_subject(member_id))
+
+
+@extend_schema(
+    tags=["gdpr"],
+    summary="Admin: erase a reseller's personal data on their request (Art. 17)",
+    request=AdminFileDeletionRequestSerializer,
+    parameters=[_SUBJECT_ID_PARAMETERS["reseller"]],
+    responses=_ERASE_RESPONSES,
+)
+@api_view(["POST"])
+@permission_classes([IsAdmin, RequiresStepUp])
+def gdpr_admin_erase_reseller_view(request: Request, reseller_id: str) -> Response:
+    """Erase a reseller who asked the office, including one without a login."""
+    return _erase_subject(request, _reseller_subject(reseller_id))
+
+
+@extend_schema(
+    tags=["gdpr"],
+    summary="Admin: a member's Subject Access Request bundle (Art. 15)",
+    parameters=[_SUBJECT_ID_PARAMETERS["member"]],
+    responses=_SUBJECT_ACCESS_RESPONSES,
+)
+@api_view(["GET"])
+@permission_classes([IsAdmin, RequiresStepUp])
+def gdpr_admin_member_subject_access_view(request: Request, member_id: str) -> Response:
+    """Everything stored about a member, for the office to send them.
+    Step-up: it is the subject's complete personal data in one response."""
+    return _subject_access_response(request, _member_subject(member_id))
+
+
+@extend_schema(
+    tags=["gdpr"],
+    summary="Admin: a reseller's Subject Access Request bundle (Art. 15)",
+    parameters=[_SUBJECT_ID_PARAMETERS["reseller"]],
+    responses=_SUBJECT_ACCESS_RESPONSES,
+)
+@api_view(["GET"])
+@permission_classes([IsAdmin, RequiresStepUp])
+def gdpr_admin_reseller_subject_access_view(
+    request: Request, reseller_id: str
+) -> Response:
+    """Everything stored about a reseller, for the office to send them."""
+    return _subject_access_response(request, _reseller_subject(reseller_id))

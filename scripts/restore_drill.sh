@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Restore drill — restores a backup into a throwaway sandbox postgres and
-# writes a per-table row-count comparison vs the live prod DB, then unpacks
-# the newest media archive to prove that half restores too.
+# writes a per-table row-count comparison vs the live prod DB, dry-runs the
+# GDPR erasure replay against the restored data, then unpacks the newest
+# media archive to prove that half restores too.
 #
 # Usage:
 #     ./scripts/restore_drill.sh                       # newest file in ./backups/
@@ -26,9 +27,10 @@
 #                                         block appended by the operator)
 #
 # Exit status:
-#     Non-zero if the media archive was found but failed to restore. A
-#     missing media archive is not a failure — a deployment with no uploads
-#     yet legitimately has none.
+#     Non-zero if the media archive was found but failed to restore, or if
+#     the erasure replay could not run against the restored data. A missing
+#     media archive is not a failure — a deployment with no uploads yet
+#     legitimately has none.
 #
 # Safety:
 #     The sandbox container is fully isolated (no host port, default
@@ -55,6 +57,11 @@ OUTPUT_FILE="${OUTPUT_DIR}/$(date +%Y-%m-%d).md"
 MEDIA_EXTRACT_DIR=""
 MEDIA_STATUS="not run"
 MEDIA_FAILED=0
+# Erasure-replay state; APP_ENV_FILE holds the app's secrets while it exists,
+# so the exit trap removes it too.
+APP_ENV_FILE=""
+REPLAY_STATUS="not run"
+REPLAY_FAILED=0
 
 # ── Argument: backup file ──────────────────────────────────────────────────
 BACKUP="${1:-}"
@@ -101,6 +108,9 @@ cleanup() {
     if [ -n "$MEDIA_EXTRACT_DIR" ] && [ -d "$MEDIA_EXTRACT_DIR" ]; then
         echo "Removing media scratch dir ($MEDIA_EXTRACT_DIR)..."
         rm -rf "$MEDIA_EXTRACT_DIR"
+    fi
+    if [ -n "$APP_ENV_FILE" ]; then
+        rm -f "$APP_ENV_FILE"
     fi
     if docker ps -q --filter "name=^${SANDBOX_CONTAINER}$" | grep -q .; then
         echo "Tearing down sandbox container..."
@@ -218,6 +228,86 @@ while IFS= read -r qualified; do
 done < <(docker exec "$SANDBOX_CONTAINER" \
     psql -U "$SANDBOX_USER" -d "$SANDBOX_DB" -t -A -c "$ENUMERATE_SQL")
 
+# ── GDPR erasure replay (dry run) ──────────────────────────────────────────
+# A real restore is followed by ``replay_gdpr_deletions``, which re-applies
+# the erasures made after the backup from the ledger kept outside the
+# database (backups/restore.sh prints the command). The dry run against the
+# sandbox shows what it would re-apply to THIS backup, and proves the app can
+# read the restored data and the ledger at all.
+#
+# The app container runs the live image with the live environment, but shares
+# only the sandbox's network: it reaches the sandbox database on localhost and
+# nothing of the running stack.
+LEDGER_FILE="backups/gdpr-deletion-ledger.jsonl"
+HUEY_CONTAINER="$(docker compose ps -q huey 2>/dev/null || true)"
+
+{
+    echo ""
+    echo "## GDPR erasure replay (dry run)"
+    echo ""
+} >> "$OUTPUT_FILE"
+
+if [ ! -f "$LEDGER_FILE" ]; then
+    REPLAY_STATUS="SKIPPED (no ledger)"
+    echo "WARNING: $LEDGER_FILE not found — skipping the erasure replay." >&2
+    {
+        echo "- **Result:** SKIPPED — \`$LEDGER_FILE\` not found. The backup"
+        echo "  container writes it every 10 minutes; check \`/var/log/backup.log\`"
+        echo "  in that container."
+    } >> "$OUTPUT_FILE"
+elif [ -z "$HUEY_CONTAINER" ]; then
+    REPLAY_STATUS="SKIPPED (huey not running)"
+    echo "WARNING: huey container not found — skipping the erasure replay." >&2
+    {
+        echo "- **Result:** SKIPPED — the huey container isn't running, so there"
+        echo "  is no app image and environment to run the replay with."
+    } >> "$OUTPUT_FILE"
+else
+    echo "Dry-running the GDPR erasure replay against the sandbox..."
+    APP_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$HUEY_CONTAINER")"
+    APP_ENV_FILE="$(mktemp)"
+    docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$HUEY_CONTAINER" \
+        > "$APP_ENV_FILE"
+    # Migrates first: an older backup may predate the code's tables.
+    if REPLAY_OUTPUT="$(docker run --rm -i \
+            --network "container:${SANDBOX_CONTAINER}" \
+            --env-file "$APP_ENV_FILE" \
+            -e POSTGRES_HOST=127.0.0.1 \
+            -e POSTGRES_PORT=5432 \
+            -e POSTGRES_DB="$SANDBOX_DB" \
+            -e POSTGRES_USER="$SANDBOX_USER" \
+            -e POSTGRES_PASSWORD="$SANDBOX_PASSWORD" \
+            -e SENTRY_DSN= \
+            --entrypoint sh "$APP_IMAGE" \
+            -c 'python manage.py migrate_schemas --noinput > /dev/null && python manage.py replay_gdpr_deletions --dry-run --ledger -' \
+            < "$LEDGER_FILE" 2>&1)"; then
+        REPLAY_STATUS="PASS"
+        echo "  replay dry run OK"
+        {
+            echo "- **Result:** PASS — the replay read the ledger and the restored data."
+            echo "- **Ledger entries:** $(wc -l < "$LEDGER_FILE" | tr -d ' ')"
+            echo ""
+            echo '```'
+            echo "$REPLAY_OUTPUT"
+            echo '```'
+        } >> "$OUTPUT_FILE"
+    else
+        REPLAY_STATUS="FAIL"
+        REPLAY_FAILED=1
+        echo "ERROR: the GDPR erasure replay failed against the sandbox" >&2
+        {
+            echo "- **Result:** FAIL — after a real restore, erasures made after this"
+            echo "  backup could not be re-applied. Treat this as an incident."
+            echo ""
+            echo '```'
+            echo "$REPLAY_OUTPUT" | tail -n 40
+            echo '```'
+        } >> "$OUTPUT_FILE"
+    fi
+    rm -f "$APP_ENV_FILE"
+    APP_ENV_FILE=""
+fi
+
 # ── Media archive verification ─────────────────────────────────────────────
 # backups/backup.sh verifies the media tar only as far as ``tar -t`` (a
 # listing). This step actually unpacks it, so a drill produces evidence that
@@ -313,6 +403,7 @@ fi
     echo ""
     echo "- Tables compared: **$TOTAL_TABLES**"
     echo "- Tables with diff > ±1000 rows: **$LARGE_DIFFS** (eyeball these in sign-off)"
+    echo "- GDPR erasure replay (dry run): **$REPLAY_STATUS**"
     echo "- Media archive: **$MEDIA_STATUS**"
     echo ""
     echo "## Sign-off"
@@ -328,12 +419,18 @@ echo "Drill complete."
 echo "Log: $OUTPUT_FILE"
 echo ""
 echo "Next steps:"
-echo "  1. Review the row-count table and the media verification result"
+echo "  1. Review the row-count table, the erasure replay and the media verification result"
 echo "  2. Append the sign-off block (set Outcome: PASS / FAIL + notes)"
 echo "  3. git add + commit the log as the audit artifact"
 
+if [ "$REPLAY_FAILED" -ne 0 ]; then
+    echo ""
+    echo "GDPR ERASURE REPLAY FAILED — the drill did NOT pass. See $OUTPUT_FILE" >&2
+fi
 if [ "$MEDIA_FAILED" -ne 0 ]; then
     echo ""
     echo "MEDIA VERIFICATION FAILED — the drill did NOT pass. See $OUTPUT_FILE" >&2
+fi
+if [ "$REPLAY_FAILED" -ne 0 ] || [ "$MEDIA_FAILED" -ne 0 ]; then
     exit 1
 fi

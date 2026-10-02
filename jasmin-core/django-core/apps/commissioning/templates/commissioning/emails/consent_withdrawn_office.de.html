@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8" /><title>Einwilligung widerrufen</title></head>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1f1f1f; max-width: 560px; margin: 0 auto; padding: 24px;">
+    <h1 style="font-size: 22px; font-weight: 600;">Ein Mitglied hat eine Einwilligung widerrufen</h1>
+    <p>
+      Ein Mitglied
+      {% if tenant_name %}von <strong>{{ tenant_name }}</strong>{% endif %}
+      hat seine Einwilligung in
+      {% if consent_kind == "withdrawal" %}die <strong>Widerrufsbelehrung</strong>{% else %}die <strong>Datenschutzerklärung</strong>{% endif %}
+      widerrufen.
+    </p>
+    <p>
+      Bitte prüft, ob die Verarbeitung seiner Daten auf einer anderen
+      Rechtsgrundlage (Vertrag, Aufbewahrungspflicht nach GenG) weiterlaufen
+      darf oder eingeschränkt werden muss. Das ist keine automatische
+      Löschung; das Mitglied bleibt markiert, bis es erneut einwilligt.
+    </p>
+    <p><a href="{{ review_url }}">{{ review_url }}</a></p>
+    <p style="color: #666; font-size: 12px; margin-top: 32px;">
+      Diese E-Mail nennt bewusst keine Angaben zur Person — die Details sind
+      nur nach der Anmeldung sichtbar.
+    </p>
+  </body>
+</html>

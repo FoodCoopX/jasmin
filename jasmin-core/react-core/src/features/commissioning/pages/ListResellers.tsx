@@ -20,6 +20,7 @@ import type {
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
 import { ROLES } from "@shared/auth/roles";
+import { ResellerDataProtection } from "@features/members/components/GdprSubjectActions";
 import { InviteUserModal, UserInfoModal } from "@shared/modals";
 import { ExportCsv } from "@features/commissioning/modals";
 import { ResellerInvoiceSettingsModal } from "@features/commissioning/modals/ResellerInvoiceSettingsModal";
@@ -66,6 +67,10 @@ const resellersResource: CrudResource<TableRecord> = {
     commissioningResellersDestroy(id, { delete_context: "resellers" }),
   getListQueryKey: getCommissioningResellersListQueryKey,
 };
+
+/** The id of the login linked to a reseller row, if it has one. */
+const linkedUserIdOf = (record: Record<string, unknown>): string | undefined =>
+  (record.linked_user_info as { id?: string } | null | undefined)?.id;
 
 export default function ListResellers() {
   const { t } = useTranslation();
@@ -158,12 +163,10 @@ export default function ListResellers() {
 
   const handleResendInvitation = useCallback(
     async (record: Record<string, unknown>) => {
-      const linkedUser = (record as TableRecord).linked_user_info as
-        | { id?: string }
-        | undefined;
-      if (!linkedUser?.id) return;
+      const linkedUserId = linkedUserIdOf(record);
+      if (!linkedUserId) return;
       try {
-        const updatedUser = await authAdminUsersResendInvitationCreate(linkedUser.id);
+        const updatedUser = await authAdminUsersResendInvitationCreate(linkedUserId);
         notify.success(t("users.invitation_resent"));
         handleCloseUserInfoModal();
         // Patch only this row so we don't lose sort/scroll position.
@@ -180,12 +183,10 @@ export default function ListResellers() {
 
   const setActive = useCallback(
     async (record: Record<string, unknown>, next: "active" | "inactive") => {
-      const linkedUser = (record as TableRecord).linked_user_info as
-        | { id?: string }
-        | undefined;
-      if (!linkedUser?.id) return;
+      const linkedUserId = linkedUserIdOf(record);
+      if (!linkedUserId) return;
       try {
-        const updatedUser = await authAdminUsersPartialUpdate(linkedUser.id, {
+        const updatedUser = await authAdminUsersPartialUpdate(linkedUserId, {
           account_status: next,
         });
         notify.success(
@@ -449,6 +450,7 @@ export default function ListResellers() {
         onResendInvitation={handleResendInvitation}
         onActivateUser={handleActivateUser}
         onDeactivateUser={handleDeactivateUser}
+        extra={<ResellerDataProtection reseller={selectedUserRecord} />}
       />
 
       <InviteUserModal

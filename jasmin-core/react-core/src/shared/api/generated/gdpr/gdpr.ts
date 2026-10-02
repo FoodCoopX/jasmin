@@ -26,7 +26,10 @@ import type {
 
 import type {
   AdminDecidedDeletion,
+  AdminFileDeletionRequest,
+  AdminFiledDeletion,
   AdminPendingDeletionList,
+  AdminSubjectAccessBundle,
   DeletionApproved,
   DeletionConfirmed,
   DeletionLogList,
@@ -205,6 +208,167 @@ export function useGdprAdminDecidedDeletionsList<TData = Awaited<ReturnType<type
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGdprAdminDecidedDeletionsListQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * Erase a member who asked the office, including one without a login.
+Step-up like the inbox approve: the erasure is irreversible.
+ * @summary Admin: erase a member's personal data on their request (Art. 17)
+ */
+export const gdprAdminMembersEraseCreate = (
+    memberId: string,
+    adminFileDeletionRequest: AdminFileDeletionRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<AdminFiledDeletion>(
+      {url: `/api/gdpr/admin/members/${memberId}/erase/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: adminFileDeletionRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getGdprAdminMembersEraseCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gdprAdminMembersEraseCreate>>, TError,{memberId: string;data: AdminFileDeletionRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof gdprAdminMembersEraseCreate>>, TError,{memberId: string;data: AdminFileDeletionRequest}, TContext> => {
+
+const mutationKey = ['gdprAdminMembersEraseCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gdprAdminMembersEraseCreate>>, {memberId: string;data: AdminFileDeletionRequest}> = (props) => {
+          const {memberId,data} = props ?? {};
+
+          return  gdprAdminMembersEraseCreate(memberId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GdprAdminMembersEraseCreateMutationResult = NonNullable<Awaited<ReturnType<typeof gdprAdminMembersEraseCreate>>>
+    export type GdprAdminMembersEraseCreateMutationBody = AdminFileDeletionRequest
+    export type GdprAdminMembersEraseCreateMutationError = ErrorResponse
+
+    /**
+ * @summary Admin: erase a member's personal data on their request (Art. 17)
+ */
+export const useGdprAdminMembersEraseCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gdprAdminMembersEraseCreate>>, TError,{memberId: string;data: AdminFileDeletionRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof gdprAdminMembersEraseCreate>>,
+        TError,
+        {memberId: string;data: AdminFileDeletionRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getGdprAdminMembersEraseCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Everything stored about a member, for the office to send them.
+Step-up: it is the subject's complete personal data in one response.
+ * @summary Admin: a member's Subject Access Request bundle (Art. 15)
+ */
+export const gdprAdminMembersSubjectAccessRetrieve = (
+    memberId: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<AdminSubjectAccessBundle>(
+      {url: `/api/gdpr/admin/members/${memberId}/subject-access/`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getGdprAdminMembersSubjectAccessRetrieveQueryKey = (memberId?: string,) => {
+    return [
+    `/api/gdpr/admin/members/${memberId}/subject-access/`
+    ] as const;
+    }
+
+    
+export const getGdprAdminMembersSubjectAccessRetrieveQueryOptions = <TData = Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError = ErrorResponse>(memberId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGdprAdminMembersSubjectAccessRetrieveQueryKey(memberId);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>> = ({ signal }) => gdprAdminMembersSubjectAccessRetrieve(memberId, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(memberId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GdprAdminMembersSubjectAccessRetrieveQueryResult = NonNullable<Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>>
+export type GdprAdminMembersSubjectAccessRetrieveQueryError = ErrorResponse
+
+
+export function useGdprAdminMembersSubjectAccessRetrieve<TData = Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError = ErrorResponse>(
+ memberId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGdprAdminMembersSubjectAccessRetrieve<TData = Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError = ErrorResponse>(
+ memberId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGdprAdminMembersSubjectAccessRetrieve<TData = Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError = ErrorResponse>(
+ memberId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Admin: a member's Subject Access Request bundle (Art. 15)
+ */
+
+export function useGdprAdminMembersSubjectAccessRetrieve<TData = Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError = ErrorResponse>(
+ memberId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminMembersSubjectAccessRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGdprAdminMembersSubjectAccessRetrieveQueryOptions(memberId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -491,6 +655,165 @@ export const useGdprAdminRejectDeletionCreate = <TError = ErrorResponse,
       return useMutation(mutationOptions, queryClient);
     }
     /**
+ * Erase a reseller who asked the office, including one without a login.
+ * @summary Admin: erase a reseller's personal data on their request (Art. 17)
+ */
+export const gdprAdminResellersEraseCreate = (
+    resellerId: string,
+    adminFileDeletionRequest: AdminFileDeletionRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<AdminFiledDeletion>(
+      {url: `/api/gdpr/admin/resellers/${resellerId}/erase/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: adminFileDeletionRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getGdprAdminResellersEraseCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gdprAdminResellersEraseCreate>>, TError,{resellerId: string;data: AdminFileDeletionRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof gdprAdminResellersEraseCreate>>, TError,{resellerId: string;data: AdminFileDeletionRequest}, TContext> => {
+
+const mutationKey = ['gdprAdminResellersEraseCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gdprAdminResellersEraseCreate>>, {resellerId: string;data: AdminFileDeletionRequest}> = (props) => {
+          const {resellerId,data} = props ?? {};
+
+          return  gdprAdminResellersEraseCreate(resellerId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GdprAdminResellersEraseCreateMutationResult = NonNullable<Awaited<ReturnType<typeof gdprAdminResellersEraseCreate>>>
+    export type GdprAdminResellersEraseCreateMutationBody = AdminFileDeletionRequest
+    export type GdprAdminResellersEraseCreateMutationError = ErrorResponse
+
+    /**
+ * @summary Admin: erase a reseller's personal data on their request (Art. 17)
+ */
+export const useGdprAdminResellersEraseCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gdprAdminResellersEraseCreate>>, TError,{resellerId: string;data: AdminFileDeletionRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof gdprAdminResellersEraseCreate>>,
+        TError,
+        {resellerId: string;data: AdminFileDeletionRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getGdprAdminResellersEraseCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Everything stored about a reseller, for the office to send them.
+ * @summary Admin: a reseller's Subject Access Request bundle (Art. 15)
+ */
+export const gdprAdminResellersSubjectAccessRetrieve = (
+    resellerId: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<AdminSubjectAccessBundle>(
+      {url: `/api/gdpr/admin/resellers/${resellerId}/subject-access/`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getGdprAdminResellersSubjectAccessRetrieveQueryKey = (resellerId?: string,) => {
+    return [
+    `/api/gdpr/admin/resellers/${resellerId}/subject-access/`
+    ] as const;
+    }
+
+    
+export const getGdprAdminResellersSubjectAccessRetrieveQueryOptions = <TData = Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError = ErrorResponse>(resellerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGdprAdminResellersSubjectAccessRetrieveQueryKey(resellerId);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>> = ({ signal }) => gdprAdminResellersSubjectAccessRetrieve(resellerId, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(resellerId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GdprAdminResellersSubjectAccessRetrieveQueryResult = NonNullable<Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>>
+export type GdprAdminResellersSubjectAccessRetrieveQueryError = ErrorResponse
+
+
+export function useGdprAdminResellersSubjectAccessRetrieve<TData = Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError = ErrorResponse>(
+ resellerId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGdprAdminResellersSubjectAccessRetrieve<TData = Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError = ErrorResponse>(
+ resellerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGdprAdminResellersSubjectAccessRetrieve<TData = Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError = ErrorResponse>(
+ resellerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Admin: a reseller's Subject Access Request bundle (Art. 15)
+ */
+
+export function useGdprAdminResellersSubjectAccessRetrieve<TData = Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError = ErrorResponse>(
+ resellerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminResellersSubjectAccessRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGdprAdminResellersSubjectAccessRetrieveQueryOptions(resellerId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
  * Confirm a pending deletion request.
 
 ``AllowAny`` because the JWT may already be expired by the time

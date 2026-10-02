@@ -111,5 +111,28 @@
   "vvt_supervisory_authority": "Supervisory authority",
   "vvt_controller_saved": "Controller details saved",
   "vvt_controller_save_failed": "Failed to save controller details",
-  "vvt_controller_save": "Save"
+  "vvt_controller_save": "Save",
+  "subject": "Person",
+  "filed_by_office": "Filed by the office: {{channel}}",
+  "channel": {
+    "self_service": "Self-service",
+    "email": "Email",
+    "letter": "Letter",
+    "phone": "Phone",
+    "in_person": "In person"
+  },
+  "office_actions": {
+    "title": "Data protection",
+    "description": "For requests made by email, letter, phone or in person — also from people without a login.",
+    "export": "Export personal data",
+    "erase": "Erase personal data",
+    "erase_title": "Erase personal data",
+    "erase_intro": "Erases this person's personal data for good (GDPR Art. 17). Records the law requires us to keep stay, without their name.",
+    "channel_label": "How did they ask for the erasure?",
+    "channel_placeholder": "Please choose",
+    "erase_confirm": "Erase for good",
+    "erased": "Personal data erased.",
+    "blocked_title": "Not erased yet",
+    "blocked_intro": "These obligations still need the data. The request waits among the deletion requests until they're settled:"
+  }
 }

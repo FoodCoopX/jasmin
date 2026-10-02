@@ -25815,6 +25815,114 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/gdpr/admin/members/{member_id}/erase/:
+    post:
+      operationId: gdpr_admin_members_erase_create
+      description: |-
+        Erase a member who asked the office, including one without a login.
+        Step-up like the inbox approve: the erasure is irreversible.
+      summary: 'Admin: erase a member''s personal data on their request (Art. 17)'
+      parameters:
+      - in: path
+        name: member_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - gdpr
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminFileDeletionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminFileDeletionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminFileDeletionRequest'
+        required: true
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminFiledDeletion'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/gdpr/admin/members/{member_id}/subject-access/:
+    get:
+      operationId: gdpr_admin_members_subject_access_retrieve
+      description: |-
+        Everything stored about a member, for the office to send them.
+        Step-up: it is the subject's complete personal data in one response.
+      summary: 'Admin: a member''s Subject Access Request bundle (Art. 15)'
+      parameters:
+      - in: path
+        name: member_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - gdpr
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSubjectAccessBundle'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/gdpr/admin/pending-deletions/:
     get:
       operationId: gdpr_admin_pending_deletions_retrieve
@@ -25968,6 +26076,111 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/gdpr/admin/resellers/{reseller_id}/erase/:
+    post:
+      operationId: gdpr_admin_resellers_erase_create
+      description: Erase a reseller who asked the office, including one without a
+        login.
+      summary: 'Admin: erase a reseller''s personal data on their request (Art. 17)'
+      parameters:
+      - in: path
+        name: reseller_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - gdpr
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminFileDeletionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminFileDeletionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminFileDeletionRequest'
+        required: true
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminFiledDeletion'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/gdpr/admin/resellers/{reseller_id}/subject-access/:
+    get:
+      operationId: gdpr_admin_resellers_subject_access_retrieve
+      description: Everything stored about a reseller, for the office to send them.
+      summary: 'Admin: a reseller''s Subject Access Request bundle (Art. 15)'
+      parameters:
+      - in: path
+        name: reseller_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - gdpr
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSubjectAccessBundle'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
           content:
             application/json:
               schema:
@@ -29891,7 +30104,8 @@ components:
           type: string
         requested_email:
           type: string
-          format: email
+        channel:
+          type: string
         requested_at:
           type: string
           format: date-time
@@ -29907,12 +30121,37 @@ components:
           type: string
           nullable: true
       required:
+      - channel
       - decided_at
       - decided_by_email
       - id
       - rejection_reason
       - requested_at
       - requested_email
+      - state
+    AdminFileDeletionRequest:
+      type: object
+      description: |-
+        Body of the office endpoints that erase a member or reseller: how the
+        person asked.
+      properties:
+        channel:
+          $ref: '#/components/schemas/ChannelEnum'
+      required:
+      - channel
+    AdminFiledDeletion:
+      type: object
+      description: |-
+        The deletion request an office endpoint filed, and the state it
+        reached: ``executed``, or ``pending_admin`` when retention obligations
+        still block it (the response is then a 409 naming them).
+      properties:
+        request_id:
+          type: string
+        state:
+          type: string
+      required:
+      - request_id
       - state
     AdminPendingDeletion:
       type: object
@@ -29922,7 +30161,16 @@ components:
           type: string
         requested_email:
           type: string
-          format: email
+        subject_label:
+          type: string
+        member_id:
+          type: string
+          nullable: true
+        reseller_id:
+          type: string
+          nullable: true
+        channel:
+          type: string
         requested_at:
           type: string
           format: date-time
@@ -29940,11 +30188,15 @@ components:
             type: string
       required:
       - blockers
+      - channel
       - current_user_email
       - email_confirmed_at
       - id
+      - member_id
       - requested_at
       - requested_email
+      - reseller_id
+      - subject_label
     AdminPendingDeletionList:
       type: object
       description: |-
@@ -29959,6 +30211,122 @@ components:
             $ref: '#/components/schemas/AdminPendingDeletion'
       required:
       - pending
+    AdminSarSubject:
+      type: object
+      description: |-
+        Identity block of the bundle the office exports: whichever of the
+        login, member and reseller records make up the subject.
+      properties:
+        user_id:
+          type: string
+          nullable: true
+        member_id:
+          type: string
+          nullable: true
+        reseller_id:
+          type: string
+          nullable: true
+        email:
+          type: string
+      required:
+      - email
+      - member_id
+      - reseller_id
+      - user_id
+    AdminSubjectAccessBundle:
+      type: object
+      description: |-
+        The Art. 15 bundle the office exports for a member or reseller, who
+        may have no login: then ``account`` is None. A separate component, so
+        the self-service bundle keeps its non-null ``account``.
+      properties:
+        format_version:
+          type: integer
+        exported_at:
+          type: string
+          format: date-time
+        subject:
+          $ref: '#/components/schemas/AdminSarSubject'
+        account:
+          allOf:
+          - $ref: '#/components/schemas/SarAccount'
+          nullable: true
+        member:
+          allOf:
+          - $ref: '#/components/schemas/SarMember'
+          nullable: true
+        billing_profile:
+          allOf:
+          - $ref: '#/components/schemas/SarBillingProfile'
+          nullable: true
+        reseller:
+          allOf:
+          - $ref: '#/components/schemas/SarReseller'
+          nullable: true
+        consents:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarConsentRecord'
+        coop_shares:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarCoopShare'
+        coop_share_transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarCoopShareTransfer'
+        subscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarSubscription'
+        member_loans:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarMemberLoan'
+        charge_schedules:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarChargeSchedule'
+        reseller_orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarOrder'
+        reseller_invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarInvoiceReseller'
+        email_log:
+          $ref: '#/components/schemas/SarEmailLogSection'
+        login_history:
+          $ref: '#/components/schemas/SarLoginHistorySection'
+        deletion_requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarDeletionRequestSummary'
+        user_invitations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SarUserInvitation'
+      required:
+      - account
+      - billing_profile
+      - charge_schedules
+      - consents
+      - coop_share_transfers
+      - coop_shares
+      - deletion_requests
+      - email_log
+      - exported_at
+      - format_version
+      - login_history
+      - member
+      - member_loans
+      - reseller
+      - reseller_invoices
+      - reseller_orders
+      - subject
+      - subscriptions
+      - user_invitations
     AdminUserCreateRequest:
       type: object
       properties:
@@ -30888,6 +31256,18 @@ components:
       required:
       - free
       - occupied
+    ChannelEnum:
+      enum:
+      - email
+      - letter
+      - phone
+      - in_person
+      type: string
+      description: |-
+        * `email` - Email
+        * `letter` - Letter
+        * `phone` - Phone
+        * `in_person` - In person
     ChargeSchedule:
       type: object
       properties:
@@ -32759,7 +33139,6 @@ components:
           type: string
         user_email:
           type: string
-          format: email
         deleted_at:
           type: string
           format: date-time

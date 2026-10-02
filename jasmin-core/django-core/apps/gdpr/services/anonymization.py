@@ -36,6 +36,7 @@ from apps.payments.models import BillingProfile
 from ..errors import RetentionPeriodActive
 from ..field_classes import FieldClass, get_classification, resolve_replacement
 from ..models import DeletionLog
+from .subjects import ErasureSubject
 
 if TYPE_CHECKING:
     # Type-only: the runtime path uses ``get_user_model()``, so this module
@@ -109,9 +110,18 @@ class AnonymizationMixin:
     # ---------------------------------------------------------------
 
     @staticmethod
-    @transaction.atomic
     def anonymize_user(user: JasminUser) -> DeletionLog:
-        """Anonymize all personal data for a user (Art. 17).
+        """Anonymize all personal data of a login user and of the member and
+        reseller records tied to it (Art. 17). See :meth:`anonymize_subject`."""
+        return GDPRService.anonymize_subject(ErasureSubject.of_user(user))
+
+    @staticmethod
+    @transaction.atomic
+    def anonymize_subject(
+        subject: ErasureSubject, *, replayed_log: DeletionLog | None = None
+    ) -> DeletionLog:
+        """Anonymize all personal data of ``subject`` (Art. 17): a login user,
+        a member or reseller without one, or any combination.
 
         Replaces PII with placeholder values on every model that
         directly or indirectly holds the subject's data. Keeps the
@@ -120,7 +130,7 @@ class AnonymizationMixin:
 
         Refuses with :class:`RetentionPeriodActive` (HTTP 409) when
         the subject still has statutory retention obligations. See
-        :meth:`check_retention_blocks` for the rules.
+        :meth:`check_retention_blocks_for_subject` for the rules.
 
         Order of operations matters:
 
@@ -133,35 +143,40 @@ class AnonymizationMixin:
            axes AccessLog / AccessAttempt / AccessFailureLog).
         5. **Log to DeletionLog** for backup-replay.
 
+        ``replayed_log`` is set by the replay after a backup restore: an
+        erasure the restore undid. Its row is written back with its original
+        id and time instead of a new one.
+
         Wrapped in ``@transaction.atomic`` so a failure halfway
         through rolls back everything — you're never left with a
         half-anonymized user that the next call sees as already-done.
         """
-        reasons = GDPRService.check_retention_blocks(user)
+        reasons = GDPRService.check_retention_blocks_for_subject(subject)
         if reasons:
             raise RetentionPeriodActive(reasons)
 
-        # Phase 1: collect every email address tied to this user.
-        # These become the search keys for EmailLog + axes scrubs.
-        known_emails = GDPRService._collect_known_emails(user)
-        original_email = user.email
+        # The subject was resolved before any wipe: phase 3 releases
+        # ``reseller.linked_user``, the key it was found by.
+        user, member, reseller = subject.user, subject.member, subject.reseller
 
-        # Auditlog scrub targets — capture BEFORE the wipes. Phase 3
-        # releases ``reseller.linked_user`` (the lookup key), so the
-        # reseller must be resolved up front.
-        member = Member.objects.filter(user=user).first()
-        reseller = Reseller.objects.filter(linked_user=user).first()
+        # Phase 1: collect every email address tied to this subject.
+        # These become the search keys for EmailLog + axes scrubs.
+        known_emails = GDPRService._collect_subject_emails(subject)
+        original_email = subject.email
 
         # Phase 2: primary records.
-        GDPRService._anonymize_jasmin_user(user)
+        if user is not None:
+            GDPRService._anonymize_jasmin_user(user)
         if member is not None:
             GDPRService._anonymize_member(member)
             GDPRService._anonymize_billing_profile(member)
             GDPRService._anonymize_consent_records(member)
 
         # Phase 3: FK-related records.
-        GDPRService._anonymize_reseller_for_user(user)
-        GDPRService._anonymize_user_invitations(user)
+        if reseller is not None:
+            GDPRService._anonymize_reseller(reseller)
+        if user is not None:
+            GDPRService._anonymize_user_invitations(user)
 
         # Phase 4: side-channel scrubs.
         GDPRService._anonymize_email_logs(known_emails)
@@ -184,8 +199,19 @@ class AnonymizationMixin:
         GDPRService._scrub_auditlog_entries(user, member, reseller)
 
         # Phase 5: audit trail (for backup-replay + auditor proof).
+        if replayed_log is not None:
+            # ``deleted_at`` is ``auto_now_add``, which overwrites it on
+            # insert: put the original time back afterwards.
+            deleted_at = replayed_log.deleted_at
+            replayed_log.save(force_insert=True)
+            DeletionLog.objects.filter(pk=replayed_log.pk).update(deleted_at=deleted_at)
+            replayed_log.deleted_at = deleted_at
+            return replayed_log
         return DeletionLog.objects.create(
             user_email=original_email,
+            user_pk=user.pk if user is not None else "",
+            member_pk=member.pk if member is not None else "",
+            reseller_pk=reseller.pk if reseller is not None else "",
             description="GDPR deletion request — all personal data anonymized.",
         )
 
@@ -221,6 +247,17 @@ class AnonymizationMixin:
     def _collect_known_emails(
         user: JasminUser, *, include_shared_secondaries: bool = True
     ) -> set[str]:
+        """Email addresses of a login user's subject; see
+        :meth:`_collect_subject_emails`."""
+        return GDPRService._collect_subject_emails(
+            ErasureSubject.of_user(user),
+            include_shared_secondaries=include_shared_secondaries,
+        )
+
+    @staticmethod
+    def _collect_subject_emails(
+        subject: ErasureSubject, *, include_shared_secondaries: bool = True
+    ) -> set[str]:
         """Return email addresses attached to the subject.
 
         Two callers, two needs:
@@ -242,46 +279,32 @@ class AnonymizationMixin:
         Must run BEFORE any of the wipes — otherwise the addresses we're
         trying to find historical records for are already gone.
         """
-        emails: set[str] = set()
-        if user.email:
+        secondaries = ["email_2", "email_3"] if include_shared_secondaries else []
+        emails: set[str | None] = set()
+        user, member, reseller = subject.user, subject.member, subject.reseller
+
+        if user is not None:
             emails.add(user.email)
+            # Historical invitation emails (the address invited to the
+            # platform, even if it was never accepted).
+            emails.update(
+                UserInvitation.objects.filter(user=user).values_list("email", flat=True)
+            )
 
-        member = Member.objects.filter(user=user).first()
+        # No ``, None`` default on the ``getattr`` calls — the field lists are
+        # hard-coded; a missing attribute here would mean the schema changed
+        # out from under us and the GDPR email-erasure target list is silently
+        # incomplete. Better to raise.
         if member is not None:
-            # No ``, None`` default — the field tuple is hard-coded; a
-            # missing attribute here would mean the Member schema changed
-            # out from under us and the GDPR email-erasure target list is
-            # silently incomplete. Better to raise.
-            member_fields = ["email"]
-            if include_shared_secondaries:
-                member_fields += ["email_2", "email_3"]
-            for field in member_fields:
-                value = getattr(member, field)
-                if value:
-                    emails.add(value)
+            emails.update(getattr(member, field) for field in ["email", *secondaries])
 
-        # B2B side: any ContactEntity the user's Reseller points to.
-        reseller = Reseller.objects.filter(linked_user=user).first()
+        # B2B side: the ContactEntity the subject's Reseller points to.
         if reseller is not None:
-            contact_fields = ["email", "order_email"]
-            if include_shared_secondaries:
-                contact_fields += ["email_2", "email_3"]
-            for field in contact_fields:
-                value = getattr(reseller.contact, field)
-                if value:
-                    emails.add(value)
-            if reseller.invoice_email:
-                emails.add(reseller.invoice_email)
+            contact_fields = ["email", "order_email", *secondaries]
+            emails.update(getattr(reseller.contact, field) for field in contact_fields)
+            emails.add(reseller.invoice_email)
 
-        # Historical invitation emails (the address invited to the
-        # platform, even if it was never accepted).
-        for invitation_email in UserInvitation.objects.filter(user=user).values_list(
-            "email", flat=True
-        ):
-            if invitation_email:
-                emails.add(invitation_email)
-
-        return emails
+        return {email for email in emails if email}
 
     @staticmethod
     def _anonymize_jasmin_user(user: JasminUser) -> None:
@@ -428,19 +451,15 @@ class AnonymizationMixin:
                 note.save(update_fields=["file"])
 
     @staticmethod
-    def _anonymize_reseller_for_user(user: JasminUser) -> None:
-        """Scrub the user's Reseller + its ContactEntity.
+    def _anonymize_reseller(reseller: Reseller) -> None:
+        """Scrub the Reseller + its ContactEntity.
 
         ContactEntity is shared infrastructure — a single row can be
         referenced by multiple Resellers AND by DeliveryStations. We
-        only wipe the contact if it's used solely by this user's
-        Reseller; otherwise we log a warning and leave the contact
-        intact (the other entity's legitimate business need wins).
+        only wipe the contact if it's used solely by this Reseller;
+        otherwise we log a warning and leave the contact intact (the
+        other entity's legitimate business need wins).
         """
-        reseller = Reseller.objects.filter(linked_user=user).first()
-        if reseller is None:
-            return
-
         # Scrub the Reseller's billing-side display fields via the
         # central classification; status transitions + the OneToOne
         # release stay inline (operational, not PII scrubs).
@@ -558,7 +577,7 @@ class AnonymizationMixin:
 
     @staticmethod
     def _scrub_auditlog_entries(
-        user: JasminUser,
+        user: JasminUser | None,
         member: Member | None,
         reseller: Reseller | None,
     ) -> None:
@@ -585,11 +604,12 @@ class AnonymizationMixin:
         """
         scrub = GDPRService._scrub_logentries_for
 
-        scrub(type(user), [user.pk])
-        scrub(
-            UserInvitation,
-            UserInvitation.objects.filter(user=user).values_list("pk", flat=True),
-        )
+        if user is not None:
+            scrub(type(user), [user.pk])
+            scrub(
+                UserInvitation,
+                UserInvitation.objects.filter(user=user).values_list("pk", flat=True),
+            )
 
         if member is not None:
             scrub(Member, [member.pk])
@@ -669,7 +689,7 @@ class AnonymizationMixin:
                 ).values_list("pk", flat=True),
             )
 
-            # Mirror ``_anonymize_reseller_for_user``: a contact shared with
+            # Mirror ``_anonymize_reseller``: a contact shared with
             # other resellers / delivery stations keeps its PII, so its audit
             # history stays too.
             contact = reseller.contact

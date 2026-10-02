@@ -138,8 +138,9 @@ Concrete platform measures that satisfy Art. 32 — all already in code:
   per-tenant schema isolation prevents cross-tenant reads
 - **Audit:** `django-auditlog` on writes; throttle-scope enforcement
   via class attribute
-- **Backups:** AES-256 GPG-encrypted `pg_dump`; restore replays the
-  `DeletionLog` so anonymised PII doesn't resurrect
+- **Backups:** AES-256 GPG-encrypted `pg_dump`; the `DeletionLog` is also
+  kept outside the database, with an encrypted off-host copy, and a restore
+  replays it so anonymised PII doesn't resurrect
 - **Brute-force protection:** `django-axes` lockout + per-endpoint
   throttle scopes
 - **Honeypot field on registration:** silent drop on bot fills

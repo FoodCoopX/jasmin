@@ -1,5 +1,5 @@
 import { Button, Descriptions, Modal, Space, Tag } from "antd";
-import type { FC } from "react";
+import type { FC, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useDateFormat } from "@hooks/index";
 import DisabledReasonTooltip from "@shared/ui/DisabledReasonTooltip";
@@ -33,6 +33,9 @@ interface UserInfoModalProps {
   onActivateUser?: (record: UserRecord) => void;
   /** Deactivate an active user. */
   onDeactivateUser?: (record: UserRecord) => void;
+  /** More content below the account details, e.g. a feature's own actions
+   *  for this person. */
+  extra?: ReactNode;
 }
 
 const STATUS_TAG_COLOR: Record<AccountStatus | "no_user", string> = {
@@ -52,6 +55,7 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
   invitationDisabledReason = null,
   onActivateUser,
   onDeactivateUser,
+  extra,
 }) => {
   const { t } = useTranslation();
   const { formatDateWithFallback } = useDateFormat();
@@ -215,6 +219,7 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
           )}
         </Space>
       </div>
+      {extra}
     </Modal>
   );
 };

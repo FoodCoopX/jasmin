@@ -412,7 +412,9 @@
     "deletion_token_invalid": "The deletion confirmation link is invalid.",
     "error": "GDPR action not possible — please check the current state.",
     "missing_rejection_reason": "A rejection reason is required.",
-    "retention_active": "Anonymization not possible — a statutory retention period is still active."
+    "retention_active": "Anonymization not possible — a statutory retention period is still active.",
+    "subject_already_erased": "This person's personal data has already been erased.",
+    "invalid_channel": "Please say how the person asked for the erasure (email, letter, phone or in person)."
   },
   "optin": {
     "deadline_passed": "The opt-in deadline has passed and can no longer be changed.",

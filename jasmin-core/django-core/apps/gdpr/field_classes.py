@@ -175,7 +175,7 @@ FIELD_CLASSIFICATION: dict[str, dict[str, tuple[FieldClass, Replacement]]] = {
     # commissioning.ContactEntity — shared infrastructure (Resellers
     # AND DeliveryStations point at it). Only scrubbed when no
     # OTHER entity still references the row; the safety check lives
-    # in ``GDPRService._anonymize_reseller_for_user``.
+    # in ``GDPRService._anonymize_reseller``.
     #
     # ``address`` / ``zip_code`` / ``city`` are NOT NULL on the
     # model — delivery routing breaks without them — so they get

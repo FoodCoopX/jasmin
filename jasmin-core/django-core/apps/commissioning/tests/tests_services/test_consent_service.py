@@ -21,6 +21,7 @@ notices.
 from __future__ import annotations
 
 import datetime
+from unittest import mock
 
 import pytest
 import time_machine
@@ -558,20 +559,76 @@ class TestConsentWithdrawalReview:
     office review AND queues an office email; re-consent clears the flag.
     TERMS (not a processing legal basis) does neither."""
 
-    def test_revoke_privacy_flags_member_and_queues_office_email(
+    @staticmethod
+    def _set_office_email(tenant, address):
+        # ``tenant`` is the object the fixture handed to ``connection.set_tenant``,
+        # so the sender reads this value.
+        tenant.email = address
+        tenant.save(update_fields=["email"])
+
+    def _revoke_and_send(self, member, kind, django_capture_on_commit_callbacks):
+        doc = _make_document(kind=kind)
+        record = ConsentService.record(member=member, document=doc)
+        with mock.patch(
+            "apps.shared.tenants.email_service.EmailService.send_email",
+            return_value=True,
+        ) as send_email:
+            with django_capture_on_commit_callbacks(execute=True):
+                ConsentService.revoke(record)
+        return send_email
+
+    def test_revoke_privacy_flags_member_and_emails_the_tenant_office(
         self, tenant, django_capture_on_commit_callbacks
     ):
-        member = MemberFactory()
-        doc = _make_document(kind=ConsentKind.PRIVACY)
-        record = ConsentService.record(member=member, document=doc)
+        self._set_office_email(tenant, "office@example.org")
+        member = MemberFactory(
+            first_name="Alice", last_name="Acres", email="alice@example.com"
+        )
 
-        with django_capture_on_commit_callbacks(execute=False) as callbacks:
-            ConsentService.revoke(record)
+        send_email = self._revoke_and_send(
+            member, ConsentKind.PRIVACY, django_capture_on_commit_callbacks
+        )
 
         member.refresh_from_db()
         assert member.consent_withdrawn_at is not None
-        # The office-alert email is queued to fire on commit (mail_admins).
-        assert len(callbacks) == 1
+        assert send_email.call_count == 1
+        kwargs = send_email.call_args.kwargs
+        assert kwargs["slug"] == "commissioning.consent_withdrawn_office"
+        assert kwargs["to_emails"] == ["office@example.org"]
+        context = kwargs["context"]
+        assert set(context) == {"tenant_name", "consent_kind", "review_url"}
+        assert context["consent_kind"] == ConsentKind.PRIVACY
+        assert context["review_url"].endswith(f"/members/members/{member.pk}")
+        # The office mailbox is often shared: nothing that names the member.
+        flat = " ".join(str(value) for value in context.values()).lower()
+        for pii in ("alice", "acres", "alice@example.com", str(member.member_number)):
+            assert pii.lower() not in flat
+
+    def test_revoke_withdrawal_terms_names_that_consent(
+        self, tenant, django_capture_on_commit_callbacks
+    ):
+        self._set_office_email(tenant, "office@example.org")
+        send_email = self._revoke_and_send(
+            MemberFactory(), ConsentKind.WITHDRAWAL, django_capture_on_commit_callbacks
+        )
+
+        assert send_email.call_args.kwargs["context"]["consent_kind"] == (
+            ConsentKind.WITHDRAWAL
+        )
+
+    def test_tenant_without_office_email_is_skipped(
+        self, tenant, django_capture_on_commit_callbacks
+    ):
+        self._set_office_email(tenant, None)
+        member = MemberFactory()
+
+        send_email = self._revoke_and_send(
+            member, ConsentKind.PRIVACY, django_capture_on_commit_callbacks
+        )
+
+        member.refresh_from_db()
+        assert member.consent_withdrawn_at is not None
+        assert not send_email.called
 
     def test_reconsent_clears_the_review_flag(self, tenant):
         member = MemberFactory()
