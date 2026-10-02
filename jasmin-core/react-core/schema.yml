@@ -10237,9 +10237,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: query
         name: is_past
@@ -10338,9 +10338,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id
@@ -10439,9 +10439,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id
@@ -10504,9 +10504,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id
@@ -16821,9 +16821,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: query
         name: is_past
@@ -16922,9 +16922,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id
@@ -17023,9 +17023,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id
@@ -17088,9 +17088,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id
@@ -25368,9 +25368,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: query
         name: day_number
@@ -25510,9 +25510,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id
@@ -25608,9 +25608,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id
@@ -25673,9 +25673,9 @@ paths:
 
         Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
         is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-        the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-        ``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-        is needed because the deleted movement IS the actual correction.
+        the movement BEFORE the delete and re-cascade the affected entity. A deleted
+        correction may have carried its day's theoretical, which another correction
+        of that day then takes over (``recalculate_actual_corrections``).
       parameters:
       - in: path
         name: id

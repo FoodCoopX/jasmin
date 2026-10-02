@@ -12329,9 +12329,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningHarvestList = (
     params?: CommissioningHarvestListParams,
@@ -12487,9 +12487,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningHarvestRetrieve = (
     id: string,
@@ -12644,9 +12644,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningHarvestPartialUpdate = (
     id: string,
@@ -12712,9 +12712,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningHarvestDestroy = (
     id: string,
@@ -21120,9 +21120,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningPurchaseList = (
     params?: CommissioningPurchaseListParams,
@@ -21278,9 +21278,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningPurchaseRetrieve = (
     id: string,
@@ -21435,9 +21435,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningPurchasePartialUpdate = (
     id: string,
@@ -21503,9 +21503,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningPurchaseDestroy = (
     id: string,
@@ -33009,9 +33009,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningWasteList = (
     params?: CommissioningWasteListParams,
@@ -33167,9 +33167,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningWasteRetrieve = (
     id: string,
@@ -33324,9 +33324,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningWastePartialUpdate = (
     id: string,
@@ -33392,9 +33392,9 @@ movement-source row (Harvest/Purchase/Waste).
 
 Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
 is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-the movement BEFORE the delete and re-cascade the affected entity. Mirrors
-``ForecastViewSet.perform_destroy`` — but no ``recalculate_actual_corrections``
-is needed because the deleted movement IS the actual correction.
+the movement BEFORE the delete and re-cascade the affected entity. A deleted
+correction may have carried its day's theoretical, which another correction
+of that day then takes over (``recalculate_actual_corrections``).
  */
 export const commissioningWasteDestroy = (
     id: string,
