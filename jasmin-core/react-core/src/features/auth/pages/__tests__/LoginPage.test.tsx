@@ -124,6 +124,39 @@ describe("LoginPage (integration)", () => {
     expect(navigateMock).toHaveBeenCalledWith("/");
   });
 
+  it("tells a device whose stored session expired to sign in again", async () => {
+    // The default MSW handler answers the boot refresh with a 401.
+    localStorage.setItem(
+      "auth",
+      JSON.stringify({ user: { id: "u-1", roles: ["office"] } }),
+    );
+
+    renderLogin();
+
+    expect(
+      await screen.findByText("auth.login_card.session_expired"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no session notice on a first visit", async () => {
+    let refreshAttempted = false;
+    server.use(
+      http.post(/\/auth\/refresh\/?$/, () => {
+        refreshAttempted = true;
+        return HttpResponse.json({ detail: "no cookie" }, { status: 401 });
+      }),
+    );
+
+    renderLogin();
+
+    // Only once the refresh has failed would a notice show.
+    await waitFor(() => expect(refreshAttempted).toBe(true));
+    await flushMicrotasks();
+    expect(
+      screen.queryByText("auth.login_card.session_expired"),
+    ).not.toBeInTheDocument();
+  });
+
   it("asks the captcha for a fresh token after a failed login", async () => {
     // Verification spends the token, so the retry needs a new one.
     server.use(

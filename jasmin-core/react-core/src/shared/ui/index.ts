@@ -15,6 +15,7 @@ export type { DisabledReasonTooltipProps } from './DisabledReasonTooltip';
 export { default as OnboardingNoEmailHint } from './OnboardingNoEmailHint';
 export { ViewDetailsButton } from './ViewDetailsButton';
 export { default as OfflineBanner } from './OfflineBanner';
+export { default as NewVersionBanner } from './NewVersionBanner';
 export { default as LiveAnnouncer } from './LiveAnnouncer';
 export { default as MobileStack } from './MobileStack';
 export { default as DiffCell } from './DiffCell';

@@ -1,0 +1,15 @@
+.app-icon-settings-hint {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.app-short-name-label {
+  display: block;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+
+.app-short-name-hint {
+  display: block;
+  margin-top: 4px;
+}

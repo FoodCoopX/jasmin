@@ -104,3 +104,10 @@
   flex-shrink: 0;
   margin-left: 8px;
 }
+
+/* Touch targets of at least 44 x 44 px (WCAG 2.5.5, Apple's guidelines); a
+   min-height above AntD's fixed button height wins over it. */
+.mobile-card-action-btn.ant-btn {
+  min-width: 44px;
+  min-height: 44px;
+}

@@ -312,9 +312,9 @@ function MobileCardList<T extends TableRecord>({
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <Space direction="vertical" size={4}>
+                <Space direction="vertical" size={8}>
                   <Button
-                    size="small"
+                    className="mobile-card-action-btn"
                     type="text"
                     icon={<InfoCircleOutlined />}
                     onClick={() => onEdit(record)}
@@ -330,7 +330,7 @@ function MobileCardList<T extends TableRecord>({
                       icon={null}
                     >
                       <Button
-                        size="small"
+                        className="mobile-card-action-btn"
                         type="text"
                         danger
                         icon={<DeleteOutlined />}

@@ -322,6 +322,8 @@ services:
         # Baked into the bundle at build time (superAdminHost.ts); must be
         # passed here or it silently defaults to "marillen" in every build.
         VITE_SUPER_ADMIN_SUBDOMAIN: ${VITE_SUPER_ADMIN_SUBDOMAIN:-marillen}
+        # Set by deploy.sh to the git sha; lets running apps notice a new deploy.
+        VITE_BUILD_ID: ${VITE_BUILD_ID:-}
     image: jasmin/frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     logging: *default-logging

@@ -1,26 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
+const matchesQuery = (query: string) =>
+  typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+
+/**
+ * Whether the viewport is at most ``breakpoint`` px wide. Read from
+ * ``matchMedia`` during the first render, so a phone never paints the desktop
+ * layout before switching.
+ */
 export const useIsMobile = (breakpoint = 768) => {
-  const [isMobile, setIsMobile] = useState(false);
+  const query = `(max-width: ${breakpoint}px)`;
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`);
-    
-    const handleMediaQueryChange = (e: MediaQueryListEvent) => {
-      setIsMobile(e.matches);
-    };
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (typeof window.matchMedia !== 'function') return () => {};
+      const mediaQuery = window.matchMedia(query);
+      mediaQuery.addEventListener('change', onChange);
+      return () => mediaQuery.removeEventListener('change', onChange);
+    },
+    [query],
+  );
 
-    // Set initial value
-    setIsMobile(mediaQuery.matches);
-
-    // Listen for changes
-    mediaQuery.addEventListener('change', handleMediaQueryChange);
-
-    // Cleanup
-    return () => {
-      mediaQuery.removeEventListener('change', handleMediaQueryChange);
-    };
-  }, [breakpoint]);
-
-  return isMobile;
+  return useSyncExternalStore(
+    subscribe,
+    () => matchesQuery(query),
+    () => false,
+  );
 };

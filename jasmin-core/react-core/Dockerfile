@@ -61,10 +61,15 @@ ARG VITE_SENTRY_DSN=""
 # Super-admin/platform subdomain — baked into the bundle (superAdminHost.ts).
 # Must be a build ARG or it silently defaults to "marillen" in every build.
 ARG VITE_SUPER_ADMIN_SUBDOMAIN=marillen
+# Id of this build (deploy.sh passes the git sha). Baked into the bundle and
+# written to /build.json, so a running app notices a newer deploy and offers a
+# reload. Empty -> no check.
+ARG VITE_BUILD_ID=""
 ENV VITE_API_URL=${VITE_API_URL} \
     VITE_APP_NAME=${VITE_APP_NAME} \
     VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
-    VITE_SUPER_ADMIN_SUBDOMAIN=${VITE_SUPER_ADMIN_SUBDOMAIN}
+    VITE_SUPER_ADMIN_SUBDOMAIN=${VITE_SUPER_ADMIN_SUBDOMAIN} \
+    VITE_BUILD_ID=${VITE_BUILD_ID}
 
 RUN npm run build
 

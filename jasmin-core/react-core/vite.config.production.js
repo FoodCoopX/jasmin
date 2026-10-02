@@ -2,9 +2,23 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Writes /build.json with this build's id (VITE_BUILD_ID, set by the Docker
+// build), which running apps compare with their own to offer a reload.
+const buildIdFile = () => ({
+  name: 'build-id-file',
+  generateBundle() {
+    this.emitFile({
+      type: 'asset',
+      fileName: 'build.json',
+      source: JSON.stringify({ build_id: process.env.VITE_BUILD_ID ?? '' }),
+    })
+  },
+})
+
 export default defineConfig({
   plugins: [
     react(),
+    buildIdFile(),
   ],
   define: {
     global: 'globalThis',

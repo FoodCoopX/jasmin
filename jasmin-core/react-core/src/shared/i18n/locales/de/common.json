@@ -106,6 +106,8 @@
   "no_data": "Keine Daten verfügbar",
   "no_orders_available": "Keine Bestellungen verfügbar",
   "offline_banner": "Du bist offline — manche Aktionen sind deaktiviert.",
+  "new_version_banner": "Eine neue Version ist verfügbar.",
+  "reload": "Neu laden",
   "required": "Pflichtfeld",
   "saved_successfully": "Erfolgreich gespeichert",
   "stock_count": "Bestand",

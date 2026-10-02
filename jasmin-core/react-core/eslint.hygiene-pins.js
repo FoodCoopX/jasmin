@@ -69,7 +69,7 @@ export const functionLengthPins = {
   "src/features/commissioning/pages/PlanningShareContentBase.tsx": 847,
   "src/features/commissioning/pages/PlanningShareContentLongTermBase.tsx": 561,
   "src/features/commissioning/pages/PurchaseList.tsx": 528,
-  "src/features/configuration/pages/ConfigurationGeneral.tsx": 453,
+  "src/features/configuration/pages/ConfigurationGeneral.tsx": 452,
   "src/features/members/modals/CoopSharesModal.tsx": 472,
   "src/features/members/pages/MemberDetail.tsx": 437,
   "src/features/members/pages/Members.tsx": 826,

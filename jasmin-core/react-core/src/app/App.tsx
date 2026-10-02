@@ -12,7 +12,7 @@ import { LocaleProvider } from "@shared/contexts/LocaleContext";
 import { TenantProvider, isPlatformDomain } from "@shared/contexts/TenantContext";
 import ErrorBoundary from "@shared/ui/ErrorBoundary";
 import { StepUpProvider } from "@shared/auth/StepUpProvider";
-import { LiveAnnouncer, OfflineBanner } from "@shared/ui";
+import { LiveAnnouncer, NewVersionBanner, OfflineBanner } from "@shared/ui";
 const SuperAdminApp = lazy(() => import("./SuperAdminApp"));
 const JasminApp = lazy(() => import("./JasminApp"));
 import { notify } from "@shared/utils";
@@ -76,6 +76,7 @@ function App() {
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <OfflineBanner />
+        <NewVersionBanner />
         <LiveAnnouncer />
         {isPlatform ? (
           // Platform domain - no TenantProvider needed

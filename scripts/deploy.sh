@@ -109,6 +109,11 @@ fi
 
 # ── 3. build ─────────────────────────────────────────────────────────────────
 log "building images (first build takes a few minutes)"
+# Stamped into the frontend bundle and /build.json: an app still running the
+# previous build sees the new id and offers a reload. A timestamp stands in when
+# there's no git checkout.
+VITE_BUILD_ID="$(git rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%d%H%M%S)"
+export VITE_BUILD_ID
 docker compose build
 
 # ── 4. bring up the core stack (glitchtip/uptime deferred to Phase 5) ───────

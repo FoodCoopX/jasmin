@@ -45,6 +45,7 @@ function Probe() {
         {probedAuth.user ? probedAuth.user.id : "anon"}
       </span>
       <span data-testid="auth-token">{probedAuth.accessToken ?? "none"}</span>
+      <span data-testid="auth-notice">{probedAuth.sessionNotice ?? "none"}</span>
     </div>
   );
 }
@@ -115,7 +116,55 @@ describe("AuthContext boot", () => {
       expect(screen.getByTestId("auth-user").textContent).toBe("u-7"),
     );
   });
+});
 
+describe("AuthContext session notice", () => {
+  const storeSession = () =>
+    localStorage.setItem(
+      "auth",
+      JSON.stringify({ user: { id: "u-7", roles: ["office"] } }),
+    );
+  // axios's ``isAxiosError`` only looks at this flag.
+  const refused = { isAxiosError: true, response: { status: 401 } };
+  const offline = { isAxiosError: true, code: "ERR_NETWORK" };
+
+  async function noticeAfterBoot() {
+    renderProvider();
+    await waitFor(() =>
+      expect(screen.getByTestId("auth-loading").textContent).toBe("false"),
+    );
+    return screen.getByTestId("auth-notice").textContent;
+  }
+
+  it("says the session expired when the server refuses a stored one", async () => {
+    storeSession();
+    performRefreshMock.mockRejectedValue(refused);
+
+    expect(await noticeAfterBoot()).toBe("expired");
+  });
+
+  it("says the server is unreachable when the refresh never gets an answer", async () => {
+    storeSession();
+    performRefreshMock.mockRejectedValue(offline);
+
+    expect(await noticeAfterBoot()).toBe("unreachable");
+  });
+
+  it("says nothing to a device that was never signed in", async () => {
+    performRefreshMock.mockRejectedValue(refused);
+
+    expect(await noticeAfterBoot()).toBe("none");
+  });
+
+  it("clears the notice once a new access token arrives", async () => {
+    storeSession();
+    performRefreshMock.mockRejectedValue(refused);
+    expect(await noticeAfterBoot()).toBe("expired");
+
+    act(() => setAccessToken("signed-in-again"));
+
+    expect(screen.getByTestId("auth-notice").textContent).toBe("none");
+  });
 });
 
 describe("AuthContext.login", () => {

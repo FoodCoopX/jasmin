@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
 
 import axiosInstance, { performRefresh } from "@shared/services/api";
 import {
@@ -63,6 +64,10 @@ interface AuthMetadata {
   [key: string]: unknown;
 }
 
+/** Why a device that was signed in starts on the login form: the server
+ * refused the stored session, or it couldn't be reached to ask. */
+export type SessionNotice = "expired" | "unreachable";
+
 interface AuthContextValue {
   user: AuthUser | null;
   userRole: string | null;
@@ -72,6 +77,9 @@ interface AuthContextValue {
    * page. */
   bootstrapping: boolean;
   error: string | null;
+  /** Set when the launch's silent refresh fails on a device with a stored
+   * session; cleared once an access token arrives. */
+  sessionNotice: SessionNotice | null;
   isAuthenticated: boolean;
   isSuperAdmin: boolean;
   accessToken: string | null;
@@ -135,6 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // instead of the code field).
   const [bootstrapping, setBootstrapping] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(
+    null,
+  );
   const navigate = useNavigate();
 
   // ``useContext`` (NOT ``useTenant``) because the super-admin domain
@@ -151,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return subscribeAccessToken((t) => {
       setAccessTokenState(t);
+      if (t !== null) setSessionNotice(null);
       if (t === null) {
         setMeta(null);
         try {
@@ -164,10 +176,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Hydrate user metadata from localStorage and attempt silent refresh on boot.
   useEffect(() => {
+    let hadSession = false;
     try {
       const storedMeta = localStorage.getItem("auth");
       if (storedMeta) {
         setMeta(JSON.parse(storedMeta) as AuthMetadata);
+        hadSession = true;
       }
     } catch (err) {
       console.error("Failed to parse stored auth metadata:", err);
@@ -197,10 +211,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // only log a "no tenant id" warning and bail — a pure no-op. The
         // explicit login path below keeps its awaited call because navigation
         // needs the full payload synchronously.
-      } catch {
+      } catch (err) {
         // No refresh cookie or it's expired — user is logged out. The
         // pre-login branding fetch in TenantContext has already given
-        // the login page everything it needs.
+        // the login page everything it needs. A device that was signed in
+        // is told why it sees the login form instead of a bare one.
+        if (hadSession && !cancelled) {
+          setSessionNotice(
+            isAxiosError(err) && !err.response ? "unreachable" : "expired",
+          );
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -442,6 +462,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       bootstrapping,
       error,
+      sessionNotice,
       isAuthenticated,
       isSuperAdmin:
         isSuperAdminHost(window.location.hostname) && isAuthenticated,
@@ -462,6 +483,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       bootstrapping,
       error,
+      sessionNotice,
       isAuthenticated,
       accessToken,
       getUser,

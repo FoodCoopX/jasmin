@@ -74,6 +74,8 @@
     "bio_logo_saved": "Organic logo saved",
     "current_app_icon": "App icon (home screen)",
     "app_icon_hint": "Square, at least 512x512 pixels. Shown as the icon when the app is installed on a phone.",
+    "app_short_name": "App name (home screen)",
+    "app_short_name_hint": "Shown under the app icon on a phone, at most 12 characters. Left empty, the first 12 characters of the name are used.",
     "app_icon_saved": "App icon saved"
   },
   "email": "email",

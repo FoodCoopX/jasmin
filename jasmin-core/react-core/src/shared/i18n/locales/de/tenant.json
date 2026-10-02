@@ -74,6 +74,8 @@
     "bio_logo_saved": "Bio-Logo gespeichert",
     "current_app_icon": "App-Symbol (Startbildschirm)",
     "app_icon_hint": "Quadratisch, mindestens 512x512 Pixel. Wird als Symbol angezeigt, wenn die App auf dem Handy installiert wird.",
+    "app_short_name": "App-Name (Startbildschirm)",
+    "app_short_name_hint": "Steht auf dem Handy unter dem App-Symbol, höchstens 12 Zeichen. Ohne Eingabe werden die ersten 12 Zeichen des Namens verwendet.",
     "app_icon_saved": "App-Symbol gespeichert"
   },
   "email": "email",

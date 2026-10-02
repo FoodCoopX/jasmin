@@ -21,6 +21,8 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { SessionNoticeAlert } from "../components/SessionNoticeAlert";
+
 const { Title, Text } = Typography;
 
 interface LoginFormValues {
@@ -205,6 +207,8 @@ const LoginPage = () => {
                   </Text>
                 )}
               </div>
+
+              <SessionNoticeAlert />
 
               {displayError && (
                 <Alert

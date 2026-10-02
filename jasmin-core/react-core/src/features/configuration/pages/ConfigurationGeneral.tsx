@@ -2,6 +2,7 @@ import {
   SettingsCategory,
   SettingsRenderer,
 } from "@features/configuration/components/SettingsRenderer";
+import { AppIconSettings } from "@features/configuration/components/AppIconSettings";
 import { useAutoSave, useTenant } from "@hooks/index";
 import type { Tenant } from "@shared/api/generated/models";
 import { tenantsTenantsPartialUpdate } from "@shared/api/generated/tenants/tenants";
@@ -371,6 +372,7 @@ export default function ConfigurationGeneral() {
       auditing_association: tenant.auditing_association || "",
       professional_association: tenant.professional_association || "",
       legal_notice_extra_html: tenant.legal_notice_extra_html || "",
+      app_short_name: tenant.app_short_name,
     };
 
     setSettings(currentSettings);
@@ -574,23 +576,21 @@ export default function ConfigurationGeneral() {
                   </Col>
                   <Col xs={24} md={8}>
                     <div style={{ padding: "4px 0" }}>
-                      <Text strong>{t("tenant.files.current_app_icon")}</Text>
-                      <div
-                        style={{ marginTop: 4, marginBottom: 8 }}
-                        className="settings-hint"
-                      >
-                        <Text type="secondary">
-                          {t("tenant.files.app_icon_hint")}
-                        </Text>
-                      </div>
-                      <PictureUploadField
-                        pictureUrl={appIconPreviewUrl}
-                        uploading={appIconUploading}
-                        onUpload={uploadAppIcon}
-                        previewVariant="inline"
-                        showDelete={false}
-                        requireSquare
-                        minSizePx={512}
+                      <AppIconSettings
+                        iconUrl={appIconPreviewUrl}
+                        iconUploading={appIconUploading}
+                        onIconUpload={uploadAppIcon}
+                        shortName={String(
+                          getTenantFieldValue("app_short_name", ""),
+                        )}
+                        onShortNameChange={(value) =>
+                          handleTenantFieldChange(
+                            "app_short_name",
+                            value,
+                            "input",
+                          )
+                        }
+                        tenantName={tenant?.name ?? ""}
                       />
                     </div>
                   </Col>

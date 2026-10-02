@@ -106,6 +106,8 @@
   "no_data": "No data available",
   "no_orders_available": "No orders available",
   "offline_banner": "You are offline — some actions are disabled.",
+  "new_version_banner": "A new version is available.",
+  "reload": "Reload",
   "required": "Required field",
   "saved_successfully": "Saved successfully",
   "stock_count": "Stock",
