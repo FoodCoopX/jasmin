@@ -22,9 +22,9 @@ answer to audit questions like:
 | Member master data — active members | **For the duration of membership** + 10 years from last payment | DB row + backups; no automatic deletion | Tax law (joint liability for membership fees, SEPA mandate records) |
 | Ex-member personal data | **10 years** from last payment, then **anonymise** (replace PII with NULL while keeping aggregate/sequence integrity) | Anonymisation cron (see ACTION below) | DSGVO Art. 5(1)(e) "storage limitation"; balanced against tax-law obligation |
 | Change history (`auditlog_logentry`) | **Forever** | Default django-auditlog behaviour (no pruning) | Small row size, high audit value; documents survive even after their source row is deleted (generic FK) |
-| Auth events (`logs/auth.log`) | **1 year** rolling window | `RotatingFileHandler`, size-rotated | Industry baseline for security forensics |
-| Security events (`logs/security.log`) | **1 year** rolling window | Same | Same |
-| App logs (`logs/app.log`) | **90 days** rolling window | Same | Operational, not legal — short window OK |
+| Auth events (`authentication` / `axes` loggers) | **1 year** rolling window | Container logs in the host's systemd journal, age- and size-capped by journald | Industry baseline for security forensics |
+| Security events (`django.security` logger) | **1 year** rolling window | Same | Same |
+| App logs (all other loggers) | **1 year** rolling window | Same — one journal holds every container's log | Operational; kept as long as the auth and security events they sit next to |
 | GDPR deletion stubs (`DeletionLog`) | **Forever** | Default behaviour | Required as the audit trail of erasure requests; contains no personal data itself |
 | pg_dump backups | **Daily snapshots for 30 days, weekly for 12 months, monthly forever (or ≥10y)** | Manual / cron pruning, with the "≥10y monthly" floor as the hard rule | Disaster recovery (recent) + tax retention (long tail) |
 
@@ -41,8 +41,9 @@ immutability at multiple layers:
   (`apps/commissioning/models/mixin.py`).
 - **Tamper detection** for finalized invoices: the nightly Huey periodic
   task `nightly_invoice_hash_check` (`apps/commissioning/tasks.py`, crontab
-  03:00, per-tenant) recomputes each invoice's `document_hash` and writes
-  `invoice.hash_drift` warnings to `logs/security.log`. For an ad-hoc check,
+  03:00, per-tenant) recomputes each invoice's `document_hash`, logs an
+  `invoice.hash_drift` warning per drifted invoice and emails the operator
+  (`ADMINS`) the list. For an ad-hoc check,
   run `python manage.py check_invoice_hashes --schema=<tenant>` (exit 1 on
   drift).
 
@@ -70,20 +71,23 @@ finalized row — including via raw SQL.
 
 ## Enforcement mechanism for log retention
 
-The three log windows above (auth: 1y, security: 1y, app: 90d)
-are enforced by Python's `RotatingFileHandler` configuration in
-`config/settings.py::LOGGING`. Concretely:
+In production every process logs to stdout, and Docker's `journald`
+log driver (`docker-compose.yml`) writes each container's output to the
+host's systemd journal, where it outlives the containers a deploy
+recreates. The one-year window above is enforced there:
 
-- File-size cap + backup-count rolling: when a log file hits its
-  size cap, it rotates and the oldest backup beyond the count is
-  deleted. The configured `maxBytes` / `backupCount` sizing covers
-  the documented windows under normal traffic.
+- `scripts/bootstrap-server.sh` installs
+  `/etc/systemd/journald.conf.d/90-jasmin.conf` with
+  `Storage=persistent`, `MaxRetentionSec=1year` and `SystemMaxUse=4G`;
+  journald deletes archived entries older than a year, or earlier when
+  the journal reaches 4 GB. `scripts/deploy.sh` warns when the drop-in
+  is missing.
 
-The policy windows above are the source of truth; the
-RotatingFileHandler config below them is the current enforcement
-mechanism, replaceable when scale demands it. If log volume ever
-outgrows the rotation budget, raise `backupCount` or ship off-box
-and treat the central store as authoritative.
+The policy windows above are the source of truth; the journald
+configuration is the current enforcement mechanism. If log volume ever
+outgrows the size cap, raise it or ship the logs off-box and treat the
+central store as authoritative. Bare-metal local development keeps
+size-rotated files under `logs/` instead.
 
 ## Review cadence
 

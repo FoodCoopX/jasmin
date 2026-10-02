@@ -83,6 +83,11 @@ ADMIN_HOST="$(envval SUPER_ADMIN_SUBDOMAIN)"; ADMIN_HOST="${ADMIN_HOST:-admin}"
 
 log "domain=$DOMAIN project=$PROJECT"
 
+# Container logs go to the systemd journal (docker-compose.yml); without the
+# retention drop-in from bootstrap-server.sh journald keeps its own defaults.
+[ -f /etc/systemd/journald.conf.d/90-jasmin.conf ] || \
+    log "WARN: no journald retention drop-in — run the '4a. journald' step of scripts/bootstrap-server.sh"
+
 # ── 2. wildcard TLS cert (issue once) ────────────────────────────────────────
 # Inspect-first: a bare `docker run -v name:/...` would AUTO-CREATE the named
 # volume without compose's ownership labels, and newer compose versions then

@@ -7,7 +7,8 @@
 #   1. create a non-root sudo user (key-login, passwordless sudo)
 #   2. copy root's SSH key to that user
 #   3. install Docker Engine + compose plugin
-#   4. unattended-upgrades (auto security patches) + optional Ubuntu Pro
+#   4. unattended-upgrades (auto security patches), journald retention for
+#      container logs (1 year, 4 GB), and optional Ubuntu Pro
 #      Livepatch (live kernel CVE patches, no reboot) when --pro-token is given
 #   5. fail2ban (ban brute-force SSH)
 #   6. ufw (allow SSH/80/443, deny the rest) — belt-and-braces behind the
@@ -98,6 +99,19 @@ APT::Periodic::Unattended-Upgrade "1";
 EOF
 systemctl enable --now unattended-upgrades >/dev/null 2>&1 || true
 systemctl enable --now fail2ban >/dev/null 2>&1 || true
+
+# ── 4a. journald: container logs that survive deploys ────────────────────────
+# docker-compose.yml sends every container's log to the systemd journal. Keep
+# it on disk for a year (the auth and security log retention), at most 4 GB.
+log "configuring journald retention for container logs"
+install -d -m 755 /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/90-jasmin.conf <<'EOF'
+[Journal]
+Storage=persistent
+SystemMaxUse=4G
+MaxRetentionSec=1year
+EOF
+systemctl restart systemd-journald
 
 # ── 4b. Ubuntu Pro Livepatch (live kernel CVE patches, no reboot) ─────────────
 # unattended-upgrades installs kernel security fixes but they only take effect

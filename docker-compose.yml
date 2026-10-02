@@ -77,15 +77,16 @@ x-backend-env: &backend-env
   STEP_UP_TTL_SECONDS: ${STEP_UP_TTL_SECONDS:-300}
   STEP_UP_REQUIRES_TOTP: ${STEP_UP_REQUIRES_TOTP:-False}
 
-# Bounded container logs. Without this every service uses the default json-file
-# driver with no size cap, so logs pile up on the same disk as postgres_data
-# → disk-full outage. Referenced (``logging: *default-logging``) by every
-# service below. ~50 MB/service ceiling (10m × 5 rotated files).
+# Container logs go to the host's systemd journal, so they outlive the
+# containers a deploy recreates (json-file logs are deleted with them). Age and
+# size are capped by journald, not here: scripts/bootstrap-server.sh installs a
+# drop-in keeping one year, at most 4 GB. Read them with ``docker compose logs``
+# or ``journalctl CONTAINER_NAME=<container>``. Referenced
+# (``logging: *default-logging``) by every service below.
 x-logging: &default-logging
-  driver: json-file
+  driver: journald
   options:
-    max-size: "10m"
-    max-file: "5"
+    tag: "{{.Name}}"
 
 # -----------------------------------------------------------------------------
 # Per-service resource caps (mem_limit / pids_limit, plus cpus on the

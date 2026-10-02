@@ -7,6 +7,7 @@ from huey import crontab
 from huey.contrib.djhuey import db_periodic_task, db_task
 
 from apps.commissioning.services import InvoiceService
+from apps.shared.ops_alerts import alert_operator
 from apps.shared.retention import IMPORT_BATCH_RETENTION_DAYS
 from apps.shared.tenants.sweep import for_each_tenant
 
@@ -19,10 +20,10 @@ def nightly_invoice_hash_check():
     """Nightly tamper-detection sweep for finalized invoices.
 
     For each tenant schema, recomputes the document_hash on every
-    finalized invoice and warns on any drift. Warnings land in
-    ``logs/security.log`` and are grepped by ``grep invoice.hash_drift``
-
+    finalized invoice and warns on any drift (``invoice.hash_drift``), then
+    emails the operator one list of the drifted invoices.
     """
+    drifted: list[str] = []
 
     def check(tenant):
         for inv in InvoiceService.find_drifted_invoices():
@@ -32,6 +33,10 @@ def nightly_invoice_hash_check():
                 inv["id"],
                 inv["prefix"],
                 inv["number"],
+            )
+            drifted.append(
+                f"{tenant.schema_name}: invoice {inv['prefix']}{inv['number']}"
+                f" (id {inv['id']})"
             )
 
     # Per-tenant isolation: one bad tenant must NOT abort the sweep. Failures
@@ -44,6 +49,13 @@ def nightly_invoice_hash_check():
     for_each_tenant(
         check, label="invoice.hash_check", logger=log, include_inactive=True
     )
+    if drifted:
+        alert_operator(
+            "Finalized invoices changed after finalization",
+            "The nightly check found finalized invoices whose stored hash no "
+            "longer matches their content, which can mean tampering:\n\n"
+            + "\n".join(drifted),
+        )
 
 
 @db_periodic_task(
@@ -204,7 +216,7 @@ def _notify_office_of_renewal_failures(tenant, failed: list[dict], run_date) -> 
     tenant office mailbox (``Tenant.email``); a missing address or a failed send
     is logged and swallowed — it must never abort the sweep. Mirrors
     ``_notify_office_of_self_cancel``."""
-    office_email = getattr(tenant, "email", None)
+    office_email = tenant.email
     if not office_email:
         ops_log.info(
             "renewal.digest_skipped tenant=%s reason=no_office_email failed=%d",
@@ -213,7 +225,7 @@ def _notify_office_of_renewal_failures(tenant, failed: list[dict], run_date) -> 
         )
         return
 
-    raw_lang = (getattr(tenant, "tenant_language", "") or "").strip().lower()[:2]
+    raw_lang = tenant.tenant_language.strip().lower()[:2]
     language = "de" if raw_lang == "de" else "en"
 
     from apps.shared.deferred_email import send_email_best_effort

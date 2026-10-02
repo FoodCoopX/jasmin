@@ -358,12 +358,12 @@ LOGGING = {
 # huey container all mount the same ``/app/logs`` volume, so a 50 MB rollover
 # in one process renames the active file out from under the others and silently
 # drops / truncates lines — including the auth.log / security.log forensics you
-# can least afford to lose. Docker already captures the console handler
-# (stdout → journald) and the GlitchTip pipeline carries the same records, so
-# in any container we route every logger to the console handler only and drop
-# the file handlers entirely (an unreferenced FileHandler would still open its
-# file at dictConfig time). Bare-metal local dev (no RUNNING_IN_DOCKER) keeps
-# the rotating files under ./logs for convenience.
+# can least afford to lose. In production the containers' log driver keeps
+# stdout in the host's journal (docker-compose.yml), so in any container we
+# route every logger to the console handler only and drop the file handlers
+# entirely (an unreferenced FileHandler would still open its file at
+# dictConfig time). Bare-metal local dev (no RUNNING_IN_DOCKER) keeps the
+# rotating files under ./logs for convenience.
 if RUNNING_IN_DOCKER:
     _file_handlers = {"app_file", "auth_file", "security_file"}
     for _handler_name in _file_handlers:

@@ -50,6 +50,7 @@ from huey.contrib.djhuey import db_periodic_task
 from apps.commissioning.models import Member
 from apps.gdpr.errors import RetentionPeriodActive
 from apps.gdpr.services import GDPRService
+from apps.shared.ops_alerts import alert_operator
 from apps.shared.retention import EX_MEMBER_RETENTION_YEARS
 from apps.shared.tenants.sweep import for_each_tenant
 
@@ -113,7 +114,8 @@ def anonymise_long_cancelled_members() -> dict[str, int]:
         despite 10y+ elapsed. Usually means open CoopShares, open
         invoices, or active subscriptions that should have been
         closed at member exit. Office needs to clean those up; the
-        member will keep showing up here until they do.
+        member will keep showing up here until they do. The operator gets
+        an email per tenant with blocked members, at most once a week.
     """
     cutoff = _retention_cutoff()
     log.info(
@@ -129,6 +131,17 @@ def anonymise_long_cancelled_members() -> dict[str, int]:
         anonymised, blocked = _run_for_current_schema(cutoff)
         counters["anonymised"] += anonymised
         counters["blocked"] += blocked
+        if blocked:
+            alert_operator(
+                f"{tenant.name}: {blocked} ex-member erasure(s) blocked",
+                f"Tenant '{tenant.name}' (schema {tenant.schema_name}) has "
+                f"{blocked} ex-member(s) past the {EX_MEMBER_RETENTION_YEARS}-year "
+                "retention whose erasure is blocked by open records (coop shares, "
+                "invoices, subscriptions or charges). The office has to close "
+                "them; the backend log lists each as gdpr.ex_member_blocked.",
+                throttle_key=f"gdpr.ex_member_blocked:{tenant.schema_name}",
+                throttle_seconds=7 * 24 * 3600,
+            )
 
     # ``include_inactive=True``: a legal retention obligation persists on a
     # frozen (is_active=False) tenant, so the erasure SLA must keep running
