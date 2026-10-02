@@ -1,5 +1,5 @@
 {
-  "title": "Weekly Share Import",
+  "title": "Weekly share import",
   "subtitle": "Upload the share quantities for one delivery week. Existing data for the same week is replaced when you apply a new file.",
   "upload_card": "1. Upload weekly file",
   "select_week": "Select year & week",
@@ -36,12 +36,12 @@
     "created": "Created"
   },
   "status": {
-    "uploaded": "uploaded",
-    "validated": "validated",
-    "preview_ready": "preview ready",
-    "applied": "applied",
-    "failed": "failed",
-    "superseded": "superseded"
+    "uploaded": "Uploaded",
+    "validated": "Validated",
+    "preview_ready": "Preview ready",
+    "applied": "Applied",
+    "failed": "Failed",
+    "superseded": "Superseded"
   },
   "explainer": {
     "title": "About this page",
@@ -56,11 +56,11 @@
     "csv_optional": "Optional columns",
     "csv_example": "Example",
     "csv_codes_hint": "The station, day and variation codes are translated to internal IDs through ",
-    "csv_codes_link": "External Code Mappings",
+    "csv_codes_link": "External code mappings",
     "csv_codes_hint_end": ". Make sure every code in the file has a mapping configured first."
   },
   "mappings": {
-    "title": "External Code Mappings",
+    "title": "External code mappings",
     "subtitle": "Map upstream system codes (used in the weekly CSV) to your internal IDs. Required before importing.",
     "no_label": "No label",
     "add": "Add mapping",

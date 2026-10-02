@@ -1,6 +1,6 @@
 {
   "purchase": {
-    "organic_certificate_required": "For Organic or In-conversion, the seller must hold a certificate valid for this delivery week."
+    "organic_certificate_required": "For organic or in-conversion goods, the supplier must hold a certificate valid for this delivery week."
   },
   "commissioning": {
     "past_week": "This week is in the past and cannot be modified anymore.",
@@ -84,14 +84,14 @@
       "effective_at_in_past": "The effective date cannot be in the past.",
       "effective_at_required": "An effective date is required."
     },
-    "confirmed_immutable": "A confirmed member can’t be deleted — end the membership via cancellation instead.",
+    "confirmed_immutable": "A confirmed member can't be deleted — end the membership via cancellation instead.",
     "exit_before_transfer": "The exit date is before a coop share transfer of this member ({{transfer_date}}). A member can't leave before their own transfer: if the exit really is earlier, the transfer was recorded wrongly."
   },
   "coop_share": {
     "contract_agreement_required": "Please agree to the subscription contract to subscribe cooperative shares.",
     "value_not_configured": "The value of one cooperative share is not configured. Please contact the office.",
     "invalid_amount": "The number of coop shares must be a whole number greater than 0.",
-    "confirmed_immutable": "A confirmed cooperative share can’t be deleted — cancel the share (or the member) instead.",
+    "confirmed_immutable": "A confirmed cooperative share can't be deleted — cancel the share (or the member) instead.",
     "confirmed_fields_locked": "The amount, member, due date and increase flag of a confirmed cooperative share can no longer be changed — cancel the share and record a new one instead.",
     "not_pending": "Only a pending cooperative share (not confirmed, not cancelled) can be confirmed."
   },
@@ -194,8 +194,8 @@
     "not_found": "Invoice not found.",
     "cannot_cancel_self": "An invoice cannot cancel itself.",
     "circular_cancellation": "Cancellation reference loop detected — please check the link.",
-    "storno_missing_target": "A storno invoice must reference the invoice being cancelled.",
-    "cannot_storno_storno": "Cannot storno a storno.",
+    "storno_missing_target": "A cancellation invoice must reference the invoice being cancelled.",
+    "cannot_storno_storno": "Cannot cancel a cancellation.",
     "already_exists": "An invoice already exists for this delivery note.",
     "already_finalized": "This invoice is already finalized and can no longer be changed.",
     "dn_not_finalized": "The delivery note is not finalized yet.",
@@ -257,7 +257,7 @@
     "refresh_missing": "Session expired — please sign in again.",
     "tenant_mismatch": "This account does not belong to this tenant.",
     "account_blocked": "This account is blocked.",
-    "self_registration_disabled": "Self-registration is disabled for this organisation.",
+    "self_registration_disabled": "Self-registration is disabled for this organization.",
     "step_up_required": "This action requires re-authentication to confirm identity.",
     "two_factor": {
       "already_enrolled": "Two-factor authentication (2FA) is already set up.",
@@ -330,7 +330,7 @@
     "over_member_limit": "The file has more than {{max_rows}} rows and more members than the weekly limit for new members still allows ({{remaining}}). Splitting it won't help: a platform administrator has to raise the limit first."
   },
   "customer": {
-    "profile_not_linked": "No customer profile is linked to this user account."
+    "profile_not_linked": "No reseller profile is linked to this user account."
   },
   "bulk_documents": {
     "model_invalid": "Invalid document type — must be a delivery note or an invoice.",
@@ -468,7 +468,7 @@
     "model_invalid": "This model type does not exist or cannot be finalized.",
     "model_not_found": "The requested model was not found.",
     "model_required": "The model parameter is required.",
-    "one_way_model": "Finalized documents are legally immutable and cannot be unfinalized. To reverse, create a storno; to revise, issue a correction document."
+    "one_way_model": "Finalized documents are legally immutable and cannot be unfinalized. To reverse, create a cancellation; to revise, issue a correction document."
   },
   "share_import": {
     "apply_failed": "The import could not be applied.",
@@ -515,7 +515,7 @@
   "email_config": {
     "test_recipient_missing": "Please enter a recipient address for the test email.",
     "not_set_up": "Email sending is not set up yet. Please save an SMTP host and a from-address first, then send the test email.",
-    "test_recipient_not_allowed": "Test emails only go to your own account address or the organisation's contact address. Please enter one of those.",
+    "test_recipient_not_allowed": "Test emails only go to your own account address or the organization's contact address. Please enter one of those.",
     "test_send_failed": "The test email could not be sent. Please check the SMTP host, port and credentials, then try again.",
     "smtp_host_not_allowed": "Please enter a public SMTP host. Private, loopback, link-local and reserved addresses are not allowed.",
     "smtp_port_invalid": "Please enter a valid port number between 1 and 65535.",

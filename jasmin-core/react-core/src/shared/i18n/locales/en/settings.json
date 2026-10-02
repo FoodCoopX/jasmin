@@ -24,13 +24,13 @@
   },
   "navigation": {
     "title": "Display Modules",
-    "show_members": "Module MEMBERS",
-    "show_abos": "Module SUBSCRIPTIONS",
-    "show_commissioning": "Module COMMISSIONING",
-    "show_staff": "Module STAFF",
-    "show_warehouse": "Module WAREHOUSE",
-    "show_economics": "Module ECONOMICS",
-    "show_cultivation": "Module CULTIVATION",
+    "show_members": "Members module",
+    "show_abos": "Subscriptions module",
+    "show_commissioning": "Commissioning module",
+    "show_staff": "Staff module",
+    "show_warehouse": "Equipment & Supplies module",
+    "show_economics": "Economics module",
+    "show_cultivation": "Cultivation module",
     "locked_by_weekly_upload": "This module is locked because the weekly share amounts are uploaded, so there are no members or subscriptions in the system."
   },
   "ai": {
@@ -123,7 +123,7 @@
       "title": "SEPA collection"
     },
     "billing_strategy": "Billing strategy",
-    "billing_strategy_desc": "EXACT_PER_PERIOD bills exactly the deliveries that fall in each cycle. SMOOTHED bills the same amount every cycle, spread across the whole subscription term.",
+    "billing_strategy_desc": "With \"Exact per period\", each cycle bills exactly the deliveries that fall in it. With \"Smoothed\", every cycle bills the same amount, spread across the whole subscription term.",
     "strategy_exact": "Exact per period (count actual deliveries)",
     "strategy_smoothed": "Smoothed across subscription term",
     "strategy_smoothed_disabled": "Smoothed across subscription term (temporarily unavailable)",
@@ -148,17 +148,17 @@
     "logistics": {
       "title": "Logistics"
     },
-    "percentage_added_to_bulk_packing_list_description": "can be adjusted directly for each vegetable",
-    "percentage_added_to_bulk_packing_list": "additional % for packing lists (only relevant if members pack their own crates)‚",
+    "percentage_added_to_bulk_packing_list_description": "Can be adjusted directly for each vegetable",
+    "percentage_added_to_bulk_packing_list": "Additional % for packing lists (only relevant if members pack their own crates)",
     "allow_upload_for_data_lists": "Data uploadable via CSV",
     "allow_upload_for_data_lists_desc": "To load larger amounts of data into the data lists (e.g. vegetables for shares), CSV files can be used for upload.",
-    "uploads_weekly_amount_desc": "via a CSV file",
+    "uploads_weekly_amount_desc": "Via a CSV file",
     "show_seller_name_in_share": "Show the supplier name for bought-in items in crates to members.",
     "packing_mode": "Packing Mode",
     "packing_mode_description": "How members receive their shares. Boxes: all shares pre-packed per delivery station. Bulk: members pick from bulk crates. Mixed: per share-type variation choice.",
     "packing_mode_boxes": "Crates are pre-packed / ready-made crates are delivered to the delivery stations",
     "packing_mode_bulk": "Members pack their own crates at the delivery stations",
-    "packing_mode_mixed": "mixed (selectable per share type)",
+    "packing_mode_mixed": "Mixed (selectable per share type)",
     "number_packing_stations": "Number of Packing Stations",
     "show_size_column": "Show vegetable sizes column",
     "distribute_forecast_by_weight": "Distribute forecast amount across sizes by weight (prefill empty cells)",
@@ -169,10 +169,12 @@
     "default_planning_mode_basic": "by days",
     "default_planning_mode_tours": "by tours",
     "default_planning_mode_stations": "by delivery stations",
-    "default_planning_mode": "planning is done: ",
+    "default_planning_mode": "Planning is done: ",
     "default_planning_mode_description": "This is only the default setting. It can be changed every week.",
     "has_markets": "Sell at Markets",
     "sells_to_resellers": "Sells to Resellers",
+    "crates_should_be_on_documents": "Crates are charged",
+    "crates_should_be_on_documents_desc": "Crates get a price and are listed on orders, delivery notes and invoices.",
     "different_offer_groups": "Different Offer Groups",
     "tax_rates": {
       "title": "Default Tax Rates",
@@ -204,7 +206,7 @@
     "has_grain_shares": "Grain Shares",
     "has_bread_shares": "Bread Shares",
     "share_types": {
-      "title": "Crate Types"
+      "title": "Share types"
     },
     "trial": {
       "title": "Trial Shares",
@@ -223,10 +225,8 @@
       "title": "Joker System"
     },
     "uses_jokers": "Enable Jokers",
-    "amount_jokers": "Number of Jokers",
     "jokers_for_trial": "Use Jokers for Trial Subscriptions",
     "donation_jokers": "Enable Donation Jokers",
-    "additional_donation_jokers": "Additional Donation Jokers",
     "subscriptions": {
       "title": "Subscription Management"
     },
@@ -345,7 +345,7 @@
     "offer_order_instructions": "Order instructions",
     "offer_order_instructions_description": "Free-form text printed between the entry lines and the offers table. Typical content: order acceptance, order deadline, where to send the completed order.",
     "offer_order_instructions_placeholder": "Enter order instructions (e.g. ordering deadline Thursday 12:00)...",
-    "correction_invoice_prefix": "Correction / storno invoice number prefix",
+    "correction_invoice_prefix": "Correction / cancellation invoice number prefix",
     "preview": {
       "title": "Preview with current text",
       "description": "Generates a sample PDF using fake reseller / item data so you can see how your edits to the entry lines, greeting lines and footer columns will look on a real document. Unsaved changes are included.",
@@ -380,7 +380,7 @@
     "uses_jokers_for_trial_subscriptions": "Use Jokers for Trial Subscriptions",
     "uses_jokers_for_trial_subscriptions_desc": "Determines whether jokers are also counted against trial subscriptions.",
     "share_types": {
-      "title": "Crate Types"
+      "title": "Share types"
     },
     "info_sentence_about_trial_subscriptions": "Short description of trial subscriptions",
     "info_sentence_about_trial_subscriptions_desc": "e.g.: trial subscriptions are possible for 4 weeks and then end automatically."

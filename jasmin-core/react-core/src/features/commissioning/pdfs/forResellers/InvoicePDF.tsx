@@ -427,7 +427,7 @@ export default function InvoicePDF({
 
           <View style={styles.taxSummaryRow}>
             <Text style={styles.taxSummaryLabel}>
-              {t("commissioning.total_sum_netto_invoice_details")}:
+              {t("commissioning.total_sum_netto_invoice_details")}
             </Text>
             <Text style={styles.taxSummaryValue}>
               {formatCurrency(formatNumber(totals.netto, 2, locale), currencySymbol)}
@@ -436,7 +436,7 @@ export default function InvoicePDF({
 
           <View style={styles.taxSummaryRow}>
             <Text style={styles.taxSummaryLabel}>
-              {t("commissioning.total_sum_ust_invoice_details")}:
+              {t("commissioning.total_sum_ust_invoice_details")}
             </Text>
             <Text style={styles.taxSummaryValue}>
               {formatCurrency(formatNumber(totals.tax, 2, locale), currencySymbol)}
@@ -460,7 +460,7 @@ export default function InvoicePDF({
                 { fontSize: 12, fontWeight: "bold" },
               ]}
             >
-              {t("commissioning.total_sum_brutto_invoice_details")}:
+              {t("commissioning.total_sum_brutto_invoice_details")}
             </Text>
             <Text style={[styles.taxSummaryValue, { fontSize: 12 }]}>
               {formatCurrency(formatNumber(totals.brutto, 2, locale), currencySymbol)}

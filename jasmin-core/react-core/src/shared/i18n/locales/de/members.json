@@ -121,7 +121,7 @@
   "is_increase": "Erhöhung?",
   "paid_at": "bezahlt am",
   "due_date": "fällig am",
-  "amount_of_coop_shares": "Anzahl Genossenschaftanteile: ",
+  "amount_of_coop_shares": "Anzahl Genossenschaftsanteile",
   "value_of_coop_shares": "Wert Genossenschaftsanteile",
   "user_info_modal_title": "Status User",
   "user_active": "aktiver User",

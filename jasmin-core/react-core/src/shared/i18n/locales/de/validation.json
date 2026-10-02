@@ -8,7 +8,7 @@
       "documentation_purchase": "Eintrag in der Einkaufsdokumentation muss einzigartig sein.",
       "invoice_modal_crate": "Kiste in der Rechnung muss einzigartig sein.",
       "list_share_articles": "Kombination im Anteilsartikel muss einzigartig sein.",
-      "member_share_type_variation_valid_from": "Pro Mitglied darf nur ein gleicher Kistentyp ab demselben Datum laufen.",
+      "member_share_type_variation_valid_from": "Pro Mitglied darf nur ein gleicher Anteilstyp ab demselben Datum laufen.",
       "members_member_number_must_be_unique": "Mitgliedsnummer muss einzigartig sein.",
       "name": "Name muss einzigartig sein.",
       "number": "Nummer muss einzigartig sein.",

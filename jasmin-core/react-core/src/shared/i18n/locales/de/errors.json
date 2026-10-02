@@ -211,7 +211,7 @@
   "order_content": {
     "not_found": "Bestellposition nicht gefunden.",
     "finalized": "Eine finalisierte Bestellposition kann nicht mehr geändert werden.",
-    "insufficient_stock": "Nicht genügend Bestand verfügbar — verfügbar: {{available}}, angefragt: {{requested}}.",
+    "insufficient_stock": "Nicht genügend Bestand verfügbar — verfügbar: {{available}}.",
     "offer_required": "Du kannst nur Angebote bestellen.",
     "offer_not_in_offer_group": "Dieses Angebot gehört nicht zu deiner Angebotsgruppe.",
     "item_change_forbidden": "Angebot oder Artikel einer Bestellposition kann nur das Büro ändern."
