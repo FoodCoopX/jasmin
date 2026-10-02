@@ -123,7 +123,8 @@ class TestRotationService:
         # ``secrets.token_urlsafe(50)`` produces ~67-char base64 strings.
         assert len(result.generated_secret) >= 50
         assert result.instructions
-        assert "DJANGO_SECRET_KEY" in result.instructions
+        assert "DJANGO_SECRET_KEY_FALLBACK" in result.instructions
+        assert "logged out" in result.instructions
         assert result.items_affected == 0
 
     def test_django_secret_is_fresh_each_call(self):
@@ -131,18 +132,20 @@ class TestRotationService:
         b = rotate("rotate_django_secret").generated_secret
         assert a != b, "Each rotation must produce a fresh secret."
 
-    def test_db_password_returns_alter_user_sql(self):
+    def test_db_password_is_set_through_the_psql_prompt(self):
         result = rotate("rotate_db_password")
         assert result.generated_secret
-        assert "ALTER USER" in result.extras["alter_sql"]
-        assert result.generated_secret in result.extras["alter_sql"]
-        assert "Postgres" in result.instructions
+        assert "docker compose exec postgres" in result.instructions
+        assert "\\password" in result.instructions
+        # Typed at the prompt, never part of SQL text or the response.
+        assert result.generated_secret not in result.instructions
+        assert result.extras == {}
 
     def test_bunny_token_is_runbook_only(self):
         result = rotate("rotate_bunny_token")
         assert result.generated_secret is None
         assert result.items_affected == 0
-        assert "BunnyCDN" in result.instructions
+        assert "Bunny dashboard" in result.instructions
 
     def test_unknown_kind_raises(self):
         with pytest.raises(UnknownRotationKind):

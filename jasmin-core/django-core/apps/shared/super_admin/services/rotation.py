@@ -1,14 +1,15 @@
 """Super-admin rotation service layer.
 
-Single source of truth for the four "operator-side" rotations the
-``OpsChecklistItem`` model declares as ``KIND_CHOICES``:
+Single source of truth for the four rotations of ``OpsChecklistItem``'s
+``KIND_CHOICES`` that the super-admin UI and the ``rotate_*`` commands
+can run:
 
   * ``rotate_django_secret``: generates a new ``DJANGO_SECRET_KEY``
     candidate. Django cannot apply this itself — the operator updates
-    ``.env`` and restarts every running process.
+    ``.env`` and recreates the backend and huey containers.
 
   * ``rotate_db_password``: generates a new Postgres password
-    candidate + the matching ``ALTER USER`` SQL. Same operator-applies
+    candidate + the runbook that sets it. Same operator-applies
     pattern.
 
   * ``rotate_bunny_token``: no integration in code today, so the
@@ -22,10 +23,12 @@ Single source of truth for the four "operator-side" rotations the
     ``is_verified=False`` — forces the tenant office to re-enter
     fresh credentials before the next outbound email.
 
-The fifth declared rotation, ``rotate_field_encryption``, has its
-own dedicated management command (chunked over millions of
-ciphertext rows) and is NOT dispatched through this service — see
-``rotate_field_encryption.py``.
+``rotate_field_encryption`` has its own dedicated management command
+(chunked over millions of ciphertext rows) and is NOT dispatched
+through this service — see ``rotate_field_encryption.py``. The other
+rotation kinds (Redis password, backup encryption key, off-site backup
+credentials, DNS API token) are operator-side only; their checklist
+item's description is the runbook.
 
 Design notes
 ------------
@@ -106,41 +109,55 @@ def _rotate_django_secret() -> RotationResult:
         kind="rotate_django_secret",
         generated_secret=new_key,
         instructions=(
-            "1. Copy the generated key above and save it in your password manager.\n"
-            "2. Update DJANGO_SECRET_KEY in the prod .env file.\n"
-            "3. Restart every Django process (gunicorn, huey worker, scheduler).\n"
-            "4. All existing sessions + CSRF tokens are invalidated — users will\n"
-            "   need to log in again. JWT access/refresh tokens are signed via\n"
-            "   simplejwt's own SIGNING_KEY (separate setting) and are NOT\n"
-            "   affected by this rotation.\n"
-            "5. Mark this checklist item done once you've verified the new key\n"
-            "   is live (visit a page that uses CSRF — e.g. the office login —\n"
-            "   and confirm the form submits cleanly)."
+            "Every user and super-admin is logged out: the access and refresh\n"
+            "tokens are signed with this key, and the fallback below doesn't\n"
+            "cover them. Pick a quiet hour.\n"
+            "\n"
+            "1. Save the generated key above in your password manager.\n"
+            "2. In the prod .env, move the current DJANGO_SECRET_KEY value to\n"
+            "   DJANGO_SECRET_KEY_FALLBACK and set DJANGO_SECRET_KEY to the new\n"
+            "   key. Password-reset and protected-media links signed with the\n"
+            "   old key keep working through the fallback.\n"
+            "3. From the repo root on the server:\n"
+            "       docker compose up -d backend huey\n"
+            "       docker compose restart gateway\n"
+            "   up -d recreates both containers with the new .env (a restart\n"
+            "   keeps the old values); the gateway restart lets nginx find the\n"
+            "   recreated backend.\n"
+            "4. Log in on the admin host and on a tenant host.\n"
+            "5. After 24 hours, when the last link signed with the old key has\n"
+            "   expired, remove DJANGO_SECRET_KEY_FALLBACK from .env and run\n"
+            "   the two commands of step 3 again."
         ),
     )
 
 
 def _rotate_db_password() -> RotationResult:
     new_password = secrets.token_urlsafe(32)
-    db_user = "jasmin"  # matches the default in docker-compose / .env.example
-    alter_sql = f"ALTER USER {db_user} WITH PASSWORD '{new_password}';"
     return RotationResult(
         kind="rotate_db_password",
         generated_secret=new_password,
         instructions=(
-            "1. Copy the generated password above and save it in your password\n"
-            "   manager.\n"
-            "2. Apply the ALTER USER SQL on the Postgres host:\n"
-            "       sudo -u postgres psql -d jasmin\n"
-            f"       {alter_sql}\n"
-            "3. Update POSTGRES_PASSWORD in the prod .env file.\n"
-            "4. Restart every service that holds a DB connection (gunicorn,\n"
-            "   huey worker, scheduler). Backup scripts that connect directly\n"
-            "   (backups/backup.sh) need their PGPASSWORD env updated too.\n"
-            "5. Verify with `make prod-bash` that the new password is in\n"
-            "   effect (a trivial query like `SELECT 1` should succeed)."
+            "1. Save the generated password above in your password manager.\n"
+            "2. Set it on the database role. From the repo root on the server:\n"
+            '       docker compose exec postgres sh -c \'psql -U "$POSTGRES_USER" '
+            '-d "$POSTGRES_DB"\'\n'
+            "   and at the psql prompt:\n"
+            "       \\password\n"
+            "   Paste the new password twice, then leave with \\q. psql sends\n"
+            "   it hashed, so it ends up in no log and no shell history.\n"
+            "3. Set POSTGRES_PASSWORD in the prod .env to the new password.\n"
+            "4. Recreate everything that connects with it, then let nginx find\n"
+            "   the recreated backend:\n"
+            "       docker compose up -d backend huey backup\n"
+            "       docker compose restart gateway\n"
+            "   The postgres container itself needs nothing: its\n"
+            "   POSTGRES_PASSWORD only applies when the database is first\n"
+            "   created.\n"
+            "5. Check that backend and huey are healthy (docker compose ps) and\n"
+            "   that a backup still works:\n"
+            "       docker compose exec backup /usr/local/bin/backup.sh now"
         ),
-        extras={"db_user": db_user, "alter_sql": alter_sql},
     )
 
 
@@ -148,20 +165,13 @@ def _rotate_bunny_token() -> RotationResult:
     return RotationResult(
         kind="rotate_bunny_token",
         instructions=(
-            "There is no BunnyCDN integration in code today, so there's nothing\n"
-            "for Django to rotate from a button. This rotation is purely\n"
-            "operator-side:\n"
+            "Nothing on the server uses a Bunny credential, so .env stays as\n"
+            "it is and nothing needs a restart. On Bunny's side:\n"
             "\n"
-            "1. Log into the BunnyCDN dashboard (https://panel.bunny.net/).\n"
-            "2. Storage Zones → your zone → FTP & API Access → Reset Password.\n"
-            "3. Save the new password in your password manager.\n"
-            "4. Update BUNNY_STORAGE_PASSWORD (or whichever env var your deploy\n"
-            "   uses) in the prod .env file. Add the variable to settings.py\n"
-            "   first if it isn't there yet.\n"
-            "5. Restart every Django process.\n"
-            "\n"
-            "If/when BunnyCDN gets a real integration in this codebase, replace\n"
-            "this stub with a real rotation that hits Bunny's API directly."
+            "1. In the Bunny dashboard, reset the account's API key.\n"
+            "2. Update any tool outside this platform that uses it.\n"
+            "3. Save the new key in your password manager and check that the\n"
+            "   account still has two-factor login on."
         ),
     )
 

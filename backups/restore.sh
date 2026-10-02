@@ -17,8 +17,21 @@ set -eu
 #   2. docker compose exec backup /backups/restore.sh /backups/<file>.sql.gz.gpg
 #      Refreshes the GDPR deletion ledger from the live database first, then
 #      restores.
-#   3. Re-apply the erasures made after the backup — printed at the end.
-#   4. docker compose up -d backend huey
+#   3. Only when the media volume is lost or damaged: unpack the media archive
+#      taken with that backup (<db>_media_<timestamp>.tar.gz.gpg), BEFORE the
+#      replay — the replay deletes the files of everyone erased since:
+#        docker compose exec -T backup sh -c \
+#            'gpg --batch --quiet --decrypt --passphrase "$BACKUP_ENCRYPTION_KEY" "/backups/$1" | gunzip' \
+#            sh <db>_media_<timestamp>.tar.gz.gpg \
+#          | docker compose run --rm --no-deps -T --user root --entrypoint tar huey \
+#              --numeric-owner -C /app/media -xf -
+#      The backup service mounts the media volume read-only, so a one-off huey
+#      container unpacks it, as root so every file keeps its owner. tar adds
+#      and overwrites; it deletes nothing.
+#   4. Re-apply the erasures made after the backup — printed at the end.
+#   5. docker compose up -d backend huey && docker compose restart gateway
+#      (nginx resolves the backend once, at startup, and it may come back on
+#      a new address).
 #
 # GDPR: the restore rolls every tenant's ``gdpr_deletionlog`` back with the
 # data, so the replay reads the copy kept outside the database,
@@ -91,8 +104,10 @@ echo " ACTION REQUIRED — re-apply the GDPR erasures, THEN start"
 echo "============================================================"
 echo " This was a SQL-only restore. Personal data that was lawfully"
 echo " erased AFTER this backup was taken has just been"
-echo " re-materialised. With backend and huey still stopped, run"
-echo " from the repo root (migrates first, then replays the ledger):"
+echo " re-materialised. If the media volume needs restoring too, do"
+echo " that first (step 3 in the header of backups/restore.sh). Then,"
+echo " with backend and huey still stopped, run from the repo root"
+echo " (migrates first, then replays the ledger):"
 echo ""
 echo "     docker compose exec -T backup cat ${LEDGER_FILE} \\"
 echo "       | docker compose run --rm --no-deps -T -e SKIP_MIGRATIONS=0 \\"
@@ -101,6 +116,7 @@ echo ""
 echo " Only then start the app again:"
 echo ""
 echo "     docker compose up -d backend huey"
+echo "     docker compose restart gateway"
 echo ""
 echo " Starting it first serves the re-materialised personal data."
 echo "============================================================"

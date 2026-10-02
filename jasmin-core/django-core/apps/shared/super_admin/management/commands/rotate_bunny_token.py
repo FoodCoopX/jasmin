@@ -1,10 +1,10 @@
 """Print the BunnyCDN token rotation runbook.
 
 There is no BunnyCDN integration in code today, so the platform has
-nothing to rotate from a button — the rotation is entirely operator-
-side (log into Bunny dashboard, reset, update .env, restart). This
-command exists so the super-admin UI button has a backing surface
-and so the runbook lives somewhere queryable from the CLI.
+nothing to rotate from a button — the rotation happens entirely in
+Bunny's dashboard. This command exists so the super-admin UI button
+has a backing surface and so the runbook lives somewhere queryable
+from the CLI.
 
 Replace this stub with a real rotation if/when BunnyCDN gets an
 integration.

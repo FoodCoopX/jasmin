@@ -70,6 +70,18 @@ class TestClassifyBackupsForPruning:
         # The kept one is the newest of the group.
         assert keep[0] == backups[-1]
 
+    def test_a_predeploy_dump_is_retained_like_a_nightly_one(self):
+        # backup.sh labels the dump deploy.sh takes (jasmin_predeploy_<ts>);
+        # past the daily tier it competes with that week's nightly dumps.
+        anchor = datetime.datetime(2026, 4, 6, 2, 0, 0)  # Monday, ISO week 15
+        nightly = _backup(anchor)
+        predeploy = _backup(
+            anchor + datetime.timedelta(hours=12), prefix="jasmin_predeploy"
+        )
+        keep, delete = classify_backups_for_pruning([nightly, predeploy], _NOW)
+        assert keep == [predeploy]
+        assert delete == [nightly]
+
     def test_monthly_tier_keeps_one_per_calendar_month_forever(self):
         # Three years of daily backups, all older than 365 days. We
         # expect exactly 36 survivors — one per month — and the rest

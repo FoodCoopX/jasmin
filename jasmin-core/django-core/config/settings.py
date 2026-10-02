@@ -18,13 +18,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key-change-in-production")
-# Rotation support for ``django.core.signing`` (password-reset + invitation
-# links, sessions, CSRF): to rotate, set DJANGO_SECRET_KEY to the NEW key and
+# Rotation support for what Django signs (password-reset links, protected-media
+# links, sessions): to rotate, set DJANGO_SECRET_KEY to the NEW key and
 # DJANGO_SECRET_KEY_FALLBACK to the previous one — Django verifies existing
 # signatures against SECRET_KEY + fallbacks, so rotation doesn't instantly
-# invalidate every in-flight signed link. (SimpleJWT HS256 signs with
-# SIGNING_KEY = SECRET_KEY and does NOT consult fallbacks, so already-issued
-# JWTs still re-auth after a rotation — but access tokens live only 15 min.)
+# invalidate every in-flight signed link. SimpleJWT signs access and refresh
+# tokens with SIGNING_KEY = SECRET_KEY and never consults the fallbacks, so a
+# rotation logs every user and super-admin out.
 SECRET_KEY_FALLBACKS = [
     key for key in (os.environ.get("DJANGO_SECRET_KEY_FALLBACK", "").strip(),) if key
 ]
@@ -759,10 +759,13 @@ AXES_LOCKOUT_PARAMETERS = [
 AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_CALLABLE = None  # Default 403 response.
 AXES_VERBOSE = True
-# Exactly one trusted proxy hop today: the gateway nginx (no CDN in the
-# stack). It appends the real client IP to X-Forwarded-For, so we trust the
-# last entry. If a CDN is ever added in front of the gateway, bump
-# TRUSTED_PROXY_COUNT to match the number of trusted hops. Single source of
+# One trusted proxy hop: the gateway nginx, which appends the address it sees
+# to X-Forwarded-For, so we trust the last entry. Keep it at 1 although Bunny
+# fronts the tenant hosts: the admin host is reached directly, and with 2 a
+# client there could forge X-Forwarded-For past the super-admin IP allowlist
+# and into the lockout, throttle and consent-IP keys. Behind Bunny, the client
+# address has to come from nginx's real_ip on the tenant vhost, before the
+# request reaches Django. Single source of
 # truth for the proxy depth — django-axes, DRF's NUM_PROXIES, and
 # ``apps.shared.request_utils.client_ip`` all read it so throttle/lockout
 # keying and the recorded forensic/consent IP stay in sync.

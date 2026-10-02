@@ -13,19 +13,20 @@
 #      (nginx/super_admin_allowed_ips.conf is the one EXPECTED server-local
 #      edit — operator IPs live only on the server, never in git)
 #   2. fetches + shows what's incoming, fast-forwards to origin/main
-#   3. hands off to deploy.sh (env validation, image build, compose up,
-#      wait-for-healthy, smoke test) — migrations run automatically in the
-#      backend entrypoint on boot, forward-only
+#   3. hands off to deploy.sh (env validation, image build, an encrypted
+#      snapshot of the database, compose up, wait-for-healthy, smoke test) —
+#      migrations run automatically in the backend entrypoint on boot,
+#      forward-only
 #
-# Rollback story (small-scale): revert the commit locally, push, re-run this.
-# Never reverse a shipped migration — write a forward fix (see CLAUDE.md).
+# Rollback: ./scripts/rollback.sh switches back to one of the last releases
+# whose migrations the database already has. Then revert or fix forward,
+# push, and re-run this. Never reverse a shipped migration — write a forward
+# fix (see CLAUDE.md).
 # =============================================================================
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
-
-die() { echo "❌ $*" >&2; exit 1; }
 
 # ── 1. clean-tree guard ──────────────────────────────────────────────────────
 # Tracked modifications block the pull (they'd conflict or get overwritten) —
@@ -58,36 +59,6 @@ else
     echo "Incoming commits:"
     echo "$incoming"
     git pull --ff-only origin "$BRANCH"
-fi
-
-# ── 2b. pre-deploy DB snapshot ───────────────────────────────────────────────
-# A full logical dump of the (single, multi-schema) Postgres DB BEFORE the
-# backend entrypoint applies migrations on the next boot. Migrations are
-# forward-only + additive, but a live prod schema change always gets its own
-# snapshot first. FAIL-CLOSED: if the dump can't be taken, we do NOT deploy.
-#
-# Skipped when postgres isn't running yet (a first-ever deploy has no data to
-# lose — deploy.sh creates the DB). The scheduled ``backup`` service still does
-# routine off-host backups; this is the extra "right before I migrate" one,
-# kept locally under backups/ (gitignored).
-PG_CID="$(docker compose ps -q postgres 2>/dev/null || true)"
-if [ -n "$PG_CID" ] && \
-   [ "$(docker inspect -f '{{.State.Running}}' "$PG_CID" 2>/dev/null)" = "true" ]; then
-    mkdir -p backups
-    SNAPSHOT="backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz"
-    echo "[update] snapshotting DB -> ${SNAPSHOT}"
-    if ! docker compose exec -T postgres \
-            sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | gzip > "$SNAPSHOT"; then
-        rm -f "$SNAPSHOT"
-        die "pre-deploy DB snapshot FAILED — not deploying. Fix the dump and re-run."
-    fi
-    # pipefail catches a pg_dump crash; this catches a 0-byte write slipping through.
-    [ -s "$SNAPSHOT" ] || die "pre-deploy snapshot is empty — not deploying."
-    echo "[update] snapshot ok ($(du -h "$SNAPSHOT" | cut -f1))"
-    # Retention (best-effort): keep the 10 most recent pre-deploy snapshots.
-    ls -1t backups/pre-deploy-*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f || true
-else
-    echo "[update] postgres not running — skipping pre-deploy snapshot (first deploy?)."
 fi
 
 # ── 3. deploy ────────────────────────────────────────────────────────────────

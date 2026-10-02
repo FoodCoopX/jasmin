@@ -23,8 +23,10 @@
 #       /tmp is small — the media tree is PDFs and images, not rows)
 #
 # Output:
-#     docs/code_audit/security/restore-drills/YYYY-MM-DD.md  (markdown table; sign-off
-#                                         block appended by the operator)
+#     backups/restore-drills/YYYY-MM-DD_HHMMSS.md  (markdown; gitignored, next to
+#     the backups it checks). Record each run on the "Restore-from-backup
+#     drill" item of the super-admin ops checklist — its run log is the
+#     record of every drill.
 #
 # Exit status:
 #     Non-zero if the media archive was found but failed to restore, or if
@@ -38,7 +40,8 @@
 #     for the row-count query — no writes anywhere near it. The media
 #     archive is unpacked into a throwaway mktemp dir, removed by the exit
 #     trap, and NEVER into media_volume, which holds the live uploads.
-#     ./backups/ is only ever read from — no artifact is moved or deleted.
+#     The drill writes only its log, under backups/restore-drills/; no
+#     backup artifact is moved or deleted.
 
 set -euo pipefail
 
@@ -50,8 +53,9 @@ SANDBOX_USER="jasmin_sandbox"
 # accepts a connection from outside docker exec.
 SANDBOX_PASSWORD="sandbox_$(date +%s)_$RANDOM"
 PROD_POSTGRES_CONTAINER="${PROD_POSTGRES_CONTAINER:-$(docker compose ps -q postgres 2>/dev/null || true)}"
-OUTPUT_DIR="docs/code_audit/security/restore-drills"
-OUTPUT_FILE="${OUTPUT_DIR}/$(date +%Y-%m-%d).md"
+OUTPUT_DIR="backups/restore-drills"
+# One file per run: a rerun on the same day keeps the earlier log.
+OUTPUT_FILE="${OUTPUT_DIR}/$(date +%Y-%m-%d_%H%M%S).md"
 # Media-verification state. Declared up front because the exit trap reads
 # MEDIA_EXTRACT_DIR under ``set -u``, and it must be empty until mktemp runs.
 MEDIA_EXTRACT_DIR=""
@@ -420,8 +424,9 @@ echo "Log: $OUTPUT_FILE"
 echo ""
 echo "Next steps:"
 echo "  1. Review the row-count table, the erasure replay and the media verification result"
-echo "  2. Append the sign-off block (set Outcome: PASS / FAIL + notes)"
-echo "  3. git add + commit the log as the audit artifact"
+echo "  2. Fill in the sign-off block (Outcome: PASS / FAIL + notes)"
+echo "  3. Mark the \"Restore-from-backup drill\" item of the super-admin ops checklist"
+echo "     done, with the outcome and the log's file name in the notes"
 
 if [ "$REPLAY_FAILED" -ne 0 ]; then
     echo ""

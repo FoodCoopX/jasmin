@@ -69,9 +69,12 @@ push_offsite() {
 }
 
 # ── DB backup ──────────────────────────────────────────────────
+# $1, optional, labels the file: "predeploy" writes
+# <db>_predeploy_<timestamp>.sql.gz.gpg. The GFS prune reads only the
+# timestamp, so a labelled dump is retained like any other.
 do_backup() {
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    FILENAME="${DB_NAME}_${TIMESTAMP}.sql.gz.gpg"
+    FILENAME="${DB_NAME}${1:+_$1}_${TIMESTAMP}.sql.gz.gpg"
     FILEPATH="${BACKUP_DIR}/${FILENAME}"
 
     echo "[$(date)] Starting encrypted DB backup → ${FILENAME}"
@@ -234,7 +237,12 @@ case "${1:-scheduled}" in
         # restores).
         export_gdpr_ledger
         ;;
-    scheduled|*)
+    predeploy)
+        # The database right before a deploy migrates it
+        # (scripts/deploy.sh); the nightly run covers media and the ledger.
+        do_backup predeploy
+        ;;
+    scheduled)
         # Run one backup on startup, then schedule via cron
         do_backup
         do_media_backup
@@ -245,5 +253,10 @@ case "${1:-scheduled}" in
         echo "*/10 * * * * ${SELF} ledger >> /var/log/backup.log 2>&1" >> /etc/crontabs/root
         echo "[$(date)] Cron scheduled: ${SCHEDULE} (GDPR ledger every 10 minutes)"
         exec crond -f -l 2
+        ;;
+    *)
+        # Not a fallback to "scheduled": that one never returns.
+        echo "Usage: backup.sh [now | ledger | predeploy | scheduled]" >&2
+        exit 2
         ;;
 esac

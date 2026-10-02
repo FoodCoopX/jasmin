@@ -91,16 +91,13 @@ coverage.xml
 certbots/*.ini
 !certbots/*.ini.example
 
-# Backups — encrypted DB dumps must never be committed (keep the scripts).
-backups/*.sql
-backups/*.sql.gz
-backups/*.gpg
-backups/*.dump
+# Backups — nothing written into backups/ is ever committed: dumps, media
+# archives, the GDPR deletion ledger, restore-drill logs and the off-host
+# credentials (rclone config, Storage Box key). Only the image's files are.
+backups/*
 !backups/*.sh
-# Off-host push credentials — rclone config + the dedicated Storage Box key.
-backups/rclone.conf
-backups/storagebox_key
-backups/storagebox_key.pub
+!backups/Dockerfile
+!backups/.dockerignore
 
 *.pdf
 text.txt

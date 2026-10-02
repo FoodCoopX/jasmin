@@ -6,10 +6,11 @@
 # It:
 #   1. validates .env (exists, no CHANGE_ME left, required vars set)
 #   2. issues the wildcard TLS cert if it isn't in the volume yet
-#   3. builds the images
-#   4. brings up the CORE stack (skips glitchtip/uptime — Phase 5)
-#   5. waits for the backend to migrate + report healthy
-#   6. smoke-tests HTTPS
+#   3. builds the images and tags them as a release (scripts/rollback.sh)
+#   4. takes an encrypted snapshot of the database before it is migrated
+#   5. brings up the CORE stack (skips glitchtip/uptime — Phase 5)
+#   6. waits for the backend to migrate + report healthy
+#   7. smoke-tests HTTPS
 #
 # Idempotent: re-run any time to rebuild + roll the stack. The cert is only
 # issued once (skipped when already present).
@@ -116,7 +117,54 @@ VITE_BUILD_ID="$(git rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%d%H%M%S
 export VITE_BUILD_ID
 docker compose build
 
-# ── 4. bring up the core stack (glitchtip/uptime deferred to Phase 5) ───────
+# Compose always runs the IMAGE_TAG tag, which every build moves. Each release
+# also keeps its images under a release tag, <UTC time>-<build id>, so
+# scripts/rollback.sh can switch back to one of the last KEEP_RELEASES without
+# a rebuild. The time is in the tag because an unchanged image (the backup one,
+# mostly) keeps its old creation time across builds.
+KEEP_RELEASES=5
+RELEASE="$(date -u +%Y%m%d-%H%M%S)-${VITE_BUILD_ID}"
+# The release tags of repository $1, newest first.
+release_tags() {
+    docker image ls "$1" --format '{{.Tag}}' | grep -E '^[0-9]{8}-[0-9]{6}-' | sort -r || true
+}
+for image in $(docker compose config --images | grep '^jasmin/' | sort -u); do
+    repository="${image%:*}"
+    docker tag "$image" "${repository}:${RELEASE}"
+    # Removing a tag deletes the image only when no other tag or container
+    # still uses it.
+    release_tags "$repository" | tail -n +$((KEEP_RELEASES + 1)) \
+        | while read -r tag; do
+            docker rmi "${repository}:${tag}" >/dev/null 2>&1 || true
+        done
+done
+log "release ${RELEASE} tagged (the last ${KEEP_RELEASES} are kept)"
+
+# ── 4. snapshot the database before the backend migrates it ─────────────────
+# The backend applies migrations when it starts in step 5, so this is the last
+# moment the database matches the running release. The freshly built backup
+# image takes it like its nightly dumps — encrypted, verified, copied off-host
+# — as backups/<db>_predeploy_<timestamp>.sql.gz.gpg, which the GFS prune
+# keeps like any other backup. FAIL-CLOSED: no snapshot, no deploy. Skipped
+# when postgres isn't running yet (a first deploy has no data to lose).
+PG_CID="$(docker compose ps -q postgres 2>/dev/null || true)"
+if [ -n "$PG_CID" ] && \
+   [ "$(docker inspect -f '{{.State.Running}}' "$PG_CID" 2>/dev/null)" = "true" ]; then
+    log "snapshotting the database before migrations run"
+    docker compose run --rm --no-deps -T backup predeploy \
+        || die "pre-deploy snapshot FAILED — not deploying. The backup output above says why."
+else
+    log "postgres not running — no pre-deploy snapshot (first deploy?)"
+fi
+
+# Database dumps belong in backups/ only encrypted.
+plain_dumps="$(find backups -maxdepth 1 -type f \( -name '*.sql' -o -name '*.sql.gz' \) 2>/dev/null || true)"
+if [ -n "$plain_dumps" ]; then
+    log "WARN: unencrypted database dumps in backups/ — delete them once you've confirmed the encrypted backups:"
+    echo "$plain_dumps" | sed 's/^/    /'
+fi
+
+# ── 5. bring up the core stack (glitchtip/uptime deferred to Phase 5) ───────
 log "starting core services"
 docker compose up -d postgres redis backend huey frontend gateway certbot backup
 
@@ -128,7 +176,7 @@ docker compose up -d postgres redis backend huey frontend gateway certbot backup
 log "restarting gateway (refresh upstream DNS after possible recreates)"
 docker compose restart gateway
 
-# ── 5. wait for the backend to migrate + go healthy ──────────────────────────
+# ── 6. wait for the backend to migrate + go healthy ──────────────────────────
 log "waiting for the backend (runs migrations on first boot — can take minutes)"
 BACKEND_CID="$(docker compose ps -q backend)"
 healthy=0
@@ -141,8 +189,9 @@ if [ "$healthy" -ne 1 ]; then
     log "WARN: backend not healthy yet. Tail logs with: docker compose logs -f backend"
 fi
 
-# ── 6. smoke test (best-effort) ──────────────────────────────────────────────
-code="$(curl -ksS -o /dev/null -w '%{http_code}' "https://${DOMAIN}/health/" 2>/dev/null || echo 000)"
+# ── 7. smoke test (best-effort) ──────────────────────────────────────────────
+# curl prints 000 itself when it gets no answer.
+code="$(curl -ksS -o /dev/null -w '%{http_code}' "https://${DOMAIN}/health/" 2>/dev/null || true)"
 log "https://${DOMAIN}/health/ -> HTTP ${code} (expect 200)"
 
 echo ""

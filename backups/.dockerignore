@@ -1,0 +1,5 @@
+# The image needs backup.sh only. Everything else here — the dumps, media
+# archives and the Storage Box key — stays out of the build context.
+*
+!backup.sh
+!Dockerfile

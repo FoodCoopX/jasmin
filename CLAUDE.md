@@ -1029,14 +1029,19 @@ npm run lint:fix                 # Auto-fix issues
 
 **Build & deploy:** there are no `make prod-*` targets, but there IS a committed
 flow — run `./scripts/deploy.sh` from the repo root on the server. It is
-idempotent: validates `.env`, issues the wildcard cert, builds, brings the core
-stack up, waits for backend health, migrates. `scripts/update.sh` is the
-"I pushed — now what?" wrapper around it.
+idempotent: validates `.env`, issues the wildcard cert, builds, tags the build
+as a release (`<UTC time>-<git hash>`, the last five kept), snapshots the
+database, brings the core stack up, waits for backend health, migrates.
+`scripts/update.sh` is the "I pushed — now what?" wrapper around it.
+`scripts/rollback.sh` switches back to a kept release whose migrations are a
+prefix of those the database has applied.
 
 **Database backups:** the `backup` service runs them — a nightly GPG-encrypted
 `pg_dump` plus a media archive (`backups/backup.sh`), with an rclone off-host
-push scaffold. `BACKUP_ENCRYPTION_KEY` is required; compose refuses to start
-without it. Don't hand-roll `pg_dump`; that skips the encrypted path.
+push scaffold; deploy.sh adds a DB-only `predeploy` dump before every deploy.
+`BACKUP_ENCRYPTION_KEY` is required; compose refuses to start without it.
+Don't hand-roll `pg_dump`; that skips the encrypted path. The restore procedure
+is in the header of `backups/restore.sh`.
 
 **Stack components** (`docker-compose.yml`):
 

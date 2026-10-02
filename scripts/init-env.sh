@@ -135,7 +135,9 @@ IMAGE_TAG=v1
 FRONTEND_DOMAIN=${DOMAIN}
 DJANGO_ALLOWED_HOSTS=${DOMAIN},.${DOMAIN}
 TIME_ZONE=${TIMEZONE}
-# Behind just nginx today = 1. Bump to 2 once Bunny sits in front (Phase 4).
+# Stays 1 behind Bunny too: the admin host is reached directly, so 2 would let a
+# client there forge X-Forwarded-For. Behind Bunny the client IP has to come
+# from nginx's real_ip on the tenant vhost.
 TRUSTED_PROXY_COUNT=1
 
 # --- core secrets (generated) ---
