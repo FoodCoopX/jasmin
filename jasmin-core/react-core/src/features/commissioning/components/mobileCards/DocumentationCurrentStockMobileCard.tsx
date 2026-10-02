@@ -8,8 +8,8 @@ import {
   MobileCardNote,
   MobileCardTags,
   MobileCardTitle,
-  getSizeLabelOrEmpty,
 } from "./primitives";
+import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 interface DocumentationCurrentStockMobileCardProps {
   record: TableRecord;

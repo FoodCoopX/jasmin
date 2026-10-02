@@ -1,3 +1,7 @@
+/* eslint-disable react-refresh/only-export-components --
+   react-pdf renders the documents built from these blocks to a file on
+   demand, not into the page, so there is no mounted component for Fast
+   Refresh to keep. */
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
 import type { TFunction } from "i18next";

@@ -62,8 +62,8 @@ class NoTenantContext(BadRequestError):
 
 
 class TenantAppIconInvalid(BadRequestError):
-    """The uploaded web-app launcher icon is not usable as one: too large,
-    not a decodable PNG/JPEG/WEBP, not square, or below the 512px minimum.
+    """The uploaded web-app launcher icon is not usable as one: over 2 MB,
+    not a decodable PNG/JPEG/WEBP, not square, or outside 512-4096px.
 
     Square is a hard requirement rather than a crop-on-upload convenience —
     the icon is rendered by the OS launcher at an aspect ratio we do not

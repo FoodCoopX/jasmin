@@ -7,8 +7,8 @@ import {
   MobileCardNote,
   MobileCardTags,
   MobileCardTitle,
-  getSizeLabelOrEmpty,
 } from "./primitives";
+import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 interface ForecastMobileCardProps {
   record: TableRecord;

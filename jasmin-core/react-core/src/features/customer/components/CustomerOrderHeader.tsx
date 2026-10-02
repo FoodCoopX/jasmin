@@ -1,9 +1,9 @@
 import { MailOutlined, PhoneOutlined } from "@ant-design/icons";
-import { Avatar, Card, Col, Row, Space, Typography } from "antd";
-import { useTranslation } from "react-i18next";
+import { Card, Col, Row, Space, Typography } from "antd";
 import type { Reseller } from "@shared/api/generated/models";
 import { useAuth } from "@shared/contexts/AuthContext";
-import { useLogoShape, useTenant } from "@hooks/index";
+import { useLogoShape } from "@hooks/index";
+import { TenantHeaderLogo } from "@shared/ui";
 
 const { Title, Text } = Typography;
 
@@ -11,8 +11,6 @@ interface Props {
   reseller: Reseller | undefined;
   logoUrl: string | null | undefined;
 }
-
-const LOGO_SIZE = 120;
 
 /**
  * Customer-page header card. Mirrors ``MemberDetail``'s header: logo
@@ -27,17 +25,12 @@ const LOGO_SIZE = 120;
  */
 export default function CustomerOrderHeader({ reseller, logoUrl }: Props) {
   const { logoShape, logoAspectRatio } = useLogoShape(logoUrl);
-  const { t } = useTranslation();
-  const { tenantName } = useTenant();
   const { user } = useAuth();
   const currentUser = user as {
     first_name?: string;
     last_name?: string;
     email?: string;
   } | null;
-
-  const isRectangle =
-    logoShape === "rectangle-wide" || logoShape === "rectangle-tall";
 
   const displayName =
     reseller?.company_name ||
@@ -68,44 +61,11 @@ export default function CustomerOrderHeader({ reseller, logoUrl }: Props) {
     >
       <Row align="middle" gutter={24}>
         <Col>
-          {logoUrl && (isRectangle ? (
-            <div
-              style={{
-                width:
-                  logoShape === "rectangle-wide"
-                    ? `${LOGO_SIZE * logoAspectRatio}px`
-                    : `${LOGO_SIZE}px`,
-                height:
-                  logoShape === "rectangle-wide"
-                    ? `${LOGO_SIZE}px`
-                    : `${LOGO_SIZE / logoAspectRatio}px`,
-                borderRadius: "8px",
-                backgroundColor: "var(--color-bg-base)",
-                padding: "8px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-              }}
-            >
-              <img
-                src={logoUrl}
-                alt={tenantName ?? t("common.logo")}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            </div>
-          ) : (
-            <Avatar
-              size={64}
-              src={logoUrl}
-              shape="circle"
-              style={{
-                backgroundColor: "var(--color-bg-base)",
-                padding: "8px",
-              }}
-              alt={tenantName ?? t("common.logo")}
-            />
-          ))}
+          <TenantHeaderLogo
+            logoUrl={logoUrl}
+            logoShape={logoShape}
+            logoAspectRatio={logoAspectRatio}
+          />
         </Col>
         <Col flex="auto">
           <h1 style={{ color: "var(--color-bg-base)", marginBottom: "8px" }}>

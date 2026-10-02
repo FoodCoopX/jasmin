@@ -2,16 +2,22 @@
 // component/hook tests run against the same singleton the app has.
 import "@shared/utils/dayjsSetup";
 import "@testing-library/jest-dom/vitest";
-// vitest-axe: the runtime axe matcher `toHaveNoViolations`, so component tests
-// can assert `expect(await axe(container)).toHaveNoViolations()` — the layer
-// that catches rendered-DOM a11y issues jsx-a11y (static, raw-JSX) can't see.
-// The package's `extend-expect` entry ships an EMPTY runtime file (0.1.0
-// packaging bug) — it only supplies the TS augmentation — so the matcher must
-// be registered explicitly via expect.extend below.
-import "vitest-axe/extend-expect"; // type augmentation for `toHaveNoViolations`
+// vitest-axe's `toHaveNoViolations`, so a render test can assert
+// `expect(await axe(container)).toHaveNoViolations()` with the `axe` from
+// `./axe` — the layer that catches rendered-DOM a11y issues jsx-a11y (static,
+// raw JSX) can't see. The package's `extend-expect` entry registers nothing at
+// runtime and types the matcher on the `Vi` namespace that vitest 3 no longer
+// reads, so the matcher is registered with expect.extend and typed below.
+import type { AxeMatchers } from "vitest-axe/matchers";
 import * as axeMatchers from "vitest-axe/matchers";
 import { afterAll, afterEach, beforeAll, expect, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+
+declare module "vitest" {
+  interface Assertion<T = any> {
+    toHaveNoViolations: AxeMatchers["toHaveNoViolations"];
+  }
+}
 
 expect.extend(axeMatchers);
 

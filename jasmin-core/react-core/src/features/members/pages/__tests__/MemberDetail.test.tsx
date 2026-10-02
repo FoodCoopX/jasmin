@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import { axe } from "@/test/axe";
 import { server } from "@/test/msw/server";
 import { profileRenders, flushMicrotasks } from "@/test/profileRenders";
 
@@ -202,6 +203,25 @@ describe("MemberDetail (integration)", () => {
     expect(screen.getByTestId("upcoming-deliveries-card")).toBeInTheDocument();
     expect(screen.getByTestId("active-subscriptions-card")).toBeInTheDocument();
     expect(screen.getByTestId("payments-card")).toBeInTheDocument();
+  });
+
+  it("has no axe violations once the member has loaded", async () => {
+    server.use(
+      http.get(`/api/commissioning/members/${MEMBER_ID}/`, () =>
+        HttpResponse.json(baseMember),
+      ),
+      http.get("/api/commissioning/share_delivery/", () =>
+        HttpResponse.json([]),
+      ),
+      http.get("/api/commissioning/abos/", () => HttpResponse.json([])),
+    );
+
+    const { container } = renderPage();
+    await screen.findByText("Alice Acres");
+    // The consents card loads its own (empty) list.
+    await screen.findByText("consent.empty");
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it("passes the member's entry and exit dates to the coop shares modal", async () => {

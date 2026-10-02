@@ -30,6 +30,8 @@ const NavigationContext = createContext<NavigationContextValue | undefined>(
   undefined,
 );
 
+/* eslint-disable-next-line react-refresh/only-export-components --
+   the hook is the only way into the private context above */
 export function useNavigation() {
   const context = useContext(NavigationContext);
   if (!context) {

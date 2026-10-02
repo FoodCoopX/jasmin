@@ -137,7 +137,7 @@
     "gross_price_in_use": "Dieser Preis kann nicht gelöscht werden, weil für diese Anteilsvariation bereits Abos bestehen."
   },
   "tenant": {
-    "app_icon_invalid": "Das App-Symbol muss ein quadratisches PNG-, JPEG- oder WEBP-Bild mit mindestens 512x512 Pixeln und höchstens 2 MB sein.",
+    "app_icon_invalid": "Das App-Symbol muss ein quadratisches PNG-, JPEG- oder WEBP-Bild mit 512x512 bis 4096x4096 Pixeln und höchstens 2 MB sein.",
     "invalid_schema_name": "Der Schema-Name ist ungültig oder reserviert — bitte einen anderen Namen wählen.",
     "schema_already_exists": "Ein Datenbank-Schema mit diesem Namen existiert bereits — bitte einen anderen Schema-Namen wählen.",
     "invalid_domain": "Die Domain ist ungültig — bitte eine gültige Domain angeben.",

@@ -4,6 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
+import { axe } from "@/test/axe";
 import { server } from "@/test/msw/server";
 import { profileRenders, flushMicrotasks } from "@/test/profileRenders";
 
@@ -155,6 +156,18 @@ describe("LoginPage (integration)", () => {
     expect(
       screen.queryByText("auth.login_card.session_expired"),
     ).not.toBeInTheDocument();
+  });
+
+  it("has no axe violations, including the session notice", async () => {
+    localStorage.setItem(
+      "auth",
+      JSON.stringify({ user: { id: "u-1", roles: ["office"] } }),
+    );
+
+    const { container } = renderLogin();
+
+    await screen.findByText("auth.login_card.session_expired");
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it("asks the captcha for a fresh token after a failed login", async () => {

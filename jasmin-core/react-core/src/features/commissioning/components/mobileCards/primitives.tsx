@@ -185,11 +185,3 @@ export function MobileCardTags({ tags }: { tags: string[] }) {
 export function MobileCardContent({ children }: { children: ReactNode }) {
   return <div className="mobile-card-content flex-min">{children}</div>;
 }
-
-/** Convenience helper used by several pages for the size label suffix. */
-export function getSizeLabelOrEmpty(
-  size: string | null | undefined,
-  getVegetableSizeLabel: (size: string) => string,
-): string {
-  return size && size !== "M" ? getVegetableSizeLabel(size) : "";
-}

@@ -64,16 +64,12 @@
   },
   "files": {
     "title": "Logos",
-    "upload_logo": "Upload logo",
     "current_logo": "Current logo",
-    "upload_favicon": "Upload favicon",
-    "current_favicon": "Current favicon",
     "current_bio_logo": "Current organic logo",
-    "upload_bio_logo": "Upload organic logo",
     "logo_saved": "Logo saved",
     "bio_logo_saved": "Organic logo saved",
     "current_app_icon": "App icon (home screen)",
-    "app_icon_hint": "Square, at least 512x512 pixels. Shown as the icon when the app is installed on a phone.",
+    "app_icon_hint": "Square, 512x512 to 4096x4096 pixels, at most 2 MB. Shown as the icon when the app is installed on a phone.",
     "app_short_name": "App name (home screen)",
     "app_short_name_hint": "Shown under the app icon on a phone, at most 12 characters. Left empty, the first 12 characters of the name are used.",
     "app_icon_saved": "App icon saved"

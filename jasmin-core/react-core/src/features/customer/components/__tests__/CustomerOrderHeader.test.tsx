@@ -38,7 +38,7 @@ const logoShapeState: {
 
 vi.mock("@hooks/index", () => ({
   useLogoShape: () => logoShapeState,
-  // CustomerOrderHeader reads tenantName for the logo's alt text (a11y).
+  // The header's logo reads tenantName for its alt text.
   useTenant: () => ({ tenantName: "Test Tenant" }),
 }));
 

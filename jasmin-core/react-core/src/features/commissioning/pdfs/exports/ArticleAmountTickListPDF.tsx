@@ -1,3 +1,6 @@
+/* eslint-disable react-refresh/only-export-components --
+   react-pdf renders this document to a file on demand, not into the page,
+   so there is no mounted component for Fast Refresh to keep. */
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { TFunction } from "i18next";
 import { listStyles } from "./listPdfBase";

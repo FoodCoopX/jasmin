@@ -147,10 +147,14 @@ interface TenantContextValue {
   refreshTenantFull: () => Promise<void>;
 }
 
+/* eslint-disable-next-line react-refresh/only-export-components --
+   useTenant and the auth and locale providers read the context directly */
 export const TenantContext = createContext<TenantContextValue | undefined>(
   undefined,
 );
 
+/* eslint-disable-next-line react-refresh/only-export-components --
+   the provider and App both branch on this host check */
 export function isPlatformDomain() {
   // Single source of truth for platform/super-admin host detection — the
   // env-driven leftmost-label check in ``superAdminHost.ts``. Both dev

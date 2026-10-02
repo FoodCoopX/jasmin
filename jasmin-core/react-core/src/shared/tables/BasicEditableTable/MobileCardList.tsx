@@ -8,6 +8,7 @@ import type { Key, ReactNode } from "react";
 import { Fragment, isValidElement, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import "./MobileCardList.css";
+import { canDeleteRow, canEditRow } from "./rowPermissions";
 import type {
   EditableColumnConfig,
   SelectOption,
@@ -210,17 +211,8 @@ function MobileCardList<T extends TableRecord>({
             );
           }
 
-          const canEditRecord =
-            permissions.canEdit !== false &&
-            (typeof permissions.canEditRecord === "function"
-              ? permissions.canEditRecord(record)
-              : permissions.canEditRecord !== false);
-
-          const canDeleteRecord =
-            permissions.canDelete !== false &&
-            (typeof permissions.canDeleteRecord === "function"
-              ? permissions.canDeleteRecord(record)
-              : permissions.canDeleteRecord !== false);
+          const canEditRecord = canEditRow(permissions, record);
+          const canDeleteRecord = canDeleteRow(permissions, record);
 
           // First primary field is the "title"
           const titleCol = primary[0];

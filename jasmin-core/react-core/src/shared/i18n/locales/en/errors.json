@@ -137,7 +137,7 @@
     "gross_price_in_use": "This price can't be deleted because the share type variation already has subscriptions."
   },
   "tenant": {
-    "app_icon_invalid": "The app icon must be a square PNG, JPEG or WEBP image of at least 512x512 pixels and at most 2 MB.",
+    "app_icon_invalid": "The app icon must be a square PNG, JPEG or WEBP image of 512x512 to 4096x4096 pixels and at most 2 MB.",
     "invalid_schema_name": "The schema name is invalid or reserved — please choose a different one.",
     "schema_already_exists": "A database schema with this name already exists — please choose a different schema name.",
     "invalid_domain": "The domain is invalid — please enter a valid domain.",

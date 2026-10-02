@@ -12,7 +12,7 @@ import {
   MemberDeliveryEditModal,
 } from "@features/members/modals";
 import SuccessModal from "@shared/modals/SuccessModal";
-import { ExplainerText } from "@shared/ui";
+import { ExplainerText, TenantHeaderLogo } from "@shared/ui";
 import { useLogoShape, useOnboardingMode, useTenant } from "@hooks/index";
 import {
   getCommissioningAbosListQueryKey,
@@ -31,7 +31,6 @@ import type { ShareDelivery } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Avatar,
   Button,
   Card,
   Col,
@@ -348,8 +347,6 @@ const MemberDetail = () => {
     );
   }
 
-  const logoSize = 120;
-
   return (
     <div style={{ padding: "24px", maxWidth: "1400px", margin: "0 auto" }}>
       {/* Header Section */}
@@ -363,50 +360,11 @@ const MemberDetail = () => {
       >
         <Row align="middle" gutter={24}>
           <Col>
-            {displayLogoUrl &&
-              (logoShape === "rectangle-wide" ||
-              logoShape === "rectangle-tall" ? (
-                <div
-                  style={{
-                    width:
-                      logoShape === "rectangle-wide"
-                        ? `${logoSize * logoAspectRatio}px`
-                        : `${logoSize}px`,
-                    height:
-                      logoShape === "rectangle-wide"
-                        ? `${logoSize}px`
-                        : `${logoSize / logoAspectRatio}px`,
-
-                    borderRadius: "8px",
-                    backgroundColor: "var(--color-bg-base)",
-                    padding: "8px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                >
-                  <img
-                    src={displayLogoUrl}
-                    alt={tenantName ?? t("common.logo")}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                    }}
-                  />
-                </div>
-              ) : (
-                <Avatar
-                  size={64}
-                  src={displayLogoUrl}
-                  shape="circle"
-                  style={{
-                    backgroundColor: "var(--color-bg-base)",
-                    padding: "8px",
-                  }}
-                />
-              ))}
+            <TenantHeaderLogo
+              logoUrl={displayLogoUrl}
+              logoShape={logoShape}
+              logoAspectRatio={logoAspectRatio}
+            />
           </Col>
           <Col flex="auto">
             <h1 style={{ color: "var(--color-bg-base)", marginBottom: "8px" }}>

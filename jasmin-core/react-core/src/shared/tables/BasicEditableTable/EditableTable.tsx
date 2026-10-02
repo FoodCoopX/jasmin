@@ -42,6 +42,7 @@ import { useTranslation } from "react-i18next";
 import EditableCell from "./EditableCell";
 import EditableModal from "./EditableModal";
 import MobileCardList from "./MobileCardList";
+import { allowsRow, canDeleteRow, canEditRow } from "./rowPermissions";
 import type {
   EditableColumnConfig,
   EditableTableProps,
@@ -874,11 +875,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
   const handleCellClick = useCallback(
     (record: T, dataIndex: string) => {
       if (record.key === "summary-row") return;
-      const canEditThisRecord =
-        typeof permissions.canEditRecord === "function"
-          ? permissions.canEditRecord(record)
-          : permissions.canEditRecord !== false;
-      if (!canEditThisRecord) return;
+      if (!allowsRow(permissions.canEditRecord, record)) return;
       if (isModalMode) {
         handleModalEdit(record);
         return;
@@ -910,6 +907,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
 
   const actionColumn = useMemo(
     () => ({
+      title: <span className="sr-only">{t("table.actions")}</span>,
       dataIndex: "actions",
       key: "actions",
       align: "center" as const,
@@ -920,17 +918,8 @@ const EditableTable = <T extends TableRecord = TableRecord>({
 
         const editable = isEditing(record);
 
-        const canEditThisRow =
-          permissions.canEdit !== false &&
-          (typeof permissions.canEditRecord === "function"
-            ? permissions.canEditRecord(record)
-            : permissions.canEditRecord !== false);
-
-        const canDeleteRecord =
-          permissions.canDelete !== false &&
-          (typeof permissions.canDeleteRecord === "function"
-            ? permissions.canDeleteRecord(record)
-            : permissions.canDeleteRecord !== false);
+        const canEditThisRow = canEditRow(permissions, record);
+        const canDeleteRecord = canDeleteRow(permissions, record);
 
         if (isModalMode) {
           return (

@@ -9,6 +9,7 @@
   "save": "Save",
   "edit": "Edit",
   "delete": "Delete",
+  "actions": "Actions",
   "add_record": "New Entry",
   "past_week_readonly": "Data are in the past and can not be modified anymore.",
   "edit_record": "Edit Entry",

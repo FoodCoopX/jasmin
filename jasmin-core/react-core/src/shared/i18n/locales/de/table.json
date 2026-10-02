@@ -9,6 +9,7 @@
     "save": "Speichern",
     "edit": "Bearbeiten",
     "delete": "Löschen", 
+    "actions": "Aktionen",
     "add_record": "Neuer Eintrag",
     "past_week_readonly": "Daten sind in der Vergangenheit und können nicht mehr bearbeitet werden.",
     "edit_record": "Eintrag bearbeiten",

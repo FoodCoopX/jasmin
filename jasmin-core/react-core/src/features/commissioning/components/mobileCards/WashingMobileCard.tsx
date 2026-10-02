@@ -5,8 +5,8 @@ import {
   MobileCardContent,
   MobileCardNote,
   MobileCardTitle,
-  getSizeLabelOrEmpty,
 } from "./primitives";
+import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 interface WashingMobileCardProps {
   record: TableRecord;

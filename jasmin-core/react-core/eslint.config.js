@@ -51,6 +51,11 @@ export default [
       'src/shared/api/generated',
     ],
   },
+  // A disable comment that no longer suppresses anything fails, so an
+  // exception disappears as soon as the code it excused is fixed.
+  {
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+  },
   // Node-side config files (vite.config*.js, this file, postcss/tailwind configs)
   {
     files: ['*.config.js', 'vite.config.*.js', 'eslint.config.js'],
@@ -89,7 +94,11 @@ export default [
       ...js.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
-      'react-refresh/only-export-components': 'off',
+      // See the ts/tsx block.
+      'react-refresh/only-export-components': [
+        'error',
+        { allowConstantExport: true },
+      ],
       // Bare `console.log` / `info` / `debug` is forbidden (debug leftovers
       // mustn't ship). `warn` / `error` are allowed; for intentional dev
       // logging use the `logger` util in src/shared/utils/logger.ts.
@@ -117,7 +126,14 @@ export default [
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': 'off',
+      // Fast Refresh hot-swaps a module in place only when it exports nothing
+      // but components. Edit one that also exports a hook or a helper and the
+      // update falls through to its importers or a full page reload, losing
+      // their state. Constants are fine; Vite handles those.
+      'react-refresh/only-export-components': [
+        'error',
+        { allowConstantExport: true },
+      ],
       // The codebase intentionally uses untyped record shapes for table rows
       // and DRF-generated payloads — flag the most useful checks, mute the noise.
       '@typescript-eslint/no-explicit-any': 'off',
@@ -130,6 +146,13 @@ export default [
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-restricted-syntax': ['error', ...noInlineI18nFallback],
     },
+  },
+  // A route table declares each page as a local `lazy()` component beside the
+  // route that loads it, and exports only the table. That is what the file is
+  // for, so the components-only rule above doesn't apply to it.
+  {
+    files: ['src/app/routing/routes/**'],
+    rules: { 'react-refresh/only-export-components': 'off' },
   },
   // Accessibility (jsx-a11y): static, build-time catch of the machine-detectable
   // a11y issues in hand-written JSX — missing alt, label-less controls, bad ARIA,

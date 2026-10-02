@@ -10,8 +10,8 @@ import {
   MobileCard,
   MobileCardContent,
   MobileCardNote,
-  getSizeLabelOrEmpty,
 } from "./primitives";
+import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 export interface ShareTypeVariationOption {
   id?: number | string;

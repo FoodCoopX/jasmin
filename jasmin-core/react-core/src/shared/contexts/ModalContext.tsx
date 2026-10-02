@@ -143,6 +143,8 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/* eslint-disable-next-line react-refresh/only-export-components --
+   the hook is the only way into the private context above */
 export function useModal() {
   const context = useContext(ModalContext);
   if (!context) {

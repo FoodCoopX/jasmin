@@ -43,6 +43,15 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+/* A card's tagline under its title. It looks like AntD's level-5 title but
+   is a paragraph, so the page's headings don't skip from h2 to h5. */
+.auth-card-subtitle {
+  margin: 1.2em 0 0.5em;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 /* ------------------------------------------------------------------
  * Login page: a vertical stack of
  *   header banner  →  row of (1 or 3) cards  →  footer banner

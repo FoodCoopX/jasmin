@@ -364,9 +364,9 @@ const LoginPage = () => {
               <Space direction="vertical" size="large" className="w-full">
                 <div className="text-center">
                   <Title level={2}>{t("auth.registration.card_title")}</Title>
-                  <Title level={5}>
+                  <p className="auth-card-subtitle">
                     {t("auth.registration.card_sub_title")}
-                  </Title>
+                  </p>
                 </div>
                 <div style={{ marginTop: "-1.5em" }}>
                   <ul style={{ paddingLeft: 20, color: "rgba(0,0,0,0.65)" }}>
@@ -399,11 +399,11 @@ const LoginPage = () => {
                     {t("auth.registration.card_title_trial")}
                   </Title>
                   {trialDurationInDeliveries != null && (
-                    <Title level={5}>
+                    <p className="auth-card-subtitle">
                       {t("auth.registration.card_sub_title_trial", {
                         weeks: trialDurationInDeliveries,
                       })}
-                    </Title>
+                    </p>
                   )}
                 </div>
                 <div style={{ marginTop: "-1.5em" }}>

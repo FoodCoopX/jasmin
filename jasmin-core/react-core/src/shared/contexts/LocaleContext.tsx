@@ -84,6 +84,8 @@ interface LocaleContextValue {
 
 const LocaleContext = createContext<LocaleContextValue | undefined>(undefined);
 
+/* eslint-disable-next-line react-refresh/only-export-components --
+   the hook is the only way into the private context above */
 export function useLocale() {
   const context = useContext(LocaleContext);
   if (!context) {

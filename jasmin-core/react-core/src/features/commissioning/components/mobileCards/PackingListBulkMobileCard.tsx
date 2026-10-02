@@ -9,8 +9,8 @@ import {
   MobileCardMetricsRow,
   MobileCardNote,
   MobileCardTitle,
-  getSizeLabelOrEmpty,
 } from "./primitives";
+import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 interface PackingListBulkMobileCardProps {
   record: TableRecord;

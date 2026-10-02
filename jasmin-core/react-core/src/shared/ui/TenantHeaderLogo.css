@@ -1,0 +1,22 @@
+/* The box's width and height come inline, from the logo's aspect ratio. */
+.tenant-header-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 8px;
+  border-radius: 8px;
+  background-color: var(--color-bg-base);
+}
+
+.tenant-header-logo__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Two classes, so it wins over AntD's own avatar background. */
+.ant-avatar.tenant-header-logo__avatar {
+  padding: 8px;
+  background-color: var(--color-bg-base);
+}

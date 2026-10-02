@@ -46,6 +46,7 @@ export function AppIconSettings({
         showDelete={false}
         requireSquare
         minSizePx={512}
+        accept="image/png,image/jpeg,image/webp"
       />
 
       <label htmlFor="app-short-name" className="app-short-name-label">

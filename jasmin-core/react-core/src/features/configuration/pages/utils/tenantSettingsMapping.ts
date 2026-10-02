@@ -23,9 +23,8 @@ export const TENANT_FILE_FIELDS = [
   "logo",
   "bio_logo",
   "app_icon",
-  // No such column exists (the name survives only in dead frontend references);
-  // kept so the strip stays a no-op rather than a behaviour change if some
-  // stale payload still carries the key.
+  // No such column exists; kept so the strip stays a no-op rather than a
+  // behaviour change if some stale payload still carries the key.
   "favicon",
 ] as const;
 
