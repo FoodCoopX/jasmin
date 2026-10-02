@@ -93,6 +93,22 @@ describe("DefaultPrivacyPolicyTemplate", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("names the recipients and transfers, and Friendly Captcha only where it runs", () => {
+    const { rerender } = render(<DefaultPrivacyPolicyTemplate tenant={tenant} />);
+
+    expect(screen.getByText("privacy.third_parties_text")).toBeInTheDocument();
+    expect(screen.getByText("privacy.third_parties_transfers")).toBeInTheDocument();
+    expect(screen.queryByText("privacy.third_parties_captcha")).not.toBeInTheDocument();
+
+    rerender(
+      <DefaultPrivacyPolicyTemplate
+        tenant={{ ...tenant, friendly_captcha_sitekey: "FCMSITEKEY" }}
+      />,
+    );
+
+    expect(screen.getByText("privacy.third_parties_captcha")).toBeInTheDocument();
+  });
+
   it("lists every data-subject right the template promises", () => {
     render(<DefaultPrivacyPolicyTemplate tenant={tenant} />);
 

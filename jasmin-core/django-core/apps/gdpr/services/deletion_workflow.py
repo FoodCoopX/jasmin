@@ -262,7 +262,7 @@ class DeletionWorkflowMixin:
         # doesn't sit unnoticed for days. Deferred via ``on_commit`` so
         # the email never goes out for a transition that gets rolled
         # back. Best-effort: the helper logs but doesn't raise; admin
-        # workflow falls back to the ConfigurationGDPR inbox card.
+        # workflow falls back to the queue on the data-protection page.
         # See ``send_deletion_pending_admin_office_email`` for the
         # "deliberately minimal payload" rationale (no PII).
         transaction.on_commit(

@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 import pytest
 from django.conf import settings
+from django.urls import reverse
 from django_otp.oath import totp
 from django_otp.plugins.otp_static.models import StaticDevice
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -30,6 +31,7 @@ from rest_framework.test import APIClient
 from apps.accounts.errors import (
     TwoFactorAlreadyEnrolled,
     TwoFactorChallengeInvalid,
+    TwoFactorCodeRequired,
     TwoFactorInvalidCode,
     TwoFactorNotEnrolled,
 )
@@ -577,16 +579,23 @@ class TestStepUpWithTotp:
 
         assert self._step_up(user, _current_totp(device))
 
-    @pytest.mark.parametrize("wrong", [False, True], ids=["missing", "wrong"])
-    def test_a_missing_or_wrong_code_is_logged_and_refused(self, tenant, wrong):
+    def test_a_missing_code_is_asked_for_not_counted_as_a_failure(self, tenant):
+        user = self._user()
+        _enrol(user)
+
+        with (
+            patch("apps.accounts.services.step_up_service.logger") as logger,
+            pytest.raises(TwoFactorCodeRequired),
+        ):
+            self._step_up(user, None)
+
+        logger.warning.assert_not_called()
+
+    def test_a_wrong_code_is_logged_and_refused(self, tenant):
         user = self._user()
         device = _enrol(user)
         # Every digit shifted: not this window's code.
-        code = (
-            "".join(str((int(d) + 5) % 10) for d in _current_totp(device))
-            if wrong
-            else None
-        )
+        code = "".join(str((int(d) + 5) % 10) for d in _current_totp(device))
 
         with (
             patch("apps.accounts.services.step_up_service.logger") as logger,
@@ -597,6 +606,21 @@ class TestStepUpWithTotp:
         logger.warning.assert_called_once_with(
             "step_up.verify_failed user=%s reason=totp", user.email
         )
+
+    def test_the_endpoint_checks_the_password_before_it_asks_for_the_code(
+        self, api_client, user
+    ):
+        _set_password(user, self.PASSWORD)
+        _enrol(user)
+        url = reverse("step_up")
+
+        wrong = api_client.post(url, {"password": "not-the-password"}, format="json")
+        asked = api_client.post(url, {"password": self.PASSWORD}, format="json")
+
+        assert wrong.status_code == status.HTTP_400_BAD_REQUEST
+        assert wrong.data["code"] == "auth.invalid_credentials"
+        assert asked.status_code == status.HTTP_400_BAD_REQUEST
+        assert asked.data["code"] == "auth.two_factor.code_required"
 
     def test_without_an_active_device_the_password_is_enough(self, tenant):
         assert self._step_up(self._user(), None)

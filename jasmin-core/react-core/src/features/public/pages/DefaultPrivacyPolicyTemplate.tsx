@@ -8,12 +8,15 @@ const { Title, Paragraph, Text } = Typography;
 
 // Last revision of this static policy template. Rendered in the tenant's
 // date format; bump when the template's wording materially changes.
-const LAST_UPDATED = "2026-04-09";
+const LAST_UPDATED = "2026-10-02";
 
 type TenantInfo = Pick<
   Tenant,
   "name" | "address" | "zip_code" | "city" | "country" | "email" | "phone_number"
->;
+> & {
+  /** Set only where Friendly Captcha guards the public forms. */
+  friendly_captcha_sitekey?: string;
+};
 
 interface Props {
   tenant: TenantInfo | null | undefined;
@@ -128,6 +131,10 @@ export default function DefaultPrivacyPolicyTemplate({ tenant }: Props) {
 
       <Title level={4}>{t("privacy.third_parties_title")}</Title>
       <Paragraph>{t("privacy.third_parties_text")}</Paragraph>
+      <Paragraph>{t("privacy.third_parties_transfers")}</Paragraph>
+      {tenant?.friendly_captcha_sitekey && (
+        <Paragraph>{t("privacy.third_parties_captcha")}</Paragraph>
+      )}
 
       <Divider />
 

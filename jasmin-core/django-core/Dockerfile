@@ -8,12 +8,11 @@
 #     runtime - lean production image, runs gunicorn via entrypoint
 # =============================================================================
 
-ARG PYTHON_VERSION=3.14
-
 # -----------------------------------------------------------------------------
-# base
+# base — named literally, not through an ARG: Dependabot skips a FROM whose
+# image comes from a build argument.
 # -----------------------------------------------------------------------------
-FROM python:${PYTHON_VERSION}-slim AS base
+FROM python:3.14-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

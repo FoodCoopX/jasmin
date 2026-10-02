@@ -56,30 +56,51 @@ CONTROLLER_FIELDS: tuple[str, ...] = (
 )
 
 
-# Joint controllers / processors the codebase relies on. The "AVV
+# Processors and other recipients of the hosted platform. The "AVV
 # yes/no" column is intentionally NOT here — that's an operational
 # question the tenant answers, not a code fact. The endpoint surfaces
-# this list and the office UI lets the admin tick each one off.
+# this list and the office UI lets the admin tick each one off. Rows
+# marked [tenant-specific] are the tenant's own choice; the rest come
+# with the platform. Error tracking (GlitchTip) and uptime monitoring run
+# on the platform's own server, so they add no party.
 PROCESSORS: list[dict[str, str]] = [
     {
-        "role": "Hosting / Infrastructure",
-        "party": "[tenant-specific]",
+        "role": "Platform operation (processor, under the AVV)",
+        "party": "The operator of this platform",
     },
     {
-        "role": "Email delivery (Anymail)",
-        "party": "SendGrid (default; override in TenantEmailConfig)",
+        "role": "Hosting: servers, database, DNS (sub-processor)",
+        "party": (
+            "Akamai Technologies (Linode), servers in Frankfurt am Main — "
+            "a US company, certified under the EU-U.S. Data Privacy Framework"
+        ),
+    },
+    {
+        "role": "Content delivery network for the tenant's web address (sub-processor)",
+        "party": (
+            "BunnyWay d.o.o. (bunny.net), Slovenia — edge servers worldwide, "
+            "standard contractual clauses for those outside the EU"
+        ),
+    },
+    {
+        "role": "Encrypted off-site backups (sub-processor)",
+        "party": "Hetzner Online GmbH (Germany), Storage Box in the EU",
+    },
+    {
+        "role": "Operator alerts by email (sub-processor)",
+        "party": "The platform operator's SMTP provider, named in the AVV",
+    },
+    {
+        "role": "Email to members, customers and resellers",
+        "party": "[tenant-specific] — the mail server set under Configuration → Email",
     },
     {
         "role": "Payment / SEPA",
-        "party": "[tenant-specific]",
+        "party": "[tenant-specific] — the tenant's bank",
     },
     {
-        "role": "Error monitoring",
-        "party": "Sentry (optional)",
-    },
-    {
-        "role": "Backup storage",
-        "party": "[tenant-specific]",
+        "role": "Bot protection on public forms, only where enabled (sub-processor)",
+        "party": "Friendly Captcha GmbH (Germany)",
     },
 ]
 
@@ -174,16 +195,23 @@ ACTIVITIES: list[Activity] = [
         data_subjects="Members, customers, resellers",
         personal_data="Name, email, message content, send-time metadata",
         source="Triggered by platform events",
-        recipients="Anymail provider (SendGrid by default)",
-        third_country_transfers=(
-            "Depends on the configured provider — SendGrid is US-based "
-            "(Standard Contractual Clauses); SMTP fallback can be "
-            "configured to an EU provider"
+        recipients=(
+            "The tenant's own mail server (Configuration → Email), which "
+            "delivers each message"
         ),
-        retention="EmailLog: 2 years; then purge",
+        third_country_transfers=(
+            "None by the platform; depends on the mail provider the tenant "
+            "configures"
+        ),
+        retention=(
+            "EmailLog: 90 days; rows in a status that still needs attention "
+            "(pending, deferred, failed, rejected, complained) are not pruned"
+        ),
         security_measures=(
-            "TLS to provider; provider has own AVV (DPA); EmailLog "
-            "scrubs subject + recipient on member anonymisation"
+            "TLS to the mail server (STARTTLS or SSL, as configured); its "
+            "password stored encrypted; the mail provider's own AVV with "
+            "the tenant; EmailLog scrubs subject + recipient on member "
+            "anonymisation"
         ),
         code_locations=["apps/notifications/"],
     ),

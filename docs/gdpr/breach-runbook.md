@@ -32,7 +32,8 @@ of this runbook.
 
 Likely detection paths:
 
-- Sentry alert on an unexpected access pattern
+- An error-tracking alert (GlitchTip, self-hosted) on an unexpected
+  access pattern
 - `django-axes` lockout spike
 - Office staff notices content that should not be visible (e.g.
   one tenant's data leaking into another tenant's schema view)
@@ -129,8 +130,9 @@ includes:
 ### Channel
 
 - Email to the address on file is typically sufficient
-- Use the existing Anymail transactional path (see
-  `apps/notifications/`) so the send is logged
+- Send through the platform's normal mail path — the tenant's own mail
+  server (`apps/shared/tenants/email_service.py`) — so each send is
+  logged in `EmailLog`
 - If email itself is the breach surface, fall back to postal
   letter or a banner on the public privacy-policy page
 

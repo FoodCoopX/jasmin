@@ -238,15 +238,15 @@ class TestSendDeletionPendingAdminOfficeEmail:
         assert "alice" not in flat
         assert "acres" not in flat
         assert "alice@example.com" not in flat
-        # The review URL hits the office config page, not a
+        # The review URL is the office's queue page, not a
         # request-specific id.
-        assert ctx["review_url"].endswith("/configuration/gdpr")
+        assert ctx["review_url"].endswith("/members/data-protection")
 
     def test_skips_silently_when_office_email_unset(self, tenant):
         """Tenant without an ``email`` configured → no send, no
         crash, log a ``skipped`` info line. The office still sees
-        pending rows in ConfigurationGDPR; they just don't get the
-        push."""
+        pending rows on the data-protection page; they just don't get
+        the push."""
         self._set_office_email(tenant, None)
         user = JasminUserFactory(roles=["member"])
         deletion_request = _make_pending_admin_request(user)
@@ -262,7 +262,7 @@ class TestSendDeletionPendingAdminOfficeEmail:
     def test_swallows_send_failure(self, tenant):
         """Best-effort: a failing send must NOT raise. The state
         transition has already committed; the office can fall back
-        to ConfigurationGDPR."""
+        to the queue on the data-protection page."""
         self._set_office_email(tenant, "office@example.org")
         user = JasminUserFactory(roles=["member"])
         deletion_request = _make_pending_admin_request(user)

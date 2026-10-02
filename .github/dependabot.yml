@@ -97,27 +97,39 @@ updates:
       interval: "monthly"
     labels: ["dependencies", "ci"]
 
-  # Docker base images in the backend Dockerfile (python:*-slim, …)
+  # Base images of the images we build: python:*-slim (backend), node:*-alpine
+  # and nginx:*-alpine (frontend), postgres:*-alpine (backup). Dependabot skips
+  # a FROM whose image comes from a build ARG, so the Dockerfiles name them
+  # literally. deploy.sh pulls the newest build of each tag on every deploy;
+  # these PRs move the tags themselves.
   - package-ecosystem: "docker"
-    directory: "/jasmin-core/django-core"
+    directories:
+      - "/jasmin-core/django-core"
+      - "/jasmin-core/react-core"
+      - "/backups"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      # The backup image's pg_dump must match the server's major version, so
+      # it moves with the Postgres upgrade below, not on its own.
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
 
-  # Docker base images in the frontend Dockerfile (node:*, nginx:*)
-  - package-ecosystem: "docker"
-    directory: "/jasmin-core/react-core"
-    schedule:
-      interval: "weekly"
-    labels: ["dependencies", "docker"]
-
-  # Image tags pinned in the compose files (postgres, redis, nginx, certbot,
-  # glitchtip, uptime-kuma, mailhog). Recent Dependabot's docker ecosystem
-  # scans docker-compose*.yml in the directory, not just Dockerfiles. If your
-  # Dependabot version doesn't pick these up, a Trivy image-scan CI job is the
-  # robust fallback for compose-only images.
-  - package-ecosystem: "docker"
+  # Images the compose files run as published (postgres, redis, nginx,
+  # certbot, glitchtip, uptime-kuma, mailhog). The docker ecosystem reads
+  # Dockerfiles only; compose files have their own.
+  - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      # A new Postgres major can't open the old data directory: it takes a dump
+      # and restore (or pg_upgrade), planned together with the backup image.
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+      # Redis holds the Huey queue in its append-only file; upgrade a major
+      # deliberately, like the redis-py client above.
+      - dependency-name: "redis"
+        update-types: ["version-update:semver-major"]

@@ -4,9 +4,12 @@
  * Mount once near the top of the app tree (JasminApp / SuperAdminApp).
  * When the interceptor receives a ``403 auth.step_up_required`` on
  * a destructive request, it calls into this provider's prompt; the
- * modal asks for the password, returns it to the interceptor, which
- * POSTs ``/api/auth/step-up/``, swaps the rotated access token in,
- * and retries the original request.
+ * modal asks for the password and verifies it through the step-up
+ * endpoint, which swaps the rotated access token in, and the
+ * interceptor retries the original request. With
+ * ``STEP_UP_REQUIRES_TOTP`` on, the backend answers a user who has an
+ * authenticator device with ``auth.two_factor.code_required``; the
+ * modal then asks for the code as well and sends both.
  *
  * Why a provider (not a hook): the prompt has to live OUTSIDE any
  * specific React tree path so it can fire from background queries,
@@ -14,6 +17,7 @@
  * mounted once high in the tree is the simplest answer.
  */
 
+import { SafetyOutlined } from "@ant-design/icons";
 import { Alert, Form, Input, Modal, Typography } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,9 +27,14 @@ import {
   type StepUpCredentials,
   type StepUpPromptArgs,
 } from "@shared/services/stepUp";
-import { getErrorMessage } from "@shared/utils/apiError";
+import { getErrorCode, getErrorMessage } from "@shared/utils/apiError";
 
 const { Text } = Typography;
+
+interface StepUpFormValues {
+  password: string;
+  totpCode?: string;
+}
 
 interface PromptResolver {
   /** Resolve the prompt promise — only after ``verify`` succeeded. */
@@ -48,11 +57,13 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Set once the backend asked this prompt for an authenticator code.
+  const [needsCode, setNeedsCode] = useState(false);
   const resolverRef = useRef<PromptResolver | null>(null);
   const verifyRef = useRef<
     ((creds: StepUpCredentials) => Promise<void>) | null
   >(null);
-  const [form] = Form.useForm<{ password: string }>();
+  const [form] = Form.useForm<StepUpFormValues>();
 
   // Register the prompt at mount and tear it down on unmount. The
   // registry is module-level so there must be exactly one provider
@@ -60,6 +71,7 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     registerStepUpPrompt((args: StepUpPromptArgs) => {
       setErrorMessage(null);
+      setNeedsCode(false);
       form.resetFields();
       verifyRef.current = args.verify;
       setPromptState({ open: true, ttlSeconds: args.ttlSeconds });
@@ -81,7 +93,7 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
   }, [form]);
 
   const handleSubmit = useCallback(
-    async (values: { password: string }) => {
+    async (values: StepUpFormValues) => {
       const resolver = resolverRef.current;
       const verify = verifyRef.current;
       if (!resolver || !verify) return;
@@ -90,24 +102,31 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
       try {
         // Verify BEFORE resolving: a wrong password keeps the modal
         // open with the error instead of failing the original action.
-        await verify({ password: values.password });
+        await verify({
+          password: values.password,
+          totpCode: needsCode ? values.totpCode : undefined,
+        });
         resolver.resolve();
         resolverRef.current = null;
         verifyRef.current = null;
         setPromptState((prev) => ({ ...prev, open: false }));
       } catch (err) {
-        setErrorMessage(
-          getErrorMessage(
-            err,
-            t("auth.step_up.failed"),
-          ),
+        const code = getErrorCode(err);
+        if (code === "auth.two_factor.code_required") {
+          // The password was right; keep it and ask for the code too.
+          setNeedsCode(true);
+          return;
+        }
+        setErrorMessage(getErrorMessage(err, t("auth.step_up.failed")));
+        // A wrong code costs only the code, not the password typed above.
+        form.resetFields(
+          code === "auth.two_factor.invalid_code" ? ["totpCode"] : undefined,
         );
-        form.resetFields();
       } finally {
         setSubmitting(false);
       }
     },
-    [form, t],
+    [form, needsCode, t],
   );
 
   const handleCancel = useCallback(() => {
@@ -149,7 +168,7 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
             type="error"
             showIcon
             message={errorMessage}
-            style={{ marginTop: 12 }}
+            className="step-up-modal__error"
           />
         )}
 
@@ -157,7 +176,7 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          style={{ marginTop: 16 }}
+          className="step-up-modal__form"
         >
           <Form.Item
             name="password"
@@ -171,7 +190,34 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
           >
             <Input.Password autoFocus autoComplete="current-password" />
           </Form.Item>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          {needsCode && (
+            <>
+              <Text type="secondary" className="step-up-modal__code-prompt">
+                {t("auth.two_factor.prompt_subtitle")}
+              </Text>
+              <Form.Item
+                name="totpCode"
+                label={t("auth.two_factor.code_label")}
+                rules={[
+                  {
+                    required: true,
+                    message: t("auth.two_factor.please_enter_code"),
+                  },
+                ]}
+                extra={t("auth.two_factor.recovery_hint")}
+              >
+                <Input
+                  prefix={<SafetyOutlined />}
+                  placeholder="123456"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  maxLength={20}
+                />
+              </Form.Item>
+            </>
+          )}
+          <Text type="secondary" className="step-up-modal__hint">
             {t(
               "auth.step_up.ttl_hint",
               { minutes: ttlMinutes },

@@ -6,8 +6,9 @@ subject contents), so it lives **inside the tenant schema**, not in
 tenant deletion (Art. 17). Cross-tenant queries are physically impossible
 because the ``email_log`` table only exists in the tenant's own schema.
 
-Updated by ESP webhooks via Anymail's ``tracking`` signal — see
-``apps/notifications/signals.py``.
+Written by the send path (``apps.shared.tenants.email_service``): a row per
+recipient as ``pending``, then ``sent`` or ``failed``. Mail goes out over SMTP
+to the tenant's own mail server, and nothing reports delivery back.
 """
 
 from __future__ import annotations
@@ -89,8 +90,8 @@ class EmailLog(models.Model):
     status = models.CharField(
         max_length=16, choices=STATUS_CHOICES, default="pending", db_index=True
     )
-    # Provider's message-id, captured after a successful send. Used as a
-    # secondary key when the webhook can't surface our metadata header.
+    # The RFC 5322 Message-ID the send path stamps on the mail, so a bounce or
+    # a mail-server log line can be traced back to this row.
     provider_message_id = models.CharField(max_length=255, blank=True, db_index=True)
     # Bounce reason / API error text. Capped by the writer to 2000 chars.
     error = models.TextField(blank=True)
@@ -114,9 +115,9 @@ class EmailLog(models.Model):
         constraints = [
             # A mail can't be sent before its row was created, nor delivered
             # before it was sent. NULL-tolerant: only enforced once both
-            # stamps in a pair are present. The webhook path uses bulk
-            # updates that bypass clean(), so these DB constraints are the
-            # real guard.
+            # stamps in a pair are present. The send path stamps rows with
+            # bulk updates that bypass clean(), so these DB constraints are
+            # the real guard.
             models.CheckConstraint(
                 name="emaillog_sent_after_created",
                 condition=(

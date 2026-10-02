@@ -17,3 +17,21 @@
   background-color: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
 }
+
+.step-up-modal__error {
+  margin-top: 12px;
+}
+
+.step-up-modal__form {
+  margin-top: 16px;
+}
+
+.step-up-modal__code-prompt {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.step-up-modal__hint {
+  display: block;
+  font-size: 12px;
+}

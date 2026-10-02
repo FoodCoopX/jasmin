@@ -33,16 +33,20 @@ and processor of itself, and Art. 28 does not apply.
 You use third-party services that touch personal data on your
 behalf:
 
-- Hosting / IaaS provider
-- Email delivery (SendGrid via Anymail)
-- Payment processing
-- Error monitoring (Sentry)
-- Backup storage
+- Hosting / IaaS provider (servers, database, DNS)
+- Content delivery network in front of the tenant hosts
+- Off-site backup storage
+- The SMTP provider of the platform's own operator-alert mail (tenant
+  mail goes out through each Solawi's own mail server, under the
+  Solawi's own contract)
+- Bot protection on public forms, if enabled
 
-Each of these needs its own AVV. Most major providers publish a
-DPA you can sign electronically (e.g. SendGrid, Sentry). Signed
-copies are held outside this repository, in the office document
-store. Do not commit executed AVVs to version control.
+Each of these needs its own AVV. Most providers publish a DPA you can
+accept or sign online (bunny.net under Account → GDPR in its
+dashboard). Error tracking (GlitchTip) and uptime monitoring run on
+the platform's own server and need none. Signed copies are held
+outside this repository, in the office document store. Do not commit
+executed AVVs to version control.
 
 ---
 
@@ -177,13 +181,18 @@ to engage sub-processors, subject to the conditions below.
 
 Current sub-processors:
 
-| Sub-processor       | Purpose             | Country   |
-|---------------------|---------------------|-----------|
-| [Hosting provider]  | IaaS                | [country] |
-| SendGrid (Anymail)  | Email delivery      | USA       |
-| [Payment processor] | SEPA execution      | [country] |
-| Sentry (optional)   | Error monitoring    | USA       |
-| [Backup storage]    | Offsite backups     | [country] |
+| Sub-processor                               | Purpose                                      | Country / transfer safeguard                                                      |
+|---------------------------------------------|----------------------------------------------|-----------------------------------------------------------------------------------|
+| Akamai Technologies, Inc. (Linode)          | Hosting: servers, database, DNS              | Servers in Frankfurt am Main, Germany; US company — EU-U.S. Data Privacy Framework |
+| BunnyWay d.o.o. (bunny.net)                 | Content delivery network for the tenant hosts | Slovenia; edge servers worldwide — standard contractual clauses outside the EU     |
+| Hetzner Online GmbH                         | Encrypted off-site backups (Storage Box)     | Germany; data centre in the EU                                                    |
+| [Platform SMTP provider]                    | Operator alerts by email                     | [country]                                                                         |
+| Friendly Captcha GmbH (only where enabled)  | Bot protection on public forms               | Germany                                                                           |
+
+Email to the Controller's members, customers and resellers goes out
+through the Controller's own mail server, under the Controller's own
+contract with its mail provider; SEPA direct debits through the
+Controller's own bank. Neither is a sub-processor of the Processor.
 
 The Processor informs the Controller of any intended changes
 to the sub-processor list with at least 30 days' notice. The

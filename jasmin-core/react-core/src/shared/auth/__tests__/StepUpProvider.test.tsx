@@ -127,6 +127,61 @@ describe("StepUpProvider", () => {
     await expect(secondFlow).resolves.toBe("sudo-token-2");
   });
 
+  it("asks for the authenticator code when the backend wants one", async () => {
+    const user = userEvent.setup();
+    render(
+      <StepUpProvider>
+        <div />
+      </StepUpProvider>,
+    );
+
+    const flow = runStepUpFlow({ ttlSeconds: 300 });
+    flow.catch(() => {});
+    await screen.findByText("auth.step_up.title");
+
+    axiosPostMock.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { code: "auth.two_factor.code_required", message: "Code needed." },
+      },
+    });
+    await submitPassword(user);
+
+    // The password was right: no error, the password stays, a code is asked.
+    const codeLabel = "auth.two_factor.code_label";
+    await user.type(await screen.findByLabelText(codeLabel), "000000");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("auth.step_up.password")).toHaveValue("hunter2");
+
+    // A wrong code shows the error and clears only the code. (A reset
+    // remounts the input, so it is looked up again.)
+    axiosPostMock.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { code: "auth.two_factor.invalid_code", message: "Wrong code." },
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "auth.step_up.submit" }));
+    await screen.findByRole("alert");
+    expect(screen.getByLabelText("auth.step_up.password")).toHaveValue("hunter2");
+    expect(screen.getByLabelText(codeLabel)).toHaveValue("");
+
+    axiosPostMock.mockResolvedValueOnce({
+      data: { access: "sudo-token", ttl_seconds: 300 },
+    });
+    await user.type(screen.getByLabelText(codeLabel), "123456");
+    await user.click(screen.getByRole("button", { name: "auth.step_up.submit" }));
+
+    await expect(flow).resolves.toBe("sudo-token");
+    expect(axiosPostMock).toHaveBeenLastCalledWith(
+      "/api/auth/step-up/",
+      { password: "hunter2", totp_code: "123456" },
+      expect.anything(),
+    );
+  });
+
   it("cancelling the modal rejects the flow", async () => {
     const user = userEvent.setup();
     render(

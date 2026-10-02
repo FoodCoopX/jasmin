@@ -23,8 +23,9 @@ import { getAccessToken, setAccessToken } from "./tokenStore";
 
 export interface StepUpCredentials {
   password: string;
-  /** Reserved for the post-TOTP rollout. The backend ignores it when
-   *  ``STEP_UP_REQUIRES_TOTP`` is off, so it's optional. */
+  /** The authenticator or recovery code, sent once the backend asked
+   *  for it (``auth.two_factor.code_required``, only with
+   *  ``STEP_UP_REQUIRES_TOTP`` on and for a user with a device). */
   totpCode?: string;
 }
 

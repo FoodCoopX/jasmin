@@ -29,7 +29,7 @@ asks "where do we stand on Art. X?".
 | `processing-activities.md` | Annual + on any vendor change |
 | `breach-runbook.md` | Annual + after any drill |
 | `dpia-assessment.md` | On any "high risk" scope change |
-| `deletion-roadmap.md` | Per-step as the roadmap advances |
+| `deletion-roadmap.md` | With every change to the erasure flow |
 | `avv-template.md` | Annual (legal text + vendor list) |
 
 ## Linking rule

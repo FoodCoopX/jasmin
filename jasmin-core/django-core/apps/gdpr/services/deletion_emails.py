@@ -136,15 +136,15 @@ def send_deletion_pending_admin_office_email(
     clicks their confirmation link. Goes to the tenant's general
     office mailbox (``Tenant.email``); falls back to a no-op +
     warning when the tenant hasn't set one (the office can still
-    see pending requests in ConfigurationGDPR, just without the
-    push).
+    see pending requests on Members → GDPR deletion requests, just
+    without the push).
 
     **DELIBERATELY MINIMAL PAYLOAD** — the email contains NO PII
     about the requesting user:
 
       * No name, no email, no member-number, no request id.
       * Just "you have a pending GDPR deletion request — review in
-        /configuration/gdpr".
+        /members/data-protection".
 
     Reasoning: the office mailbox is typically a shared inbox,
     sometimes auto-forwarded to multiple addresses. Pushing the
@@ -154,8 +154,8 @@ def send_deletion_pending_admin_office_email(
     "go check the queue".
 
     Best-effort: a failed send does NOT roll back the state
-    transition. The office can still find the request in
-    ConfigurationGDPR — they just don't get the push.
+    transition. The office can still find the request on the
+    data-protection page — they just don't get the push.
     """
     from apps.shared.deferred_email import send_email_best_effort
     from apps.shared.tenant_urls import frontend_base_url, tenant_name
@@ -165,7 +165,7 @@ def send_deletion_pending_admin_office_email(
     office_email = getattr(connection.tenant, "email", None)
     if not office_email:
         # No address configured → skip silently. The office still
-        # sees pending rows in ConfigurationGDPR; this just means
+        # sees pending rows on the data-protection page; this just means
         # they won't get notified by email. ``logger.info`` (not
         # ``warning``) because a fresh tenant legitimately has no
         # email set and we don't want noise during onboarding.
@@ -176,7 +176,8 @@ def send_deletion_pending_admin_office_email(
         )
         return
 
-    review_url = f"{frontend_base_url()}/configuration/gdpr"
+    # The queue page: Members → GDPR deletion requests.
+    review_url = f"{frontend_base_url()}/members/data-protection"
 
     # Context carries ONLY tenant-side info + the review link. The
     # ``deletion_request`` is NOT passed in — anyone editing the
@@ -202,7 +203,8 @@ def send_deletion_pending_admin_office_email(
         log_not_sent_event="gdpr.deletion_pending_office_email_not_sent",
         log_ref=f"request_id={deletion_request.pk}",
         # An unpushed office heads-up is non-actionable (the request is still
-        # visible in ConfigurationGDPR), so keep WARNING, not the default ERROR.
+        # visible on the data-protection page), so keep WARNING, not the
+        # default ERROR.
         log_level="warning",
     )
 

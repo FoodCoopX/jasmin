@@ -34,13 +34,24 @@ in the public privacy-policy template. Keep them in sync.
 
 ## 2. Joint Controllers / Processors (Art. 26 / Art. 28)
 
-| Role                       | Party              | Contract on file |
-|----------------------------|--------------------|------------------|
-| Hosting / Infrastructure   | [fill in]          | [AVV yes/no]     |
-| Email delivery (Anymail)   | SendGrid (default) | [AVV yes/no]     |
-| Payment / SEPA             | [fill in]          | [AVV yes/no]     |
-| Error monitoring           | Sentry (optional)  | [AVV yes/no]     |
-| Backup storage             | [fill in]          | [AVV yes/no]     |
+For a Solawi on the hosted platform. Rows marked † are sub-processors of the
+platform operator: they are covered by the operator's AVV (its §6), not by
+a contract of the Solawi's own. A Solawi that hosts Jasmin itself replaces
+them with its own providers.
+
+| Role                                            | Party                                                                                              | Contract on file |
+|-------------------------------------------------|----------------------------------------------------------------------------------------------------|------------------|
+| Platform operation                              | [the platform operator]                                                                            | [AVV yes/no]     |
+| Hosting: servers, database, DNS †               | Akamai Technologies (Linode), servers in Frankfurt am Main — US company, EU-U.S. Data Privacy Framework | operator's AVV   |
+| Content delivery network †                      | BunnyWay d.o.o. (bunny.net), Slovenia — edge servers worldwide, standard contractual clauses outside the EU | operator's AVV   |
+| Encrypted off-site backups †                    | Hetzner Online GmbH (Germany), Storage Box in the EU                                               | operator's AVV   |
+| Operator alerts by email †                      | [the operator's SMTP provider, named in the AVV]                                                   | operator's AVV   |
+| Email to members, customers, resellers          | [fill in: your mail provider — Configuration → Email]                                              | [AVV yes/no]     |
+| Payment / SEPA                                  | [fill in: your bank]                                                                               | [AVV yes/no]     |
+| Bot protection on public forms, if enabled †    | Friendly Captcha GmbH (Germany)                                                                    | operator's AVV   |
+
+Error tracking (GlitchTip) and uptime monitoring run on the platform's own
+server and add no party.
 
 See [avv-template.md](avv-template.md) for the AVV template you sign
 WITH your sub-processors AND, if you host this platform for OTHER
@@ -91,9 +102,9 @@ implements all of them — paths refer to `apps/` packages.
 | Categories of data subjects | Members, customers, resellers                                                                                        |
 | Categories of personal data | Name, email, message content, send-time metadata                                                                     |
 | Source                      | Triggered by platform events                                                                                         |
-| Recipients                  | Anymail provider (SendGrid by default)                                                                               |
-| Retention                   | EmailLog: 2 years; then purge                                                                                        |
-| Security measures           | TLS to provider; provider has own AVV (DPA); EmailLog scrubs subject + recipient on member anonymisation             |
+| Recipients                  | Your own mail server (Configuration → Email), which delivers each message                                            |
+| Retention                   | EmailLog: 90 days; rows in a status that still needs attention (pending, deferred, failed, rejected, complained) are not pruned |
+| Security measures           | TLS to the mail server (STARTTLS or SSL, as configured); its password stored encrypted; your mail provider's own AVV; EmailLog scrubs subject + recipient on member anonymisation |
 | Code locations              | `apps/notifications/`                                                                                                |
 
 ### 3.4 Login + access logging

@@ -264,6 +264,7 @@
       "challenge_invalid": "Die 2FA-Anfrage ist ungültig oder abgelaufen — bitte erneut anmelden.",
       "enrolment_required": "Für diese Rolle ist die Einrichtung der Zwei-Faktor-Authentifizierung (2FA) erforderlich.",
       "invalid_code": "Der 2FA-Code stimmt nicht — bitte erneut versuchen.",
+      "code_required": "Bitte gib zusätzlich den Code aus deiner Authenticator-App ein.",
       "not_enrolled": "Für diesen Account ist keine Zwei-Faktor-Authentifizierung (2FA) eingerichtet."
     }
   },

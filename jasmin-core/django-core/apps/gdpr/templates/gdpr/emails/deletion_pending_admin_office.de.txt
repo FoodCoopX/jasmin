@@ -6,11 +6,12 @@ Person per E-Mail-Link bestätigt worden.
 
 Die Anfrage ist jetzt im Zustand "wartet auf Büro-Freigabe" und muss vor
 der eigentlichen Anonymisierung manuell geprüft und freigegeben (oder mit
-Begründung abgelehnt) werden.
+Begründung abgelehnt) werden. Die Antwort an die Person ist binnen eines
+Monats fällig (Art. 12 Abs. 3 DSGVO).
 
 Im Büro öffnen:
 {{ review_url }}
 
 Diese E-Mail enthält bewusst keine Angaben zur antragstellenden Person —
-die Details zur Anfrage sind nur in der Konfigurations-Seite sichtbar, die
-ein Zugriffsrecht erfordert.
+die Details zur Anfrage sind nur unter Mitglieder → DSGVO Löschanträge
+sichtbar, nach der Anmeldung als Admin.

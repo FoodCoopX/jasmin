@@ -264,6 +264,7 @@
       "challenge_invalid": "The 2FA challenge is invalid or expired — please sign in again.",
       "enrolment_required": "This role requires two-factor authentication (2FA) to be set up.",
       "invalid_code": "The 2FA code is incorrect — please try again.",
+      "code_required": "Please also enter the code from your authenticator app.",
       "not_enrolled": "No two-factor authentication (2FA) is set up for this account."
     }
   },

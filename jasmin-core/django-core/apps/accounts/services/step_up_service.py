@@ -12,8 +12,11 @@ Flow
 ::
 
     1. Frontend calls a gated endpoint → 403 ``auth.step_up_required``.
-    2. Frontend pops a password (and, post-TOTP rollout, code) modal.
-    3. Frontend POSTs ``/api/auth/step-up/`` with the password.
+    2. Frontend pops a password modal.
+    3. Frontend POSTs ``/api/auth/step-up/`` with the password. With
+       ``STEP_UP_REQUIRES_TOTP`` on, a user with an active TOTP device
+       gets ``auth.two_factor.code_required`` back, and the modal asks for
+       the code and POSTs the password with it.
     4. ``verify_and_issue_step_up_token`` returns a fresh access token.
     5. Frontend replaces its in-memory access token + retries the call.
 
@@ -33,7 +36,11 @@ from typing import Any
 from django.conf import settings
 from rest_framework_simplejwt.tokens import AccessToken
 
-from apps.accounts.errors import InvalidCredentials, TwoFactorInvalidCode
+from apps.accounts.errors import (
+    InvalidCredentials,
+    TwoFactorCodeRequired,
+    TwoFactorInvalidCode,
+)
 from apps.accounts.models import JasminUser
 
 from . import two_factor_service
@@ -85,9 +92,12 @@ def verify_and_issue_step_up_token(
     ------
     InvalidCredentials
         Password didn't match.
+    TwoFactorCodeRequired
+        ``STEP_UP_REQUIRES_TOTP=True``, the user has an active device,
+        the password matched and no code came with it.
     TwoFactorInvalidCode
         ``STEP_UP_REQUIRES_TOTP=True``, the user has an active device,
-        and the code was missing or wrong.
+        and the code was wrong.
     """
     if not password or not user.check_password(password):
         # Log first, then raise — InvalidCredentials is mapped by the
@@ -101,11 +111,15 @@ def verify_and_issue_step_up_token(
     if getattr(
         settings, "STEP_UP_REQUIRES_TOTP", False
     ) and two_factor_service.has_two_factor(user):
+        if not totp_code:
+            # Not a failed attempt: the modal only learns here that this
+            # user needs a code.
+            raise TwoFactorCodeRequired("Enter the code from your authenticator app.")
         # The verify path of the post-login 2FA flow, so the TOTP and
-        # recovery-code semantics stay identical. It raises for a missing
-        # or wrong code rather than returning False.
+        # recovery-code semantics stay identical. It raises for a wrong
+        # code rather than returning False.
         try:
-            two_factor_service.verify_code(user=user, code=totp_code or "")
+            two_factor_service.verify_code(user=user, code=totp_code)
         except TwoFactorInvalidCode:
             logger.warning(
                 "step_up.verify_failed user=%s reason=totp",

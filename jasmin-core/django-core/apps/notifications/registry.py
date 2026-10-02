@@ -897,7 +897,9 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
             "Anfrage damit in den Status ``PENDING_ADMIN`` übergeht. "
             "Geht an die allgemeine Büro-Mailbox (``Tenant.email``); "
             "ohne diese Mail würde das Büro die Anfrage erst sehen, "
-            "wenn jemand die GDPR-Konfigurations-Seite öffnet."
+            "wenn jemand unter Mitglieder die Seite „DSGVO Löschanträge“ "
+            "öffnet. Die Antwort ist binnen eines Monats fällig "
+            "(Art. 12 Abs. 3 DSGVO)."
             "\n\n"
             "**Bewusst PII-arm**: Die Mail enthält weder Namen noch "
             "E-Mail noch Mitgliedsnummer der antragstellenden Person — "
@@ -916,15 +918,15 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
                 name="review_url",
                 label="Link zur Freigabe-Seite",
                 description=(
-                    "Direkter Link auf ``/configuration/gdpr`` im "
-                    "Büro-Frontend, wo die wartenden Anfragen "
-                    "aufgelistet sind."
+                    "Direkter Link auf ``/members/data-protection`` "
+                    "(Mitglieder → DSGVO Löschanträge), wo die wartenden "
+                    "Anfragen aufgelistet sind."
                 ),
             ),
         ],
         sample={
             "tenant_name": "Beispiel-Solawi",
-            "review_url": "https://app.example.org/configuration/gdpr",
+            "review_url": "https://app.example.org/members/data-protection",
         },
     ),
     "gdpr.deletion_rejected": EmailTemplateSpec(

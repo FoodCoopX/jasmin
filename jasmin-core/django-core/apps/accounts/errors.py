@@ -223,6 +223,18 @@ class TwoFactorInvalidCode(AuthError):
     http_status = 400
 
 
+class TwoFactorCodeRequired(AuthError):
+    """Step-up needs the user's TOTP or recovery code too, and none came.
+
+    Raised only with ``STEP_UP_REQUIRES_TOTP`` on, for a user with an
+    active device, after the password verified. The step-up modal answers
+    by asking for the code and sending it together with the password.
+    """
+
+    code = "auth.two_factor.code_required"
+    http_status = 400
+
+
 class TwoFactorChallengeInvalid(AuthError):
     """The challenge token is expired, malformed, or for the wrong user."""
 
@@ -263,6 +275,7 @@ __all__ = [
     "TwoFactorNotEnrolled",
     "TwoFactorAlreadyEnrolled",
     "TwoFactorInvalidCode",
+    "TwoFactorCodeRequired",
     "TwoFactorChallengeInvalid",
     "TwoFactorEnrolmentRequired",
 ]

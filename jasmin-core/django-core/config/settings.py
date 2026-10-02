@@ -1000,10 +1000,10 @@ FRIENDLY_CAPTCHA_TIMEOUT_SECONDS = float(
 # permission class ``apps.accounts.permissions.RequiresStepUp`` raises
 # ``StepUpRequired`` when the claim is missing or older than the TTL.
 STEP_UP_TTL_SECONDS = int(os.environ.get("STEP_UP_TTL_SECONDS", "300"))
-# When True, the step-up endpoint requires a fresh TOTP code on top
-# of the password. Flip this once TOTP MFA is rolled out and you
-# want the strongest gate on destructive actions. Until then, password
-# re-confirmation is the bar.
+# When True, step-up asks a user with an active TOTP device for a code (or a
+# recovery code) after the password; users without a device confirm with the
+# password alone. Super-admins have no TOTP devices, so their step-up stays
+# password-only either way.
 STEP_UP_REQUIRES_TOTP = (
     os.environ.get("STEP_UP_REQUIRES_TOTP", "False").lower() == "true"
 )

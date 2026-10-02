@@ -6,7 +6,8 @@
 # It:
 #   1. validates .env (exists, no CHANGE_ME left, required vars set)
 #   2. issues the wildcard TLS cert if it isn't in the volume yet
-#   3. builds the images and tags them as a release (scripts/rollback.sh)
+#   3. pulls the newest build of every image tag, builds the images and tags
+#      them as a release (scripts/rollback.sh)
 #   4. takes an encrypted snapshot of the database before it is migrated
 #   5. brings up the CORE stack (skips glitchtip/uptime — Phase 5)
 #   6. waits for the backend to migrate + report healthy
@@ -115,7 +116,19 @@ log "building images (first build takes a few minutes)"
 # there's no git checkout.
 VITE_BUILD_ID="$(git rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%d%H%M%S)"
 export VITE_BUILD_ID
-docker compose build
+# --pull and the pull below fetch the newest build of each tag (python:3.14-slim,
+# postgres:15-alpine, …), so OS and library fixes ship with every deploy instead
+# of waiting for someone to pull by hand. A registry hiccup — a Docker Hub rate
+# limit, an outage — must not block a hotfix, so both fall back to the images
+# already on the host and say so.
+if ! docker compose build --pull; then
+    log "WARN: build with --pull failed — retrying with the base images already on this host"
+    docker compose build
+fi
+# The core stack's images that come from a registry as published (the others
+# are built above). Glitchtip and Uptime Kuma aren't started here.
+docker compose pull --quiet postgres redis gateway certbot || \
+    log "WARN: couldn't pull newer postgres/redis/nginx/certbot images — keeping the ones on this host"
 
 # Compose always runs the IMAGE_TAG tag, which every build moves. Each release
 # also keeps its images under a release tag, <UTC time>-<build id>, so

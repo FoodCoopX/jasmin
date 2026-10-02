@@ -1029,9 +1029,10 @@ npm run lint:fix                 # Auto-fix issues
 
 **Build & deploy:** there are no `make prod-*` targets, but there IS a committed
 flow — run `./scripts/deploy.sh` from the repo root on the server. It is
-idempotent: validates `.env`, issues the wildcard cert, builds, tags the build
-as a release (`<UTC time>-<git hash>`, the last five kept), snapshots the
-database, brings the core stack up, waits for backend health, migrates.
+idempotent: validates `.env`, issues the wildcard cert, pulls the newest build
+of every image tag and builds, tags the build as a release (`<UTC time>-<git
+hash>`, the last five kept), snapshots the database, brings the core stack up,
+waits for backend health, migrates.
 `scripts/update.sh` is the "I pushed — now what?" wrapper around it.
 `scripts/rollback.sh` switches back to a kept release whose migrations are a
 prefix of those the database has applied.

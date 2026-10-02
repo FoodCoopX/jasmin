@@ -8,12 +8,13 @@
 #     nginx   - production: serves /app/dist via nginx
 # =============================================================================
 
-ARG NODE_VERSION=22
+# The node stages name their base image literally, not through an ARG:
+# Dependabot skips a FROM whose image comes from a build argument.
 
 # -----------------------------------------------------------------------------
 # deps - cached node_modules layer
 # -----------------------------------------------------------------------------
-FROM node:${NODE_VERSION}-alpine AS deps
+FROM node:22-alpine AS deps
 
 WORKDIR /app
 RUN apk add --no-cache python3 make g++ libc6-compat
@@ -25,7 +26,7 @@ RUN npm ci
 # -----------------------------------------------------------------------------
 # dev - vite dev server (source bind-mounted at runtime by compose)
 # -----------------------------------------------------------------------------
-FROM node:${NODE_VERSION}-alpine AS dev
+FROM node:22-alpine AS dev
 
 WORKDIR /app
 ENV NODE_ENV=development \
@@ -41,7 +42,7 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 # -----------------------------------------------------------------------------
 # builder - produces /app/dist for production
 # -----------------------------------------------------------------------------
-FROM node:${NODE_VERSION}-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 ENV NODE_ENV=production
