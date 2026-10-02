@@ -3,7 +3,8 @@
 Covers the security-critical core: the durable ledger count, the weekly and
 per-minute ceilings, the platform-owned override resolution (including the
 malformed / cap-disabling inputs a compromised config must not be able to
-exploit), the 7-day window, the 80% ops alert, and the actor trail.
+exploit), the 7-day window, the 80% ops alert, the security-log line for a
+refused attempt, and the actor trail.
 
 The ``tenant`` fixture calls ``connection.set_tenant(...)`` and yields the
 public ``Tenant`` row, so ``connection.tenant`` is live and overrides can be
@@ -27,11 +28,21 @@ from apps.shared.tenants.rate_limits import (
     enforce_action_quota,
     enforce_action_quota_batch,
     release_action_quota,
+    remaining_weekly_quota,
     resolve_action_rate_limit,
 )
 
 INV = RateLimitedAction.INVOICE_FINALIZATION
 SEPA = RateLimitedAction.SEPA_CHARGE_GENERATION
+
+
+@pytest.fixture(autouse=True)
+def _restore_overrides(tenant):
+    # ``tenant`` is one object for the whole session; overrides set here must
+    # not reach later tests.
+    original = tenant.action_rate_limit_overrides
+    yield
+    tenant.action_rate_limit_overrides = original
 
 
 def _set_override(tenant, *, weekly=None, per_minute=None, action=INV):
@@ -246,6 +257,69 @@ def test_ops_alert_fires_even_for_a_cap_of_one(
         assert mailer.call_count == 1
 
 
+def test_ops_alert_fires_once_as_a_batch_crosses_80_percent(
+    tenant, django_capture_on_commit_callbacks
+):
+    _set_override(tenant, weekly=10, per_minute=1)  # 80% of 10 == 8
+    with patch("apps.shared.tenants.rate_limits.mail_admins") as mailer:
+        with django_capture_on_commit_callbacks(execute=True):
+            enforce_action_quota_batch(INV, count=5, tenant=tenant)  # 0 -> 5
+        assert mailer.call_count == 0
+
+        with django_capture_on_commit_callbacks(execute=True):
+            enforce_action_quota_batch(INV, count=4, tenant=tenant)  # 5 -> 9
+        assert mailer.call_count == 1
+        assert "9/10" in mailer.call_args.args[0]
+
+        with django_capture_on_commit_callbacks(execute=True):
+            enforce_action_quota_batch(INV, count=1, tenant=tenant)  # 9 -> 10
+        assert mailer.call_count == 1
+
+
+# --------------------------------------------------------------------------- #
+# Security log                                                                 #
+# --------------------------------------------------------------------------- #
+
+
+def _blocked_line(security_log) -> str:
+    message, *args = security_log.warning.call_args.args
+    return message % tuple(args)
+
+
+@pytest.mark.parametrize(
+    ("weekly", "per_minute", "scope"),
+    [(1, 100, "weekly"), (100, 1, "per_minute")],
+)
+def test_a_refused_attempt_is_logged_to_the_security_log(
+    tenant, user, weekly, per_minute, scope
+):
+    # The refusal writes no ledger row, so this line is its only trace.
+    _set_override(tenant, weekly=weekly, per_minute=per_minute)
+    enforce_action_quota(INV, actor=user, tenant=tenant)  # fills the cap
+
+    with patch("apps.shared.tenants.rate_limits._security_log") as security_log:
+        with pytest.raises(ActionRateLimitExceeded):
+            enforce_action_quota(INV, actor=user, tenant=tenant)
+
+    assert _blocked_line(security_log) == (
+        f"ratelimit.blocked tenant={tenant.schema_name} action={INV} "
+        f"scope={scope} limit=1 actor={user.pk}"
+    )
+
+
+def test_a_refused_batch_logs_its_size(tenant):
+    _set_override(tenant, weekly=5, per_minute=100)
+
+    with patch("apps.shared.tenants.rate_limits._security_log") as security_log:
+        with pytest.raises(ActionRateLimitExceeded):
+            enforce_action_quota_batch(INV, count=6, tenant=tenant)
+
+    assert _blocked_line(security_log) == (
+        f"ratelimit.blocked tenant={tenant.schema_name} action={INV} "
+        "scope=weekly limit=5 actor=- batch=6"
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Batch reservation (bulk paths, e.g. CSV import)                              #
 # --------------------------------------------------------------------------- #
@@ -302,6 +376,26 @@ def test_batch_returns_reserved_ids_and_release_refunds(tenant):
         enforce_action_quota(INV, tenant=tenant)  # 3 + 7 = 10, exactly the cap
     with pytest.raises(ActionRateLimitExceeded):
         enforce_action_quota(INV, tenant=tenant)
+
+
+def test_remaining_weekly_quota_counts_down_to_zero(tenant):
+    _set_override(tenant, weekly=5, per_minute=100)
+    assert remaining_weekly_quota(INV, tenant=tenant) == 5
+
+    enforce_action_quota_batch(INV, count=3, tenant=tenant)
+    assert remaining_weekly_quota(INV, tenant=tenant) == 2
+
+    # A cap lowered below what the week already used leaves nothing, not less.
+    _set_override(tenant, weekly=1, per_minute=100)
+    assert remaining_weekly_quota(INV, tenant=tenant) == 0
+
+
+def test_remaining_weekly_quota_is_none_without_tenant_context(tenant):
+    connection.set_schema_to_public()
+    try:
+        assert remaining_weekly_quota(INV) is None
+    finally:
+        connection.set_tenant(tenant)
 
 
 def test_release_action_quota_is_safe_on_empty(tenant):

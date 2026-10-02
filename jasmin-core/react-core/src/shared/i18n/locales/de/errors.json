@@ -14,7 +14,8 @@
     "insufficient": "Nicht genug Bestand für diese Aktion.",
     "amount_negative": "Die Menge darf nicht negativ sein.",
     "amount_not_number": "Die Menge muss eine Zahl sein.",
-    "inventory_finalized": "Dieser Inventureintrag ist finalisiert und kann nicht mehr geändert oder gelöscht werden. Bitte zuerst die Finalisierung aufheben."
+    "inventory_finalized": "Dieser Inventureintrag ist finalisiert und kann nicht mehr geändert oder gelöscht werden. Bitte zuerst die Finalisierung aufheben.",
+    "invalid_composite_id": "Ungültige Kennung für den Lagereintrag."
   },
   "subscription": {
     "start_too_soon": "Das Abo kann frühestens am {{earliest}} starten ({{min_weeks}} Woche(n) Vorlauf).",
@@ -324,7 +325,9 @@
     "not_found": "Inventureintrag nicht gefunden."
   },
   "data_import": {
-    "invalid": "Die hochgeladene Datei konnte nicht importiert werden — bitte Datei prüfen und erneut versuchen."
+    "invalid": "Die hochgeladene Datei konnte nicht importiert werden — bitte Datei prüfen und erneut versuchen.",
+    "too_many_rows": "Die Datei hat mehr als {{max_rows}} Zeilen; ein Import nimmt höchstens {{max_rows}} Zeilen auf. Bitte die Datei aufteilen.",
+    "over_member_limit": "Die Datei hat mehr als {{max_rows}} Zeilen und mehr Mitglieder, als das wöchentliche Limit für neue Mitglieder noch zulässt ({{remaining}}). Aufteilen hilft hier nicht: Eine Plattform-Administrator:in muss das Limit zuerst anheben."
   },
   "customer": {
     "profile_not_linked": "Mit diesem Benutzerkonto ist kein Kundenprofil verknüpft."

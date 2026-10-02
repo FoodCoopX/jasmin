@@ -10,13 +10,15 @@ from apps.commissioning.utils.composite_id_utils import (
     parse_composite_id,
 )
 
+CODE = "stock.invalid_composite_id"
+
 
 # ---------------------------------------------------------------------------
 # parse_composite_id  (pure function — no DB needed)
 # ---------------------------------------------------------------------------
 class TestParseCompositeId:
     def test_valid_id(self):
-        result = parse_composite_id("abc123_KG_M_store1_2024_10_3")
+        result = parse_composite_id("abc123_KG_M_store1_2024_10_3", code=CODE)
         assert result == {
             "share_article_id": "abc123",
             "unit": "KG",
@@ -28,13 +30,13 @@ class TestParseCompositeId:
         }
 
     def test_none_values_parsed(self):
-        result = parse_composite_id("abc123_KG_None_None_2024_10_3")
+        result = parse_composite_id("abc123_KG_None_None_2024_10_3", code=CODE)
         assert result["size"] is None
         assert result["storage_id"] is None
         assert result["share_article_id"] == "abc123"
 
     def test_all_none_optional_fields(self):
-        result = parse_composite_id("None_None_None_None_2026_1_0")
+        result = parse_composite_id("None_None_None_None_2026_1_0", code=CODE)
         assert result["share_article_id"] is None
         assert result["unit"] is None
         assert result["size"] is None
@@ -45,15 +47,21 @@ class TestParseCompositeId:
 
     def test_too_few_parts_raises_invalid(self):
         with pytest.raises(CompositeIdInvalid, match="expected 7 parts"):
-            parse_composite_id("abc_KG_M")
+            parse_composite_id("abc_KG_M", code=CODE)
 
     def test_too_many_parts_raises_invalid(self):
         with pytest.raises(CompositeIdInvalid, match="expected 7 parts"):
-            parse_composite_id("a_b_c_d_1_2_3_extra")
+            parse_composite_id("a_b_c_d_1_2_3_extra", code=CODE)
 
     def test_non_integer_year_raises_invalid(self):
         with pytest.raises(CompositeIdInvalid):
-            parse_composite_id("abc_KG_M_store_notint_10_3")
+            parse_composite_id("abc_KG_M_store_notint_10_3", code=CODE)
+
+    @pytest.mark.parametrize("composite_id", ["abc_KG_M", "abc_KG_M_store_notint_10_3"])
+    def test_error_carries_the_given_code(self, composite_id):
+        with pytest.raises(CompositeIdInvalid) as excinfo:
+            parse_composite_id(composite_id, code="some.code")
+        assert excinfo.value.code == "some.code"
 
 
 # ---------------------------------------------------------------------------
@@ -88,12 +96,12 @@ class TestBuildCompositeId:
             original["delivery_week"],
             original["day_number"],
         )
-        parsed = parse_composite_id(composite)
+        parsed = parse_composite_id(composite, code=CODE)
         assert parsed == original
 
     def test_roundtrip_with_nones(self):
         composite = build_composite_id("x", None, None, None, 2026, 52, 4)
-        parsed = parse_composite_id(composite)
+        parsed = parse_composite_id(composite, code=CODE)
         assert parsed["share_article_id"] == "x"
         assert parsed["unit"] is None
         assert parsed["size"] is None

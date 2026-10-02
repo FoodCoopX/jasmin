@@ -175,10 +175,7 @@ def enforce_action_quota_batch(
         return []
 
     weekly_cap, _ = resolve_action_rate_limit(tenant, action)
-    now = timezone.now()
-    weekly_count = ActionRateLog.objects.filter(
-        tenant_schema=schema, action=action, created_at__gte=now - timedelta(days=7)
-    ).count()
+    weekly_count = _weekly_count(schema, action)
     actor_pk = getattr(actor, "pk", actor)
     if weekly_count + count > weekly_cap:
         _raise_blocked(schema, action, _WEEKLY, weekly_cap, actor_pk, batch=count)
@@ -194,6 +191,19 @@ def enforce_action_quota_batch(
     return [row.pk for row in created]
 
 
+def remaining_weekly_quota(action: str, *, tenant: Any = None) -> int | None:
+    """How many more ``action`` records the tenant's weekly cap admits now.
+
+    ``None`` where the guards are a no-op (no tenant context, see
+    :func:`enforce_action_quota`), since nothing is capped there.
+    """
+    tenant, schema = _resolve_guarded_tenant(tenant)
+    if schema is None:
+        return None
+    weekly_cap, _ = resolve_action_rate_limit(tenant, action)
+    return max(0, weekly_cap - _weekly_count(schema, action))
+
+
 def release_action_quota(row_ids: list[str]) -> None:
     """Refund reserved batch quota by deleting the given ledger rows.
 
@@ -205,6 +215,14 @@ def release_action_quota(row_ids: list[str]) -> None:
     if not row_ids:
         return
     ActionRateLog.objects.filter(pk__in=row_ids).delete()
+
+
+def _weekly_count(schema: str, action: str) -> int:
+    return ActionRateLog.objects.filter(
+        tenant_schema=schema,
+        action=action,
+        created_at__gte=timezone.now() - timedelta(days=7),
+    ).count()
 
 
 def _raise_blocked(

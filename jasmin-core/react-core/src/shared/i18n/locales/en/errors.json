@@ -14,7 +14,8 @@
     "insufficient": "Not enough stock for this action.",
     "amount_negative": "Amount must not be negative.",
     "amount_not_number": "Amount must be a number.",
-    "inventory_finalized": "This inventory entry is finalized and can no longer be changed or deleted. Unfinalize it first."
+    "inventory_finalized": "This inventory entry is finalized and can no longer be changed or deleted. Unfinalize it first.",
+    "invalid_composite_id": "Invalid stock entry id."
   },
   "subscription": {
     "start_too_soon": "The subscription can't start before {{earliest}} ({{min_weeks}} week(s) lead time).",
@@ -324,7 +325,9 @@
     "not_found": "Inventory entry not found."
   },
   "data_import": {
-    "invalid": "The uploaded file could not be imported — please check the file and try again."
+    "invalid": "The uploaded file could not be imported — please check the file and try again.",
+    "too_many_rows": "The file has more than {{max_rows}} rows; an import takes at most {{max_rows}} rows. Please split the file.",
+    "over_member_limit": "The file has more than {{max_rows}} rows and more members than the weekly limit for new members still allows ({{remaining}}). Splitting it won't help: a platform administrator has to raise the limit first."
   },
   "customer": {
     "profile_not_linked": "No customer profile is linked to this user account."

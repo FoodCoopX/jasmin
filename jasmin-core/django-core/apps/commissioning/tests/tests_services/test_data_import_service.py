@@ -39,6 +39,18 @@ from apps.commissioning.services.data_import import (
     import_rows_from_csv,
 )
 from apps.commissioning.tests.factories import JasminUserFactory
+from apps.shared.tenants.models import RateLimitedAction
+from apps.shared.tenants.rate_limits import remaining_weekly_quota
+
+
+@pytest.fixture
+def restore_overrides(tenant):
+    # ``tenant`` is one object for the whole session; an override set in a test
+    # must not reach later ones.
+    original = tenant.action_rate_limit_overrides
+    yield
+    tenant.action_rate_limit_overrides = original
+
 
 # ---------------------------------------------------------------------------
 # Pure helpers — no DB, no fixtures needed
@@ -290,7 +302,9 @@ class TestImportRowsFromCsv:
         # (header row + 1).
         assert result.results[0]["row"] == 2
 
-    def test_member_import_over_weekly_cap_is_refused_up_front(self, tenant):
+    def test_member_import_over_weekly_cap_is_refused_up_front(
+        self, tenant, restore_overrides
+    ):
         """A member CSV whose size would blow the weekly MEMBER_CREATION cap is
         refused before any row is written (the import must not partially apply),
         closing the bulk-import bypass of the interactive create cap."""
@@ -912,8 +926,46 @@ class TestRowCap:
         with pytest.raises(DataImportInvalid) as exc_info:
             import_rows_from_csv("crate", csv_bytes)
 
-        assert str(_MAX_IMPORT_ROWS) in str(exc_info.value)
+        assert exc_info.value.code == "data_import.too_many_rows"
+        assert exc_info.value.details == {"max_rows": _MAX_IMPORT_ROWS}
         assert not Crate.objects.exists()
+
+    def test_an_over_cap_member_file_past_the_weekly_budget_is_not_told_to_split(
+        self, tenant, restore_overrides
+    ):
+        # Every part of a split file draws on the same weekly member budget, so
+        # with less than a file's worth left, splitting can't get it in.
+        tenant.action_rate_limit_overrides = {"member_creation": {"weekly": 1000}}
+        remaining = remaining_weekly_quota(RateLimitedAction.MEMBER_CREATION)
+
+        with pytest.raises(DataImportInvalid) as exc_info:
+            import_rows_from_csv("member", _oversized_member_csv())
+
+        assert exc_info.value.code == "data_import.over_member_limit"
+        assert exc_info.value.details == {
+            "max_rows": _MAX_IMPORT_ROWS,
+            "remaining": remaining,
+        }
+        assert not Member.objects.filter(last_name="Oversized").exists()
+
+    def test_an_over_cap_member_file_within_a_raised_budget_is_told_to_split(
+        self, tenant, restore_overrides
+    ):
+        tenant.action_rate_limit_overrides = {"member_creation": {"weekly": 20000}}
+
+        with pytest.raises(DataImportInvalid) as exc_info:
+            import_rows_from_csv("member", _oversized_member_csv())
+
+        assert exc_info.value.code == "data_import.too_many_rows"
+
+
+def _oversized_member_csv() -> bytes:
+    return _member_csv(
+        *(
+            f"Member{i},Oversized,member{i}@example.org,{i + 1},false"
+            for i in range(_MAX_IMPORT_ROWS + 1)
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

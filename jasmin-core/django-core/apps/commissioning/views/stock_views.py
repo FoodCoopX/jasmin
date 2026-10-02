@@ -253,9 +253,8 @@ class CurrentStockComparisonView(APIViewRolePermissionsMixin, APIView):
     )
     @transaction.atomic
     def patch(self, request: Request, composite_id: str) -> Response:
-        # parse_composite_id raises CompositeIdInvalid (canonical 400,
-        # code="stock.invalid_composite_id") — let it propagate, no re-wrap.
-        parsed = parse_composite_id(composite_id)
+        # CompositeIdInvalid (a canonical 400) propagates, no re-wrap.
+        parsed = parse_composite_id(composite_id, code="stock.invalid_composite_id")
 
         metadata = _validated_inventory_metadata(request)
         amount = _parse_counted_amount(request)
@@ -488,9 +487,8 @@ class CurrentStockComparisonView(APIViewRolePermissionsMixin, APIView):
     )
     @transaction.atomic
     def delete(self, request: Request, composite_id: str) -> Response:
-        # parse_composite_id raises CompositeIdInvalid (canonical 400,
-        # code="stock.invalid_composite_id") — let it propagate, no re-wrap.
-        parsed = parse_composite_id(composite_id)
+        # CompositeIdInvalid (a canonical 400) propagates, no re-wrap.
+        parsed = parse_composite_id(composite_id, code="stock.invalid_composite_id")
 
         inventory_date = _ywd_to_datetime(
             parsed["year"], parsed["delivery_week"], parsed["day_number"]
@@ -597,7 +595,7 @@ def _group_composite_ids(
 
     for composite_id in composite_ids:
         try:
-            parsed = parse_composite_id(composite_id)
+            parsed = parse_composite_id(composite_id, code="stock.invalid_composite_id")
             group_key = (
                 parsed["year"],
                 parsed["delivery_week"],
@@ -997,7 +995,7 @@ def _pre_acquire_entity_locks(composite_ids: list[str]) -> None:
     entity_keys: list[tuple] = []
     for composite_id in composite_ids:
         try:
-            parsed = parse_composite_id(composite_id)
+            parsed = parse_composite_id(composite_id, code="stock.invalid_composite_id")
         except (ValueError, CompositeIdInvalid):
             continue
         entity_keys.append(
@@ -1131,7 +1129,7 @@ def bulk_set_to_zero_current_stock(request: Request) -> Response:
 
     for composite_id in composite_ids:
         try:
-            parsed = parse_composite_id(composite_id)
+            parsed = parse_composite_id(composite_id, code="stock.invalid_composite_id")
             # Per-item savepoint: a DB error rolls back only this item and keeps
             # the connection usable, instead of poisoning the view's outer atomic
             # and 500-ing the whole batch on one bad row.

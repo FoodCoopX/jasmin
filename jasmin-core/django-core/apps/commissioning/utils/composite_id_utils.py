@@ -44,21 +44,21 @@ def parse_composite_pk(
     return result
 
 
-def parse_composite_id(
-    composite_id: str, *, code: str = "stock.invalid_composite_id"
-) -> dict[str, Any]:
+def parse_composite_id(composite_id: str, *, code: str) -> dict[str, Any]:
     """Parse the 7-part CurrentStock composite id into a dict.
 
     Format: ``share_article_id_unit_size_storage_id_year_week_day``. Raises
-    ``CompositeIdInvalid`` (400) on a wrong part count or a bad year/week/day
-    cast.
+    ``CompositeIdInvalid`` (400, with the given ``code``) on a wrong part count
+    or a bad year/week/day cast.
 
     (The 5-part planning ids use :func:`parse_composite_pk`; this variant stays
     separate because it decodes the CurrentStock ``"None"`` sentinel for the
     optional article/unit/size/storage parts.)
 
     Example:
-        >>> parse_composite_id("abc123_kg_M_store1_2024_10_3")
+        >>> parse_composite_id(
+        ...     "abc123_kg_M_store1_2024_10_3", code="stock.invalid_composite_id"
+        ... )
         {"share_article_id": "abc123", "unit": "kg", "size": "M",
          "storage_id": "store1", "year": 2024, "delivery_week": 10,
          "day_number": 3}

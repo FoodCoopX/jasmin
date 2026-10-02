@@ -448,6 +448,35 @@ def _dry_run_scope(dry_run: bool):
             transaction.set_rollback(True)
 
 
+def _too_many_rows(model_name: str) -> DataImportInvalid:
+    """The error for an upload of more than ``_MAX_IMPORT_ROWS`` rows.
+
+    Splitting the file is the fix, except for members past the weekly
+    member-creation budget: every part draws on that one budget, so a file
+    bigger than what is left of it can't get in this week however it is split.
+    """
+    if model_name == "member":
+        from apps.shared.tenants.models import RateLimitedAction
+        from apps.shared.tenants.rate_limits import remaining_weekly_quota
+
+        remaining = remaining_weekly_quota(RateLimitedAction.MEMBER_CREATION)
+        if remaining is not None and remaining <= _MAX_IMPORT_ROWS:
+            return DataImportInvalid(
+                f"CSV has more than {_MAX_IMPORT_ROWS} data rows, more members "
+                f"than the {remaining} the weekly member limit still allows. "
+                "Splitting the file won't get them in; a platform administrator "
+                "has to raise the limit first.",
+                code="data_import.over_member_limit",
+                details={"max_rows": _MAX_IMPORT_ROWS, "remaining": remaining},
+            )
+    return DataImportInvalid(
+        f"CSV has more than {_MAX_IMPORT_ROWS} data rows; imports are capped at "
+        f"{_MAX_IMPORT_ROWS} rows per upload. Split the file.",
+        code="data_import.too_many_rows",
+        details={"max_rows": _MAX_IMPORT_ROWS},
+    )
+
+
 def import_rows_from_csv(
     model_name: str,
     file_bytes: bytes,
@@ -489,10 +518,7 @@ def import_rows_from_csv(
 
     headers, data_lines, first_data_row_number = _split_template_rows(all_lines)
     if len(data_lines) > _MAX_IMPORT_ROWS:
-        raise DataImportInvalid(
-            f"CSV has more than {_MAX_IMPORT_ROWS} data rows; imports are "
-            f"capped at {_MAX_IMPORT_ROWS} rows per upload. Split the file."
-        )
+        raise _too_many_rows(model_name)
     reserved_member_quota_ids: list[str] = []
     if model_name == "member" and not dry_run:
         # The interactive create path (MemberViewSet.create) is volume-capped, so

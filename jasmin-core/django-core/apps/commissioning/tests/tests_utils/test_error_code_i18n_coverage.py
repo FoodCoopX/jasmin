@@ -93,7 +93,9 @@ IGNORED_APPS = frozenset({"cultivation", "economics", "staff"})
 # inline ``code=`` on a call to one of these reaches the wire as the envelope
 # code, exactly like constructing the error directly). Kept as a small explicit
 # allowlist because they can't be discovered from errors.py.
-_CODE_FORWARDING_HELPERS = frozenset({"assert_not_finalized", "parse_composite_pk"})
+_CODE_FORWARDING_HELPERS = frozenset(
+    {"assert_not_finalized", "parse_composite_id", "parse_composite_pk"}
+)
 
 # Codes that intentionally pass through to DRF/Django's server-side
 # translations and shouldn't be translated again on the frontend.

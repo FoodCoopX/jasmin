@@ -56,4 +56,51 @@ come last, once every station exists and has its delivery days.
 
 Once these five are in place the operational screens (forecast, harvesting list,
 packing list, station overview) have everything they need, and members can be
-imported or invited.
+imported or invited. For an onboarding of more than 1000 members, do step 6
+first.
+
+## 6. Before a large import: raise the weekly limits
+
+Each tenant can create at most 1000 members, invite 1000 users and confirm 1000
+subscriptions in any 7 days. The limits stop a compromised office account from
+flooding the tenant, but a bigger onboarding runs into them:
+
+- A member import reserves one slot per row up front and refuses the whole file
+  if its rows don't fit into what is left of the week. Splitting the file
+  doesn't help: every part draws on the same weekly limit.
+- Inviting a member to their account and confirming a subscription count one
+  each.
+
+Only the platform operator can raise the limits. They are stored on the
+tenant's platform record (`Tenant.action_rate_limit_overrides`), out of the
+office's reach on purpose. Before the import, raise them on the server, with
+headroom over the number of members; replace `<schema>` with the tenant's
+schema name:
+
+```shell
+docker compose exec backend python manage.py shell -c "
+from apps.shared.tenants.models import Tenant
+tenant = Tenant.objects.get(schema_name='<schema>')
+tenant.action_rate_limit_overrides = {
+    'member_creation': {'weekly': 5000},
+    'user_creation': {'weekly': 5000},
+    'subscription_confirmation': {'weekly': 5000},
+}
+tenant.save(update_fields=['action_rate_limit_overrides'])
+"
+```
+
+A single upload takes at most 5000 rows, so split a bigger file once the limits
+are raised.
+
+When the onboarding is done, put the limits back so the protective defaults
+apply again. If the tenant had overrides before, restore those instead:
+
+```shell
+docker compose exec backend python manage.py shell -c "
+from apps.shared.tenants.models import Tenant
+tenant = Tenant.objects.get(schema_name='<schema>')
+tenant.action_rate_limit_overrides = {}
+tenant.save(update_fields=['action_rate_limit_overrides'])
+"
+```
