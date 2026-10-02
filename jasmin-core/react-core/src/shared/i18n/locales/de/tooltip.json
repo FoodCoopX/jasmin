@@ -46,7 +46,7 @@
   "undo": "Letzte Änderung rückgängig machen",
   "sidebar_collapse": "Seitenleiste einklappen",
   "member_number": "Die Mitgliedsnummer wird automatisch vergeben, wenn das Mitglied freigegeben wird.",
-  "locked_setting_tooltip": "Diese Einstellung ist gesperrt, weil sie Auswirkungen auf die Nummerierung von Dokumenten hat. Sie kann nur am Jahreswechsel geändert werden, wenn die Nummerierung zurückgesetzt wird.",
+  "locked_setting_tooltip": "Diese Einstellung ist gesperrt, weil es schon Dokumente dieser Art gibt — eine Änderung würde ihre Nummernfolge brechen. Solange es nur Entwürfe gibt, gibt das Löschen aller Entwürfe sie wieder frei; ab dem ersten finalisierten Dokument bleibt sie fest.",
   "order_number": "Wenn die Bestellung nicht festgeschrieben ist, hat sie eine vorläufige Bestellnummer, mit Suffix v, damit später keine möglichen Lücken entstehen.",
   "order_days": "Erntetag, Waschtag, Putztag und Kommissionierungstag für diese Bestellung. Weichen sie von den Standardwerten des Wiederverkäufers ab, werden sie rot hervorgehoben. Nach dem Anlegen der Bestellung sind sie nicht mehr änderbar.",
   "delivery_note_number": "Wenn der Lieferschein nicht finalisiert ist, hat er eine vorläufige Nummer, mit Suffix v.",

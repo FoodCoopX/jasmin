@@ -2,32 +2,36 @@ import dayjs from "dayjs";
 import { useMemo } from "react";
 import { useTenant } from "./useTenant";
 
-// Fallback creation year when the tenant record carries no ``created_at`` (e.g.
-// the anonymous ``/tenants/current/`` payload). The selectable window spans this
-// many years starting at the tenant's creation year.
-const DEFAULT_TENANT_CREATION_YEAR = 2025;
-const YEAR_WINDOW = 3;
+// The fewest years the selectors offer, counted from the tenant's creation year.
+const MIN_YEAR_WINDOW = 3;
 
 /**
  * Single source of truth for the year range the Year / Week selectors offer:
- * the tenant's creation year (or the default fallback) plus a fixed forward
- * window. Both selectors must present the same range, so they read it here
- * instead of each re-deriving the magic fallback + ``Array.from`` window.
+ * from the tenant's creation year through next year (at least three years), so
+ * the current season and the next stay selectable however old the tenant is.
+ * Without a ``created_at`` (e.g. the anonymous ``/tenants/current/`` payload)
+ * the range starts at the current year. Both selectors must present the same
+ * range, so they read it here.
  */
 export function useTenantYearOptions() {
   const { tenant } = useTenant();
+  const currentYear = dayjs().year();
 
   const tenantCreationYear = tenant?.created_at
     ? dayjs(tenant.created_at as string).year()
-    : DEFAULT_TENANT_CREATION_YEAR;
+    : currentYear;
+  const lastYear = Math.max(
+    tenantCreationYear + MIN_YEAR_WINDOW - 1,
+    currentYear + 1,
+  );
 
   const yearOptions = useMemo(
     () =>
-      Array.from({ length: YEAR_WINDOW }, (_, index) => ({
-        value: index + tenantCreationYear,
-        label: index + tenantCreationYear,
+      Array.from({ length: lastYear - tenantCreationYear + 1 }, (_, index) => ({
+        value: tenantCreationYear + index,
+        label: tenantCreationYear + index,
       })),
-    [tenantCreationYear],
+    [tenantCreationYear, lastYear],
   );
 
   return { tenantCreationYear, yearOptions };

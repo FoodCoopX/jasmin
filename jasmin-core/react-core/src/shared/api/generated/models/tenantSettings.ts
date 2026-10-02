@@ -221,7 +221,7 @@ export interface TenantSettings {
    */
   billing_due_day_of_month?: number;
   /**
-   * Default day of month on which the bank should execute SEPA direct-debit collections. Used to derive the RequestedCollectionDate when an office user creates a billing run by month. Adjusted forward for SEPA lead times and TARGET banking days.
+   * Default day of month on which the bank should execute SEPA direct-debit collections. The billing-run form pre-fills the collection date with this day of the chosen month (today, if that day has passed); the office can change it. Nothing moves it for SEPA lead times or TARGET banking days.
    * @minimum 1
    * @maximum 28
    */

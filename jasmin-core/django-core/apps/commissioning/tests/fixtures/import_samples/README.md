@@ -59,8 +59,9 @@ per-row.
 > path: don't import coop shares for members who have already left, unless you
 > then cancel them by hand.
 
-`email` is unique, so re-uploading the same file reports per-row conflicts on the
-second run.
+Re-uploading the same file reports a per-row conflict for every row that carries
+a `member_number`, since the number is unique. Rows without one are imported
+again as new members, so don't re-upload a file that has already gone in.
 
 ## `subscriptions_sample.csv`
 

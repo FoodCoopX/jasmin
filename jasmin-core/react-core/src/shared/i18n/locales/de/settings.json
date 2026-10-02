@@ -290,14 +290,14 @@
     "order_prefix": "Bestellnummern-Präfix",
     "order_prefix_desc": "Präfix für Bestellnummern (z.B. BE-2024-001)",
     "order_numbers_reset": "Bestellnummern bei Jahreswechsel zurücksetzen",
-    "order_numbers_reset_desc": "Bestellnummerierung jedes Jahr bei 1 beginnen",
+    "order_numbers_reset_desc": "Bestellnummerierung jedes Jahr bei 1 beginnen. Wird mit der ersten Bestellung festgelegt.",
     "delivery_note_prefix": "Lieferschein-Präfix",
     "delivery_note_reset": "Lieferscheinnummern bei Jahreswechsel zurücksetzen",
-    "delivery_note_numbers_reset_desc": "Lieferscheinnummerierung jedes Jahr bei 1 beginnen",
+    "delivery_note_numbers_reset_desc": "Lieferscheinnummerierung jedes Jahr bei 1 beginnen. Wird mit dem ersten Lieferschein festgelegt.",
     "invoice_prefix": "Rechnungsnummern-Präfix",
     "correction_prefix": "Korrekturrechnung-Präfix",
     "invoice_reset": "Rechnungsnummern bei Jahreswechsel zurücksetzen",
-    "invoice_numbers_reset_desc": "Rechnungsnummerierung jedes Jahr bei 1 beginnen",
+    "invoice_numbers_reset_desc": "Rechnungsnummerierung jedes Jahr bei 1 beginnen. Wird mit der ersten Rechnung festgelegt.",
     "offer_settings": {
       "title": "Angebots-Einstellungen",
       "description": "Konfiguration der Preisstaffeln für Angebote an Wiederverkäufer. Es können bis zu drei Staffeln definiert werden."

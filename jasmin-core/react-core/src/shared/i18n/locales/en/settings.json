@@ -287,14 +287,14 @@
     "order_prefix": "Order Number Prefix",
     "order_prefix_desc": "Prefix for order numbers (e.g. OR-2024-001)",
     "order_numbers_reset": "Reset Order Numbers at Year End",
-    "order_numbers_reset_desc": "Start order numbering at 1 each year",
+    "order_numbers_reset_desc": "Start order numbering at 1 each year. Fixed once the first order exists.",
     "delivery_note_prefix": "Delivery Note Prefix",
     "delivery_note_reset": "Reset Delivery Note Numbers at Year End",
-    "delivery_note_numbers_reset_desc": "Start delivery note numbering at 1 each year",
+    "delivery_note_numbers_reset_desc": "Start delivery note numbering at 1 each year. Fixed once the first delivery note exists.",
     "invoice_prefix": "Invoice Number Prefix",
     "correction_prefix": "Correction Invoice Prefix",
     "invoice_reset": "Reset Invoice Numbers at Year End",
-    "invoice_numbers_reset_desc": "Start invoice numbering at 1 each year",
+    "invoice_numbers_reset_desc": "Start invoice numbering at 1 each year. Fixed once the first invoice exists.",
     "offer_settings": {
       "title": "Offer Settings",
       "description": "Configuration of price tiers for offers to resellers. Up to three tiers can be defined."

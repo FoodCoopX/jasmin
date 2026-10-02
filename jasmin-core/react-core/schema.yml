@@ -42785,9 +42785,10 @@ components:
           maximum: 28
           minimum: 1
           description: Default day of month on which the bank should execute SEPA
-            direct-debit collections. Used to derive the RequestedCollectionDate when
-            an office user creates a billing run by month. Adjusted forward for SEPA
-            lead times and TARGET banking days.
+            direct-debit collections. The billing-run form pre-fills the collection
+            date with this day of the chosen month (today, if that day has passed);
+            the office can change it. Nothing moves it for SEPA lead times or TARGET
+            banking days.
         require_admin_approval_for_gdpr_deletion:
           type: boolean
           description: If on (default), every deletion request needs an office/admin
@@ -43082,9 +43083,10 @@ components:
           maximum: 28
           minimum: 1
           description: Default day of month on which the bank should execute SEPA
-            direct-debit collections. Used to derive the RequestedCollectionDate when
-            an office user creates a billing run by month. Adjusted forward for SEPA
-            lead times and TARGET banking days.
+            direct-debit collections. The billing-run form pre-fills the collection
+            date with this day of the chosen month (today, if that day has passed);
+            the office can change it. Nothing moves it for SEPA lead times or TARGET
+            banking days.
         require_admin_approval_for_gdpr_deletion:
           type: boolean
           description: If on (default), every deletion request needs an office/admin

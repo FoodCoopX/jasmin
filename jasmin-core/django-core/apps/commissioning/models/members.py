@@ -141,10 +141,9 @@ class Member(
         indexes = [
             # Keep only indexes that aren't subsumed by larger composites.
             # ``last_name, first_name`` covers "last_name only" too;
-            # ``is_trial, is_active`` covers "is_active only". The
-            # ``member_number`` and ``email`` equality lookups (login/recovery)
-            # are already served by their ``unique=True`` B-tree indexes — no
-            # explicit Index needed (an extra one is pure write amplification).
+            # ``is_trial, is_active`` covers "is_active only". ``member_number``
+            # lookups are already served by its ``unique=True`` B-tree index —
+            # no explicit Index needed (an extra one is pure write amplification).
             models.Index(fields=["is_trial", "is_active"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["last_name", "first_name"]),

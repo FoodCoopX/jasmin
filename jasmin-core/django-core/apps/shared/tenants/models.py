@@ -553,6 +553,12 @@ class TenantSettings(JasminModel):
         max_digits=5, decimal_places=2, blank=True, null=True
     )
     early_payment_discount_days = models.PositiveIntegerField(blank=True, null=True)
+    # The three ``*_numbers_start_new_at_year_change`` flags choose between one
+    # running sequence and a per-year one with the year in the prefix. Flipping
+    # one after documents of its type exist breaks the visible sequence (RE-1 …
+    # RE-50, then RE-2026-51), so the settings API refuses the change while any
+    # exist (``_validate_year_numbering_locks``). Nothing else enforces it: don't
+    # change these from a shell or with SQL either.
     order_numbers_start_new_at_year_change = models.BooleanField(default=False)
     order_number_prefix = models.CharField(max_length=10, default="BE")
     delivery_note_numbers_start_new_at_year_change = models.BooleanField(default=False)
@@ -657,9 +663,10 @@ class TenantSettings(JasminModel):
         validators=[MinValueValidator(1), MaxValueValidator(28)],
         help_text=(
             "Default day of month on which the bank should execute SEPA "
-            "direct-debit collections. Used to derive the RequestedCollectionDate "
-            "when an office user creates a billing run by month. Adjusted "
-            "forward for SEPA lead times and TARGET banking days."
+            "direct-debit collections. The billing-run form pre-fills the "
+            "collection date with this day of the chosen month (today, if that "
+            "day has passed); the office can change it. Nothing moves it for "
+            "SEPA lead times or TARGET banking days."
         ),
     )
 
