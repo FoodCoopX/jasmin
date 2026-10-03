@@ -25,6 +25,7 @@ from ..errors import (
     CommissioningError,
     CrateNotFound,
     ForecastNotFound,
+    PlotInUse,
     ShareArticleNotFound,
 )
 from ..models import (
@@ -68,7 +69,7 @@ from ..services import (
 from ..utils.lookup import get_or_404
 from ..utils.query_params import DOCUMENTATION_MODELS, validate_query_params
 from ..utils.validation_utils import parse_bulk_ids
-from .base_viewsets import BaseArchivableViewSet
+from .base_viewsets import BaseArchivableViewSet, CanBeDeletedDestroyMixin
 
 _EXPORT_DATE_PARAMETERS = [
     *EXPORT_DATE_RANGE_PARAMETERS,
@@ -232,10 +233,13 @@ def _summary_echo_response(
     return Response(row, status=status_code)
 
 
-class PlotViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
+class PlotViewSet(
+    CanBeDeletedDestroyMixin, RolePermissionsMixin, viewsets.ModelViewSet
+):
     read_permission = IsStaff
     write_permission = IsOffice
     serializer_class = PlotSerializer
+    not_deletable_error = PlotInUse
 
     @extend_schema(parameters=[get_is_active_parameter()])
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:

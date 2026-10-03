@@ -21,6 +21,7 @@ URL surface (registered in ``urls.py`` via ``DefaultRouter``):
 
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import contextmanager
 from typing import Any
@@ -49,7 +50,8 @@ from apps.shared.openapi_params import catalogue_parameter
 from apps.shared.query_params import parse_body_bool
 from apps.shared.request_utils import body, client_ip
 from apps.shared.tenants.errors import SchemaAlreadyExists
-from apps.shared.tenants.models import Domain, Tenant
+from apps.shared.tenants.models import Domain, RateLimitedAction, Tenant
+from apps.shared.tenants.rate_limits import DEFAULT_ACTION_RATE_LIMITS
 from core.errors import BadRequestError, NotFoundError
 from core.serializers import ErrorResponseSerializer
 
@@ -148,10 +150,12 @@ class TenantManagementViewSet(ViewSet):
     # session must not fire any of them without a fresh password re-confirmation.
     # Keep the set small and named so an audit can list "gated by step-up" at a
     # glance. ``partial_update`` is gated conditionally (see get_permissions) —
-    # only when it flips the ``is_active`` kill-switch.
+    # only when it flips the ``is_active`` kill-switch or changes the tenant's
+    # rate-limit caps.
     _STEP_UP_ACTIONS = frozenset(
         {"create", "update_user_roles", "create_admin", "create_user"}
     )
+    _STEP_UP_UPDATE_FIELDS = frozenset({"is_active", "action_rate_limit_overrides"})
 
     def get_permissions(self):
         from apps.accounts.permissions import RequiresStepUp
@@ -160,9 +164,10 @@ class TenantManagementViewSet(ViewSet):
         if self.action in self._STEP_UP_ACTIONS:
             perms.append(RequiresStepUp())
         # Deactivating / reactivating a tenant (the is_active kill-switch) is a
-        # high-blast-radius mutation a stolen session must not fire un-confirmed;
-        # name/description edits via partial_update stay ungated.
-        elif self.action == "partial_update" and "is_active" in (
+        # high-blast-radius mutation a stolen session must not fire
+        # un-confirmed, and so is raising the caps that hold a compromised
+        # office account's floods back; name/description edits stay ungated.
+        elif self.action == "partial_update" and self._STEP_UP_UPDATE_FIELDS & set(
             self.request.data or {}
         ):
             perms.append(RequiresStepUp())
@@ -393,6 +398,17 @@ class TenantManagementViewSet(ViewSet):
                         ],
                         "created_on": tenant.created_at,
                         "is_active": tenant.is_active,
+                        "action_rate_limit_defaults": [
+                            {
+                                "action": action.value,
+                                "display_name": action.label,
+                                **DEFAULT_ACTION_RATE_LIMITS[action],
+                            }
+                            for action in RateLimitedAction
+                        ],
+                        "action_rate_limit_overrides": (
+                            tenant.action_rate_limit_overrides
+                        ),
                     },
                     status=status.HTTP_200_OK,
                 )
@@ -431,6 +447,11 @@ class TenantManagementViewSet(ViewSet):
                     tenant.description = validated["description"]
                 if "is_active" in validated:
                     tenant.is_active = validated["is_active"]
+                previous_overrides = tenant.action_rate_limit_overrides
+                if "action_rate_limit_overrides" in validated:
+                    tenant.action_rate_limit_overrides = validated[
+                        "action_rate_limit_overrides"
+                    ]
 
                 tenant.save()
 
@@ -440,9 +461,23 @@ class TenantManagementViewSet(ViewSet):
                     tenant.schema_name,
                     client_ip(request),
                     sorted(
-                        set(validated.keys()) & {"name", "description", "is_active"}
+                        set(validated.keys())
+                        & {
+                            "name",
+                            "description",
+                            "is_active",
+                            "action_rate_limit_overrides",
+                        }
                     ),
                 )
+                if "action_rate_limit_overrides" in validated:
+                    logger.info(
+                        "tenant.rate_limits_changed actor=%s schema=%s from=%s to=%s",
+                        request.user.id,
+                        tenant.schema_name,
+                        json.dumps(previous_overrides, sort_keys=True),
+                        json.dumps(tenant.action_rate_limit_overrides, sort_keys=True),
+                    )
 
                 return Response(
                     {

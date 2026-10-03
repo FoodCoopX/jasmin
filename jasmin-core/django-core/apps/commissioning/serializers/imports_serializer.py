@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.core.validators import FileExtensionValidator
 from rest_framework import serializers
 
+from ..errors import ExternalCodeMappingTargetMissing
 from ..models import (
     ExternalCodeMapping,
     ExternalShareDemand,
@@ -14,6 +15,26 @@ class ExternalCodeMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExternalCodeMapping
         fields = ["id", "kind", "external_code", "internal_id", "note"]
+
+    def validate(self, attrs):
+        """Refuse an ``internal_id`` with no object of the mapping's kind: a
+        mistyped id would otherwise only surface weeks later, as a feed row
+        that fails for a reason that names something else."""
+        attrs = super().validate(attrs)
+        kind = attrs.get("kind", getattr(self.instance, "kind", None))
+        internal_id = attrs.get(
+            "internal_id", getattr(self.instance, "internal_id", None)
+        )
+        if kind not in dict(ExternalCodeMapping.KIND_CHOICES):
+            return attrs
+        target = ExternalCodeMapping.target_model(kind)
+        if not target.objects.filter(pk=internal_id).exists():
+            raise ExternalCodeMappingTargetMissing(
+                f"No {target.__name__} has the id {internal_id!r}.",
+                field="internal_id",
+                details={"kind": kind, "internal_id": internal_id},
+            )
+        return attrs
 
 
 class ShareImportBatchSerializer(serializers.ModelSerializer):

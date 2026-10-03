@@ -1034,6 +1034,84 @@ class TestRaggedRows:
 
 
 @pytest.mark.django_db
+class TestDelimiter:
+    """A spreadsheet saved as CSV in German separates columns with semicolons;
+    the header row tells the importer which separator a file uses."""
+
+    def _validate(self, data: bytes):
+        batch = ShareImportService.ingest_upload(
+            file_bytes=data,
+            original_filename="feed.csv",
+            year=2026,
+            delivery_week=15,
+            uploaded_by=JasminUserFactory(roles=["office"]),
+        )
+        return ShareImportService.parse_and_validate(batch)
+
+    def test_a_semicolon_file_parses(self, import_world):
+        outcome = self._validate(
+            "\ufeffyear;delivery_week;delivery_station_code;delivery_day_code;"
+            "variation_code;quantity\r\n"
+            "2026;15;STN-1;WED;VEG-M;4\r\n".encode()
+        )
+
+        assert outcome.errors == {}
+        assert [(row.row_number, row.quantity) for row in outcome.rows] == [(1, 4)]
+
+    def test_a_comma_file_still_parses(self, import_world):
+        outcome = self._validate(
+            _csv_bytes(
+                [
+                    {
+                        "year": 2026,
+                        "delivery_week": 15,
+                        "delivery_station_code": "STN-1",
+                        "delivery_day_code": "WED",
+                        "variation_code": "VEG-M",
+                        "quantity": 3,
+                    }
+                ]
+            )
+        )
+
+        assert outcome.errors == {}
+        assert [row.quantity for row in outcome.rows] == [3]
+
+
+@pytest.mark.django_db
+class TestMappingToAMissingObject:
+    def test_the_row_names_the_mapping(self, import_world):
+        ExternalCodeMapping.objects.filter(external_code="VEG-M").update(
+            internal_id="missing00000"
+        )
+        batch = ShareImportService.ingest_upload(
+            file_bytes=_csv_bytes(
+                [
+                    {
+                        "year": 2026,
+                        "delivery_week": 15,
+                        "delivery_station_code": "STN-1",
+                        "delivery_day_code": "WED",
+                        "variation_code": "VEG-M",
+                        "quantity": 2,
+                    }
+                ]
+            ),
+            original_filename="stale.csv",
+            year=2026,
+            delivery_week=15,
+            uploaded_by=JasminUserFactory(roles=["office"]),
+        )
+
+        outcome = ShareImportService.parse_and_validate(batch)
+
+        assert outcome.errors["1"] == [
+            "variation_code 'VEG-M' is mapped to 'missing00000', but no variation "
+            "has that id — correct the mapping"
+        ]
+
+
+@pytest.mark.django_db
 class TestTerminalBatchStatus:
     """An applied batch's rows ARE the week's demand; a superseded batch's were
     replaced by a later one. Re-running a stage on either would rewrite the week

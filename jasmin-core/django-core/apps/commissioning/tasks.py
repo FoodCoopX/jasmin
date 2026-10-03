@@ -377,6 +377,33 @@ def run_bulk_invoice_reminder_send(
         )
 
 
+@db_task(retries=0)
+def run_bulk_document_send(
+    *,
+    schema_name: str,
+    job_id: str,
+    order_ids: list[str],
+    model: str,
+) -> None:
+    """Bulk-send invoices or delivery notes (``model``) to their resellers.
+
+    Runs under the real tenant, not the worker's schema-only FakeTenant: the
+    per-document send reads the tenant's name, bank details and settings to
+    build each email, exactly as it does in a request.
+    """
+    from django_tenants.utils import get_tenant_model, tenant_context
+
+    from apps.commissioning.services.document_email import bulk_send_documents
+    from apps.notifications.jobs import run_job
+
+    with run_job(schema_name, job_id) as job:
+        tenant = get_tenant_model().objects.get(schema_name=schema_name)
+        with tenant_context(tenant):
+            job.result = bulk_send_documents(
+                order_ids=order_ids, model=model, progress_cb=job.progress
+            )
+
+
 @db_periodic_task(crontab(minute="*/30"), retries=1, retry_delay=120)
 def expire_stale_waiting_list_offers() -> None:
     """Expire spot-available waiting-list offers whose response window lapsed,

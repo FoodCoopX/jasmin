@@ -39,7 +39,10 @@ from django.core.mail import mail_admins
 from django.db import transaction
 from django.utils import timezone
 
-from apps.shared.tenants.errors import ActionRateLimitExceeded
+from apps.shared.tenants.errors import (
+    ActionRateLimitExceeded,
+    TenantRateLimitsInvalid,
+)
 from apps.shared.tenants.models import ActionRateLog, RateLimitedAction
 from core.tenant_db import connection
 
@@ -73,6 +76,10 @@ DEFAULT_ACTION_RATE_LIMITS: dict[str, dict[str, int]] = {
     RateLimitedAction.SUBSCRIPTION_CONFIRMATION: {_WEEKLY: 1000, _PER_MINUTE: 30},
 }
 
+# The largest cap an override may set: far above any real volume, and low
+# enough that a slip of the keyboard can't switch a cap off in effect.
+MAX_ACTION_RATE_LIMIT = 100_000
+
 # Emit a (non-blocking) ops alert once weekly volume crosses this fraction of
 # the cap, so a human is warned BEFORE the wall — and notices if the wall ever
 # starts biting legitimate year-end batches.
@@ -103,6 +110,48 @@ def resolve_action_rate_limit(tenant: Any, action: str) -> tuple[int, int]:
         return value if value > 0 else default[key]
 
     return _bound(_WEEKLY), _bound(_PER_MINUTE)
+
+
+def validate_action_rate_limit_overrides(value: Any) -> dict[str, dict[str, int]]:
+    """Return ``value`` as clean overrides —
+    ``{"<action>": {"weekly": int, "per_minute": int}}`` — or raise
+    :class:`TenantRateLimitsInvalid`.
+
+    Every key must be a :class:`RateLimitedAction` and every bound a whole
+    number from 1 to ``MAX_ACTION_RATE_LIMIT``. A bound that is left out or
+    ``null`` keeps the default, and an action without a bound is dropped.
+    """
+    if not isinstance(value, dict):
+        raise TenantRateLimitsInvalid(
+            "Rate-limit overrides must be an object mapping actions to caps."
+        )
+    cleaned: dict[str, dict[str, int]] = {}
+    for action, bounds in value.items():
+        if action not in RateLimitedAction.values:
+            raise TenantRateLimitsInvalid(
+                f"Unknown rate-limited action: {action}", details={"action": action}
+            )
+        if not isinstance(bounds, dict) or set(bounds) - {_WEEKLY, _PER_MINUTE}:
+            raise TenantRateLimitsInvalid(
+                f"The caps of {action} must be an object with weekly and/or "
+                "per_minute.",
+                details={"action": action},
+            )
+        caps = {key: bound for key, bound in bounds.items() if bound is not None}
+        for key, bound in caps.items():
+            if (
+                isinstance(bound, bool)
+                or not isinstance(bound, int)
+                or not 1 <= bound <= MAX_ACTION_RATE_LIMIT
+            ):
+                raise TenantRateLimitsInvalid(
+                    f"The {key} cap of {action} must be a whole number from 1 to "
+                    f"{MAX_ACTION_RATE_LIMIT}.",
+                    details={"action": action, "bound": key},
+                )
+        if caps:
+            cleaned[action] = caps
+    return cleaned
 
 
 def enforce_action_quota(

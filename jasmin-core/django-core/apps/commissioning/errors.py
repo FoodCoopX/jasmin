@@ -728,6 +728,14 @@ class ShareImportBatchInTerminalStatus(BadRequestError):
     code = "share_import.batch_in_terminal_status"
 
 
+class ExternalCodeMappingTargetMissing(BadRequestError):
+    """An external-code mapping names an ``internal_id`` with no object of its
+    kind — a station, share type variation or delivery day. ``details``
+    carries the ``kind`` and the ``internal_id``."""
+
+    code = "share_import.mapping_target_missing"
+
+
 class ShareImportFileAlreadyUsed(ConflictError):
     """The uploaded bytes belong to a batch for that week whose status already
     records what it did to the demand (``applied`` / ``superseded``). Ingest is
@@ -1949,6 +1957,48 @@ class DeliveryStationDayStartsBeforeDeliveryDay(ConflictError):
                 "delivery_day_valid_from": str(delivery_day_valid_from),
             },
         )
+
+
+class ShareTypeInUse(ConflictError):
+    """A share type with variations, subscriptions or other rows still
+    pointing at it cannot be deleted — the delete would cascade or fail on
+    them (``can_be_deleted`` reports the same)."""
+
+    code = "share_type.in_use"
+
+
+class PlotInUse(ConflictError):
+    """A plot still used by forecasts cannot be deleted: the delete would take
+    them and their theoretical harvests with it."""
+
+    code = "plot.in_use"
+
+
+class StorageInUse(ConflictError):
+    """A storage still used by forecasts or documentation rows cannot be
+    deleted: the delete would take them with it."""
+
+    code = "storage.in_use"
+
+
+class ShareArticleInUse(ConflictError):
+    """A share article still used by share contents, default-share entries or
+    its price history cannot be deleted: the delete would take them with it."""
+
+    code = "share_article.in_use"
+
+
+class CrateInUse(ConflictError):
+    """A crate still used by prices, offers or deliveries cannot be deleted:
+    the delete would take its prices with it."""
+
+    code = "crate.in_use"
+
+
+class OrdersDeliveryDayInUse(ConflictError):
+    """An order day still referenced elsewhere cannot be deleted."""
+
+    code = "orders_delivery_day.in_use"
 
 
 class DeliveryStationInUse(ConflictError):

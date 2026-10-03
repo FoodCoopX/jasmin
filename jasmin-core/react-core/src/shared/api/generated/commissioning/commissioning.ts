@@ -1612,6 +1612,71 @@ export const useCommissioningBulkFinalizeShareContentCreate = <TError = ErrorRes
       return useMutation(mutationOptions, queryClient);
     }
     /**
+ * Enqueues a Huey background job that emails each selected order's finalized invoice or delivery note (``model``) as a PDF to the reseller's invoice address. A document already sent is skipped; one that can't be sent (not finalized, no PDF, no address, invoices on paper only) is reported in the job result. Returns 202 with a ``job_id``; the frontend polls ``GET /api/notifications/jobs/{job_id}/`` until status is ``done`` or ``failed``.
+ * @summary Enqueue a bulk send of invoices or delivery notes
+ */
+export const commissioningBulkSendDocumentsViaEmailCreate = (
+    bulkDocumentRequest: BulkDocumentRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<BackgroundJobEnqueueResponse>(
+      {url: `/api/commissioning/bulk_send_documents_via_email/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: bulkDocumentRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getCommissioningBulkSendDocumentsViaEmailCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningBulkSendDocumentsViaEmailCreate>>, TError,{data: BulkDocumentRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof commissioningBulkSendDocumentsViaEmailCreate>>, TError,{data: BulkDocumentRequest}, TContext> => {
+
+const mutationKey = ['commissioningBulkSendDocumentsViaEmailCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commissioningBulkSendDocumentsViaEmailCreate>>, {data: BulkDocumentRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  commissioningBulkSendDocumentsViaEmailCreate(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommissioningBulkSendDocumentsViaEmailCreateMutationResult = NonNullable<Awaited<ReturnType<typeof commissioningBulkSendDocumentsViaEmailCreate>>>
+    export type CommissioningBulkSendDocumentsViaEmailCreateMutationBody = BulkDocumentRequest
+    export type CommissioningBulkSendDocumentsViaEmailCreateMutationError = ErrorResponse
+
+    /**
+ * @summary Enqueue a bulk send of invoices or delivery notes
+ */
+export const useCommissioningBulkSendDocumentsViaEmailCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningBulkSendDocumentsViaEmailCreate>>, TError,{data: BulkDocumentRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof commissioningBulkSendDocumentsViaEmailCreate>>,
+        TError,
+        {data: BulkDocumentRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getCommissioningBulkSendDocumentsViaEmailCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Enqueues a Huey background job that sends consolidated payment-reminder emails (one per reseller, covering all of their ticked overdue invoices). Returns 202 with a ``job_id``; the frontend polls ``GET /api/notifications/jobs/{job_id}/`` until status is ``done`` or ``failed``.
  * @summary Enqueue bulk invoice-reminder job
  */

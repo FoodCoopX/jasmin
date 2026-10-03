@@ -37,6 +37,10 @@ from ..serializers import (
     BulkUnfinalizeResponseSerializer,
 )
 from ..services.bulk_operations import bulk_with_savepoints
+from ..services.finalization_quota import (
+    FinalizationReservation,
+    reserve_finalizations,
+)
 from ..utils import get_finalizable_objects
 from ..utils.composite_id_utils import parse_composite_pk
 from ..utils.validation_utils import parse_bulk_ids
@@ -191,30 +195,7 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
         already_finalized_count = 0
         errors: list[dict[str, str]] = []
 
-        # Reserve the whole batch against the weekly finalization caps up front,
-        # so a legitimate bulk finalize doesn't trip the per-minute burst cap on
-        # item ~20 (the per-item guards are then suppressed with skip_quota). An
-        # over-cap batch is refused here (429) before any item is finalized; this
-        # runs inside the view's @transaction.atomic, so it rolls back cleanly.
-        from apps.shared.tenants.models import RateLimitedAction
-        from apps.shared.tenants.rate_limits import enforce_action_quota_batch
-
-        n_invoices = sum(
-            1 for o in objects if isinstance(o, InvoiceReseller) and not o.is_finalized
-        )
-        n_delivery_notes = sum(
-            1
-            for o in objects
-            if isinstance(o, DeliveryNoteReseller) and not o.is_finalized
-        )
-        enforce_action_quota_batch(
-            RateLimitedAction.INVOICE_FINALIZATION, count=n_invoices, actor=user
-        )
-        enforce_action_quota_batch(
-            RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
-            count=n_delivery_notes,
-            actor=user,
-        )
+        reservations = self._reserve(objects, user)
 
         def finalize_one(obj: Any) -> None:
             nonlocal finalized_count, already_finalized_count
@@ -267,12 +248,49 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
             ),
             on_error=record_error,
         )
+        for reservation in reservations:
+            reservation.release_unused()
 
         return {
             "finalized_count": finalized_count,
             "already_finalized_count": already_finalized_count,
             "errors": errors,
         }
+
+    @staticmethod
+    def _reserve(objects: list, user: Any) -> list[FinalizationReservation]:
+        """Reserve the invoice and delivery-note finalizations this batch may
+        perform, up front, so an over-cap batch is refused (429) before any
+        item is finalized; the items are then finalized with ``skip_quota``.
+        Only documents not yet final count, and finalizing an invoice also
+        finalizes the delivery notes behind it. Runs inside the view's
+        ``@transaction.atomic``, so a refusal rolls back cleanly."""
+        from apps.shared.tenants.models import RateLimitedAction
+
+        from ..services import InvoiceService
+
+        invoice_ids = {
+            obj.pk
+            for obj in objects
+            if isinstance(obj, InvoiceReseller) and not obj.is_finalized
+        }
+        delivery_note_ids = {
+            obj.pk
+            for obj in objects
+            if isinstance(obj, DeliveryNoteReseller) and not obj.is_finalized
+        } | InvoiceService.unfinalized_upstream_delivery_note_ids(invoice_ids)
+        return [
+            reserve_finalizations(
+                RateLimitedAction.INVOICE_FINALIZATION,
+                InvoiceReseller.objects.filter(pk__in=invoice_ids),
+                actor=user,
+            ),
+            reserve_finalizations(
+                RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
+                DeliveryNoteReseller.objects.filter(pk__in=delivery_note_ids),
+                actor=user,
+            ),
+        ]
 
 
 class BulkUnfinalizeView(APIViewRolePermissionsMixin, APIView):

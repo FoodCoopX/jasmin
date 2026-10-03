@@ -24,6 +24,7 @@ from ..errors import (
     DeliveryDayValidFromInPast,
     DeliveryDayValidFromMoveIntoPast,
     InvalidQueryParam,
+    OrdersDeliveryDayInUse,
     SharesDeliveryDayShorteningStrandsChildren,
     SharesDeliveryDayStartMoveStrandsChildren,
 )
@@ -48,6 +49,7 @@ from ..services import SharesDeliveryDayService
 from ..services.onboarding_policy import onboarding_mode_enabled
 from ..utils.iso_week_utils import previous_monday
 from ..utils.query_params import validate_query_params
+from .base_viewsets import CanBeDeletedDestroyMixin
 
 logger = logging.getLogger(__name__)
 
@@ -335,7 +337,9 @@ class SharesDeliveryDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         instance.delete()
 
 
-class OrdersDeliveryDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
+class OrdersDeliveryDayViewSet(
+    CanBeDeletedDestroyMixin, RolePermissionsMixin, viewsets.ModelViewSet
+):
     # Catalogue endpoint read by every authenticated persona:
     #   * Members → MemberDetail subscription-flow choices
     #   * Customers → CustomerOrderPage day selector
@@ -345,6 +349,7 @@ class OrdersDeliveryDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     read_permission = IsStaffOrMemberOrCustomer
     write_permission = IsOffice
     serializer_class = OrdersDeliveryDaySerializer
+    not_deletable_error = OrdersDeliveryDayInUse
 
     @extend_schema()
     def list(self, request: Request, *args, **kwargs) -> Response:

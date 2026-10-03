@@ -865,3 +865,118 @@ class TestUpdateUserRoles:
         assert response.status_code == 200
         admin.refresh_from_db()
         assert "admin" not in admin.roles
+
+
+@pytest.mark.django_db
+class TestRateLimitOverrides:
+    """The super-admin raises or lowers a tenant's rate-limit caps; the change
+    needs a fresh step-up claim, like the kill-switch, and is validated."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_overrides(self, tenant):
+        from apps.shared.tenants.models import Tenant
+
+        with schema_context("public"):
+            original = Tenant.objects.get(id=tenant.id).action_rate_limit_overrides
+        yield
+        with schema_context("public"):
+            Tenant.objects.filter(id=tenant.id).update(
+                action_rate_limit_overrides=original
+            )
+
+    @staticmethod
+    def _stored(tenant):
+        from apps.shared.tenants.models import Tenant
+
+        with schema_context("public"):
+            return Tenant.objects.get(id=tenant.id).action_rate_limit_overrides
+
+    def _patch(self, factory, tenant, super_admin, overrides, *, step_up=True):
+        request = factory.patch(
+            f"/tenants/{tenant.id}/",
+            {"action_rate_limit_overrides": overrides},
+            format="json",
+        )
+        token = make_step_up_token(super_admin) if step_up else None
+        force_authenticate(request, user=super_admin, token=token)
+        return _dispatch({"patch": "partial_update"}, request, pk=tenant.id)
+
+    def test_overrides_are_stored(self, factory, tenant, super_admin):
+        response = self._patch(
+            factory,
+            tenant,
+            super_admin,
+            {
+                "invoice_finalization": {"weekly": 900},
+                "member_creation": {"weekly": 2000, "per_minute": None},
+            },
+        )
+
+        assert response.status_code == 200, response.data
+        assert self._stored(tenant) == {
+            "invoice_finalization": {"weekly": 900},
+            "member_creation": {"weekly": 2000},
+        }
+
+    def test_changing_them_requires_step_up(self, factory, tenant, super_admin):
+        before = self._stored(tenant)
+
+        response = self._patch(
+            factory,
+            tenant,
+            super_admin,
+            {"invoice_finalization": {"weekly": 900}},
+            step_up=False,
+        )
+
+        assert response.status_code == 403
+        assert response.data["code"] == "auth.step_up_required"
+        assert self._stored(tenant) == before
+
+    @pytest.mark.parametrize(
+        "overrides",
+        [
+            {"unknown_action": {"weekly": 10}},
+            {"invoice_finalization": {"weekly": 0}},
+            {"invoice_finalization": {"weekly": "900"}},
+            {"invoice_finalization": {"daily": 10}},
+            {"invoice_finalization": 900},
+            ["invoice_finalization"],
+        ],
+    )
+    def test_invalid_overrides_are_refused(
+        self, factory, tenant, super_admin, overrides
+    ):
+        before = self._stored(tenant)
+
+        response = self._patch(factory, tenant, super_admin, overrides)
+
+        assert response.status_code == 400
+        assert response.data["code"] == "tenant.rate_limits_invalid"
+        assert self._stored(tenant) == before
+
+    def test_the_detail_shows_defaults_and_overrides(
+        self, factory, tenant, super_admin
+    ):
+        from apps.shared.tenants.models import Tenant
+
+        with schema_context("public"):
+            Tenant.objects.filter(id=tenant.id).update(
+                action_rate_limit_overrides={"user_creation": {"per_minute": 60}}
+            )
+        request = factory.get(f"/tenants/{tenant.id}/")
+        force_authenticate(request, user=super_admin)
+
+        response = _dispatch({"get": "retrieve"}, request, pk=tenant.id)
+
+        assert response.status_code == 200
+        defaults = {
+            row["action"]: row for row in response.data["action_rate_limit_defaults"]
+        }
+        assert defaults["invoice_finalization"]["weekly"] == 300
+        assert (
+            defaults["invoice_finalization"]["display_name"] == "Invoice finalization"
+        )
+        assert response.data["action_rate_limit_overrides"] == {
+            "user_creation": {"per_minute": 60}
+        }

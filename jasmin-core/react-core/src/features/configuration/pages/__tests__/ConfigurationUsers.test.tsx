@@ -3,7 +3,8 @@
 // button is disabled with the reason on hover and as its accessible
 // description. Staff and customer invitations stay available, and a refused
 // resend shows the server's reason. Without an SMTP host of the tenant's own,
-// no invitation can be sent or re-sent at all.
+// no invitation can be sent or re-sent at all. An open invitation can be
+// cancelled, after a confirmation.
 
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,6 +30,7 @@ const hookState = vi.hoisted(() => ({
 const api = vi.hoisted(() => ({
   users: [] as Record<string, unknown>[],
   resend: vi.fn(),
+  cancel: vi.fn(),
 }));
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 const apiError = vi.hoisted(() => ({ getErrorMessage: vi.fn() }));
@@ -40,6 +42,7 @@ vi.mock("@hooks/index", () => ({
 }));
 
 vi.mock("@shared/api/generated/auth/auth", () => ({
+  authAdminUsersCancelInvitationCreate: (id: string) => api.cancel(id),
   authAdminUsersPartialUpdate: vi.fn(),
   authAdminUsersResendInvitationCreate: (id: string) => api.resend(id),
   getAuthAdminUsersListQueryKey: () => ["/api/auth/admin/users/"],
@@ -148,6 +151,7 @@ beforeEach(() => {
     pendingLogin("member-login", ["member"]),
   ];
   api.resend.mockReset();
+  api.cancel.mockReset();
   notify.success.mockReset();
   notify.error.mockReset();
   apiError.getErrorMessage.mockReset();
@@ -227,5 +231,40 @@ describe("ConfigurationUsers resend invitation", () => {
     );
     expect(notify.error).toHaveBeenCalledWith("Turn off onboarding mode first.");
     expect(notify.success).not.toHaveBeenCalled();
+  });
+});
+
+describe("ConfigurationUsers cancel invitation", () => {
+  it("cancels an open invitation after a confirmation", async () => {
+    api.cancel.mockResolvedValue({});
+    renderPage();
+
+    await userEvent.click(
+      within(screen.getByTestId("user-row-office-login")).getByRole("button", {
+        name: "users.cancel_invitation",
+      }),
+    );
+    expect(api.cancel).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(await screen.findByRole("tooltip")).getByRole("button", {
+        name: "users.cancel_invitation",
+      }),
+    );
+
+    expect(api.cancel).toHaveBeenCalledWith("office-login");
+    expect(notify.success).toHaveBeenCalledWith("users.invitation_cancelled");
+  });
+
+  it("offers no cancel once no invitation is open", () => {
+    api.users = [
+      { ...pendingLogin("office-login", ["office"]), invitation_expires_at: null },
+    ];
+    renderPage();
+
+    const row = within(screen.getByTestId("user-row-office-login"));
+    expect(row.getByText("users.no_open_invitation")).toBeInTheDocument();
+    expect(
+      row.queryByRole("button", { name: "users.cancel_invitation" }),
+    ).toBeNull();
   });
 });

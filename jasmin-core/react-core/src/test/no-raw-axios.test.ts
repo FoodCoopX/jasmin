@@ -106,6 +106,10 @@ const ALLOWED: ReadonlyArray<{ path: string; why: string }> = [
     why: "Super-admin tenant detail; same pattern as SuperAdminDashboard.",
   },
   {
+    path: "src/features/platform/components/TenantRateLimits.tsx",
+    why: "Super-admin tenant PATCH of the rate-limit overrides; public-schema endpoint, excluded from the Orval schema like TenantDetail.",
+  },
+  {
     path: "src/features/platform/pages/SuperAdminSupportTickets.tsx",
     why: "Super-admin support-ticket aggregate; endpoints are public-schema and excluded from the Orval schema (same realm as SuperAdminDashboard).",
   },

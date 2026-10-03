@@ -9,6 +9,10 @@ import { SUPER_ADMIN_ENDPOINTS } from "@features/platform/services/superAdmin";
 import CreateAdminModal from "@features/platform/modals/CreateAdminModal";
 import CreateUserModal from "@features/platform/modals/CreateUserModal";
 import RoleChipSelector from "@features/platform/components/RoleChipSelector";
+import TenantRateLimits, {
+  type ActionRateLimitDefault,
+  type ActionRateLimitOverrides,
+} from "@features/platform/components/TenantRateLimits";
 import { ACCOUNT_STATUS_COLORS } from "@features/platform/userManagement";
 
 interface Domain {
@@ -24,6 +28,8 @@ interface TenantDetail {
   created_on: string;
   is_active: boolean;
   domains?: Domain[];
+  action_rate_limit_defaults: ActionRateLimitDefault[];
+  action_rate_limit_overrides: ActionRateLimitOverrides;
 }
 
 interface TenantUser {
@@ -190,6 +196,14 @@ export default function TenantDetail() {
               </div>
             ))}
           </div>
+
+          <TenantRateLimits
+            key={tenant.id}
+            tenantId={id!}
+            defaults={tenant.action_rate_limit_defaults ?? []}
+            overrides={tenant.action_rate_limit_overrides ?? {}}
+            onSaved={() => void tenantQuery.refetch()}
+          />
 
           <h3 className="sa-subheading">Admin Users</h3>
           <div className="sa-toolbar">

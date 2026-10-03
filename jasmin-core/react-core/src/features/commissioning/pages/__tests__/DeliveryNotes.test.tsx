@@ -13,6 +13,8 @@
  *      409 ``FinalizedError``, the
  *      shared ``notify.error`` toast fires via ``BulkActionButton``'s
  *      built-in catch path.
+ *   3. Bulk send by email — only the selected orders with a finalized
+ *      delivery note are sent, and the job opens in the progress drawer.
  *
  * Everything below the action bar (EditableTable rows, per-row action
  * cell, modal contents) is stubbed — covering it again here would
@@ -91,6 +93,7 @@ const ordersOverviewListFnMock = vi.fn();
 const bulkFinalizeMock = vi.fn();
 const bulkCreateDocsMock = vi.fn();
 const bulkDeleteDocsMock = vi.fn();
+const bulkSendDocsMock = vi.fn();
 const dnContentsCreateMock = vi.fn();
 const dnContentsPatchMock = vi.fn();
 const dnDestroyMock = vi.fn();
@@ -106,6 +109,8 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
     bulkCreateDocsMock(...args),
   commissioningBulkDeleteDocumentsCreate: (...args: unknown[]) =>
     bulkDeleteDocsMock(...args),
+  commissioningBulkSendDocumentsViaEmailCreate: (...args: unknown[]) =>
+    bulkSendDocsMock(...args),
   commissioningDeliveryNoteContentsCreate: (...args: unknown[]) =>
     dnContentsCreateMock(...args),
   commissioningDeliveryNoteContentsPartialUpdate: (...args: unknown[]) =>
@@ -124,6 +129,11 @@ vi.mock("@features/commissioning/modals", () => ({
 vi.mock("@features/commissioning/pdfs", () => ({
   DeliveryNotePDFButtons: () => <div data-testid="dn-pdf-buttons" />,
   generateAndUploadDeliveryNotePDF: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@shared/ui/JobProgressDrawer", () => ({
+  JobProgressDrawer: ({ jobId }: { jobId: string | null }) =>
+    jobId ? <div data-testid="job-drawer">{jobId}</div> : null,
 }));
 
 vi.mock("@shared/selectors", () => ({
@@ -257,6 +267,7 @@ beforeEach(() => {
   bulkFinalizeMock.mockReset().mockResolvedValue({ results: [] });
   bulkCreateDocsMock.mockReset().mockResolvedValue({ results: [] });
   bulkDeleteDocsMock.mockReset().mockResolvedValue({ results: [] });
+  bulkSendDocsMock.mockReset().mockResolvedValue({ job_id: "job-1" });
   dnContentsCreateMock.mockReset();
   dnContentsPatchMock.mockReset();
   dnDestroyMock.mockReset();
@@ -383,5 +394,33 @@ describe("bulk finalize button", () => {
       );
     });
     expect(notifyMock.success).not.toHaveBeenCalled();
+  });
+});
+
+// ── Bulk send by email ──────────────────────────────────────────────────────
+
+describe("bulk send by email", () => {
+  it("sends the selected orders with a finalized delivery note and opens the job drawer", async () => {
+    ordersOverviewListHookMock.mockReturnValue({
+      data: [
+        makeRow({ delivery_note_is_finalized: true }),
+        makeRow({ id: "ord-2" }),
+      ],
+      refetch: vi.fn(),
+    });
+    renderPage();
+
+    await userEvent.click(screen.getByText("select-all"));
+    await userEvent.click(
+      screen.getByTestId("bulk-commissioning.send_delivery_notes_bulk_via_email"),
+    );
+
+    await waitFor(() => {
+      expect(bulkSendDocsMock).toHaveBeenCalledWith({
+        ids: ["ord-1"],
+        model: "delivery_note",
+      });
+    });
+    expect(await screen.findByTestId("job-drawer")).toHaveTextContent("job-1");
   });
 });

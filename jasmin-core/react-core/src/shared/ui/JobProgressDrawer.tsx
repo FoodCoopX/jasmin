@@ -26,10 +26,28 @@ interface PerItemResult {
   reseller_id?: string;
   reseller_name?: string;
   order_id?: string;
+  order_number?: string | null;
   invoice_number?: string;
+  document_number?: string;
   already_sent?: boolean;
   error?: string;
 }
+
+interface JobResult {
+  total_processed?: number;
+  successful?: number;
+  failed?: number;
+  results?: PerItemResult[];
+  errors?: PerItemResult[];
+}
+
+/** Every per-item row of a finished job. The per-order jobs (invoice
+ * reminders, invoices and delivery notes by email) report their failures in a
+ * separate ``errors`` list; the offers job keeps them in ``results``. */
+const perItemRows = (result: JobResult): PerItemResult[] => [
+  ...(result.results ?? []),
+  ...(result.errors ?? []),
+];
 
 interface ProgressShape {
   processed?: number;
@@ -56,9 +74,9 @@ interface JobProgressDrawerProps {
  * bar in flight and a per-item result table once the worker writes
  * the final result blob.
  *
- * Designed to be kind-agnostic — the drawer reads ``result.results``
- * and renders a small set of columns it knows how to format
- * (reseller name, invoice number, success / error). When a new kind
+ * Designed to be kind-agnostic — the drawer reads ``result.results`` and
+ * ``result.errors`` and renders a small set of columns it knows how to format
+ * (reseller name, document or order number, success / error). When a new kind
  * lands and needs different columns, extend the table render block
  * in this file rather than forking the drawer.
  */
@@ -71,12 +89,8 @@ export const JobProgressDrawer: FC<JobProgressDrawerProps> = ({
   const { data: job, isLoading } = useJob(jobId);
 
   const progress: ProgressShape = (job?.progress ?? {}) as ProgressShape;
-  const result = (job?.result ?? {}) as {
-    total_processed?: number;
-    successful?: number;
-    failed?: number;
-    results?: PerItemResult[];
-  };
+  const result = (job?.result ?? {}) as JobResult;
+  const rows = perItemRows(result);
 
   const percent =
     progress.total && progress.total > 0
@@ -179,7 +193,7 @@ export const JobProgressDrawer: FC<JobProgressDrawerProps> = ({
             />
           )}
 
-          {job.status === "done" && result.results && result.results.length > 0 && (
+          {job.status === "done" && rows.length > 0 && (
             <>
               <Title level={5} style={{ marginBottom: 0 }}>
                 {t("job_progress.per_item_results")}
@@ -190,13 +204,15 @@ export const JobProgressDrawer: FC<JobProgressDrawerProps> = ({
                   row.reseller_id ?? row.order_id ?? String(idx ?? 0)
                 }
                 pagination={false}
-                dataSource={result.results}
+                dataSource={rows}
                 columns={[
                   {
                     title: t("job_progress.col_target"),
                     render: (_v, row) =>
                       row.reseller_name ??
                       row.invoice_number ??
+                      row.document_number ??
+                      row.order_number ??
                       row.order_id ??
                       "—",
                   },

@@ -11,6 +11,7 @@ backend from that same flag.
 
 from __future__ import annotations
 
+from django.apps import apps
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -53,6 +54,12 @@ class ExternalCodeMapping(JasminModel):
 
     def __str__(self) -> str:
         return f"{self.kind}: {self.external_code} -> {self.internal_id}"
+
+    @classmethod
+    def target_model(cls, kind: str) -> type[models.Model]:
+        """The model a mapping of ``kind`` points at — the one each
+        ``KIND_CHOICES`` label names."""
+        return apps.get_model("commissioning", dict(cls.KIND_CHOICES)[kind])
 
 
 class ShareImportBatch(JasminModel, CreatedMixin):

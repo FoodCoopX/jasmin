@@ -19,7 +19,6 @@ import type { UploadFile } from "antd/es/upload/interface";
 import { WeekSelector } from "@shared/selectors";
 import { ExplainerText } from "@shared/ui";
 import { ExternalCodeMappingsModal } from "@features/commissioning/modals";
-import { useTenant } from "@hooks/index";
 import {
   commissioningShareImportBatchesApplyCreate,
   commissioningShareImportBatchesPreviewCreate,
@@ -100,15 +99,12 @@ function failedBatchFromError(err: unknown): ShareImportBatch | null {
 
 export default function ImportShares() {
   const { t } = useTranslation();
-  const { getSetting } = useTenant();
 
   const now = dayjs();
   const [selectedYear, setSelectedYear] = useState<number>(now.isoWeekYear());
   const [selectedWeek, setSelectedWeek] = useState<number | null>(
     now.isoWeek(),
   );
-
-  const csvFormat = (getSetting("csv_format", "de") as string).toLowerCase();
 
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [activeBatch, setActiveBatch] = useState<ShareImportBatch | null>(null);
@@ -468,14 +464,6 @@ export default function ImportShares() {
             <strong>{t("import_shares.explainer.csv_heading")}</strong>
             <div style={{ marginTop: 4 }}>
               {t("import_shares.explainer.csv_intro")}
-            </div>
-            <div style={{ marginTop: 4 }}>
-              <strong>
-                {t("import_shares.explainer.tenant_csv_format_label")}:
-              </strong>{" "}
-              {csvFormat === "en"
-                ? t("import_shares.explainer.tenant_csv_format_en")
-                : t("import_shares.explainer.tenant_csv_format_de")}
             </div>
             <div style={{ marginTop: 4 }}>
               <strong>{t("import_shares.explainer.csv_required")}:</strong>{" "}

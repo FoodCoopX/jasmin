@@ -51,6 +51,7 @@ from ..errors import (
     InvalidQueryParam,
     RequiredFieldMissing,
     ShareArticleNotFound,
+    ShareTypeInUse,
     ShareTypeVariationGrossPriceInUse,
     ShareTypeVariationNotFound,
     VirtualComponentNotPhysical,
@@ -163,7 +164,9 @@ def _body_with_normalized_share_option(request: Request) -> Any:
     return data
 
 
-class ShareTypeViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
+class ShareTypeViewSet(
+    CanBeDeletedDestroyMixin, RolePermissionsMixin, viewsets.ModelViewSet
+):
     # Members need to read this on their MemberDetail page (the
     # subscription flow lists share types). ``ShareTypeVariation``
     # below is already ``IsStaffOrMember``; matching that here.
@@ -174,6 +177,7 @@ class ShareTypeViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     # The serializer exposes catalog fields only (no PII / banking).
     public_read_actions = frozenset({"list"})
     serializer_class = ShareTypeSerializer
+    not_deletable_error = ShareTypeInUse
 
     @extend_schema(
         parameters=[

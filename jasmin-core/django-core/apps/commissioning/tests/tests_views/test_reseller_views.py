@@ -862,6 +862,75 @@ class TestBulkSendInvoiceRemindersViaEmail:
 
 
 # ---------------------------------------------------------------------------
+# BulkSendDocumentsViaEmailView (enqueue contract; the send is a service test)
+# ---------------------------------------------------------------------------
+URL_SEND_DOCUMENTS = reverse("bulk_send_documents_via_email")
+
+
+@pytest.mark.django_db
+class TestBulkSendDocumentsViaEmail:
+    @pytest.mark.parametrize("model", ["invoice", "delivery_note"])
+    def test_enqueues_a_job(self, step_up_client, tenant, email_config, model):
+        from apps.notifications.models import BackgroundJob
+
+        resp = step_up_client.post(
+            URL_SEND_DOCUMENTS, {"ids": ["order-1"], "model": model}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_202_ACCEPTED, resp.data
+        assert resp.data["kind"] == f"{model}.bulk_send"
+        assert BackgroundJob.objects.get(pk=resp.data["job_id"]).status == "queued"
+
+    def test_requires_step_up(self, api_client, tenant, email_config):
+        resp = api_client.post(
+            URL_SEND_DOCUMENTS, {"ids": ["order-1"], "model": "invoice"}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        assert resp.data["code"] == "auth.step_up_required"
+
+    def test_refused_without_a_mail_server(self, step_up_client, tenant):
+        from apps.notifications.models import BackgroundJob
+        from apps.shared.tenants.models import TenantEmailConfig
+
+        TenantEmailConfig.objects.filter(tenant=tenant).delete()
+        before = BackgroundJob.objects.count()
+
+        resp = step_up_client.post(
+            URL_SEND_DOCUMENTS, {"ids": ["order-1"], "model": "invoice"}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_409_CONFLICT
+        assert resp.data["code"] == "email_config.sending_not_set_up"
+        assert BackgroundJob.objects.count() == before
+
+    def test_an_unknown_model_is_refused(self, step_up_client, tenant, email_config):
+        resp = step_up_client.post(
+            URL_SEND_DOCUMENTS, {"ids": ["order-1"], "model": "offer"}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.parametrize("bad_id", [123, None, {"id": "x"}])
+    def test_a_non_string_id_is_refused(
+        self, step_up_client, tenant, email_config, bad_id
+    ):
+        from apps.notifications.models import BackgroundJob
+
+        before = BackgroundJob.objects.count()
+
+        resp = step_up_client.post(
+            URL_SEND_DOCUMENTS,
+            {"ids": ["order-1", bad_id], "model": "invoice"},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "bulk.ids_invalid"
+        assert BackgroundJob.objects.count() == before
+
+
+# ---------------------------------------------------------------------------
 # BulkSendOffersViaEmailView (validation + 404 — happy path needs SMTP)
 # ---------------------------------------------------------------------------
 URL_SEND_OFFERS = reverse("bulk_send_offers_via_email")

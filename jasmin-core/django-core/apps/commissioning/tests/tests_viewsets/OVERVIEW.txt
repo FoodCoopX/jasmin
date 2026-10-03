@@ -1,6 +1,6 @@
 Viewset Tests Overview
 ======================
-1066 tests | 198 test classes | 34 files
+1080 tests | 198 test classes | 35 files
 Run: poetry run pytest apps/commissioning/tests/tests_viewsets/ --no-header --tb=short -q
 
 Counts are collected cases, so a parametrized method counts once per case.
@@ -214,10 +214,11 @@ test_documentation_viewsets.py (62 tests)
   TestBulkSetAsExpectedAmountPrecision     3   the confirmed harvest / purchase amount is stored exactly; one
                                                finer than the 2dp column is refused
 
-test_imports_viewsets.py (26 tests)
+test_imports_viewsets.py (29 tests)
 ───────────────────────────────────
-  TestExternalCodeMappingViewSet           7   list, filter by kind, unknown kind → 400, create, duplicate
-                                               code refused, delete
+  TestExternalCodeMappingViewSet          10   list, filter by kind, unknown kind → 400, create, duplicate
+                                               code refused, an id that is no object of the mapping's kind
+                                               → 400 on create and on repointing, delete
   TestShareImportBatchViewSet             11   upload → preview-ready (or failed on invalid CSV), missing file
                                                → 400, idempotent for the same bytes, preview action,
                                                full upload → preview → apply round trip, ?status= filters
@@ -227,6 +228,14 @@ test_imports_viewsets.py (26 tests)
                                                stored status named in the error details; re-uploading the
                                                same file is a 409 naming that batch, while a changed file
                                                for the same week still uploads and applies
+  (module-level)                           1   the documented validation-failed 400 bodies reference the
+                                               published batch component instead of copying it
+
+test_in_use_deletion.py (11 tests) — DELETE honours can_be_deleted
+──────────────────────────────────────────────────────────────────
+  (module-level)                          11   an in-use share type, plot, storage, share article or crate
+                                               → 409 with its <model>.in_use code and the row kept; an
+                                               unused one, and an unused order day, → 204
 
 test_logs_viewsets.py (16 tests) — theoretical harvest/purchase/wash/clean recency window (frozen clock)
 ────────────────────────────────────────────────────────────────────────────────────────────────────────

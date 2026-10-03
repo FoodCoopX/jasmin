@@ -21,6 +21,7 @@ import type {
   CommissioningOrdersOverviewListParams,
   DeliveryNoteResellerContent,
 } from "@shared/api/generated/models";
+import BulkSendDocumentsButton from "@features/commissioning/components/BulkSendDocumentsButton";
 import { DeliveryNoteModal } from "@features/commissioning/modals";
 import { DeliveryNotePDFButtons } from "@features/commissioning/pdfs";
 // Helper imported directly from its dedicated file — the file has
@@ -528,13 +529,11 @@ export default function DeliveryNotes() {
           marginTop: "-20px",
         }}
       >
-        {/* Bulk send-email is still a disabled placeholder: its backend route
-            doesn't exist yet. Re-enable with the real endpoint once it lands. */}
-        <BulkActionButton
+        <BulkSendDocumentsButton
+          model="delivery_note"
+          rows={data}
           selectedIds={selectedRowKeys}
-          buttonText={t("commissioning.send_delivery_notes_bulk_via_email")}
-          buttonProps={{ type: "primary" }}
-          disabled
+          onClose={() => void refetchOrders()}
         />
 
         {/* Download the selected delivery notes' finalized PDFs as a single

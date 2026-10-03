@@ -27,6 +27,7 @@ from .reseller_views import (
     BulkCreateSummaryInvoiceFromOrdersView,
     BulkDeleteDocumentsView,
     BulkFinalizeDocumentsView,
+    BulkSendDocumentsViaEmailView,
     BulkSendInvoiceRemindersViaEmailView,
     BulkSendOffersViaEmailView,
     BulkSetToPaidDocumentsView,

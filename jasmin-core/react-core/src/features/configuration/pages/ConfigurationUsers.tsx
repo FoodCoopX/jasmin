@@ -1,5 +1,5 @@
 import { EditOutlined, MailOutlined, PlusOutlined } from "@ant-design/icons";
-import {  Badge, Button, Space, Typography } from "antd";
+import { Badge, Button, Popconfirm, Space, Typography } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import { memo, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,6 +25,7 @@ import {
   useTenantSmtpConfigured,
 } from "@hooks/index";
 import {
+  authAdminUsersCancelInvitationCreate,
   authAdminUsersPartialUpdate,
   authAdminUsersResendInvitationCreate,
   getAuthAdminUsersListQueryKey,
@@ -125,6 +126,7 @@ export default function ConfigurationUsers() {
   const [createOpen, setCreateOpen] = useState(false);
 
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   // A member's portal invitation is not re-sent while onboarding mode is on.
   const onboardingMode = useOnboardingMode();
 
@@ -159,6 +161,21 @@ export default function ConfigurationUsers() {
       notify.error(getErrorMessage(error, t("users.resend_failed")));
     } finally {
       setResendingId(null);
+    }
+  };
+
+  // ---- Cancel invitation ------------------------------------------------
+  // Revokes the emailed link; the account stays and a resend undoes it.
+  const handleCancelInvitation = async (userId: string) => {
+    setCancellingId(userId);
+    try {
+      await authAdminUsersCancelInvitationCreate(userId);
+      notify.success(t("users.invitation_cancelled"));
+      fetchUsers();
+    } catch (error) {
+      notify.error(getErrorMessage(error, t("users.cancel_invitation_failed")));
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -373,8 +390,9 @@ export default function ConfigurationUsers() {
           return (
             <Space size={4} wrap>
               {isPendingInvite &&
-                t("users.invitation_expires_on") +
-                  ` ${expiryDate}`}
+                (expiryDate
+                  ? `${t("users.invitation_expires_on")} ${expiryDate}`
+                  : t("users.no_open_invitation"))}
               {isPendingInvite && (
                 <DisabledReasonTooltip reason={resendDisabledReason}>
                   {(reasonId) => (
@@ -390,6 +408,19 @@ export default function ConfigurationUsers() {
                     </Button>
                   )}
                 </DisabledReasonTooltip>
+              )}
+              {isPendingInvite && expiryDate && !invitationExpired && (
+                <Popconfirm
+                  title={t("users.cancel_invitation_confirm")}
+                  okText={t("users.cancel_invitation")}
+                  okButtonProps={{ danger: true }}
+                  cancelText={t("common.cancel")}
+                  onConfirm={() => handleCancelInvitation(u.id)}
+                >
+                  <Button size="small" danger loading={cancellingId === u.id}>
+                    {t("users.cancel_invitation")}
+                  </Button>
+                </Popconfirm>
               )}
               {(isActive || isInactive) && (
                 <Button
@@ -408,7 +439,7 @@ export default function ConfigurationUsers() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, formatDate, resendingId, onboardingMode, smtpConfigured],
+    [t, formatDate, resendingId, cancellingId, onboardingMode, smtpConfigured],
   );
 
   const columns = useMemo(() => buildColumns(), [buildColumns]);

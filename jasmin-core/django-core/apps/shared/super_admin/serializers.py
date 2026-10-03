@@ -12,6 +12,7 @@ from apps.shared.tenants.provisioning import (
 from apps.shared.tenants.provisioning import (
     validate_schema_name as _validate_schema_name,
 )
+from apps.shared.tenants.rate_limits import validate_action_rate_limit_overrides
 
 # Column widths the request payloads are written into: ``JasminUser.first_name``
 # / ``last_name`` / ``email``, ``Tenant.name``, and django-tenants' own
@@ -109,6 +110,15 @@ class DomainSerializer(serializers.Serializer):
     is_primary = serializers.BooleanField()
 
 
+class ActionRateLimitDefaultSerializer(serializers.Serializer):
+    """The caps a rate-limited action has when the tenant sets none."""
+
+    action = serializers.CharField()
+    display_name = serializers.CharField()
+    weekly = serializers.IntegerField()
+    per_minute = serializers.IntegerField()
+
+
 class TenantDetailResponseSerializer(serializers.Serializer):
     id = serializers.CharField()
     schema_name = serializers.CharField()
@@ -118,6 +128,9 @@ class TenantDetailResponseSerializer(serializers.Serializer):
     domains = DomainSerializer(many=True)
     created_on = serializers.DateTimeField()
     is_active = serializers.BooleanField()
+    action_rate_limit_defaults = ActionRateLimitDefaultSerializer(many=True)
+    # As stored: ``{"<action>": {"weekly": int, "per_minute": int}}``.
+    action_rate_limit_overrides = serializers.JSONField()
 
 
 # --- Tenant Users ---
@@ -213,6 +226,17 @@ class UpdateTenantRequestSerializer(serializers.Serializer):
         required=False, allow_blank=True, allow_null=True
     )
     is_active = serializers.BooleanField(required=False)
+    action_rate_limit_overrides = serializers.JSONField(
+        required=False,
+        help_text=(
+            "Replaces the tenant's caps on the rate-limited actions: "
+            '{"<action>": {"weekly": int, "per_minute": int}}. An action or '
+            "bound left out keeps the default; {} restores every default."
+        ),
+    )
+
+    def validate_action_rate_limit_overrides(self, value):
+        return validate_action_rate_limit_overrides(value)
 
 
 class UpdateTenantResponseSerializer(serializers.Serializer):

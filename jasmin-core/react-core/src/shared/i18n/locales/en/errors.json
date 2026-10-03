@@ -114,12 +114,14 @@
   "share_article": {
     "not_found": "Share article not found.",
     "invalid_share_option": "Invalid share option.",
-    "net_price_in_use": "This currently valid price can't be deleted because the article is already in use. Add a new price with a later start date instead."
+    "net_price_in_use": "This currently valid price can't be deleted because the article is already in use. Add a new price with a later start date instead.",
+    "in_use": "This article is still in use (in share contents or with prices, say) and can't be deleted."
   },
   "share_type": {
     "succession_has_active_variations": "Can't start a new share type while the current one still has variations active on or after this date. End those variations first, or choose a later start date.",
     "shortening_strands_variation": "Can't end this share type on the given date: some variations are open or end after it and would outlive their parent. End or shorten those variations first, or choose a later end date.",
-    "invalid_share_option": "Invalid share option."
+    "invalid_share_option": "Invalid share option.",
+    "in_use": "This share type is still in use (by variations or subscriptions, say) and can't be deleted."
   },
   "time_bound": {
     "succession_start_before_predecessor": "Can't start a new record before the existing open record it would succeed. Choose a start date on or after the existing record's, or close the existing record first.",
@@ -146,7 +148,8 @@
     "weak_password": "The password is too weak — please choose a stronger one.",
     "no_context": "This request carries no tenant context. Please open the page via the tenant's own address.",
     "logo_invalid": "The logo must be a PNG, JPEG, WEBP or GIF image within the size and resolution limits.",
-    "feature_flags_invalid": "The navigation and AI settings must be sent as an object of on/off values."
+    "feature_flags_invalid": "The navigation and AI settings must be sent as an object of on/off values.",
+    "rate_limits_invalid": "The caps must map known actions to whole numbers from 1 to 100000 for weekly and per_minute."
   },
   "tenant_settings": {
     "coop_shares_bounds_inverted": "The minimum number of coop shares cannot exceed the maximum.",
@@ -232,7 +235,8 @@
     "invoice_email_disabled": "This reseller receives invoices on paper only — invoice email is turned off."
   },
   "storage": {
-    "not_found": "Storage not found."
+    "not_found": "Storage not found.",
+    "in_use": "This storage is still in use (by forecasts or documentation entries, say) and can't be deleted."
   },
   "offer": {
     "not_found": "Offer not found."
@@ -391,7 +395,8 @@
   },
   "crate": {
     "not_found": "Crate not found.",
-    "net_price_in_use": "This currently valid price can't be deleted because the crate is already in use. Add a new price with a later start date instead."
+    "net_price_in_use": "This currently valid price can't be deleted because the crate is already in use. Add a new price with a later start date instead.",
+    "in_use": "This crate is still in use (with prices or in deliveries, say) and can't be deleted."
   },
   "document": {
     "date_required": "A date is required for this document.",
@@ -479,6 +484,7 @@
     "batch_in_terminal_status": "This import has already been applied, or replaced by a newer one, and cannot be validated or applied again. Upload a new file instead.",
     "file_already_used": "This file has already been imported for this week (status: {{status}}) and cannot be applied again. Upload a changed or newly exported file to correct the week.",
     "invalid_status": "The import batch is in a status that cannot be applied (needs preview_ready or validated).",
+    "mapping_target_missing": "The internal id belongs to no object of the chosen kind. Check the id of the station, share type variation or delivery day.",
     "validation_failed": "Some rows in the file are invalid, so the import was not applied. The per-row report shows which rows are affected and what to fix."
   },
   "shares_day_change": {
@@ -555,5 +561,11 @@
   },
   "accounting": {
     "email_missing": "No accounting email is configured — please add one in the email configuration."
+  },
+  "plot": {
+    "in_use": "This plot is still in use (by forecasts, say) and can't be deleted."
+  },
+  "orders_delivery_day": {
+    "in_use": "This order day is still in use and can't be deleted."
   }
 }

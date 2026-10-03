@@ -148,6 +148,39 @@ class TestExternalCodeMappingViewSet:
         resp = api_client.post(self.URL, payload, format="json")
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
+    @pytest.mark.parametrize(
+        "kind", [ExternalCodeMapping.KIND_STATION, ExternalCodeMapping.KIND_VARIATION]
+    )
+    def test_a_mapping_to_no_object_of_its_kind_is_refused(
+        self, api_client, world, kind
+    ):
+        # A station's id is no variation's id, and "missing00000" is no one's.
+        internal_id = (
+            "missing00000"
+            if kind == ExternalCodeMapping.KIND_STATION
+            else str(world["station"].id)
+        )
+        resp = api_client.post(
+            self.URL,
+            {"kind": kind, "external_code": "NEW-1", "internal_id": internal_id},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "share_import.mapping_target_missing"
+        assert not ExternalCodeMapping.objects.filter(external_code="NEW-1").exists()
+
+    def test_repointing_a_mapping_to_no_object_is_refused(self, api_client, world):
+        mapping = ExternalCodeMapping.objects.get(external_code="STN-1")
+        url = reverse("external_code_mapping-detail", kwargs={"pk": mapping.pk})
+
+        resp = api_client.patch(url, {"internal_id": "missing00000"}, format="json")
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "share_import.mapping_target_missing"
+        mapping.refresh_from_db()
+        assert mapping.internal_id == str(world["station"].id)
+
     def test_delete_mapping(self, api_client, world):
         mapping = ExternalCodeMapping.objects.get(external_code="WED")
         url = reverse("external_code_mapping-detail", kwargs={"pk": mapping.pk})

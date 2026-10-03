@@ -84,6 +84,13 @@ class TenantLogoInvalid(BadRequestError):
     code = "tenant.logo_invalid"
 
 
+class TenantRateLimitsInvalid(BadRequestError):
+    """A tenant's rate-limit overrides must map known actions to whole-number
+    ``weekly`` / ``per_minute`` caps within the allowed range."""
+
+    code = "tenant.rate_limits_invalid"
+
+
 class TenantFeatureFlagsInvalid(BadRequestError):
     """``navigation`` / ``ai`` must be an object mapping flag names to booleans.
 

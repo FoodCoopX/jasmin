@@ -42,7 +42,7 @@ export const complexityPins = {
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 50,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 35,
   "src/shared/tables/BasicEditableTable/useEditableTable.ts": 56,
-  "src/shared/ui/JobProgressDrawer.tsx": 35,
+  "src/shared/ui/JobProgressDrawer.tsx": 34,
 };
 
 // Longest function per file, blank lines and comments excluded.
@@ -57,10 +57,10 @@ export const functionLengthPins = {
   "src/features/commissioning/modals/DeliveryStationDetailModal.tsx": 451,
   "src/features/commissioning/modals/InvoiceModal.tsx": 478,
   "src/features/commissioning/modals/ShareTypeVariationModal.tsx": 608,
-  "src/features/commissioning/pages/DeliveryNotes.tsx": 481,
+  "src/features/commissioning/pages/DeliveryNotes.tsx": 479,
   "src/features/commissioning/pages/DeliveryStationsDetails.tsx": 435,
   "src/features/commissioning/pages/Forecast.tsx": 439,
-  "src/features/commissioning/pages/Invoices.tsx": 760,
+  "src/features/commissioning/pages/Invoices.tsx": 758,
   "src/features/commissioning/pages/ListResellers.tsx": 408,
   "src/features/commissioning/pages/LoggingStorage.tsx": 464,
   "src/features/commissioning/pages/Orders.tsx": 477,

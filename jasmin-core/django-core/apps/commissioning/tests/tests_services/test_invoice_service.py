@@ -343,8 +343,8 @@ class TestNullAmountDeliveryNoteLine:
 
     def test_the_snapshot_mirrors_the_written_amount(self, tenant):
         """``_create_invoice_article_content`` sets ``source_amount`` from the
-        same argument as ``amount``, so the GoBD audit snapshot must not be
-        left NULL while the written value is 0."""
+        same ``pricing.amount`` as ``amount``, so the GoBD audit snapshot must
+        not be left NULL while the written value is 0."""
         dn = self._finalized_dn_with_null_amount(tenant)
 
         invoice = InvoiceService.create_from_delivery_note(dn)

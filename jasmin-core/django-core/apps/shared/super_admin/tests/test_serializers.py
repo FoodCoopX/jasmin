@@ -433,10 +433,32 @@ class TestResponseSerializerShapes:
                 "domains": [{"domain": "x.com", "is_primary": True}],
                 "created_on": datetime.datetime(2026, 1, 1),
                 "is_active": True,
+                "action_rate_limit_defaults": [
+                    {
+                        "action": "invoice_finalization",
+                        "display_name": "Invoice finalization",
+                        "weekly": 300,
+                        "per_minute": 20,
+                    }
+                ],
+                "action_rate_limit_overrides": {
+                    "invoice_finalization": {"weekly": 600}
+                },
             },
         )
         assert out["domains"] == [{"domain": "x.com", "is_primary": True}]
         assert out["tenant_language"] == "de"
+        assert out["action_rate_limit_defaults"] == [
+            {
+                "action": "invoice_finalization",
+                "display_name": "Invoice finalization",
+                "weekly": 300,
+                "per_minute": 20,
+            }
+        ]
+        assert out["action_rate_limit_overrides"] == {
+            "invoice_finalization": {"weekly": 600}
+        }
 
     def test_tenant_user_list_response(self):
         # TenantUserSerializer is fully typed — fixtures carry the

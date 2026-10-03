@@ -4,7 +4,9 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
@@ -41,6 +43,18 @@ def _payment_due_date(invoice_date, reseller):
         # ``schema_name``; fall back to the default terms.
         terms_days = 14
     return invoice_date + timedelta(days=terms_days)
+
+
+@dataclass(frozen=True)
+class InvoiceLinePricing:
+    """What a call site decides for one invoice line: the amount (negated on a
+    storno), the tax rate, the discount, and the raw ``source_rabatt``
+    snapshot, which can differ from the coerced ``rabatt``."""
+
+    amount: Any
+    tax_rate: Any
+    rabatt: Any
+    source_rabatt: Any
 
 
 class InvoiceService:
@@ -119,14 +133,30 @@ class InvoiceService:
         }
 
     @staticmethod
+    def unfinalized_upstream_delivery_note_ids(invoice_ids) -> set[str]:
+        """The unfinalized delivery notes that finalizing these invoices
+        cascades to (see ``finalize_invoice``): those behind their article
+        lines and those behind their crate lines, in two queries. A bulk
+        finalize reserves their quota up front."""
+        ids = list(invoice_ids)
+        if not ids:
+            return set()
+        article_notes = InvoiceResellerContent.objects.filter(
+            invoice_id__in=ids,
+            delivery_note_contents__delivery_note__is_finalized=False,
+        ).values_list("delivery_note_contents__delivery_note_id", flat=True)
+        crate_notes = CrateContentInvoiceReseller.objects.filter(
+            invoice_id__in=ids,
+            crate_delivery_note_contents__delivery_note__is_finalized=False,
+        ).values_list("crate_delivery_note_contents__delivery_note_id", flat=True)
+        return {str(pk) for pk in article_notes} | {str(pk) for pk in crate_notes}
+
+    @staticmethod
     def _create_invoice_article_content(
         invoice: InvoiceReseller,
         source_row,
+        pricing: InvoiceLinePricing,
         *,
-        amount,
-        tax_rate,
-        rabatt,
-        source_rabatt,
         order_content=None,
         delivery_note_contents=(),
     ) -> InvoiceResellerContent:
@@ -137,10 +167,10 @@ class InvoiceService:
 
         These are legally-immutable (GoBD/UStG) documents: a missed ``source_*``
         field silently breaks the serializer's ``*_differs`` audit, so the five
-        snapshot fields are laid out in one place here. ``amount`` / sign /
-        ``tax_rate`` / ``rabatt`` (and the raw ``source_rabatt`` snapshot, which
-        legitimately diverges from the coerced ``rabatt or 0`` on the create
-        path) stay at the CALL SITE:
+        snapshot fields are laid out in one place here. ``pricing`` — amount /
+        sign / ``tax_rate`` / ``rabatt`` and the raw ``source_rabatt`` snapshot,
+        which legitimately diverges from the coerced ``rabatt or 0`` on the
+        create path — is decided at the CALL SITE:
 
           * create-from-DN passes the positive amount + the DN content's tax
             + the single source DN content on the M2M;
@@ -163,15 +193,15 @@ class InvoiceService:
             unit=source_row.unit,
             size=source_row.size,
             sort=source_row.sort,
-            amount=amount,
+            amount=pricing.amount,
             price_per_unit=source_row.price_per_unit,
-            rabatt=rabatt,
-            tax_rate=tax_rate,
+            rabatt=pricing.rabatt,
+            tax_rate=pricing.tax_rate,
             # Snapshot of the upstream row so the serializer's *_differs
             # fields are pure local comparisons on this immutable document.
-            source_amount=amount,
+            source_amount=pricing.amount,
             source_price_per_unit=source_row.price_per_unit,
-            source_rabatt=source_rabatt,
+            source_rabatt=pricing.source_rabatt,
             source_unit=source_row.unit,
             source_size=source_row.size,
         )
@@ -183,33 +213,29 @@ class InvoiceService:
     def _create_invoice_crate_content(
         invoice: InvoiceReseller,
         source_row,
+        pricing: InvoiceLinePricing,
         *,
-        amount,
-        tax_rate,
-        rabatt,
-        source_rabatt,
         crate_delivery_note_contents=(),
     ) -> CrateContentInvoiceReseller:
         """Create one ``CrateContentInvoiceReseller`` line from an upstream crate
         row — the crate counterpart to ``_create_invoice_article_content``.
 
         Owns the three ``source_*`` snapshot fields (crates carry no unit/size)
-        + the crate provenance M2M. As with the article helper, ``amount`` /
-        sign / ``tax_rate`` / ``rabatt`` / the raw ``source_rabatt`` stay at the
-        call site; storno wires no M2M.
+        + the crate provenance M2M. As with the article helper, ``pricing`` is
+        decided at the call site; storno wires no M2M.
         """
         content = CrateContentInvoiceReseller.objects.create(
             invoice=invoice,
             crate_type=source_row.crate_type,
-            amount=amount,
+            amount=pricing.amount,
             price_per_unit=source_row.price_per_unit,
-            rabatt=rabatt,
-            tax_rate=tax_rate,
+            rabatt=pricing.rabatt,
+            tax_rate=pricing.tax_rate,
             note=source_row.note,
             # Snapshot of the upstream crate row — same rationale as above.
-            source_amount=amount,
+            source_amount=pricing.amount,
             source_price_per_unit=source_row.price_per_unit,
-            source_rabatt=source_rabatt,
+            source_rabatt=pricing.source_rabatt,
         )
         if crate_delivery_note_contents:
             content.crate_delivery_note_contents.add(*crate_delivery_note_contents)
@@ -374,10 +400,12 @@ class InvoiceService:
                 # The SUMMARY invoice path coerces the same value (``amount or 0``
                 # when accumulating ``total_amount``), so both paths accept the same
                 # data. ``rabatt`` below is coerced too.
-                amount=delivery_note_content.amount or 0,
-                tax_rate=delivery_note_content.tax_rate,
-                rabatt=delivery_note_content.rabatt or 0,
-                source_rabatt=delivery_note_content.rabatt,
+                InvoiceLinePricing(
+                    amount=delivery_note_content.amount or 0,
+                    tax_rate=delivery_note_content.tax_rate,
+                    rabatt=delivery_note_content.rabatt or 0,
+                    source_rabatt=delivery_note_content.rabatt,
+                ),
                 order_content=delivery_note_content.order_content,
                 delivery_note_contents=(delivery_note_content,),
             )
@@ -394,10 +422,12 @@ class InvoiceService:
             InvoiceService._create_invoice_crate_content(
                 invoice,
                 crate_delivery_note_content,
-                amount=crate_delivery_note_content.amount,
-                tax_rate=crate_delivery_note_content.tax_rate,
-                rabatt=crate_delivery_note_content.rabatt or 0,
-                source_rabatt=crate_delivery_note_content.rabatt,
+                InvoiceLinePricing(
+                    amount=crate_delivery_note_content.amount,
+                    tax_rate=crate_delivery_note_content.tax_rate,
+                    rabatt=crate_delivery_note_content.rabatt or 0,
+                    source_rabatt=crate_delivery_note_content.rabatt,
+                ),
                 crate_delivery_note_contents=(crate_delivery_note_content,),
             )
 
@@ -421,8 +451,11 @@ class InvoiceService:
 
         ``skip_quota=True`` is passed by bulk endpoints that have already
         reserved the whole batch against the weekly cap up front (see
-        ``enforce_action_quota_batch``); it suppresses the per-item guard so a
-        legitimate bulk finalize doesn't trip the per-minute burst cap mid-batch.
+        ``apps.commissioning.services.finalization_quota``); it suppresses the
+        per-item guard — for the invoice and for the delivery notes it
+        cascades to, whose quota the caller reserves too
+        (``unfinalized_upstream_delivery_note_ids``) — so a legitimate bulk
+        finalize doesn't trip the per-minute burst cap mid-batch.
         """
         invoice.assert_not_finalized(label="Invoice", code="invoice.already_finalized")
 
@@ -521,7 +554,9 @@ class InvoiceService:
                     delivery_notes[delivery_note.pk] = delivery_note
 
         for delivery_note in delivery_notes.values():
-            DeliveryNoteService.finalize_delivery_note(delivery_note, user=user)
+            DeliveryNoteService.finalize_delivery_note(
+                delivery_note, user=user, skip_quota=skip_quota
+            )
 
         # Re-read order state AFTER the DN finalisations — a DN finalize can
         # cascade up to its own order — so a manual line's order is never
@@ -593,10 +628,12 @@ class InvoiceService:
             InvoiceService._create_invoice_article_content(
                 storno,
                 item,
-                amount=-item.amount,
-                tax_rate=item.tax_rate,
-                rabatt=item.rabatt,
-                source_rabatt=item.rabatt,
+                InvoiceLinePricing(
+                    amount=-item.amount,
+                    tax_rate=item.tax_rate,
+                    rabatt=item.rabatt,
+                    source_rabatt=item.rabatt,
+                ),
                 order_content=item.order_content,
             )
 
@@ -604,10 +641,12 @@ class InvoiceService:
             InvoiceService._create_invoice_crate_content(
                 storno,
                 crate_item,
-                amount=-crate_item.amount,
-                tax_rate=crate_item.tax_rate,
-                rabatt=crate_item.rabatt,
-                source_rabatt=crate_item.rabatt,
+                InvoiceLinePricing(
+                    amount=-crate_item.amount,
+                    tax_rate=crate_item.tax_rate,
+                    rabatt=crate_item.rabatt,
+                    source_rabatt=crate_item.rabatt,
+                ),
             )
 
         InvoiceService.finalize_invoice(storno, user=user)
@@ -740,10 +779,12 @@ class InvoiceService:
             InvoiceService._create_invoice_article_content(
                 invoice,
                 group["first_content"],
-                amount=group["total_amount"],
-                tax_rate=group["tax_rate"],
-                rabatt=group["rabatt"],
-                source_rabatt=group["rabatt"],
+                InvoiceLinePricing(
+                    amount=group["total_amount"],
+                    tax_rate=group["tax_rate"],
+                    rabatt=group["rabatt"],
+                    source_rabatt=group["rabatt"],
+                ),
                 delivery_note_contents=group["dn_contents"],
             )
 
@@ -796,10 +837,12 @@ class InvoiceService:
             InvoiceService._create_invoice_crate_content(
                 invoice,
                 group["first_content"],
-                amount=group["total_amount"],
-                tax_rate=group["tax_rate"],
-                rabatt=group["rabatt"],
-                source_rabatt=group["rabatt"],
+                InvoiceLinePricing(
+                    amount=group["total_amount"],
+                    tax_rate=group["tax_rate"],
+                    rabatt=group["rabatt"],
+                    source_rabatt=group["rabatt"],
+                ),
                 crate_delivery_note_contents=group["dn_crate_contents"],
             )
 

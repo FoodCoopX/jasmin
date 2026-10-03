@@ -21,7 +21,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import RequiresStepUp
 from apps.authz.permissions import APIViewRolePermissionsMixin, IsOffice, IsStaff
 from apps.shared.request_utils import auth_user, body
-from core.errors import ConflictError, NotFoundError
+from core.errors import JasminError, NotFoundError
 from core.serializers import ErrorResponseSerializer
 
 from ..errors import (
@@ -32,6 +32,8 @@ from ..errors import (
 )
 from ..models import (
     CrateContentInvoiceReseller,
+    DeliveryNoteReseller,
+    InvoiceReseller,
     InvoiceResellerContent,
     OfferGroup,
     OfferSending,
@@ -73,6 +75,10 @@ from ..services.bulk_operations import bulk_with_savepoints
 from ..services.bulk_results import (
     format_order_error,
     get_delivery_note_or_error,
+)
+from ..services.finalization_quota import (
+    FinalizationReservation,
+    reserve_finalizations,
 )
 from ..utils.iso_week_utils import week_day_to_date
 from ..utils.lookup import get_or_404
@@ -130,6 +136,31 @@ def _append_missing_order_errors(
 _get_invoice_for_delivery_note = InvoiceService.get_invoice_for_delivery_note
 
 
+def _has_finalized_delivery_note(order: Order) -> bool:
+    delivery_note = getattr(order, "delivery_note", None)
+    return delivery_note is not None and delivery_note.is_finalized
+
+
+def _release_unused(reservations: Iterable[FinalizationReservation]) -> None:
+    for reservation in reservations:
+        reservation.release_unused()
+
+
+def _finalize_for_summary(delivery_note: DeliveryNoteReseller, user: Any) -> str:
+    """Finalize ``delivery_note`` (quota reserved by the caller) in a
+    savepoint; return why it couldn't be, or "" — one note that can't be
+    finalized (an empty one) is left out of a summary invoice instead of
+    aborting it."""
+    try:
+        with transaction.atomic():
+            finalized = DeliveryNoteService.finalize_delivery_note(
+                delivery_note=delivery_note, user=user, skip_quota=True
+            )
+    except (ValidationError, JasminError) as exc:
+        return str(exc)
+    return "" if finalized else "Failed to finalize delivery note"
+
+
 def _run_per_order_bulk(
     orders: QuerySet[Order],
     handler: Callable[[Order, list[dict[str, Any]], list[dict[str, Any]]], None],
@@ -140,18 +171,18 @@ def _run_per_order_bulk(
     ``handler(order, results, errors)`` does one order's work: it appends a
     success row to ``results`` and may append business-rule rejections to
     ``errors`` directly (then ``return`` to skip the order). Any
-    ``ValidationError`` / ``ConflictError`` / DB error / ``ValueError`` it
-    raises is caught here and recorded as a per-order error, so a single bad
-    order never aborts the whole batch.
+    ``ValidationError``, domain error (``JasminError`` — an already-finalized
+    conflict, an empty document), DB error or ``ValueError`` it raises is
+    caught here and recorded as a per-order error, so a single bad order never
+    aborts the whole batch.
     """
     results: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
 
     def record_error(order: Order, exc: Exception) -> None:
-        if isinstance(exc, (ValidationError, ConflictError)):
-            # Already-finalized / already-exists conflicts (and validation
-            # failures) are expected per-order outcomes in a bulk run — they
-            # belong in the 207 errors list, not as a request-aborting 409.
+        if isinstance(exc, (ValidationError, JasminError)):
+            # Expected per-order outcomes in a bulk run — they belong in the
+            # 207 errors list, not as a request-aborting 400 / 409.
             errors.append(format_order_error(order, str(exc)))
         else:
             # DatabaseError covers IntegrityError / DataError / etc.
@@ -162,7 +193,7 @@ def _run_per_order_bulk(
         lambda order: handler(order, results, errors),
         catch=(
             ValidationError,
-            ConflictError,
+            JasminError,
             DatabaseError,
             ValueError,
         ),
@@ -292,17 +323,21 @@ class BulkCreateDocumentsFromOrdersView(APIViewRolePermissionsMixin, APIView):
         if not orders.exists():
             raise NotFoundError("No valid orders found")
 
-        # The invoice branch finalizes each order's delivery note before creating
-        # the (draft) invoice — reserve that DN-finalization batch up front so a
-        # bulk run doesn't trip the per-minute cap (skip_quota below suppresses the
-        # per-item guard). The delivery_note branch only CREATES (no finalize).
+        # The invoice branch finalizes each order's delivery note — creating it
+        # first where there is none — before creating the (draft) invoice, so it
+        # reserves those finalizations (see ``finalization_quota``). The
+        # delivery_note branch only creates.
+        reservation: FinalizationReservation | None = None
         if model == "invoice":
             from apps.shared.tenants.models import RateLimitedAction
-            from apps.shared.tenants.rate_limits import enforce_action_quota_batch
 
-            enforce_action_quota_batch(
+            to_finalize = [
+                order.id for order in orders if not _has_finalized_delivery_note(order)
+            ]
+            reservation = reserve_finalizations(
                 RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
-                count=orders.count(),
+                DeliveryNoteReseller.objects.filter(order_id__in=to_finalize),
+                count=len(to_finalize),
                 actor=request.user,
             )
 
@@ -318,6 +353,8 @@ class BulkCreateDocumentsFromOrdersView(APIViewRolePermissionsMixin, APIView):
 
         results, errors = _run_per_order_bulk(orders, handler)
         _append_missing_order_errors(order_ids, orders, errors)
+        if reservation is not None:
+            reservation.release_unused()
 
         return _build_bulk_response(
             model, order_ids, results, errors, success_status=status.HTTP_201_CREATED
@@ -387,21 +424,7 @@ class BulkFinalizeDocumentsView(APIViewRolePermissionsMixin, APIView):
         if not orders.exists():
             raise NotFoundError("No valid orders found")
 
-        # Reserve the whole batch against the weekly finalization cap up front so
-        # a legitimate bulk finalize doesn't trip the per-minute burst cap on item
-        # ~20; the per-item guards are suppressed via skip_quota below. Over-cap
-        # → 429 before any finalize (inside this @transaction.atomic).
-        from apps.shared.tenants.models import RateLimitedAction
-        from apps.shared.tenants.rate_limits import enforce_action_quota_batch
-
-        _batch_action = (
-            RateLimitedAction.DELIVERY_NOTE_FINALIZATION
-            if model == "delivery_note"
-            else RateLimitedAction.INVOICE_FINALIZATION
-        )
-        enforce_action_quota_batch(
-            _batch_action, count=orders.count(), actor=request.user
-        )
+        reservations = self._reserve(orders, model, request.user)
 
         def handler(
             order: Order,
@@ -451,7 +474,59 @@ class BulkFinalizeDocumentsView(APIViewRolePermissionsMixin, APIView):
 
         results, errors = _run_per_order_bulk(orders, handler)
         _append_missing_order_errors(order_ids, orders, errors)
+        _release_unused(reservations)
         return _build_bulk_response(model, order_ids, results, errors)
+
+    @staticmethod
+    def _reserve(
+        orders: QuerySet[Order], model: str, actor: Any
+    ) -> list[FinalizationReservation]:
+        """Reserve the finalizations this batch may perform, up front, so an
+        over-cap batch is refused (429) before anything is finalized; the run
+        then finalizes with ``skip_quota``. Only documents not yet final count,
+        and finalizing an invoice also finalizes the delivery notes behind it."""
+        from apps.shared.tenants.models import RateLimitedAction
+
+        delivery_notes = [
+            order.delivery_note
+            for order in orders
+            if getattr(order, "delivery_note", None) is not None
+        ]
+        if model == "delivery_note":
+            return [
+                reserve_finalizations(
+                    RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
+                    DeliveryNoteReseller.objects.filter(
+                        pk__in=[
+                            note.pk for note in delivery_notes if not note.is_finalized
+                        ]
+                    ),
+                    actor=actor,
+                )
+            ]
+        invoice_ids = {
+            invoice.pk
+            for invoice in InvoiceService.get_invoices_for_delivery_notes(
+                [note.pk for note in delivery_notes]
+            ).values()
+            if not invoice.is_finalized
+        }
+        return [
+            reserve_finalizations(
+                RateLimitedAction.INVOICE_FINALIZATION,
+                InvoiceReseller.objects.filter(pk__in=invoice_ids),
+                actor=actor,
+            ),
+            reserve_finalizations(
+                RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
+                DeliveryNoteReseller.objects.filter(
+                    pk__in=InvoiceService.unfinalized_upstream_delivery_note_ids(
+                        invoice_ids
+                    )
+                ),
+                actor=actor,
+            ),
+        ]
 
 
 class BulkDeleteDocumentsView(APIViewRolePermissionsMixin, APIView):
@@ -1164,19 +1239,6 @@ class BulkCreateSummaryInvoiceFromOrdersView(APIViewRolePermissionsMixin, APIVie
         if not orders:
             raise NotFoundError("No valid orders found")
 
-        # Reserve the DN-finalization batch up front (this view finalizes each
-        # order's delivery note before rolling them into one summary invoice), so
-        # a bulk run doesn't trip the per-minute cap; skip_quota below suppresses
-        # the per-item guard. len(orders) is a safe upper bound.
-        from apps.shared.tenants.models import RateLimitedAction
-        from apps.shared.tenants.rate_limits import enforce_action_quota_batch
-
-        enforce_action_quota_batch(
-            RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
-            count=len(orders),
-            actor=request.user,
-        )
-
         # ``delivery_note`` is a reverse OneToOne (FK on DeliveryNoteReseller),
         # so Order has no ``_id`` for it — read via getattr; select_related
         # above keeps the access query-free.
@@ -1200,6 +1262,25 @@ class BulkCreateSummaryInvoiceFromOrdersView(APIViewRolePermissionsMixin, APIVie
             CrateContentInvoiceReseller.objects.filter(
                 crate_delivery_note_contents__delivery_note_id__in=all_delivery_note_ids
             ).values_list("crate_delivery_note_contents__delivery_note_id", flat=True)
+        )
+
+        # The view finalizes each usable delivery note that isn't final yet
+        # before rolling them into one summary invoice, so it reserves those
+        # finalizations (see ``finalization_quota``).
+        from apps.shared.tenants.models import RateLimitedAction
+
+        reservation = reserve_finalizations(
+            RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
+            DeliveryNoteReseller.objects.filter(
+                pk__in=[
+                    delivery_note.pk
+                    for delivery_note in delivery_note_by_order.values()
+                    if delivery_note is not None
+                    and not delivery_note.is_finalized
+                    and delivery_note.id not in already_invoiced_delivery_note_ids
+                ]
+            ),
+            actor=request.user,
         )
 
         delivery_notes = []
@@ -1229,21 +1310,21 @@ class BulkCreateSummaryInvoiceFromOrdersView(APIViewRolePermissionsMixin, APIVie
                 )
                 continue
 
-            if not delivery_note.is_finalized:
-                finalize_success = DeliveryNoteService.finalize_delivery_note(
-                    delivery_note=delivery_note, user=request.user, skip_quota=True
+            if not delivery_note.is_finalized and (
+                finalize_error := _finalize_for_summary(delivery_note, request.user)
+            ):
+                errors.append(
+                    {
+                        "order_id": str(order.id),
+                        "order_number": order.full_number,
+                        "error": finalize_error,
+                    }
                 )
-                if not finalize_success:
-                    errors.append(
-                        {
-                            "order_id": str(order.id),
-                            "order_number": order.full_number,
-                            "error": "Failed to finalize delivery note",
-                        }
-                    )
-                    continue
+                continue
 
             delivery_notes.append(delivery_note)
+
+        reservation.release_unused()
 
         if not delivery_notes:
             raise CommissioningError(
@@ -1464,6 +1545,58 @@ class BulkSendInvoiceRemindersViaEmailView(APIViewRolePermissionsMixin, APIView)
             created_by=auth_user(request),
         )
 
+        return Response(
+            BackgroundJobEnqueueResponseSerializer(
+                {"job_id": job.id, "kind": job.kind, "status": job.status}
+            ).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class BulkSendDocumentsViaEmailView(APIViewRolePermissionsMixin, APIView):
+    read_permission = IsOffice
+    write_permission = IsOffice
+    # Step-up required: one email per selected document goes out from the
+    # tenant's mail server, which a stolen session must not fan out unconfirmed.
+    permission_classes = (RequiresStepUp,)
+
+    @extend_schema(
+        summary="Enqueue a bulk send of invoices or delivery notes",
+        description=(
+            "Enqueues a Huey background job that emails each selected order's "
+            "finalized invoice or delivery note (``model``) as a PDF to the "
+            "reseller's invoice address. A document already sent is skipped; "
+            "one that can't be sent (not finalized, no PDF, no address, "
+            "invoices on paper only) is reported in the job result. Returns "
+            "202 with a ``job_id``; the frontend polls ``GET /api/"
+            "notifications/jobs/{job_id}/`` until status is ``done`` or "
+            "``failed``."
+        ),
+        request=BulkDocumentRequestSerializer,
+        responses={
+            202: BackgroundJobEnqueueResponseSerializer,
+            400: ErrorResponseSerializer,
+            # ``EmailSendingNotSetUp`` — the tenant has no SMTP host of its own.
+            409: ErrorResponseSerializer,
+        },
+    )
+    @transaction.atomic
+    def post(self, request: Request) -> Response:
+        from apps.commissioning.tasks import run_bulk_document_send
+        from apps.notifications.jobs import enqueue_job
+        from apps.shared.tenants.email_service import assert_tenant_can_send_email
+
+        params = validate_bulk_document_request(request)
+        assert_tenant_can_send_email()
+        job = enqueue_job(
+            kind=f"{params['model']}.bulk_send",
+            task=run_bulk_document_send,
+            task_kwargs={
+                "order_ids": [str(order_id) for order_id in params["order_ids"]],
+                "model": params["model"],
+            },
+            created_by=auth_user(request),
+        )
         return Response(
             BackgroundJobEnqueueResponseSerializer(
                 {"job_id": job.id, "kind": job.kind, "status": job.status}

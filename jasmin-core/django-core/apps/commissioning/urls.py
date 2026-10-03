@@ -10,6 +10,7 @@ from .views import (
     BulkFinalizeDocumentsView,
     BulkFinalizeShareContentView,
     BulkFinalizeView,
+    BulkSendDocumentsViaEmailView,
     BulkSendInvoiceRemindersViaEmailView,
     BulkSendOffersViaEmailView,
     BulkSetToPaidDocumentsView,
@@ -502,6 +503,11 @@ urlpatterns = [
         "bulk_send_invoice_reminders_via_email/",
         BulkSendInvoiceRemindersViaEmailView.as_view(),
         name="bulk_send_invoice_reminders_via_email",
+    ),
+    path(
+        "bulk_send_documents_via_email/",
+        BulkSendDocumentsViaEmailView.as_view(),
+        name="bulk_send_documents_via_email",
     ),
     path(
         "bulk_send_offers_via_email/",

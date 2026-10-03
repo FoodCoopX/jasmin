@@ -42,6 +42,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import itertools
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
@@ -79,6 +80,20 @@ REQUIRED_COLUMNS = {
 # header. Its default would file them under the key ``None``, which is not a
 # column name and blows up the row normalisation in ``parse_and_validate``.
 _EXTRA_CELLS_KEY = "__extra_cells__"
+
+
+def _delimiter_of(header_line: str) -> str:
+    """The delimiter of a file whose header row is ``header_line``: a
+    semicolon when it splits out more of the required columns than a comma
+    does — a spreadsheet saved as CSV in German uses ``;`` — else a comma."""
+
+    def required_columns_split_by(delimiter: str) -> int:
+        cells = {cell.strip().strip('"') for cell in header_line.split(delimiter)}
+        return len(REQUIRED_COLUMNS & cells)
+
+    return (
+        ";" if required_columns_split_by(";") > required_columns_split_by(",") else ","
+    )
 
 
 # --- DTOs -------------------------------------------------------------------
@@ -230,8 +245,12 @@ class ShareImportService:
             cls._persist_validation(batch, outcome, ok=False)
             return outcome
 
-        # Pre-load all mappings into memory once.
+        # Pre-load all mappings into memory once, and which of the objects
+        # they point at exist: a mapping whose object is gone (or whose id
+        # was mistyped before the mapping API checked it) fails its rows
+        # naming the mapping, not as a missing station-day link.
         mappings = cls._load_mappings()
+        existing_targets = cls._existing_mapping_targets(mappings)
 
         # Pre-load every DeliveryStationDay once, keyed by the
         # (station_id, day_id) pair. Without this the per-row lookup below
@@ -257,7 +276,7 @@ class ShareImportService:
                 # field name, so the row cannot be read. Report it and move on.
                 outcome.errors[str(line_no)] = [
                     f"row has more cells than the header ({len(surplus)} "
-                    "extra) — check for a stray comma or an unquoted separator"
+                    "extra) — check for a stray or unquoted separator"
                 ]
                 continue
 
@@ -288,22 +307,20 @@ class ShareImportService:
                     f"batch ({batch.year}/{batch.delivery_week})"
                 )
 
-            variation_id = mappings["variation"].get(data["variation_code"])
-            if variation_id is None:
-                row_errors.append(f"unknown variation_code: {data['variation_code']!r}")
-
-            station_id = mappings["station"].get(data["delivery_station_code"])
-            if station_id is None:
-                row_errors.append(
-                    f"unknown delivery_station_code: "
-                    f"{data['delivery_station_code']!r}"
+            resolved: dict[str, str | None] = {}
+            for kind, column in (
+                ("variation", "variation_code"),
+                ("station", "delivery_station_code"),
+                ("day", "delivery_day_code"),
+            ):
+                resolved[kind], error = cls._resolve_code(
+                    kind, column, data[column], mappings, existing_targets
                 )
-
-            day_id = mappings["day"].get(data["delivery_day_code"])
-            if day_id is None:
-                row_errors.append(
-                    f"unknown delivery_day_code: {data['delivery_day_code']!r}"
-                )
+                if error:
+                    row_errors.append(error)
+            variation_id = resolved["variation"]
+            station_id = resolved["station"]
+            day_id = resolved["day"]
 
             station_day_id: str | None = None
             if station_id and day_id:
@@ -576,11 +593,53 @@ class ShareImportService:
     @staticmethod
     def _read_rows(batch: ShareImportBatch) -> Iterable[dict[str, str]]:
         """Yield dict rows from the uploaded file. CSV only for now;
-        extend with openpyxl for .xlsx as needed."""
+        extend with openpyxl for .xlsx as needed. The columns may be
+        separated by commas or semicolons; the header row tells which."""
         with batch.file.open("rb") as fh:
             text = io.TextIOWrapper(fh, encoding="utf-8-sig", newline="")
-            reader = csv.DictReader(text, restkey=_EXTRA_CELLS_KEY)
+            header = text.readline()
+            reader = csv.DictReader(
+                itertools.chain([header], text),
+                delimiter=_delimiter_of(header),
+                restkey=_EXTRA_CELLS_KEY,
+            )
             yield from reader
+
+    @staticmethod
+    def _existing_mapping_targets(
+        mappings: dict[str, dict[str, str]],
+    ) -> dict[str, set[str]]:
+        """Of the ids the mappings point at, those that exist — per kind, in
+        one query each."""
+        return {
+            kind: {
+                str(pk)
+                for pk in ExternalCodeMapping.target_model(kind)
+                ._default_manager.filter(pk__in=set(internal_ids.values()))
+                .values_list("pk", flat=True)
+            }
+            for kind, internal_ids in mappings.items()
+        }
+
+    @staticmethod
+    def _resolve_code(
+        kind: str,
+        column: str,
+        code: str,
+        mappings: dict[str, dict[str, str]],
+        existing_targets: dict[str, set[str]],
+    ) -> tuple[str | None, str | None]:
+        """``(internal_id, None)`` for a code the ``kind`` mappings resolve to
+        an existing object, else ``(None, why)``."""
+        internal_id = mappings[kind].get(code)
+        if internal_id is None:
+            return None, f"unknown {column}: {code!r}"
+        if internal_id not in existing_targets[kind]:
+            return None, (
+                f"{column} {code!r} is mapped to {internal_id!r}, but no "
+                f"{kind} has that id — correct the mapping"
+            )
+        return internal_id, None
 
     @staticmethod
     def _load_mappings() -> dict[str, dict[str, str]]:

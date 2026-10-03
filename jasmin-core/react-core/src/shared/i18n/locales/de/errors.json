@@ -114,12 +114,14 @@
   "share_article": {
     "not_found": "Artikel nicht gefunden.",
     "invalid_share_option": "Ungültige Anteilsoption.",
-    "net_price_in_use": "Dieser aktuell gültige Preis kann nicht gelöscht werden, weil der Artikel bereits verwendet wird. Stattdessen einen neuen Preis mit späterem Gültigkeitsbeginn anlegen."
+    "net_price_in_use": "Dieser aktuell gültige Preis kann nicht gelöscht werden, weil der Artikel bereits verwendet wird. Stattdessen einen neuen Preis mit späterem Gültigkeitsbeginn anlegen.",
+    "in_use": "Dieser Artikel wird noch verwendet (etwa in Anteilsinhalten oder mit Preisen) und kann nicht gelöscht werden."
   },
   "share_type": {
     "succession_has_active_variations": "Es kann kein neuer Anteilstyp begonnen werden, solange der aktuelle noch Varianten hat, die an oder nach diesem Datum aktiv sind. Beende zuerst diese Varianten oder wähle ein späteres Startdatum.",
     "shortening_strands_variation": "Der Anteilstyp kann nicht zu diesem Datum beendet werden: Es gibt Varianten, die offen sind oder danach enden und damit ihren Anteilstyp überdauern würden. Beende oder verkürze zuerst diese Varianten oder wähle ein späteres Enddatum.",
-    "invalid_share_option": "Ungültige Anteilsoption."
+    "invalid_share_option": "Ungültige Anteilsoption.",
+    "in_use": "Dieser Anteilstyp wird noch verwendet (etwa von Varianten oder Abos) und kann nicht gelöscht werden."
   },
   "time_bound": {
     "succession_start_before_predecessor": "Es kann kein neuer Eintrag vor dem bestehenden offenen Eintrag begonnen werden, den er ablösen würde. Wähle ein Startdatum am oder nach dem des bestehenden Eintrags, oder schließe den bestehenden Eintrag zuerst.",
@@ -146,7 +148,8 @@
     "weak_password": "Das Passwort ist zu schwach — bitte ein sichereres Passwort wählen.",
     "no_context": "Diese Anfrage enthält keinen Mandanten-Kontext. Bitte die Seite über die Adresse des Mandanten erneut aufrufen.",
     "logo_invalid": "Das Logo muss ein PNG-, JPEG-, WEBP- oder GIF-Bild sein und die Größen- und Auflösungsgrenzen einhalten.",
-    "feature_flags_invalid": "Die Einstellungen für Navigation und KI müssen als Objekt mit An-/Aus-Werten übermittelt werden."
+    "feature_flags_invalid": "Die Einstellungen für Navigation und KI müssen als Objekt mit An-/Aus-Werten übermittelt werden.",
+    "rate_limits_invalid": "Die Obergrenzen müssen bekannten Aktionen ganze Zahlen von 1 bis 100000 für „weekly“ und „per_minute“ zuordnen."
   },
   "tenant_settings": {
     "coop_shares_bounds_inverted": "Die Mindestanzahl an Geschäftsanteilen darf die Höchstanzahl nicht überschreiten.",
@@ -232,7 +235,8 @@
     "invoice_email_disabled": "Dieser Wiederverkäufer erhält Rechnungen nur auf Papier — der Rechnungsversand per E-Mail ist ausgeschaltet."
   },
   "storage": {
-    "not_found": "Lager nicht gefunden."
+    "not_found": "Lager nicht gefunden.",
+    "in_use": "Dieses Lager wird noch verwendet (etwa von Prognosen oder Dokumentationseinträgen) und kann nicht gelöscht werden."
   },
   "offer": {
     "not_found": "Angebot nicht gefunden."
@@ -391,7 +395,8 @@
   },
   "crate": {
     "not_found": "Kiste nicht gefunden.",
-    "net_price_in_use": "Dieser aktuell gültige Preis kann nicht gelöscht werden, weil die Kiste bereits verwendet wird. Stattdessen einen neuen Preis mit späterem Gültigkeitsbeginn anlegen."
+    "net_price_in_use": "Dieser aktuell gültige Preis kann nicht gelöscht werden, weil die Kiste bereits verwendet wird. Stattdessen einen neuen Preis mit späterem Gültigkeitsbeginn anlegen.",
+    "in_use": "Diese Kiste wird noch verwendet (etwa mit Preisen oder in Lieferungen) und kann nicht gelöscht werden."
   },
   "document": {
     "date_required": "Für dieses Dokument ist ein Datum erforderlich.",
@@ -479,6 +484,7 @@
     "batch_in_terminal_status": "Dieser Import wurde bereits angewendet oder durch einen neueren ersetzt und kann nicht erneut geprüft oder angewendet werden. Bitte eine neue Datei hochladen.",
     "file_already_used": "Diese Datei wurde für diese Woche bereits importiert (Status: {{status}}) und kann nicht erneut angewendet werden. Für eine Korrektur bitte eine geänderte oder neu exportierte Datei hochladen.",
     "invalid_status": "Der Import-Batch ist in einem Status, der nicht angewendet werden kann (benötigt „preview_ready“ oder „validated“).",
+    "mapping_target_missing": "Die interne ID gehört zu keinem Objekt der gewählten Art. Bitte die ID der Station, der Anteilsvariante bzw. des Liefertags prüfen.",
     "validation_failed": "Einige Zeilen der Datei sind ungültig, der Import wurde nicht angewendet. Die Zeilenprüfung zeigt, welche Zeilen betroffen sind und was zu korrigieren ist."
   },
   "shares_day_change": {
@@ -555,5 +561,11 @@
   },
   "accounting": {
     "email_missing": "Es ist keine Buchhaltungs-E-Mail hinterlegt — bitte in der E-Mail-Konfiguration eintragen."
+  },
+  "plot": {
+    "in_use": "Diese Fläche wird noch verwendet (etwa von Prognosen) und kann nicht gelöscht werden."
+  },
+  "orders_delivery_day": {
+    "in_use": "Dieser Bestelltag wird noch verwendet und kann nicht gelöscht werden."
   }
 }

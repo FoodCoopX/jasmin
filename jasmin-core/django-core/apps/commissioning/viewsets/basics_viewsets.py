@@ -32,8 +32,11 @@ from core.serializers import ErrorResponseSerializer
 
 from ..errors import (
     CommissioningError,
+    CrateInUse,
+    ShareArticleInUse,
     ShareArticleNetPriceInUse,
     ShareArticleNotFound,
+    StorageInUse,
 )
 from ..models import (
     Crate,
@@ -105,7 +108,9 @@ class SeasonViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     update=extend_schema(responses=StorageSerializer),
     partial_update=extend_schema(responses=StorageSerializer),
 )
-class StorageViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
+class StorageViewSet(
+    CanBeDeletedDestroyMixin, RolePermissionsMixin, viewsets.ModelViewSet
+):
     """
     ViewSet for managing storage locations.
     """
@@ -113,6 +118,7 @@ class StorageViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     read_permission = IsStaff
     write_permission = IsStaff
     serializer_class = StorageSerializer
+    not_deletable_error = StorageInUse
 
     @extend_schema(
         parameters=[get_is_active_parameter()],
@@ -133,7 +139,9 @@ class StorageViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         return queryset
 
 
-class ShareArticleViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
+class ShareArticleViewSet(
+    CanBeDeletedDestroyMixin, RolePermissionsMixin, viewsets.ModelViewSet
+):
     """
     ViewSet for managing share articles (vegetables, fruits, and other products).
 
@@ -147,6 +155,7 @@ class ShareArticleViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     read_permission = IsStaff
     write_permission = IsStaff
     serializer_class = ShareArticleSerializer
+    not_deletable_error = ShareArticleInUse
     pagination_class = OptionalLimitOffsetPagination
 
     @extend_schema(
@@ -507,7 +516,9 @@ class ShareArticleNetPriceViewSet(
         )
 
 
-class CrateViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
+class CrateViewSet(
+    CanBeDeletedDestroyMixin, RolePermissionsMixin, viewsets.ModelViewSet
+):
     """
     ViewSet for managing crates (containers for delivery).
     """
@@ -515,6 +526,7 @@ class CrateViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     read_permission = IsStaff
     write_permission = IsStaff
     serializer_class = CrateSerializer
+    not_deletable_error = CrateInUse
 
     @extend_schema(
         parameters=[

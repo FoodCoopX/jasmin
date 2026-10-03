@@ -23,6 +23,7 @@ import type {
   CombinedOrderOverview,
   CommissioningOrdersOverviewListParams,
 } from "@shared/api/generated/models";
+import BulkSendDocumentsButton from "@features/commissioning/components/BulkSendDocumentsButton";
 import { InvoiceModal } from "@features/commissioning/modals";
 import StornoInvoiceModal from "@features/commissioning/modals/StornoInvoiceModal";
 // ``InvoicePDFButtons`` is light (no @react-pdf import) — safe to
@@ -872,13 +873,11 @@ export default function Invoices() {
           marginTop: "-20px",
         }}
       >
-        {/* Bulk send-email is still a disabled placeholder: its backend route
-              doesn't exist yet. Re-enable with the real endpoint once it lands. */}
-        <BulkActionButton
+        <BulkSendDocumentsButton
+          model="invoice"
+          rows={data}
           selectedIds={selectedRowKeys}
-          buttonText={t("resellers.send_via_email_resellers")}
-          buttonProps={{ type: "primary" }}
-          disabled
+          onClose={invalidateData}
         />
         {/* Download the selected invoices' finalized e-PDFs (ZUGFeRD) as a
               single ZIP, built client-side. Enabled whenever at least one

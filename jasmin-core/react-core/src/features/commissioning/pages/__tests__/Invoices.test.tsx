@@ -12,6 +12,8 @@
  *      the modal, the OK button is disabled until a reason is typed,
  *      and submitting hits the ``/api/commissioning/invoices/{id}/
  *      create_storno/`` endpoint with ``{ reason }``.
+ *   4. Bulk send by email — only the selected orders with a finalized
+ *      invoice are sent, and the enqueued job opens in the progress drawer.
  */
 
 import { render, screen, waitFor, within } from "@testing-library/react";
@@ -86,6 +88,7 @@ const bulkFinalizeMock = vi.fn();
 const bulkCreateDocsMock = vi.fn();
 const bulkCreateSummaryMock = vi.fn();
 const bulkDeleteDocsMock = vi.fn();
+const bulkSendDocsMock = vi.fn();
 const createStornoMutateAsyncMock = vi.fn();
 
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
@@ -103,6 +106,8 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
     bulkCreateSummaryMock(...args),
   commissioningBulkDeleteDocumentsCreate: (...args: unknown[]) =>
     bulkDeleteDocsMock(...args),
+  commissioningBulkSendDocumentsViaEmailCreate: (...args: unknown[]) =>
+    bulkSendDocsMock(...args),
   getCommissioningOrdersOverviewListQueryKey: (p?: unknown) => ["orders", p],
 }));
 
@@ -115,6 +120,11 @@ vi.mock("@features/commissioning/modals", () => ({
 
 vi.mock("@features/commissioning/pdfs", () => ({
   InvoicePDFButtons: () => <button>invoice-pdf</button>,
+}));
+
+vi.mock("@shared/ui/JobProgressDrawer", () => ({
+  JobProgressDrawer: ({ jobId }: { jobId: string | null }) =>
+    jobId ? <div data-testid="job-drawer">{jobId}</div> : null,
 }));
 
 // The page deep-imports the PDF helper (Invoices.tsx imports
@@ -294,6 +304,7 @@ beforeEach(() => {
   bulkCreateDocsMock.mockReset().mockResolvedValue({ results: [] });
   bulkCreateSummaryMock.mockReset().mockResolvedValue({ results: [] });
   bulkDeleteDocsMock.mockReset().mockResolvedValue({ results: [] });
+  bulkSendDocsMock.mockReset().mockResolvedValue({ job_id: "job-1" });
   axiosServiceMock.mockReset();
   resellerSelectorPropsMock.mockReset();
   createStornoMutateAsyncMock.mockReset().mockResolvedValue({ id: "storno-1" });
@@ -360,6 +371,38 @@ describe("Invoices mount", () => {
     // ``data`` is derived via useMemo from ``ordersData``, so the rows
     // are present on the first render — no waiting needed.
     expect(screen.getByTestId("row-count").textContent).toBe("2");
+  });
+});
+
+// ── Bulk send by email ──────────────────────────────────────────────────────
+
+describe("bulk send by email", () => {
+  it("sends the selected orders with a finalized invoice and opens the job drawer", async () => {
+    ordersOverviewHookMock.mockReturnValue({
+      data: [
+        makeRow(),
+        makeRow({
+          id: "ord-10",
+          has_finalized_invoice: false,
+          invoice_is_finalized: false,
+        }),
+      ],
+      refetch: vi.fn(),
+    });
+    renderPage();
+
+    await userEvent.click(screen.getByText("select-all"));
+    await userEvent.click(
+      screen.getByTestId("bulk-resellers.send_via_email_resellers"),
+    );
+
+    await waitFor(() => {
+      expect(bulkSendDocsMock).toHaveBeenCalledWith({
+        ids: ["ord-9"],
+        model: "invoice",
+      });
+    });
+    expect(await screen.findByTestId("job-drawer")).toHaveTextContent("job-1");
   });
 });
 

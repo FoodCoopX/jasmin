@@ -687,6 +687,24 @@ class TenantEmailConfigViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
 
     serializer_class = TenantEmailConfigSerializer
 
+    # Where the tenant's mail goes out and where replies and invoices land.
+    # Whoever controls the SMTP server reads every message sent through it —
+    # the invitation and password-reset links for admin accounts included —
+    # so changing any of these needs fresh step-up auth, like a bank-account
+    # write. Display fields (``from_name``) stay ungated, and resending an
+    # unchanged value doesn't prompt.
+    _STEP_UP_SENSITIVE_FIELDS = (
+        "smtp_host",
+        "smtp_port",
+        "smtp_username",
+        "smtp_password",
+        "smtp_use_tls",
+        "smtp_use_ssl",
+        "from_email",
+        "reply_to_email",
+        "accounting_email",
+    )
+
     def get_queryset(self) -> QuerySet[TenantEmailConfig]:
         tenant = getattr(self.request, "tenant", None)
         if not tenant or tenant.schema_name == "public":
@@ -734,8 +752,33 @@ class TenantEmailConfigViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
         partial = request.method == "PATCH"
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+        self._enforce_step_up_for_sensitive_changes(request, instance, serializer)
         serializer.save()
         return Response(serializer.data)
+
+    def _enforce_step_up_for_sensitive_changes(
+        self, request: Request, instance: TenantEmailConfig, serializer: Any
+    ) -> None:
+        """Require fresh step-up auth when the save changes where mail goes
+        (``_STEP_UP_SENSITIVE_FIELDS``). A non-blank password always counts
+        as a change, since the stored one can't be compared; a blank one
+        leaves it as it is."""
+        changed = [
+            field
+            for field, value in serializer.validated_data.items()
+            if field in self._STEP_UP_SENSITIVE_FIELDS
+            and (
+                bool(value)
+                if field == "smtp_password"
+                else value != getattr(instance, field)
+            )
+        ]
+        if changed:
+            from apps.accounts.permissions import RequiresStepUp
+
+            # Raises StepUpRequired (``auth.step_up_required``) when the token
+            # carries no fresh step-up claim — before anything is saved.
+            RequiresStepUp().has_permission(request, self)
 
     @extend_schema(
         request=inline_serializer(
