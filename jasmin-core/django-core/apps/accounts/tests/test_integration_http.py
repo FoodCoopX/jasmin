@@ -430,7 +430,7 @@ class TestAdminUsersGating:
         assert resp.status_code == status.HTTP_200_OK
         assert isinstance(resp.data, list)
 
-    def test_admin_create_user(self, tenant):
+    def test_admin_create_user(self, tenant, email_config):
         admin = JasminUserFactory(roles=[Role.ADMIN])
         # roles in the payload → step-up gated.
         client = _step_up_client(admin)
@@ -448,7 +448,7 @@ class TestAdminUsersGating:
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
         assert resp.data["account_status"] == "pending_invitation"
 
-    def test_admin_create_coerces_non_string_name(self, tenant):
+    def test_admin_create_coerces_non_string_name(self, tenant, email_config):
         """``create`` hands the service ``validated_data``, not the raw body.
 
         The service calls ``.strip()`` on the name fields, so a JSON number
@@ -538,6 +538,47 @@ class TestAdminUsersGating:
         )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_create_refused_without_the_tenants_smtp(self, tenant):
+        """The invitation email is the point of the call; without an SMTP host
+        of the tenant's own nothing is created."""
+        admin = JasminUserFactory(roles=[Role.ADMIN])
+        client = _step_up_client(admin)
+        resp = client.post(
+            "/api/auth/admin/users/",
+            data={
+                "first_name": "New",
+                "last_name": "User",
+                "email": "no-smtp@example.com",
+                "roles": [Role.STAFF],
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_409_CONFLICT, resp.data
+        assert resp.data["code"] == "email_config.sending_not_set_up"
+        assert not JasminUser.objects.filter(email="no-smtp@example.com").exists()
+
+    def test_resend_refused_without_the_tenants_smtp(self, tenant):
+        from apps.shared.invitations import create_user_with_invitation
+
+        admin = JasminUserFactory(roles=[Role.ADMIN])
+        with patch("apps.shared.invitations._send_invitation_email"):
+            pending, invitation = create_user_with_invitation(
+                email="pending-staff@example.com",
+                first_name="Pat",
+                last_name="Pending",
+                roles=[Role.STAFF],
+            )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+        resp = client.post(
+            f"/api/auth/admin/users/{pending.id}/resend-invitation/",
+            data={},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_409_CONFLICT, resp.data
+        assert resp.data["code"] == "email_config.sending_not_set_up"
+        assert list(UserInvitation.objects.filter(user=pending)) == [invitation]
+
 
 # --------------------------------------------------------------------------- #
 # End-to-end flows                                                             #
@@ -599,7 +640,7 @@ class TestEndToEndSelfRegistration:
 
 
 class TestEndToEndInvitation:
-    def test_full_flow(self, tenant):
+    def test_full_flow(self, tenant, email_config):
         admin = JasminUserFactory(roles=[Role.ADMIN])
         # roles in the create payload → step-up gated.
         admin_client = _step_up_client(admin)

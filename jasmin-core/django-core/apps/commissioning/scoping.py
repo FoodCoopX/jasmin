@@ -115,9 +115,24 @@ def own_member_id(request) -> str | None:
     return get_owner_id(request, user_attr="member_profile")
 
 
-def enforce_own_reseller(request, target_id) -> None:
-    """Reject a non-privileged caller targeting another reseller."""
-    enforce_owner(request, target_id, user_attr="linked_reseller")
+def enforce_own_reseller(
+    request,
+    target_id,
+    *,
+    privileged_roles: Iterable[str] = DEFAULT_PRIVILEGED_ROLES,
+) -> None:
+    """Reject a non-privileged caller targeting another reseller.
+
+    Same ``privileged_roles`` contract as :func:`scope_to_reseller`: pass
+    ``IsStaff.required_roles`` on a reseller-context READ, or the crew tier,
+    which has no ``linked_reseller``, is refused although the read gate admits
+    it."""
+    enforce_owner(
+        request,
+        target_id,
+        user_attr="linked_reseller",
+        privileged_roles=privileged_roles,
+    )
 
 
 def enforce_own_member(request, target_id) -> None:

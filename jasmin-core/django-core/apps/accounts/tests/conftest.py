@@ -8,6 +8,7 @@ from apps.commissioning.tests.conftest import (  # noqa: F401
     _tenant_schema,
     api_client,
     api_request_factory,
+    email_config,
     tenant,
     user,
 )

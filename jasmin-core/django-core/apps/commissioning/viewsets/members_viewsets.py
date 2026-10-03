@@ -103,12 +103,15 @@ logger = logging.getLogger(__name__)
 
 
 class RefetchForResponseMixin:
-    """Reload a mutated instance through ``get_queryset()`` so the serialized
-    response carries the annotations / ``select_related`` the list-and-detail
-    queryset adds (the raw instance returned by ``serializer.save()`` lacks
-    them). Returns ``None`` if the row vanished (e.g. deleted concurrently)."""
-
     def refetch_for_response(self, instance: Any) -> Any:
+        """Reload a mutated instance through ``get_queryset()`` so the
+        serialized response carries the annotations / ``select_related`` the
+        list-and-detail queryset adds (the raw instance returned by
+        ``serializer.save()`` lacks them). Returns ``None`` if the row vanished
+        (e.g. deleted concurrently).
+
+        On the method rather than the mixin class: drf-spectacular publishes a
+        class docstring as the description of the viewset's operations."""
         return self.get_queryset().filter(id=instance.id).first()
 
 
@@ -712,7 +715,8 @@ class MemberViewSet(
             # ``MemberInvitationError``: no email, an active user, or an
             # address that already holds another member's login.
             400: ErrorResponseSerializer,
-            # ``EmailActionBlockedInOnboardingMode``.
+            # ``EmailActionBlockedInOnboardingMode``, or ``EmailSendingNotSetUp``
+            # while the tenant has no SMTP host of its own.
             409: ErrorResponseSerializer,
         },
     )
@@ -1122,7 +1126,8 @@ class SubscriptionViewSet(
             # Not a pending waiting-list entry, waiting list off, or an invalid
             # or below-floor price.
             400: ErrorResponseSerializer,
-            # Capacity full, or ``EmailActionBlockedInOnboardingMode``.
+            # Capacity full, ``EmailActionBlockedInOnboardingMode``, or
+            # ``EmailSendingNotSetUp`` (no SMTP host of the tenant's own).
             409: ErrorResponseSerializer,
         },
     )

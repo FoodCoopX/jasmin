@@ -21,6 +21,7 @@
   "invite_user": "Invite user",
   "smtp_missing_warning": "No SMTP server (email sending) is set up for this organization yet. Without SMTP, invitation emails can't be sent — so inviting users is disabled.",
   "smtp_missing_link": "→ Set up email settings",
+  "smtp_missing_reason": "Without an SMTP server of your own, no invitations go out. Please set an SMTP host under Configuration → Email first.",
   "invite_title": "Invite a new user",
   "send_invitation": "Send invitation",
   "edit_roles": "Edit roles",

@@ -1,4 +1,5 @@
-"""Tests for crates_viewsets.py — CrateDeliveryNoteContent, CrateContentInvoice, CrateNetPrice.
+"""Tests for the crate viewsets — CrateOrderContent, CrateDeliveryNoteContent,
+CrateContentInvoice, CrateNetPrice.
 
 These viewsets each override ``list`` / ``create`` / ``update`` / ``destroy``
 with custom logic (aggregation, finalize-rejection, parent-id resolution).
@@ -14,6 +15,7 @@ import pytest
 import time_machine
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.test import APIClient
 
 from apps.commissioning.models import (
     CrateContentInvoiceReseller,
@@ -29,10 +31,57 @@ from apps.commissioning.tests.factories import (
     CrateNetPriceFactory,
     DeliveryNoteResellerFactory,
     InvoiceResellerFactory,
+    JasminUserFactory,
     OrderFactory,
     ResellerFactory,
     ShareTypeVariationFactory,
 )
+
+# ---------------------------------------------------------------------------
+# CrateOrderContentViewSet — list (a reseller's crates for one delivery day)
+# ---------------------------------------------------------------------------
+URL_CRATE_ORDER_CONTENT = reverse("crate_contents-list")
+
+
+def _crate_summary_params(reseller) -> dict:
+    return {
+        "year": 2026,
+        "delivery_week": 10,
+        "day_number": 1,
+        "reseller": str(reseller.id),
+    }
+
+
+@pytest.mark.django_db
+class TestCrateOrderContentList:
+    """The read gate is IsStaffOrCustomer: the crew tier reads any reseller's
+    crates, a customer only their own."""
+
+    @pytest.mark.parametrize("role", ["staff", "gardener"])
+    def test_the_crew_tier_reads_any_resellers_crates(self, tenant, role):
+        client = APIClient()
+        client.force_authenticate(user=JasminUserFactory(roles=[role]))
+
+        resp = client.get(
+            URL_CRATE_ORDER_CONTENT, _crate_summary_params(ResellerFactory())
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+
+    def test_a_customer_reads_only_their_own(self, tenant):
+        user = JasminUserFactory(roles=["customer"])
+        own = ResellerFactory(linked_user=user)
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        own_resp = client.get(URL_CRATE_ORDER_CONTENT, _crate_summary_params(own))
+        other_resp = client.get(
+            URL_CRATE_ORDER_CONTENT, _crate_summary_params(ResellerFactory())
+        )
+
+        assert own_resp.status_code == status.HTTP_200_OK, own_resp.data
+        assert other_resp.status_code == status.HTTP_403_FORBIDDEN
+
 
 # ---------------------------------------------------------------------------
 # CrateDeliveryNoteContentViewSet — list / create

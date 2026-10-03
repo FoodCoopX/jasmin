@@ -93,11 +93,18 @@ class AdminUserViewSet(RolePermissionsMixin, ViewSet):
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
+            # ``EmailSendingNotSetUp``: the tenant has no SMTP host of its own.
+            409: ErrorResponseSerializer,
         },
     )
     def create(self, request: Request) -> Response:
+        from apps.shared.tenants.email_service import assert_tenant_can_send_email
+
         serializer = AdminUserCreateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # The invitation email is the point of this call; without the tenant's
+        # own SMTP it would be skipped and the pending login left waiting.
+        assert_tenant_can_send_email()
         # Hand the service validated_data, as partial_update does: the service
         # reads by key and calls ``.strip()`` on the name fields, so a raw
         # ``{"first_name": 5}`` would reach str-only code uncoerced. The
@@ -141,7 +148,9 @@ class AdminUserViewSet(RolePermissionsMixin, ViewSet):
             "it. For a member's portal login (no internal and no customer "
             "role) the invitation is a member email: refused with 409 while "
             "the tenant's onboarding mode is on, before any invitation is "
-            "created or quota is used, as members/{id}/send_invitation is."
+            "created or quota is used, as members/{id}/send_invitation is. "
+            "Every resend is refused with 409 while the tenant has no SMTP "
+            "host of its own."
         ),
         request=None,
         responses={
@@ -150,7 +159,7 @@ class AdminUserViewSet(RolePermissionsMixin, ViewSet):
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
-            # ``EmailActionBlockedInOnboardingMode``.
+            # ``EmailActionBlockedInOnboardingMode`` or ``EmailSendingNotSetUp``.
             409: ErrorResponseSerializer,
         },
     )
@@ -161,6 +170,7 @@ class AdminUserViewSet(RolePermissionsMixin, ViewSet):
             assert_member_email_action_allowed,
         )
         from apps.shared.invitations import resend_invitation
+        from apps.shared.tenants.email_service import assert_tenant_can_send_email
         from apps.shared.tenants.onboarding_emails import EmailCategory
 
         try:
@@ -171,7 +181,10 @@ class AdminUserViewSet(RolePermissionsMixin, ViewSet):
             raise UserNotPendingInvitation("User is not waiting for an invitation.")
         member_portal_login = is_member_portal_login(user.roles)
         if member_portal_login:
+            # Onboarding mode, then the tenant's SMTP.
             assert_member_email_action_allowed()
+        else:
+            assert_tenant_can_send_email()
         resend_invitation(
             user=user,
             created_by=auth_user(request),

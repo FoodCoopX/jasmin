@@ -8,7 +8,7 @@ views raise, they don't build ``Response`` objects by hand.
 
 from __future__ import annotations
 
-from core.errors import BadRequestError, RateLimitError
+from core.errors import BadRequestError, ConflictError, RateLimitError
 
 # --------------------------------------------------------------------------- #
 # Provisioning input validation                                               #
@@ -146,6 +146,22 @@ class TestEmailRecipientMissing(BadRequestError):
 
 class EmailConfigNotSetUp(BadRequestError):
     code = "email_config.not_set_up"
+
+
+class EmailSendingNotSetUp(ConflictError):
+    """An office action whose whole purpose is an email (an invitation, a
+    waiting-list spot offer) while the tenant has no SMTP host of its own.
+    Nothing would go out, so the action is refused before it creates a login
+    or invitation, or holds capacity."""
+
+    code = "email_config.sending_not_set_up"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This action sends an email, and this organization has no SMTP "
+            "server of its own set up yet. Set one up under Configuration → "
+            "Email first."
+        )
 
 
 class TestEmailRecipientNotAllowed(BadRequestError):

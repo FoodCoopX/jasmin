@@ -1122,7 +1122,9 @@ class CrateOrderContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
         day_number = params["day_number"]
         reseller = params["reseller"]
 
-        enforce_own_reseller(request, reseller)
+        # A read behind the IsStaffOrCustomer gate: the crew tier reads any
+        # reseller's crates, a customer only their own.
+        enforce_own_reseller(request, reseller, privileged_roles=IsStaff.required_roles)
 
         crates_summary = CrateOrderContentService.get_crates_summary_for_period(
             year=year,

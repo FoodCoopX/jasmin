@@ -367,14 +367,6 @@ class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
         own = self.roles if isinstance(self.roles, (list, tuple)) else []
         return any(r in own for r in roles)
 
-    @property
-    def is_staff(self) -> bool:
-        """Required by Django admin."""
-        return (
-            self.has_any_role([Role.STAFF, Role.ADMIN, Role.MANAGEMENT, Role.OFFICE])
-            or self.is_superuser
-        )
-
     # ------------------------------------------------------------------ #
     # Role mutators                                                       #
     # ------------------------------------------------------------------ #

@@ -3,7 +3,8 @@
 While ``TenantSettings.onboarding_mode`` is on, ``EmailService.send_email``
 suppresses member emails. ``members/{id}/send_invitation`` and
 ``abos/{id}/offer_spot``, whose whole purpose is the email, are refused before
-they change anything. Member flows mark the invitation and welcome emails they
+they change anything — as they are while the tenant has no SMTP host of its
+own. Member flows mark the invitation and welcome emails they
 share with login flows, so a member's portal invitation is suppressed while a
 staff invitation still goes out. An office cancellation and the renewal digest
 still run; only their emails are suppressed. The SMTP connection is Django's
@@ -51,6 +52,7 @@ from apps.shared.tenants.models import (
 )
 
 BLOCKED_CODE = "onboarding_mode.email_action_blocked"
+NO_SMTP_CODE = "email_config.sending_not_set_up"
 
 
 @pytest.fixture(autouse=True)
@@ -161,6 +163,20 @@ class TestSendInvitationEndpoint:
         open_invitation.refresh_from_db()
         assert open_invitation.status == InvitationStatus.SENT
         assert UserInvitation.objects.filter(user=user).count() == 1
+
+    def test_refused_without_the_tenants_smtp_before_anything_changes(
+        self, api_client, onboarding_mode_off
+    ):
+        member = MemberFactory(user=None, email="new.member@example.org")
+
+        resp = api_client.post(_invitation_url(member))
+
+        assert resp.status_code == status.HTTP_409_CONFLICT, resp.data
+        assert resp.data["code"] == NO_SMTP_CODE
+        member.refresh_from_db()
+        assert member.user_id is None
+        assert not JasminUser.objects.filter(email__iexact=member.email).exists()
+        assert not UserInvitation.objects.filter(email=member.email).exists()
 
     def test_invitation_sent_while_off(
         self,
@@ -344,8 +360,33 @@ class TestOfferSpotEndpoint:
         reserve.assert_not_called()
         send_offer.assert_not_called()
 
-    def test_offered_while_off(
+    def test_refused_without_the_tenants_smtp_before_anything_changes(
         self, api_client, onboarding_mode_off, pending_entry, hold_and_email
+    ):
+        reserve, send_offer = hold_and_email
+
+        resp = api_client.post(
+            reverse("abos-offer-spot", kwargs={"pk": pending_entry.pk}),
+            {},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_409_CONFLICT, resp.data
+        assert resp.data["code"] == NO_SMTP_CODE
+        pending_entry.refresh_from_db()
+        assert pending_entry.waiting_list_status == (
+            Subscription.WaitingListStatus.PENDING
+        )
+        reserve.assert_not_called()
+        send_offer.assert_not_called()
+
+    def test_offered_while_off(
+        self,
+        api_client,
+        onboarding_mode_off,
+        email_config,
+        pending_entry,
+        hold_and_email,
     ):
         reserve, send_offer = hold_and_email
 

@@ -1,9 +1,9 @@
 // UserInfoModal offers the invitation actions for the account status, and a
-// caller-supplied reason disables them with a hover tooltip and an accessible
-// description.
+// caller-supplied reason — or a missing SMTP host of the tenant's own —
+// disables them with a hover tooltip and an accessible description.
 
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -17,11 +17,24 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
-vi.mock("@hooks/index", () => ({
-  useDateFormat: () => ({
-    formatDateWithFallback: (value: unknown) => String(value ?? "-"),
-  }),
+const smtp = vi.hoisted(() => ({ configured: true as boolean | undefined }));
+
+vi.mock("@shared/hooks/configuration/useTenantSmtpConfigured", () => ({
+  useTenantSmtpConfigured: () => smtp.configured,
 }));
+
+// The real reason hook, over the stubbed SMTP lookup above.
+vi.mock("@hooks/index", async () => {
+  const { useInvitationDisabledReason } = await import(
+    "@shared/hooks/configuration/useInvitationDisabledReason"
+  );
+  return {
+    useDateFormat: () => ({
+      formatDateWithFallback: (value: unknown) => String(value ?? "-"),
+    }),
+    useInvitationDisabledReason,
+  };
+});
 
 import UserInfoModal from "../UserInfoModal";
 
@@ -51,6 +64,10 @@ const MEMBER_WITH_EXPIRED_INVITATION = {
 };
 
 const REASON = "onboarding.mode.invitation_disabled";
+
+beforeEach(() => {
+  smtp.configured = true;
+});
 
 describe("UserInfoModal invitation actions", () => {
   it("sends an invitation for a member without a user", async () => {
@@ -129,6 +146,39 @@ describe("UserInfoModal invitation actions", () => {
     });
     expect(button).toBeDisabled();
     expect(button).toHaveAccessibleDescription(REASON);
+  });
+
+  it("disables invitations without an SMTP host of the tenant's own", () => {
+    smtp.configured = false;
+    render(
+      <UserInfoModal
+        isOpen
+        onClose={vi.fn()}
+        record={MEMBER_WITHOUT_USER}
+        onSendInvitation={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "users.send_invitation" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription("users.smtp_missing_reason");
+  });
+
+  it("names the caller's reason over the missing SMTP host", () => {
+    smtp.configured = false;
+    render(
+      <UserInfoModal
+        isOpen
+        onClose={vi.fn()}
+        record={MEMBER_WITH_OPEN_INVITATION}
+        onResendInvitation={vi.fn()}
+        invitationDisabledReason={REASON}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "users.resend_invitation" }),
+    ).toHaveAccessibleDescription(REASON);
   });
 
   it("keeps resending enabled without a reason", () => {

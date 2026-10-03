@@ -79,6 +79,7 @@ class TestCreateRequiresExplicitRoles:
         assert Role.MEMBER not in payload["roles"]
 
 
+@pytest.mark.usefixtures("email_config")
 class TestCreateRequiresExplicitRolesOverHttp:
     def test_absent_roles_key_returns_400(self, tenant):
         # No ``roles`` key → the step-up gate does not fire, so this reaches

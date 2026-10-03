@@ -11,8 +11,9 @@ Each row in :data:`MATRIX` is::
 
     (path, method, role, expected_category)
 
-where ``role`` is one of ``"anon"``, ``"member"``, ``"office"``, ``"staff"``
-or ``"gardener"`` and the expected category is one of:
+where ``role`` is one persona — ``"anon"``, ``"member"``, ``"customer"``,
+``"office"``, ``"admin"``, ``"management"``, ``"staff"`` or ``"gardener"``, each a
+user with that single role — and the expected category is one of:
 
   - ``"ok"``    → 2xx (request passed permission + completed)
   - ``"deny"``  → 401 / 403 (rejected by auth or permission)
@@ -28,6 +29,9 @@ Two cautions when adding rows:
 ``"4xx"`` is the weakest assertion here — a mistyped path 404s straight into
 it, so a row meant to prove "this role is no longer denied" can pass while
 testing nothing. Check the path resolves before trusting a green ``"4xx"``.
+
+Each persona holds one role only. An ``office`` persona that also held ``admin``
+would pass every admin-only gate as "office ok".
 
 Rows for ``staff`` / ``gardener`` earn their keep. Neither role existed in this
 matrix for a long time, and that blind spot is why read-only GET ``@action``
@@ -61,6 +65,10 @@ MATRIX: list[tuple[str, str, str, str]] = [
     # Member row by ``scope_to_member`` (see _build_member_queryset).
     ("/api/commissioning/members/", "get", "member", "ok"),
     ("/api/commissioning/members/", "get", "office", "ok"),
+    ("/api/commissioning/members/", "get", "admin", "ok"),
+    # Neither the board nor a customer is in the members read gate.
+    ("/api/commissioning/members/", "get", "management", "deny"),
+    ("/api/commissioning/members/", "get", "customer", "deny"),
     # POST: IsOfficeOrMember lets the member pass the permission layer, but
     # ``enforce_privileged`` inside ``create()`` blocks non-office writers.
     ("/api/commissioning/members/", "post", "member", "deny"),
@@ -74,6 +82,8 @@ MATRIX: list[tuple[str, str, str, str]] = [
     # subscriptions by ``apps.authz.scoping`` (verified elsewhere).
     ("/api/commissioning/abos/", "get", "member", "ok"),
     ("/api/commissioning/abos/", "get", "office", "ok"),
+    ("/api/commissioning/abos/", "get", "management", "ok"),
+    ("/api/commissioning/abos/", "get", "customer", "deny"),
     # ------- Billing profiles (StaffOrMember read, Office write) -------
     ("/api/payments/billing_profiles/", "get", "anon", "deny"),
     ("/api/payments/billing_profiles/", "get", "member", "ok"),
@@ -87,16 +97,28 @@ MATRIX: list[tuple[str, str, str, str]] = [
     # POST is method-not-allowed (405) — categorised as "4xx" because
     # the failure is not a permission denial.
     ("/api/payments/charge_schedules/", "post", "office", "4xx"),
-    # ------- Billing runs (Staff read, Office write) -------
+    # ------- Billing runs (Office read+write) -------
+    # Office-only on purpose: the serializer hands out a signed link to the
+    # SEPA file with every debited member's IBAN (see BillingRunViewSet).
     ("/api/payments/billing_runs/", "get", "anon", "deny"),
     ("/api/payments/billing_runs/", "get", "member", "deny"),
     ("/api/payments/billing_runs/", "get", "office", "ok"),
     ("/api/payments/billing_runs/", "post", "member", "deny"),
     ("/api/payments/billing_runs/", "post", "office", "4xx"),
-    # ------- Notification email templates (Staff read+write) -------
+    ("/api/payments/billing_runs/", "get", "management", "deny"),
+    ("/api/payments/billing_runs/", "get", "staff", "deny"),
+    ("/api/payments/billing_runs/", "get", "customer", "deny"),
+    # ------- Notification email templates (Admin read+write) -------
     ("/api/notifications/email-templates/", "get", "anon", "deny"),
     ("/api/notifications/email-templates/", "get", "member", "deny"),
-    ("/api/notifications/email-templates/", "get", "office", "ok"),
+    ("/api/notifications/email-templates/", "get", "office", "deny"),
+    ("/api/notifications/email-templates/", "get", "management", "deny"),
+    ("/api/notifications/email-templates/", "get", "admin", "ok"),
+    # ------- Crate contents (StaffOrCustomer read, OfficeOrCustomer write) -------
+    # "4xx": the list needs query params the harness does not send.
+    ("/api/commissioning/crate_contents/", "get", "customer", "4xx"),
+    ("/api/commissioning/crate_contents/", "get", "staff", "4xx"),
+    ("/api/commissioning/crate_contents/", "get", "member", "deny"),
     # ------- Read-only GET @actions declared in ``read_actions`` -------
     # A custom @action takes ``write_permission`` unless the viewset names it
     # in ``read_actions``. These all sit on viewsets whose read gate is
@@ -155,17 +177,22 @@ MATRIX: list[tuple[str, str, str, str]] = [
 ]
 
 
+PERSONAS = (
+    "member",
+    "customer",
+    "office",
+    "admin",
+    "management",
+    "staff",
+    "gardener",
+)
+
+
 def _user_for_role(role: str):
     if role == "anon":
         return None
-    if role == "member":
-        return JasminUserFactory(roles=["member"])
-    if role == "office":
-        return JasminUserFactory(roles=["office", "admin"])
-    if role == "staff":
-        return JasminUserFactory(roles=["staff"])
-    if role == "gardener":
-        return JasminUserFactory(roles=["gardener"])
+    if role in PERSONAS:
+        return JasminUserFactory(roles=[role])
     raise ValueError(f"unknown role: {role}")
 
 

@@ -297,6 +297,7 @@ class TestSolidarityFloorOnPatch:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("email_config")
 class TestOfferSpotPriceBounds:
     """``offer_spot`` reads its price straight from the request body, so the
     endpoint holds it to the column's ``numeric(8, 2)`` bounds before the offer

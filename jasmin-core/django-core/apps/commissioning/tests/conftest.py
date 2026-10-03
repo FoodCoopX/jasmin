@@ -129,6 +129,26 @@ def tenant(_tenant_schema, db):
 
 
 @pytest.fixture()
+def email_config(tenant):
+    """Give the test tenant an SMTP host of its own, for the office actions that
+    refuse to run without one (``assert_tenant_can_send_email``). Nothing is
+    sent: the emails are deferred to ``on_commit``, which the test transaction
+    never reaches. Modules that check what is sent define their own
+    ``email_config``, with an in-memory outbox."""
+    from apps.shared.tenants.models import TenantEmailConfig
+
+    config, _ = TenantEmailConfig.objects.update_or_create(
+        tenant=tenant,
+        defaults={
+            "smtp_host": "smtp.example.org",
+            "from_email": "office@example.org",
+            "is_active": True,
+        },
+    )
+    return config
+
+
+@pytest.fixture()
 def user(tenant):
     """Default authenticated tenant user — has the ``office`` role.
 

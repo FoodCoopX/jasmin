@@ -37,32 +37,6 @@ import { axiosService } from '../../../services/api';
 
 
 
-/**
- * ViewSet mixin that maps DRF actions to permission classes.
-
-Usage:
-    class InvoiceViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
-        read_permission = IsStaff
-        write_permission = IsOffice
-
-Read actions (`list`, `retrieve`) require `read_permission`; everything
-else (create / update / partial_update / destroy / custom @action) requires
-`write_permission`. Both default to `IsAuthenticated`. Any classes set on
-the parent (via `permission_classes`) are layered on top.
-
-Public actions:
-    Set ``public_read_actions`` to a set of action names that should be
-    accessible to *anyone* (anonymous + authenticated, no role check).
-    Use for endpoints that serve content the public needs before login —
-    the registration wizard fetching ``ConsentDocument`` text is the
-    canonical case. The set may include ``"list"`` / ``"retrieve"`` and
-    custom ``@action`` names alike; entries here override
-    ``read_permission`` / ``write_permission`` for that action only.
-
-    class ConsentDocumentViewSet(RolePermissionsMixin, ModelViewSet):
-        write_permission = IsOffice          # publishing a new version
-        public_read_actions = {"list", "retrieve", "current"}
- */
 export const supportTicketsList = (
     
  signal?: AbortSignal
@@ -149,32 +123,6 @@ export function useSupportTicketsList<TData = Awaited<ReturnType<typeof supportT
 
 
 
-/**
- * ViewSet mixin that maps DRF actions to permission classes.
-
-Usage:
-    class InvoiceViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
-        read_permission = IsStaff
-        write_permission = IsOffice
-
-Read actions (`list`, `retrieve`) require `read_permission`; everything
-else (create / update / partial_update / destroy / custom @action) requires
-`write_permission`. Both default to `IsAuthenticated`. Any classes set on
-the parent (via `permission_classes`) are layered on top.
-
-Public actions:
-    Set ``public_read_actions`` to a set of action names that should be
-    accessible to *anyone* (anonymous + authenticated, no role check).
-    Use for endpoints that serve content the public needs before login —
-    the registration wizard fetching ``ConsentDocument`` text is the
-    canonical case. The set may include ``"list"`` / ``"retrieve"`` and
-    custom ``@action`` names alike; entries here override
-    ``read_permission`` / ``write_permission`` for that action only.
-
-    class ConsentDocumentViewSet(RolePermissionsMixin, ModelViewSet):
-        write_permission = IsOffice          # publishing a new version
-        public_read_actions = {"list", "retrieve", "current"}
- */
 export const supportTicketsCreate = (
     supportTicketCreate: SupportTicketCreate,
  signal?: AbortSignal
@@ -233,33 +181,7 @@ const {mutation: mutationOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
-    /**
- * ViewSet mixin that maps DRF actions to permission classes.
-
-Usage:
-    class InvoiceViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
-        read_permission = IsStaff
-        write_permission = IsOffice
-
-Read actions (`list`, `retrieve`) require `read_permission`; everything
-else (create / update / partial_update / destroy / custom @action) requires
-`write_permission`. Both default to `IsAuthenticated`. Any classes set on
-the parent (via `permission_classes`) are layered on top.
-
-Public actions:
-    Set ``public_read_actions`` to a set of action names that should be
-    accessible to *anyone* (anonymous + authenticated, no role check).
-    Use for endpoints that serve content the public needs before login —
-    the registration wizard fetching ``ConsentDocument`` text is the
-    canonical case. The set may include ``"list"`` / ``"retrieve"`` and
-    custom ``@action`` names alike; entries here override
-    ``read_permission`` / ``write_permission`` for that action only.
-
-    class ConsentDocumentViewSet(RolePermissionsMixin, ModelViewSet):
-        write_permission = IsOffice          # publishing a new version
-        public_read_actions = {"list", "retrieve", "current"}
- */
-export const supportTicketsRetrieve = (
+    export const supportTicketsRetrieve = (
     id: string,
  signal?: AbortSignal
 ) => {
@@ -345,32 +267,6 @@ export function useSupportTicketsRetrieve<TData = Awaited<ReturnType<typeof supp
 
 
 
-/**
- * ViewSet mixin that maps DRF actions to permission classes.
-
-Usage:
-    class InvoiceViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
-        read_permission = IsStaff
-        write_permission = IsOffice
-
-Read actions (`list`, `retrieve`) require `read_permission`; everything
-else (create / update / partial_update / destroy / custom @action) requires
-`write_permission`. Both default to `IsAuthenticated`. Any classes set on
-the parent (via `permission_classes`) are layered on top.
-
-Public actions:
-    Set ``public_read_actions`` to a set of action names that should be
-    accessible to *anyone* (anonymous + authenticated, no role check).
-    Use for endpoints that serve content the public needs before login —
-    the registration wizard fetching ``ConsentDocument`` text is the
-    canonical case. The set may include ``"list"`` / ``"retrieve"`` and
-    custom ``@action`` names alike; entries here override
-    ``read_permission`` / ``write_permission`` for that action only.
-
-    class ConsentDocumentViewSet(RolePermissionsMixin, ModelViewSet):
-        write_permission = IsOffice          # publishing a new version
-        public_read_actions = {"list", "retrieve", "current"}
- */
 export const supportTicketsReplyCreate = (
     id: string,
     supportTicketReplyRequest: SupportTicketReplyRequest,

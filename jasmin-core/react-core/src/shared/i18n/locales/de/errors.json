@@ -518,6 +518,7 @@
   "email_config": {
     "test_recipient_missing": "Bitte eine Empfängeradresse für die Test-E-Mail angeben.",
     "not_set_up": "Der E-Mail-Versand ist noch nicht eingerichtet. Bitte zuerst SMTP-Host und Absenderadresse hinterlegen und speichern, dann die Test-E-Mail senden.",
+    "sending_not_set_up": "Diese Aktion verschickt eine E-Mail, aber für eure Organisation ist noch kein eigener SMTP-Server eingerichtet. Bitte zuerst unter Konfiguration → E-Mail einen SMTP-Host hinterlegen.",
     "test_recipient_not_allowed": "Test-E-Mails gehen nur an die eigene Konto-Adresse oder an die Kontaktadresse der Organisation. Bitte eine dieser Adressen eintragen.",
     "test_send_failed": "Die Test-E-Mail konnte nicht gesendet werden. Bitte SMTP-Host, Port und Zugangsdaten prüfen und erneut versuchen.",
     "smtp_host_not_allowed": "Bitte einen öffentlich erreichbaren SMTP-Host angeben. Private, lokale und reservierte Adressen sind nicht erlaubt.",

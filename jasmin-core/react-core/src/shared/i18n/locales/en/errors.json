@@ -518,6 +518,7 @@
   "email_config": {
     "test_recipient_missing": "Please enter a recipient address for the test email.",
     "not_set_up": "Email sending is not set up yet. Please save an SMTP host and a from-address first, then send the test email.",
+    "sending_not_set_up": "This action sends an email, but no SMTP server of your own is set up for your organization yet. Please set an SMTP host under Configuration → Email first.",
     "test_recipient_not_allowed": "Test emails only go to your own account address or the organization's contact address. Please enter one of those.",
     "test_send_failed": "The test email could not be sent. Please check the SMTP host, port and credentials, then try again.",
     "smtp_host_not_allowed": "Please enter a public SMTP host. Private, loopback, link-local and reserved addresses are not allowed.",

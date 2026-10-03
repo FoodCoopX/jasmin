@@ -53,6 +53,8 @@ export { useTableRowSelection } from './useTableRowSelection';
 export { useSepaMandateStatus } from './useSepaMandateStatus';
 export { useTenant } from './configuration/useTenant';
 export { useOnboardingMode } from './configuration/useOnboardingMode';
+export { useTenantSmtpConfigured } from './configuration/useTenantSmtpConfigured';
+export { useInvitationDisabledReason } from './configuration/useInvitationDisabledReason';
 export { useTenantSettingToggle } from './configuration/useTenantSettingToggle';
 export {
   useOrganicGate,

@@ -37,16 +37,16 @@ def pending_admin_confirmation_q() -> Q:
     )
 
 
+# Base for the "needs office confirmation" badge counters.
+#
+# Each subclass sets ``count_model`` (an ``AdminConfirmableMixin`` model) and
+# optionally narrows the base ``pending_admin_confirmation_q()`` predicate via
+# ``extra_filter`` (a ``.filter``) / ``exclude_filter`` (an ``.exclude``) — the
+# trial split and the cancelled-coop-share carve-out. Returns
+# ``{"count": <int>}``. A comment, not a docstring: drf-spectacular would
+# publish a base class docstring as the description of every subclass's
+# endpoint.
 class _PendingCountViewSet(RolePermissionsMixin, viewsets.ViewSet):
-    """Base for the "needs office confirmation" badge counters.
-
-    Each subclass sets ``count_model`` (an ``AdminConfirmableMixin`` model) and
-    optionally narrows the base ``pending_admin_confirmation_q()`` predicate via
-    ``extra_filter`` (a ``.filter``) / ``exclude_filter`` (an ``.exclude``) — the
-    trial split and the cancelled-coop-share carve-out. Returns
-    ``{"count": <int>}``.
-    """
-
     read_permission = IsStaff
     write_permission = IsStaff
     # Class-level ``serializer_class`` silences spectacular's "unable to guess
@@ -58,7 +58,13 @@ class _PendingCountViewSet(RolePermissionsMixin, viewsets.ViewSet):
     extra_filter: dict | None = None
     exclude_filter: dict | None = None
 
-    @extend_schema(responses={200: _COUNT_RESPONSE})
+    @extend_schema(
+        description=(
+            "How many rows still wait for the office's confirmation (the menu "
+            "badge)."
+        ),
+        responses={200: _COUNT_RESPONSE},
+    )
     @action(detail=False, methods=["get"])
     def unconfirmed_count(self, request):
         queryset = self.count_model.objects.filter(pending_admin_confirmation_q())

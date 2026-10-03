@@ -414,7 +414,7 @@ export const useAuthAdminUsersCancelInvitationCreate = <TError = ErrorResponse,
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Cancels the user's open invitation, creates a new one and emails it. For a member's portal login (no internal and no customer role) the invitation is a member email: refused with 409 while the tenant's onboarding mode is on, before any invitation is created or quota is used, as members/{id}/send_invitation is.
+ * Cancels the user's open invitation, creates a new one and emails it. For a member's portal login (no internal and no customer role) the invitation is a member email: refused with 409 while the tenant's onboarding mode is on, before any invitation is created or quota is used, as members/{id}/send_invitation is. Every resend is refused with 409 while the tenant has no SMTP host of its own.
  * @summary Re-send invitation email to a user still in pending_invitation
  */
 export const authAdminUsersResendInvitationCreate = (

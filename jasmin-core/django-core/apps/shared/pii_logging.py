@@ -61,21 +61,23 @@ def sanitize_log_value(value: Any) -> str:
     )[:_LOG_VALUE_MAX_LENGTH]
 
 
+# Mount in front of ``RolePermissionsMixin`` on viewsets serving PII-bearing
+# models (Member, BillingProfile, Reseller, …).
+#
+# The ``super().retrieve(...)`` call dispatches through the rest of the MRO
+# (permission check + ModelViewSet.retrieve) — we only write the log line if
+# that returned successfully. Failures (403 / 404 / 500) propagate unchanged
+# with no ``pii.read`` row written, because the actor didn't actually see
+# anything.
+#
+# The subject identifier is taken from the URL kwarg (``pk`` by default), and
+# the model name from the viewset's ``queryset``. Neither requires a custom
+# override per viewset.
+#
+# A comment, not a docstring: drf-spectacular publishes the first class
+# docstring along a viewset's MRO as the description of every operation the
+# viewset leaves undescribed.
 class PIIReadLoggingMixin:
-    """Mount in front of ``RolePermissionsMixin`` on viewsets serving
-    PII-bearing models (Member, BillingProfile, Reseller, …).
-
-    The ``super().retrieve(...)`` call dispatches through the rest of
-    the MRO (permission check + ModelViewSet.retrieve) — we only
-    write the log line if that returned successfully. Failures
-    (403 / 404 / 500) propagate unchanged with no ``pii.read`` row
-    written, because the actor didn't actually see anything.
-
-    The subject identifier is taken from the URL kwarg (``pk`` by
-    default), and the model name from the viewset's ``queryset``.
-    Neither requires a custom override per viewset.
-    """
-
     # Override on the viewset if the URL uses a different lookup
     # kwarg (e.g. ``slug``) and ``pk`` isn't populated.
     pii_read_subject_kwarg: str = "pk"

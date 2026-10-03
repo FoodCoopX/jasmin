@@ -99,9 +99,10 @@ def serializer_model(serializer_class: Any) -> type[Any]:
     return model
 
 
+# Base ViewSet that selects the active or full-archive manager based on
+# ``is_past``. A comment, not a docstring, so drf-spectacular doesn't publish it
+# as the description of the subclasses' operations.
 class BaseArchivableViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
-    """Base ViewSet that selects the active or full-archive manager based on ``is_past``."""
-
     read_permission = IsStaff
     write_permission = IsStaff
     # ``is_past=true`` bypasses the active-manager cutoff and returns the full

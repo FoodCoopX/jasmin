@@ -681,3 +681,22 @@ class EmailService:
             # hang the worker (no timeout = block forever).
             timeout=getattr(settings, "EMAIL_TIMEOUT", 10),
         )
+
+
+def assert_tenant_can_send_email() -> None:
+    """Refuse an office action whose whole purpose is an email — an invitation,
+    a waiting-list spot offer — while the current tenant has no SMTP host of its
+    own. ``EmailService`` would skip the send, and the login, invitation or
+    capacity hold the action leaves behind would wait for a message that never
+    arrives. Call it before the action changes anything.
+
+    Reads the config through the same scoped chokepoint ``EmailService`` uses,
+    but not through ``EmailService.config``, which logs a missing config as an
+    error — here it is an expected refusal the office can fix."""
+    from core.tenant_db import connection
+
+    config = TenantEmailConfig.get_active_for_schema(connection.tenant.schema_name)
+    if config is None or not config.has_smtp_configured:
+        from .errors import EmailSendingNotSetUp
+
+        raise EmailSendingNotSetUp()

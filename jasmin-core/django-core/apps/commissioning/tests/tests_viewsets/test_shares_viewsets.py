@@ -28,6 +28,7 @@ from apps.commissioning.services.share_demand_service import ExternalDemandBacke
 from apps.commissioning.tests.factories import (
     DeliveryStationDayFactory,
     DeliveryStationFactory,
+    JasminUserFactory,
     MemberFactory,
     ShareArticleFactory,
     ShareDeliveryFactory,
@@ -2124,9 +2125,9 @@ class TestShareDeliveryExceptionGaps:
 
     def test_member_may_fetch_own_gaps(self, member_user, tenant):
         """A plain member reaches the action for their OWN gaps — the whole
-        point of the self-scoping. exception_gaps must be in the
-        viewset's member-reachable allowlist, else the member is 403'd by
-        write_permission=IsOffice before the self-check runs."""
+        point of the self-scoping. exception_gaps must be in the viewset's
+        ``read_actions``, else the member is 403'd by write_permission=IsOffice
+        before the self-check runs."""
         member = MemberFactory(user=member_user)
         variation = ShareTypeVariationFactory()
         self._confirmed_subscription(member, variation)
@@ -2145,6 +2146,26 @@ class TestShareDeliveryExceptionGaps:
         client = APIClient()
         client.force_authenticate(user=member_user)
         resp = client.get(self.URL, {"member": str(other.id), "year": 2026})
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_management_may_fetch_any_members_gaps(self, tenant):
+        member = MemberFactory()
+        self._confirmed_subscription(member, ShareTypeVariationFactory())
+
+        client = APIClient()
+        client.force_authenticate(user=JasminUserFactory(roles=["management"]))
+        resp = client.get(self.URL, {"member": str(member.id), "year": 2026})
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+
+    @pytest.mark.parametrize("role", ["staff", "gardener"])
+    def test_the_crew_tier_may_not_fetch_a_members_gaps(self, tenant, role):
+        """Member-owned data: the crew tier passes the read gate but is not in
+        the bypass set and has no member of its own."""
+        member = MemberFactory()
+
+        client = APIClient()
+        client.force_authenticate(user=JasminUserFactory(roles=[role]))
+        resp = client.get(self.URL, {"member": str(member.id), "year": 2026})
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
 

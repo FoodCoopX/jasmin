@@ -443,20 +443,23 @@ class ForecastViewSet(BaseArchivableViewSet):
 
 
 class _MovementSourceDestroyMixin:
-    """``perform_destroy`` that re-cascades stock snapshots after deleting a
-    movement-source row (Harvest/Purchase/Waste).
-
-    Deleting the row cascade-deletes its ``MovementShareArticle`` (the source FK
-    is ``on_delete=CASCADE``); the plain DRF destroy never recomputes, so capture
-    the movement BEFORE the delete and re-cascade the affected entity. A deleted
-    correction may have carried its day's theoretical, which another correction
-    of that day then takes over (``recalculate_actual_corrections``).
-    """
-
     movement_source_fk: str  # "harvest" / "purchase" / "waste"
 
     @transaction.atomic
     def perform_destroy(self, instance) -> None:
+        """Re-cascade stock snapshots after deleting a movement-source row
+        (Harvest/Purchase/Waste).
+
+        Deleting the row cascade-deletes its ``MovementShareArticle`` (the
+        source FK is ``on_delete=CASCADE``); the plain DRF destroy never
+        recomputes, so capture the movement BEFORE the delete and re-cascade
+        the affected entity. A deleted correction may have carried its day's
+        theoretical, which another correction of that day then takes over
+        (``recalculate_actual_corrections``).
+
+        On the method rather than the mixin class: drf-spectacular publishes
+        a class docstring as the description of the viewset's operations.
+        """
         from ..models import MovementShareArticle
         from ..services.snapshot_service import SnapshotService
         from ..services.theoretical_objects import (

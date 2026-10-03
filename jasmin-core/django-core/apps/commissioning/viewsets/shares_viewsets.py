@@ -640,11 +640,18 @@ class ShareDeliveryViewSet(
     week's planning data."""
 
     read_permission = IsStaffOrMember
-    # A read-only GET behind an isStaff-gated page. Naming it here routes it
-    # through ``read_permission``, which admits members — the action's own
-    # ``enforce_privileged`` is what excludes them, so that call is required,
-    # not redundant.
-    read_actions = frozenset({"box_combination_matrix"})
+    # Read-only GETs routed through ``read_permission``, which admits members:
+    #   * ``box_combination_matrix`` sits behind an isStaff-gated page; its own
+    #     ``enforce_privileged`` is what excludes members, so that call is
+    #     required, not redundant.
+    #   * ``pending_optin`` / ``exception_gaps`` show one member's deliveries.
+    #     They scope in their bodies like the share-delivery list does: the
+    #     default bypass set (office, admin, management) reads any member, a
+    #     member only themselves, and the crew tier — no member profile — is
+    #     refused, on purpose, as for all member-owned data.
+    read_actions = frozenset(
+        {"box_combination_matrix", "pending_optin", "exception_gaps"}
+    )
     # Members may ONLY reach the opt-in actions (see get_permissions). All
     # standard CRUD + the office @actions require IsOffice. IsOfficeOrMember on
     # every write verb would let a member POST/PATCH/DELETE arbitrary
@@ -655,13 +662,11 @@ class ShareDeliveryViewSet(
     serializer_class = ShareDeliverySerializer
     pagination_class = OptionalLimitOffsetPagination
 
-    # Member-reachable actions: the opt-in writes (toggle_optin / pending_optin)
-    # plus the read-only exception_gaps lookup (a member views their own
-    # delivery gaps on their member detail). Each self-scopes the member to
-    # their OWN data in its body — without being listed here the member is
+    # The member-reachable write: ``toggle_optin`` self-scopes the member to
+    # their OWN delivery in its body — without being listed here the member is
     # rejected by write_permission = IsOffice before that self-check can run.
     # Everything else falls through to write_permission = IsOffice.
-    _MEMBER_ACTIONS = frozenset({"toggle_optin", "pending_optin", "exception_gaps"})
+    _MEMBER_ACTIONS = frozenset({"toggle_optin"})
 
     def get_permissions(self):
         if self.action in self._MEMBER_ACTIONS:
@@ -787,9 +792,9 @@ class ShareDeliveryViewSet(
         description=(
             "Upcoming on-off deliveries this member can still toggle "
             "(variation has ``requires_optin=True`` AND deadline is "
-            "today or later). Office may pass ``?member=`` for any "
-            "member; non-office callers MUST ask for themselves only "
-            "— a cross-member request returns 403."
+            "today or later). Office, admin and management may pass "
+            "``?member=`` for any member; everyone else MUST ask for "
+            "themselves only — a cross-member request returns 403."
         ),
         parameters=[get_member_parameter(required=False)],
         responses={
@@ -806,20 +811,14 @@ class ShareDeliveryViewSet(
         # Resolve the requesting user's own Member row (None when the
         # caller is staff without a linked Member).
         self_member = Member.objects.filter(user=auth_user(request)).first()
-        # Explicit roles matching what get_permissions grants for this action
-        # (IsOfficeOrMember = OFFICE/ADMIN/MEMBER). The default privileged set
-        # also includes MANAGEMENT, but a MANAGEMENT-only user is rejected at
-        # the permission layer and can never reach this branch — scoping the
-        # check to the reachable roles keeps the two layers honest.
-        from apps.authz.roles import Role
-
-        privileged = is_privileged(request, privileged_roles=(Role.OFFICE, Role.ADMIN))
+        # The default bypass set (office, admin, management), as on the
+        # share-delivery list; see ``read_actions``.
+        privileged = is_privileged(request)
 
         member_id = validate_query_params(request, optional=["member"])["member"]
         if member_id:
-            # Non-office callers can ONLY ask for their own member id
-            # — a cross-member request is a permission leak. Office
-            # bypasses this check (they manage on behalf of anyone).
+            # Everyone else can ONLY ask for their own member id — a
+            # cross-member request is a permission leak.
             if not privileged and (
                 self_member is None or str(self_member.pk) != str(member_id)
             ):
@@ -865,7 +864,6 @@ class ShareDeliveryViewSet(
         pagination_class=None,
     )
     def exception_gaps(self, request: Request) -> Response:
-        from apps.authz.roles import Role
         from apps.commissioning.models import Member
         from apps.commissioning.services.delivery_exceptions import (
             member_exception_gaps,
@@ -875,9 +873,9 @@ class ShareDeliveryViewSet(
         member_id = params["member"]
         year = params["year"]
 
-        # Same self-vs-office scoping as ``pending_optin``: a member may only
-        # ask for their own gaps; office asks for anyone.
-        privileged = is_privileged(request, privileged_roles=(Role.OFFICE, Role.ADMIN))
+        # Same scoping as ``pending_optin``: the default bypass set asks for
+        # anyone, everyone else only for their own gaps.
+        privileged = is_privileged(request)
         if not privileged:
             self_member = Member.objects.filter(user=auth_user(request)).first()
             if self_member is None or str(self_member.pk) != str(member_id):

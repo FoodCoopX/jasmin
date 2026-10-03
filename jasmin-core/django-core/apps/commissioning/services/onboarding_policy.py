@@ -55,14 +55,18 @@ def onboarding_mode_enabled() -> bool:
 
 def assert_member_email_action_allowed() -> None:
     """Refuse an office action whose whole purpose is an email to the member (a
-    portal invitation, a waiting-list spot offer) while onboarding mode is on.
-    Call it before the action changes anything: the email would be suppressed,
-    and the login, invitation, capacity hold or quota it leaves behind would
-    wait for a message that never arrives."""
+    portal invitation, a waiting-list spot offer) while onboarding mode is on,
+    or while the tenant has no SMTP host of its own. Call it before the action
+    changes anything: the email would be suppressed or skipped, and the login,
+    invitation, capacity hold or quota it leaves behind would wait for a
+    message that never arrives."""
     if onboarding_mode_enabled():
         from apps.commissioning.errors import EmailActionBlockedInOnboardingMode
 
         raise EmailActionBlockedInOnboardingMode()
+    from apps.shared.tenants.email_service import assert_tenant_can_send_email
+
+    assert_tenant_can_send_email()
 
 
 def backfill_earliest_monday() -> datetime.date:

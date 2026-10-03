@@ -1,7 +1,7 @@
 import { Button, Descriptions, Modal, Space, Tag } from "antd";
 import type { FC, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useDateFormat } from "@hooks/index";
+import { useDateFormat, useInvitationDisabledReason } from "@hooks/index";
 import DisabledReasonTooltip from "@shared/ui/DisabledReasonTooltip";
 import type {
   AccountStatus,
@@ -26,8 +26,10 @@ interface UserInfoModalProps {
   onSendInvitation?: (record: UserRecord) => void;
   /** Resend an invitation that's still pending. */
   onResendInvitation?: (record: UserRecord) => void;
-  /** Why no invitation can be sent right now. Disables the send and resend
-   *  buttons and explains why on hover and to assistive technology. */
+  /** Why no invitation can be sent right now (onboarding mode, say). Disables
+   *  the send and resend buttons and explains why on hover and to assistive
+   *  technology. The modal adds a missing SMTP host of the tenant's own
+   *  itself, since no invitation goes out without one. */
   invitationDisabledReason?: string | null;
   /** Activate a deactivated user. */
   onActivateUser?: (record: UserRecord) => void;
@@ -59,6 +61,7 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const { formatDateWithFallback } = useDateFormat();
+  const disabledReason = useInvitationDisabledReason(invitationDisabledReason);
 
   if (!record) return null;
 
@@ -164,12 +167,12 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
       <div style={{ marginTop: 16, textAlign: "right" }}>
         <Space>
           {accountStatus === "no_user" && onSendInvitation && (
-            <DisabledReasonTooltip reason={invitationDisabledReason}>
+            <DisabledReasonTooltip reason={disabledReason}>
               {(reasonId) => (
                 <Button
                   type="primary"
                   onClick={handleSendInvitation}
-                  disabled={!!invitationDisabledReason}
+                  disabled={!!disabledReason}
                   aria-describedby={reasonId}
                 >
                   {t("users.send_invitation")}
@@ -178,11 +181,11 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
             </DisabledReasonTooltip>
           )}
           {accountStatus === "pending_invitation" && onResendInvitation && (
-            <DisabledReasonTooltip reason={invitationDisabledReason}>
+            <DisabledReasonTooltip reason={disabledReason}>
               {(reasonId) => (
                 <Button
                   type={isInvitationExpired ? "default" : "primary"}
-                  disabled={isInvitationExpired || !!invitationDisabledReason}
+                  disabled={isInvitationExpired || !!disabledReason}
                   onClick={handleResendInvitation}
                   aria-describedby={reasonId}
                 >
@@ -194,12 +197,12 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
           {accountStatus === "pending_invitation" &&
             isInvitationExpired &&
             onSendInvitation && (
-              <DisabledReasonTooltip reason={invitationDisabledReason}>
+              <DisabledReasonTooltip reason={disabledReason}>
                 {(reasonId) => (
                   <Button
                     type="primary"
                     onClick={handleSendInvitation}
-                    disabled={!!invitationDisabledReason}
+                    disabled={!!disabledReason}
                     aria-describedby={reasonId}
                   >
                     {t("users.send_new_invitation")}

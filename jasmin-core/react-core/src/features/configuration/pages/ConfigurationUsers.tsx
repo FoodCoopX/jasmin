@@ -19,18 +19,18 @@ import {
   PastWarningMessage,
 } from "@shared/ui";
 import { getErrorMessage } from "@shared/utils/apiError";
-import { useDateFormat, useOnboardingMode } from "@hooks/index";
+import {
+  useDateFormat,
+  useOnboardingMode,
+  useTenantSmtpConfigured,
+} from "@hooks/index";
 import {
   authAdminUsersPartialUpdate,
   authAdminUsersResendInvitationCreate,
   getAuthAdminUsersListQueryKey,
   useAuthAdminUsersList,
 } from "@shared/api/generated/auth/auth";
-import { useTenantsEmailConfigList } from "@shared/api/generated/tenants/tenants";
-import type {
-  AdminUserRow,
-  TenantEmailConfig,
-} from "@shared/api/generated/models";
+import type { AdminUserRow } from "@shared/api/generated/models";
 import { notify } from "@shared/utils";
 
 const { Text } = Typography;
@@ -130,19 +130,10 @@ export default function ConfigurationUsers() {
 
   const [roleEditUser, setRoleEditUser] = useState<UserRow | null>(null);
 
-  // Inviting a user sends an invitation email, which the backend refuses when
-  // the tenant hasn't wired its own SMTP — so gate the invite button on it and
-  // explain why, rather than let invites silently fail to send.
-  const { data: emailConfig } = useTenantsEmailConfigList({
-    query: {
-      select: (data) => {
-        // Backend returns a single object; orval types it as an array.
-        const raw = data as unknown;
-        return (Array.isArray(raw) ? raw[0] : raw) as TenantEmailConfig;
-      },
-    },
-  });
-  const smtpConfigured = Boolean(emailConfig?.smtp_host?.trim());
+  // Inviting a user sends an invitation email, which the backend refuses while
+  // the tenant has no SMTP host of its own — so gate the invite and resend
+  // buttons on it and explain why. ``undefined`` while the settings load.
+  const smtpConfigured = useTenantSmtpConfigured();
 
   // React Query — failures route through the global queryCache.onError
   // toast. Writes call `fetchUsers()` to invalidate and refetch.
@@ -376,7 +367,9 @@ export default function ConfigurationUsers() {
           const resendDisabledReason =
             onboardingMode && isMemberPortalLogin(u.roles)
               ? t("onboarding.mode.invitation_disabled")
-              : null;
+              : smtpConfigured === false
+                ? t("users.smtp_missing_reason")
+                : null;
           return (
             <Space size={4} wrap>
               {isPendingInvite &&
@@ -415,7 +408,7 @@ export default function ConfigurationUsers() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, formatDate, resendingId, onboardingMode],
+    [t, formatDate, resendingId, onboardingMode, smtpConfigured],
   );
 
   const columns = useMemo(() => buildColumns(), [buildColumns]);
@@ -424,7 +417,7 @@ export default function ConfigurationUsers() {
     <div>
       <h1>{t("users.title")}</h1>
       <div style={{ marginBottom: "2em", marginTop: "2em" }}>
-        {!smtpConfigured && (
+        {smtpConfigured === false && (
           <PastWarningMessage width="100%" className="mb-1em">
             {t("users.smtp_missing_warning")}{" "}
             <Link to="/configuration/email">

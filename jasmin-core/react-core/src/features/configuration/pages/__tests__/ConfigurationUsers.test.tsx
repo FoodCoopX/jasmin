@@ -2,7 +2,8 @@
 // invitation can't be re-sent (the server refuses it), so that row's resend
 // button is disabled with the reason on hover and as its accessible
 // description. Staff and customer invitations stay available, and a refused
-// resend shows the server's reason.
+// resend shows the server's reason. Without an SMTP host of the tenant's own,
+// no invitation can be sent or re-sent at all.
 
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,7 +22,10 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
-const hookState = vi.hoisted(() => ({ onboardingMode: false }));
+const hookState = vi.hoisted(() => ({
+  onboardingMode: false,
+  smtpConfigured: true as boolean | undefined,
+}));
 const api = vi.hoisted(() => ({
   users: [] as Record<string, unknown>[],
   resend: vi.fn(),
@@ -32,6 +36,7 @@ const apiError = vi.hoisted(() => ({ getErrorMessage: vi.fn() }));
 vi.mock("@hooks/index", () => ({
   useDateFormat: () => ({ formatDate: (value: string) => value }),
   useOnboardingMode: () => hookState.onboardingMode,
+  useTenantSmtpConfigured: () => hookState.smtpConfigured,
 }));
 
 vi.mock("@shared/api/generated/auth/auth", () => ({
@@ -39,12 +44,6 @@ vi.mock("@shared/api/generated/auth/auth", () => ({
   authAdminUsersResendInvitationCreate: (id: string) => api.resend(id),
   getAuthAdminUsersListQueryKey: () => ["/api/auth/admin/users/"],
   useAuthAdminUsersList: () => ({ data: api.users, isFetching: false }),
-}));
-
-vi.mock("@shared/api/generated/tenants/tenants", () => ({
-  useTenantsEmailConfigList: () => ({
-    data: { smtp_host: "smtp.example.org" },
-  }),
 }));
 
 // Renders every column's cell for every row, one test id per row.
@@ -142,6 +141,7 @@ function resendButton(userId: string) {
 
 beforeEach(() => {
   hookState.onboardingMode = false;
+  hookState.smtpConfigured = true;
   api.users = [
     pendingLogin("office-login", ["office"]),
     pendingLogin("customer-login", ["customer", "member"]),
@@ -175,6 +175,19 @@ describe("ConfigurationUsers resend invitation", () => {
       expect(button).not.toHaveAttribute("aria-describedby");
     }
     expect(api.resend).not.toHaveBeenCalled();
+  });
+
+  it("disables every invitation without an SMTP host of the tenant's own", () => {
+    hookState.smtpConfigured = false;
+    renderPage();
+
+    for (const userId of ["office-login", "customer-login", "member-login"]) {
+      const button = resendButton(userId);
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription("users.smtp_missing_reason");
+    }
+    expect(screen.getByRole("button", { name: /users\.invite_user/ })).toBeDisabled();
+    expect(screen.getByText(/users\.smtp_missing_warning/)).toBeInTheDocument();
   });
 
   it("re-sends a member's invitation while onboarding mode is off", async () => {

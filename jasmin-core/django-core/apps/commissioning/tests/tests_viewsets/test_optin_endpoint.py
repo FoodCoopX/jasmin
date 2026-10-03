@@ -104,6 +104,23 @@ class TestPendingOptinEndpoint:
         response = client.get(PENDING_URL)
         assert response.status_code == 200
 
+    def test_management_can_read_any_members_list(self, tenant):
+        owner, _delivery, _ = _make_member_with_onoff_delivery()
+        client = APIClient()
+        client.force_authenticate(user=JasminUserFactory(roles=["management"]))
+        response = client.get(PENDING_URL, {"member": str(owner.pk)})
+        assert response.status_code == 200
+
+    @pytest.mark.parametrize("role", ["staff", "gardener"])
+    def test_the_crew_tier_cannot_read_a_members_list(self, tenant, role):
+        """Member-owned data: the crew tier passes the read gate but is not in
+        the bypass set and has no member of its own."""
+        owner, _delivery, _ = _make_member_with_onoff_delivery()
+        client = APIClient()
+        client.force_authenticate(user=JasminUserFactory(roles=[role]))
+        response = client.get(PENDING_URL, {"member": str(owner.pk)})
+        assert response.status_code == 403
+
     def test_member_cannot_read_another_members_list(self, tenant):
         """Permission leak guard: a non-office member passing
         ``?member=<other_id>`` must be refused."""
