@@ -868,7 +868,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
             "tenant_name": "Beispiel-Solawi",
             "user": {"first_name": "Maria"},
             "confirm_url": "https://app.example.org/gdpr/confirm-deletion/abc123",
-            "requires_admin_approval": False,
+            "requires_admin_approval": True,
         },
     ),
     "gdpr.deletion_approved": EmailTemplateSpec(

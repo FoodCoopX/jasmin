@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 from apps.commissioning.models import Member, Reseller
 
@@ -119,3 +120,23 @@ def _is_anonymized_reseller(reseller: Reseller) -> bool:
         and not reseller.invoice_email
         and reseller.linked_user_id is None
     )
+
+
+def anonymized_member_q() -> Q:
+    """The members anonymization has run on, as :func:`_is_anonymized_member`
+    tells them apart — for a query."""
+    return Q(
+        first_name=_tombstone("commissioning.Member", "first_name"),
+        last_name=_tombstone("commissioning.Member", "last_name"),
+    ) & (Q(email__isnull=True) | Q(email=""))
+
+
+def anonymized_reseller_q() -> Q:
+    """The resellers anonymization has run on, as
+    :func:`_is_anonymized_reseller` tells them apart — for a query."""
+    return Q(
+        name_for_member_pages=_tombstone(
+            "commissioning.Reseller", "name_for_member_pages"
+        ),
+        linked_user__isnull=True,
+    ) & (Q(invoice_email__isnull=True) | Q(invoice_email=""))

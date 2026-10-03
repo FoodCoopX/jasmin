@@ -1,7 +1,8 @@
 /**
- * ``MemberConsentsCard`` tells a consent replaced by a newer signature apart
- * from a withdrawal: re-signing the SEPA mandate closes the earlier consent
- * with the ``superseded`` reason, and that row must not read as "revoked".
+ * ``MemberConsentsCard`` loads only the member's own consent records, and
+ * tells a consent replaced by a newer signature apart from a withdrawal:
+ * re-signing the SEPA mandate closes the earlier consent with the
+ * ``superseded`` reason, and that row must not read as "revoked".
  */
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -23,13 +24,15 @@ vi.mock("@hooks/index", () => ({
   }),
 }));
 
-const consentsMock = vi.hoisted(() => ({ records: [] as unknown[] }));
+const consentsMock = vi.hoisted(() => ({
+  records: [] as unknown[],
+  params: undefined as unknown,
+}));
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
-  useCommissioningConsentsList: () => ({
-    data: consentsMock.records,
-    isLoading: false,
-    error: null,
-  }),
+  useCommissioningConsentsList: (params: unknown) => {
+    consentsMock.params = params;
+    return { data: consentsMock.records, isLoading: false, error: null };
+  },
   useCommissioningConsentsRevokeCreate: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -57,6 +60,12 @@ function renderCard(records: unknown[]) {
 }
 
 describe("MemberConsentsCard", () => {
+  it("asks the server for this member's consents only", () => {
+    renderCard([]);
+
+    expect(consentsMock.params).toEqual({ member: MEMBER_ID });
+  });
+
   it("labels a superseded consent as replaced, and a withdrawal as revoked with its reason", () => {
     renderCard([
       {

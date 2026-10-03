@@ -261,7 +261,10 @@ class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
         ]
 
     def __str__(self) -> str:
-        return self.username
+        # Not the username, which is the email address: django-auditlog keeps
+        # ``str()`` of every logged user as the entry's label, out of reach of
+        # the field masking, for as long as the entry exists.
+        return f"User {self.pk}"
 
     # ------------------------------------------------------------------ #
     # Invariants                                                          #

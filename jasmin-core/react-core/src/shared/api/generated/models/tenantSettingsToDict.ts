@@ -232,7 +232,7 @@ export interface TenantSettingsToDict {
    * @maximum 28
    */
   sepa_collection_day_of_month?: number;
-  /** If on (default), every deletion request needs an office/admin to approve after the email-confirm step. Turn off to honour Art. 17 requests automatically once the user clicks the email link. Staff/admin deletions always need admin approval regardless of this. */
+  /** Has no effect: every deletion request needs an office/admin approval after the email-confirm step, whatever this says. */
   require_admin_approval_for_gdpr_deletion?: boolean;
   requires_paper_signature_for_membership?: boolean;
   requires_paper_signature_for_cancellation_of_membership?: boolean;

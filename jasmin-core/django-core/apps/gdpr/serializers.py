@@ -847,9 +847,10 @@ class PreviewSideChannelSerializer(serializers.Serializer):
 
 
 class DeletionPreviewSerializer(serializers.Serializer):
-    """Dry-run of what an Art-17 deletion would do to a user — persona,
+    """Dry-run of what an Art-17 deletion would do to a subject — persona,
     retention blockers and the per-model field list — without writing.
-    Built by :meth:`apps.gdpr.services.GDPRService.preview_deletion`."""
+    Built by :meth:`apps.gdpr.services.GDPRService.preview_subject_deletion`;
+    ``user_id`` is empty for a member or reseller without a login."""
 
     user_id = serializers.CharField()
     user_email = serializers.CharField()

@@ -670,21 +670,14 @@ class TenantSettings(JasminModel):
         ),
     )
 
-    # ---- GDPR Art. 17 deletion gate ----
-    # When True (default), *every* self-service deletion needs an
-    # office/admin to approve it after the email-confirm step. This
-    # is the safer default — tenants who want the GDPR-clean
-    # "without undue delay" baseline can flip it off. Staff/admin
-    # personas always need admin approval regardless of this flag
-    # (enforced in ``GDPRService.request_deletion``).
+    # Nothing reads this: every deletion request waits for an office/admin
+    # approval after the email-confirm step (``GDPRService.request_deletion``).
+    # It stays because the settings API still reads and writes it.
     require_admin_approval_for_gdpr_deletion = models.BooleanField(
         default=True,
         help_text=(
-            "If on (default), every deletion request needs an "
-            "office/admin to approve after the email-confirm step. "
-            "Turn off to honour Art. 17 requests automatically once "
-            "the user clicks the email link. Staff/admin deletions "
-            "always need admin approval regardless of this."
+            "Has no effect: every deletion request needs an office/admin "
+            "approval after the email-confirm step, whatever this says."
         ),
     )
 

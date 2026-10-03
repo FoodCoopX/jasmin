@@ -5,6 +5,11 @@ field are stored as ``AUDIT_LOG_MASK`` — nothing of the value, not even the
 second half django-auditlog's own default mask keeps. The gdpr migration
 ``0003_mask_audit_log_values_in_full`` rewrites the entries written before
 the same way.
+
+An entry about a user is labelled without their email address, which masking
+can't reach; the accounts migration
+``0004_audit_log_user_labels_without_email`` relabels the entries written
+before.
 """
 
 from __future__ import annotations
@@ -32,6 +37,9 @@ from apps.shared.pii_masking import AUDIT_LOG_MASK
 
 mask_migration = importlib.import_module(
     "apps.gdpr.migrations.0003_mask_audit_log_values_in_full"
+)
+relabel_migration = importlib.import_module(
+    "apps.accounts.migrations.0004_audit_log_user_labels_without_email"
 )
 
 # A new value for every masked field, unlike anything the factories set.
@@ -311,3 +319,41 @@ class TestMaskInFullMigration:
             entry.changes == {"email": ["None", mask_migration.MASK]}
             for entry in entries
         )
+
+
+@pytest.mark.django_db
+class TestUserEntryLabels:
+    def test_a_user_entry_is_labelled_without_the_email(self, tenant):
+        user = JasminUserFactory(email="label.user@example.com")
+        user.first_name = "Lia"
+        user.save()
+
+        entries = LogEntry.objects.get_for_object(user)
+        assert entries.exists()
+        for entry in entries:
+            assert entry.object_repr == f"User {user.pk}"
+
+    def test_the_migration_relabels_the_stored_entries(self, tenant):
+        user = JasminUserFactory(email="stored.user@example.com")
+        member = MemberFactory(first_name="Anna", last_name="Stored")
+
+        def entry(model, object_pk, label):
+            return LogEntry.objects.create(
+                content_type=ContentType.objects.get_for_model(model),
+                object_pk=object_pk,
+                object_repr=label,
+                action=LogEntry.Action.UPDATE,
+                changes={},
+            )
+
+        stored = entry(JasminUser, str(user.pk), "stored.user@example.com")
+        erased = entry(JasminUser, "erased-user", "[anonymised]")
+        member_entry = entry(Member, str(member.pk), "Anna Stored")
+
+        relabel_migration.relabel_user_entries(django_apps, None)
+
+        for row in (stored, erased, member_entry):
+            row.refresh_from_db()
+        assert stored.object_repr == f"User {user.pk}"
+        assert erased.object_repr == "[anonymised]"
+        assert member_entry.object_repr == "Anna Stored"

@@ -194,7 +194,6 @@
   "set_up_sepa_mandate": "SEPA-Mandat einrichten",
   "accept_subscription_contract": "Ich habe den Abo-Vertrag gelesen und akzeptiere ihn:",
   "subscription_contract_required": "Bitte akzeptiere den Abo-Vertrag, bevor du fortfährst.",
-  "subscription_contract_record_failed": "Das Abo wurde erstellt, aber die Einwilligung zum Abo-Vertrag konnte nicht gespeichert werden.",
   "emails_select_filter_hint": "Wähle oben einen Filter, um die Empfängerliste anzuzeigen.",
   "emails_no_recipients": "Keine Empfänger für diese Auswahl.",
   "emails_recipients": "{{count}} Empfänger",

@@ -29,4 +29,6 @@ export interface MySubscriptionSubscribe {
    */
   price_per_delivery?: string | null;
   on_waiting_list?: boolean;
+  /** Id of the subscription contract (a consent document) the member accepted. Required while one is in force; recorded as their consent together with the subscription. */
+  subscription_contract_document?: string;
 }

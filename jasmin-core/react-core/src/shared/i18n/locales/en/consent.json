@@ -17,6 +17,7 @@
     "withdrawal": "Withdrawal terms",
     "terms": "Terms of service",
     "coop_contract": "Cooperative-share contract",
+    "coop_cancellation": "Membership cancellation",
     "subscription_contract": "Subscription contract"
   },
   "admin": {
@@ -58,5 +59,11 @@
     "signature_line": "Place, date, signature"
   },
   "accept_prefix": "I have read and accept:",
-  "document": "the document"
+  "document": "the document",
+  "review": {
+    "title": "Consent withdrawn on {{date}}",
+    "description": "The member withdrew a consent (privacy policy or withdrawal terms). Please check which processing rests on it and has to stop.",
+    "mark_done": "Review done",
+    "marked_done": "Review marked as done."
+  }
 }

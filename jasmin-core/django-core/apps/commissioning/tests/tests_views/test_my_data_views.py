@@ -1070,6 +1070,86 @@ class TestMySubscriptionSubscribe:
         # ShareTypeVariationGrossPriceFactory default price_per_delivery.
         assert sub.price_per_delivery == Decimal("10.00")
 
+    @staticmethod
+    def _subscription_contract(locale: str = "de") -> ConsentDocument:
+        return ConsentDocument.objects.create(
+            kind=ConsentKind.SUBSCRIPTION_CONTRACT,
+            locale=locale,
+            version="v1",
+            valid_from=datetime.date(2026, 1, 5),
+            body="Abo-Vertrag — Bedingungen …",
+        )
+
+    def test_subscription_contract_required_while_one_is_in_force(
+        self, member_user, tenant
+    ):
+        MemberFactory(user=member_user)
+        self._subscription_contract(locale="en")  # any locale binds
+        variation, payment_cycle, dsd = self._setup()
+
+        resp = _client_for(member_user).post(
+            URL_SUB_SUBSCRIBE,
+            self._payload(variation, payment_cycle, dsd),
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "subscription.contract_agreement_required"
+        assert Subscription.objects.count() == 0
+
+    def test_accepted_subscription_contract_is_recorded_with_the_subscription(
+        self, member_user, tenant
+    ):
+        member = MemberFactory(user=member_user)
+        contract = self._subscription_contract()
+        variation, payment_cycle, dsd = self._setup()
+
+        resp = _client_for(member_user).post(
+            URL_SUB_SUBSCRIBE,
+            self._payload(
+                variation,
+                payment_cycle,
+                dsd,
+                subscription_contract_document=str(contract.pk),
+            ),
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        assert Subscription.objects.filter(member=member).count() == 1
+        assert ConsentRecord.objects.filter(
+            member=member, document=contract, revoked_at__isnull=True
+        ).exists()
+
+    def test_a_contract_not_in_force_is_refused(self, member_user, tenant):
+        from django.utils import timezone
+
+        MemberFactory(user=member_user)
+        self._subscription_contract()
+        not_yet_in_force = ConsentDocument.objects.create(
+            kind=ConsentKind.SUBSCRIPTION_CONTRACT,
+            locale="en",
+            version="v2",
+            valid_from=timezone.localdate() + datetime.timedelta(days=60),
+            body="next version",
+        )
+        variation, payment_cycle, dsd = self._setup()
+
+        resp = _client_for(member_user).post(
+            URL_SUB_SUBSCRIBE,
+            self._payload(
+                variation,
+                payment_cycle,
+                dsd,
+                subscription_contract_document=str(not_yet_in_force.pk),
+            ),
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "subscription.contract_agreement_required"
+        assert ConsentRecord.objects.count() == 0
+
 
 # ---------------------------------------------------------------------------
 # my_membership/cancel (self-service membership cancellation)

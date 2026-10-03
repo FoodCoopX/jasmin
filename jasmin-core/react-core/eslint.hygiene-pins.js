@@ -34,7 +34,7 @@ export const complexityPins = {
   "src/features/members/modals/CoopSharesModal.tsx": 35,
   "src/features/members/modals/DeliveryStationMemberModal.tsx": 42,
   "src/features/members/pages/MemberDetail.tsx": 26,
-  "src/features/members/pages/Members.tsx": 50,
+  "src/features/members/pages/Members.tsx": 42,
   "src/features/public/pages/PublicLegalNoticePage.tsx": 59,
   "src/shared/modals/UserInfoModal.tsx": 50,
   "src/shared/services/api.ts": 30,
@@ -48,7 +48,7 @@ export const complexityPins = {
 // Longest function per file, blank lines and comments excluded.
 export const functionLengthPins = {
   "src/features/abos/hooks/columns/useAbosColumns.tsx": 590,
-  "src/features/abos/modals/NewSubscriptionModal.tsx": 901,
+  "src/features/abos/modals/NewSubscriptionModal.tsx": 893,
   "src/features/abos/pages/WaitingListAbos.tsx": 470,
   "src/features/commissioning/hooks/columns/useHarvestingListColumns.tsx": 484,
   "src/features/commissioning/hooks/columns/useOrderColumns.tsx": 433,
@@ -70,7 +70,7 @@ export const functionLengthPins = {
   "src/features/commissioning/pages/PurchaseList.tsx": 528,
   "src/features/configuration/pages/ConfigurationGeneral.tsx": 452,
   "src/features/members/modals/CoopSharesModal.tsx": 472,
-  "src/features/members/pages/Members.tsx": 826,
+  "src/features/members/pages/Members.tsx": 768,
   "src/shared/layout/sidebars/CommissioningSidebar.tsx": 610,
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 912,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 472,
@@ -80,8 +80,8 @@ export const functionLengthPins = {
 // Total file length, blank lines and comments INCLUDED — a file you have to
 // scroll is a file you have to scroll.
 export const fileLengthPins = {
-  "src/features/abos/modals/NewSubscriptionModal.tsx": 1280,
+  "src/features/abos/modals/NewSubscriptionModal.tsx": 1273,
   "src/features/commissioning/pages/PlanningShareContentBase.tsx": 1234,
-  "src/features/members/pages/Members.tsx": 1078,
+  "src/features/members/pages/Members.tsx": 1018,
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 1265,
 };

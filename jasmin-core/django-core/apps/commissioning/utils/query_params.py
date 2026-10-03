@@ -71,6 +71,7 @@ _BOOL_PARAMS = (
     "on_waiting_list",
     "need_info_on_tours",
     "exclude_trial_members",
+    "consent_withdrawn",
     "get_price_info",
     "get_delivery_stations",
     "summed",

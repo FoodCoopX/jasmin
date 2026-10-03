@@ -273,6 +273,59 @@ class TestSelfRegistration:
         assert not JasminUser.objects.filter(email=payload["email"]).exists()
         assert not Member.objects.filter(email=payload["email"]).exists()
 
+    def test_subscription_choice_requires_contract_consent_when_published(
+        self, tenant, payload
+    ):
+        # The wizard's subscription choice needs the subscription contract the
+        # same way equity needs the coop-share contract.
+        import datetime
+
+        from apps.commissioning.models import ConsentDocument, ConsentRecord
+        from apps.commissioning.models.choices import ConsentKind
+
+        contract = ConsentDocument.objects.create(
+            kind=ConsentKind.SUBSCRIPTION_CONTRACT,
+            locale="de",
+            version="v1",
+            valid_from=datetime.date(2026, 1, 5),
+            body="Abo-Vertrag",
+        )
+        choice = {**payload, "share_type_variation_id": "variation-1"}
+        with pytest.raises(RegistrationError) as exc:
+            register_public_applicant(data=choice, tenant=tenant)
+        assert exc.value.field == "accepted_consent_documents"
+        assert not JasminUser.objects.filter(email=payload["email"]).exists()
+
+        result = register_public_applicant(
+            data={
+                **choice,
+                "accepted_consent_documents": {
+                    ConsentKind.SUBSCRIPTION_CONTRACT: contract.id
+                },
+            },
+            tenant=tenant,
+        )
+        member = Member.objects.get(id=result["member_id"])
+        assert ConsentRecord.objects.filter(member=member, document=contract).exists()
+
+    def test_no_subscription_choice_needs_no_subscription_contract(
+        self, tenant, payload
+    ):
+        import datetime
+
+        from apps.commissioning.models import ConsentDocument
+        from apps.commissioning.models.choices import ConsentKind
+
+        ConsentDocument.objects.create(
+            kind=ConsentKind.SUBSCRIPTION_CONTRACT,
+            locale="de",
+            version="v1",
+            valid_from=datetime.date(2026, 1, 5),
+            body="Abo-Vertrag",
+        )
+        result = register_public_applicant(data=payload, tenant=tenant)
+        assert result["member_id"] is not None
+
     def test_registration_with_required_consents_accepted_succeeds(
         self, tenant, payload
     ):

@@ -874,6 +874,14 @@ class CoopShareContractAgreementRequired(BadRequestError):
     code = "coop_share.contract_agreement_required"
 
 
+class SubscriptionContractAgreementRequired(BadRequestError):
+    """The tenant has a subscription contract ("Abo-Vertrag") in force, but the
+    subscribe request didn't name the version that was accepted, or named one
+    that isn't in force."""
+
+    code = "subscription.contract_agreement_required"
+
+
 class CoopShareValueNotConfigured(BadRequestError):
     """A coop-share self-subscription was attempted but the tenant has no
     configured per-share value — refuse rather than persist a 0-valued share."""

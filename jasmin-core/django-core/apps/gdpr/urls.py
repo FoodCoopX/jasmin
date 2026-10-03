@@ -9,10 +9,9 @@ urlpatterns = [
         views.gdpr_my_deletion_status_view,
         name="gdpr-my-deletion-status",
     ),
-    # Two-step deletion flow. The request endpoint creates a PENDING
-    # request + sends the confirmation email; the confirm endpoint is
-    # the link the user clicks; the admin endpoints gate the deletion
-    # when the tenant / persona requires office approval.
+    # Deletion flow. The request endpoint creates a PENDING request +
+    # sends the confirmation email; the confirm endpoint is the link the
+    # user clicks; the admin endpoints approve or reject every request.
     path(
         "request-deletion/",
         views.gdpr_request_deletion_view,
@@ -49,6 +48,13 @@ urlpatterns = [
         "admin/preview-deletion/<str:user_id>/",
         views.gdpr_admin_preview_deletion_view,
         name="gdpr-admin-preview-deletion",
+    ),
+    # The same dry-run for the subject of a request waiting for approval,
+    # which may be a member or reseller without a login.
+    path(
+        "admin/pending-deletions/<str:request_id>/preview/",
+        views.gdpr_admin_preview_pending_deletion_view,
+        name="gdpr-admin-preview-pending-deletion",
     ),
     # Requests the office handles for a member or reseller (e.g. one without a
     # login, or who wrote a letter). Admin + step-up.

@@ -1,11 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AdminPendingDeletion } from "@shared/api/generated/models";
 
 const rows = vi.hoisted(() => ({ pending: [] as AdminPendingDeletion[] }));
+const approval = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  preview: undefined as unknown,
+  previewedRequestId: undefined as string | undefined,
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -34,9 +39,20 @@ vi.mock("@shared/api/generated/gdpr/gdpr", () => ({
     isFetching: false,
   }),
   useGdprAdminApproveDeletionCreate: () => ({
-    mutate: vi.fn(),
-    variables: undefined,
+    mutate: approval.mutate,
+    isPending: false,
   }),
+  useGdprAdminPendingDeletionsPreviewRetrieve: (
+    requestId: string,
+    options: { query: { enabled: boolean } },
+  ) => {
+    if (options.query.enabled) approval.previewedRequestId = requestId;
+    return {
+      data: options.query.enabled ? approval.preview : undefined,
+      isLoading: false,
+      isError: false,
+    };
+  },
   getGdprAdminPendingDeletionsRetrieveQueryKey: () => ["pending"],
   getGdprAdminDecidedDeletionsListQueryKey: () => ["decided"],
 }));
@@ -88,5 +104,83 @@ describe("PendingDeletionsTable", () => {
       screen.getAllByText("gdpr.filed_by_office:gdpr.channel.letter"),
     ).toHaveLength(1);
     expect(screen.getByText("1 open CoopShare(s)")).toBeInTheDocument();
+  });
+
+  it("shows what the erasure deletes before approving it", () => {
+    rows.pending = [row({})];
+    approval.mutate.mockReset();
+    approval.preview = {
+      user_id: "u1",
+      user_email: "self@example.com",
+      persona: "member",
+      has_member: true,
+      has_reseller: false,
+      can_anonymize_now: true,
+      retention_blocks: [],
+      model_count: 1,
+      field_count: 2,
+      models: [
+        {
+          model: "commissioning.Member",
+          row_count: 1,
+          scrubbed_fields: [
+            { field: "first_name", action: "tombstone", becomes: "x" },
+            { field: "email", action: "pii_immediate", becomes: "y" },
+          ],
+        },
+      ],
+      side_channels: [{ target: "auditlog", description: "server text" }],
+    };
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PendingDeletionsTable onRejectRequested={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByText("gdpr.approve"));
+
+    const dialog = screen.getByRole("dialog");
+    expect(approval.previewedRequestId).toBe("r1");
+    expect(within(dialog).getByText("gdpr.preview.model.member")).toBeInTheDocument();
+    expect(within(dialog).getByText(/first_name, email/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("gdpr.preview.side_channel.auditlog"),
+    ).toBeInTheDocument();
+    expect(approval.mutate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByText("gdpr.preview.approve"));
+
+    expect(approval.mutate).toHaveBeenCalledWith({ requestId: "r1" });
+  });
+
+  it("can't approve while the preview reports a retention obligation", () => {
+    rows.pending = [row({})];
+    approval.mutate.mockReset();
+    approval.preview = {
+      user_id: "u1",
+      user_email: "self@example.com",
+      persona: "member",
+      has_member: true,
+      has_reseller: false,
+      can_anonymize_now: false,
+      retention_blocks: ["1 open CoopShare(s)"],
+      model_count: 0,
+      field_count: 0,
+      models: [],
+      side_channels: [],
+    };
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PendingDeletionsTable onRejectRequested={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByText("gdpr.approve"));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("1 open CoopShare(s)")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("gdpr.preview.approve").closest("button"),
+    ).toBeDisabled();
   });
 });

@@ -873,6 +873,25 @@ class SubscriptionSerializer(
         return obj.get_display_id()
 
 
+class SubscriptionCreateRequestSerializer(SubscriptionSerializer):
+    """The office create: a subscription plus the subscription contract the
+    member accepted."""
+
+    subscription_contract_document = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        help_text=(
+            "Id of the subscription contract (a consent document) the member "
+            "accepted. Required while one is in force; recorded as the "
+            "member's consent together with the subscription."
+        ),
+    )
+
+    class Meta(SubscriptionSerializer.Meta):
+        pass
+
+
 class CoopShareSerializer(
     UserNameFieldMixin, MemberStringFieldMixin, serializers.ModelSerializer
 ):

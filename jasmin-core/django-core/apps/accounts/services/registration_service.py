@@ -26,14 +26,17 @@ logger = logging.getLogger("authentication")
 _REQUIRED_FIELDS = ("first_name", "last_name", "email")
 
 
-def _assert_required_consents(accepted: dict, *, coop_shares_count: int, as_of) -> None:
+def _assert_required_consents(
+    accepted: dict, *, coop_shares_count: int, wants_subscription: bool, as_of
+) -> None:
     """Reject a public registration that omits a mandatory, currently-published
     consent — the server-side counterpart to the authenticated self-service
     gates (e.g. ``MyCoopShareSubscribeView``'s COOP_CONTRACT check). A kind is
     required only when the tenant has a CURRENT document for it (nothing to
     accept otherwise); the cooperative contract is required only when the
-    applicant requests equity. Each accepted id must resolve to a current
-    document of that kind — a forged / stale / kind-mismatched id doesn't count.
+    applicant requests equity, the subscription contract only when they chose
+    a subscription. Each accepted id must resolve to a current document of that
+    kind — a forged / stale / kind-mismatched id doesn't count.
     """
     from django.db.models import Q
 
@@ -43,6 +46,8 @@ def _assert_required_consents(accepted: dict, *, coop_shares_count: int, as_of) 
     required = [ConsentKind.PRIVACY, ConsentKind.WITHDRAWAL]
     if coop_shares_count > 0:
         required.append(ConsentKind.COOP_CONTRACT)
+    if wants_subscription:
+        required.append(ConsentKind.SUBSCRIPTION_CONTRACT)
 
     def _current(**kw):
         return ConsentDocument.objects.filter(valid_from__lte=as_of, **kw).filter(
@@ -131,7 +136,10 @@ def register_public_applicant(
     assert_member_creation_allowed(is_trial=is_trial)
 
     _assert_required_consents(
-        accepted, coop_shares_count=coop_shares_count, as_of=as_of
+        accepted,
+        coop_shares_count=coop_shares_count,
+        wants_subscription=bool(str(data.get("share_type_variation_id") or "").strip()),
+        as_of=as_of,
     )
 
     # Create the account WITHOUT a usable password and email a set-password

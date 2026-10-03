@@ -25,6 +25,7 @@ from ..errors import (
     ConsentAlreadyRevoked,
     ConsentDocumentNotFound,
     ConsentRevokeReasonReserved,
+    SubscriptionContractAgreementRequired,
 )
 from ..models import ConsentDocument, ConsentKind, ConsentRecord, Member
 
@@ -104,6 +105,38 @@ class ConsentService:
                 f"effective on or before {as_of.isoformat()}.",
             )
         return doc
+
+    @staticmethod
+    def documents_in_force(kind: str, as_of=None) -> models.QuerySet[ConsentDocument]:
+        """Every document of ``kind`` in force on ``as_of`` (default: today),
+        in any locale."""
+        as_of = as_of or timezone.localdate()
+        return ConsentDocument.objects.filter(kind=kind, valid_from__lte=as_of).filter(
+            models.Q(valid_until__isnull=True) | models.Q(valid_until__gte=as_of)
+        )
+
+    @staticmethod
+    def accepted_subscription_contract(
+        document_id: str | None,
+    ) -> ConsentDocument | None:
+        """The subscription contract a subscribe request accepted, or ``None``
+        when the tenant has none in force and there is nothing to accept.
+
+        Fails closed: while a contract is in force in any locale,
+        ``document_id`` must name one in force — a missing, stale or
+        other-kind id raises ``SubscriptionContractAgreementRequired``. The
+        caller records the consent in the transaction that creates the
+        subscription.
+        """
+        in_force = ConsentService.documents_in_force(ConsentKind.SUBSCRIPTION_CONTRACT)
+        if not in_force.exists():
+            return None
+        document = in_force.filter(pk=document_id).first() if document_id else None
+        if document is None:
+            raise SubscriptionContractAgreementRequired(
+                "Accept the subscription contract to subscribe."
+            )
+        return document
 
     # ------------------------------------------------------------------ #
     # Record consent                                                     #
@@ -223,6 +256,20 @@ class ConsentService:
             ConsentService._flag_member_for_consent_review(consent)
 
         return consent
+
+    @staticmethod
+    @transaction.atomic
+    def mark_withdrawal_reviewed(member: Member) -> Member:
+        """The office has reviewed a member's withdrawn consent: clear
+        ``consent_withdrawn_at``. The withdrawal itself stays on its
+        ConsentRecord. Saved through the model so the audit log records who
+        cleared it; clearing a flag that is not set changes nothing.
+        """
+        member = Member.objects.select_for_update().get(pk=member.pk)
+        if member.consent_withdrawn_at is not None:
+            member.consent_withdrawn_at = None
+            member.save(update_fields=["consent_withdrawn_at"])
+        return member
 
     @staticmethod
     def _flag_member_for_consent_review(consent: ConsentRecord) -> None:

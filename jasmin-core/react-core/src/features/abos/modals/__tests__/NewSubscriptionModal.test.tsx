@@ -39,17 +39,18 @@ vi.mock("@shared/auth", () => ({
 // ── Generated create fns (the boundary under assertion) ────────────────────
 const subscribeCreateMock = vi.fn();
 const abosCreateMock = vi.fn();
-const consentsCreateMock = vi.fn();
+// Published subscription-contract documents. Empty by default → the consent
+// block is not shown and doesn't gate the save.
+const consentDocuments = vi.hoisted(() => ({ list: [] as unknown[] }));
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   commissioningMySubscriptionsSubscribeCreate: (...args: unknown[]) =>
     subscribeCreateMock(...args),
   commissioningAbosCreate: (...args: unknown[]) => abosCreateMock(...args),
-  commissioningConsentsCreate: (...args: unknown[]) =>
-    consentsCreateMock(...args),
   useCommissioningDeliveryExceptionPeriodsList: () => ({ data: [] }),
-  // No published subscription-contract document in these tests → the consent
-  // block is not shown and doesn't gate the save.
-  useCommissioningConsentDocumentsList: () => ({ data: [], isLoading: false }),
+  useCommissioningConsentDocumentsList: () => ({
+    data: consentDocuments.list,
+    isLoading: false,
+  }),
 }));
 
 // SEPA gate: stub the setup modal + return a ready mandate so the save flow
@@ -295,6 +296,7 @@ function fillRequiredFields(price?: string) {
 beforeEach(() => {
   rolesMock.mockReset();
   getSettingMock.mockReset();
+  consentDocuments.list = [];
   sepaModal.lastProps = undefined;
   subscriptionTerm.lastOptions = undefined;
   subscribeCreateMock.mockReset().mockResolvedValue(undefined);
@@ -496,5 +498,61 @@ describe("NewSubscriptionModal — SEPA setup hand-off", () => {
     renderModal();
 
     expect(sepaModal.lastProps?.officeMode).toBe(false);
+  });
+});
+
+describe("NewSubscriptionModal — subscription contract", () => {
+  it("office path: sends the accepted contract with the subscription", async () => {
+    rolesMock.mockReturnValue({ isMemberOnly: false });
+    getSettingMock.mockImplementation((_k: string, fb?: unknown) => fb);
+    consentDocuments.list = [
+      {
+        id: "contract-1",
+        kind: "subscription_contract",
+        title: "Abo-Vertrag",
+        valid_from: "2020-01-06",
+        valid_until: null,
+      },
+    ];
+
+    renderModal();
+    selectVariation();
+    fillRequiredFields("12");
+    fireEvent.mouseDown(screen.getByText("delivery.select_station"));
+    fireEvent.click(await screen.findByText("Station A"));
+    fireEvent.click(screen.getByText("abos.accept_subscription_contract"));
+
+    fireEvent.click(screen.getByText("common.save"));
+
+    await waitFor(() => expect(abosCreateMock).toHaveBeenCalledTimes(1));
+    expect(abosCreateMock.mock.calls[0][0].subscription_contract_document).toBe(
+      "contract-1",
+    );
+  });
+
+  it("keeps save disabled until the contract is accepted", async () => {
+    rolesMock.mockReturnValue({ isMemberOnly: false });
+    getSettingMock.mockImplementation((_k: string, fb?: unknown) => fb);
+    consentDocuments.list = [
+      {
+        id: "contract-1",
+        kind: "subscription_contract",
+        title: "Abo-Vertrag",
+        valid_from: "2020-01-06",
+        valid_until: null,
+      },
+    ];
+
+    renderModal();
+    selectVariation();
+    fillRequiredFields("12");
+    fireEvent.mouseDown(screen.getByText("delivery.select_station"));
+    fireEvent.click(await screen.findByText("Station A"));
+
+    const save = screen.getByText("common.save").closest("button");
+    expect(save).toBeDisabled();
+    fireEvent.click(screen.getByText("abos.accept_subscription_contract"));
+    expect(save).toBeEnabled();
+    expect(abosCreateMock).not.toHaveBeenCalled();
   });
 });

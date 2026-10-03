@@ -6,7 +6,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, Space, Tag, Tooltip, Typography } from "antd";
 import { ReadOnlyReportTable } from "@shared/tables";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getGdprAdminDecidedDeletionsListQueryKey,
@@ -19,6 +19,8 @@ import { useTimeFormat } from "@hooks/index";
 import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 
+import ApproveDeletionModal from "../modals/ApproveDeletionModal";
+
 const { Paragraph } = Typography;
 
 interface PendingDeletionsTableProps {
@@ -29,7 +31,8 @@ interface PendingDeletionsTableProps {
 /**
  * Admin inbox of GDPR deletion requests in ``PENDING_ADMIN``.
  *
- * Owns its own query + approve mutation. The reject flow is parent-
+ * Owns its own query + approve mutation; Approve opens a modal showing what
+ * the erasure would delete before it runs. The reject flow is parent-
  * driven because the reject reason modal is shared with potentially
  * other entry points later — this table just bubbles "user clicked
  * Ablehnen on this row" upward.
@@ -43,12 +46,15 @@ export default function PendingDeletionsTable({
 
   const { data, isFetching } = useGdprAdminPendingDeletionsRetrieve();
   const pending: AdminPendingDeletion[] = data?.pending ?? [];
+  const [approveTarget, setApproveTarget] =
+    useState<AdminPendingDeletion | null>(null);
 
-  const { mutate: approveMutate, variables: approvingVariables } =
+  const { mutate: approveMutate, isPending: approving } =
     useGdprAdminApproveDeletionCreate({
       mutation: {
         onSuccess: () => {
           notify.success(t("gdpr.approved"));
+          setApproveTarget(null);
           // Both lists are now stale: the approved row leaves pending
           // and shows up in decided.
           queryClient.invalidateQueries({
@@ -59,11 +65,10 @@ export default function PendingDeletionsTable({
           });
         },
         onError: (error) => {
-          notify.error(getErrorMessage(error, "Failed to approve"));
+          notify.error(getErrorMessage(error));
         },
       },
     });
-  const approvingId = approvingVariables?.requestId;
 
   const columns = useMemo(
     () => [
@@ -129,16 +134,14 @@ export default function PendingDeletionsTable({
         align: "right" as const,
         render: (_: unknown, row: AdminPendingDeletion) => {
           const blocked = row.blockers.length > 0;
-          const acting = approvingId === row.id;
           return (
             <Space>
               <Tooltip title={blocked ? t("gdpr.approve_blocked_tooltip") : ""}>
                 <Button
                   type="primary"
                   icon={<CheckOutlined />}
-                  loading={acting}
                   disabled={blocked}
-                  onClick={() => approveMutate({ requestId: row.id })}
+                  onClick={() => setApproveTarget(row)}
                 >
                   {t("gdpr.approve")}
                 </Button>
@@ -146,7 +149,6 @@ export default function PendingDeletionsTable({
               <Button
                 danger
                 icon={<CloseOutlined />}
-                disabled={acting}
                 onClick={() => onRejectRequested(row)}
               >
                 {t("gdpr.reject")}
@@ -156,7 +158,7 @@ export default function PendingDeletionsTable({
         },
       },
     ],
-    [t, formatDateTime, approvingId, approveMutate, onRejectRequested],
+    [t, formatDateTime, onRejectRequested],
   );
 
   return (
@@ -180,6 +182,13 @@ export default function PendingDeletionsTable({
         pagination={false}
         loading={isFetching}
         emptyText={t("gdpr.no_pending")}
+      />
+
+      <ApproveDeletionModal
+        request={approveTarget}
+        approving={approving}
+        onApprove={(row) => approveMutate({ requestId: row.id })}
+        onCancel={() => setApproveTarget(null)}
       />
     </div>
   );

@@ -48,15 +48,9 @@ interface MemberConsentsCardProps {
  * Lists every ConsentRecord for the member, with a revoke action on
  * each still-active row.
  *
- * Server-side scoping: members only ever see their own consents
- * (``scope_to_member`` in the viewset). Office staff see all consents
- * tenant-wide, so for them we narrow client-side to ``memberId``.
- *
- * Once the next ``make generate-api`` regen picks up the
- * ``?member=<id>`` query parameter (declared via ``@extend_schema``
- * on the backend), swap the post-fetch ``.filter`` for passing
- * ``{ params: { member: memberId } }`` into the hook — let the DB
- * narrow instead of the browser.
+ * The server narrows the list to ``memberId`` (``?member=``); a member
+ * viewer is scoped to their own consents there whatever the parameter
+ * says (``scope_to_member`` in the viewset).
  */
 const MemberConsentsCard = ({
   memberId,
@@ -68,17 +62,18 @@ const MemberConsentsCard = ({
   const [revokeTarget, setRevokeTarget] = useState<ConsentRecord | null>(null);
   const [revokeReason, setRevokeReason] = useState("");
 
-  const { data, isLoading, error } = useCommissioningConsentsList();
+  const { data, isLoading, error } = useCommissioningConsentsList({
+    member: memberId,
+  });
 
-  const records = useMemo<ConsentRecord[]>(() => {
-    // ``data`` is ``ConsentRecord[]`` from the unpaginated default shape, but
-    // ``unwrapList`` also handles orval surfacing a paginated wrapper.
-    return unwrapList<ConsentRecord>(data).filter((r) => r.member === memberId);
-  }, [data, memberId]);
+  // ``data`` is ``ConsentRecord[]`` from the unpaginated default shape, but
+  // ``unwrapList`` also handles orval surfacing a paginated wrapper.
+  const records = useMemo(() => unwrapList<ConsentRecord>(data), [data]);
 
   const revokeMutation = useCommissioningConsentsRevokeCreate({
     mutation: {
       onSuccess: () => {
+        // The key without params prefix-matches this member's list.
         void queryClient.invalidateQueries({
           queryKey: getCommissioningConsentsListQueryKey(),
         });

@@ -558,6 +558,8 @@ export * from './subjectAccessBundleBillingProfile';
 export * from './subjectAccessBundleMember';
 export * from './subjectAccessBundleReseller';
 export * from './subscription';
+export * from './subscriptionCreateRequest';
+export * from './subscriptionCreateRequestWaitingListReason';
 export * from './subscriptionMemberEmailsResponse';
 export * from './subscriptionWaitingListReason';
 export * from './supportTicketCreate';

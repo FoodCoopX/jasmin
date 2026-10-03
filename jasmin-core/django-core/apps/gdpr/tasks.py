@@ -5,7 +5,8 @@ Three tasks live here:
   * ``anonymise_long_cancelled_members`` — enforces the 10-year retention
     clock that the published retention policy advertises. Without this
     task, ``Member.objects.filter(cancelled_effective_at__lt=ten_years_ago)``
-    would find PII the policy claims is erased.
+    would find PII the policy claims is erased. It also deletes the files an
+    earlier erasure had to keep until their own retention window closed.
 
   * ``alert_on_mass_deletes`` — detects mass-deletion bursts on
     PII / legally-relevant tables. The brute-force alert in
@@ -39,23 +40,38 @@ from __future__ import annotations
 import datetime
 import logging
 from collections import Counter
+from collections.abc import Callable
+from typing import TypeVar
 
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.mail import mail_admins
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 from huey import crontab
 from huey.contrib.djhuey import db_periodic_task
 
-from apps.commissioning.models import Member
+from apps.commissioning.models import (
+    DeliveryNoteReseller,
+    InvoiceReseller,
+    Member,
+    Reseller,
+)
 from apps.gdpr.errors import RetentionPeriodActive
 from apps.gdpr.services import GDPRService
+from apps.gdpr.services.subjects import (
+    ErasureSubject,
+    anonymized_member_q,
+    anonymized_reseller_q,
+)
 from apps.shared.ops_alerts import alert_operator
 from apps.shared.retention import EX_MEMBER_RETENTION_YEARS
 from apps.shared.tenants.sweep import for_each_tenant
 
 log = logging.getLogger("gdpr")
 ops_log = logging.getLogger("tasks")
+
+_SubjectT = TypeVar("_SubjectT", Member, Reseller)
 
 
 def _retention_cutoff(today: datetime.date | None = None) -> datetime.date:
@@ -68,15 +84,16 @@ def _retention_cutoff(today: datetime.date | None = None) -> datetime.date:
 
 
 def _candidates_for_anonymisation(cutoff: datetime.date):
-    """Members past the retention window who haven't been anonymised yet.
+    """Members past the retention window who haven't been anonymised yet,
+    with a login or without one — the office's paper members and the
+    historical ex-members an onboarding import brings in have none.
 
-    Idempotency key: the anonymisation tombstone on the email column.
-    ``GDPRService.anonymize_user`` scrubs the live email to
-    ``deleted_<pk>@deleted.invalid``, so an already-anonymised member is
-    excluded by that suffix. We must NOT key on ``user.is_active`` — ordinary
-    office deactivation (``account_status="inactive"``) also clears it, so a
+    Idempotency key: the anonymisation tombstone on the member row
+    (``anonymized_member_q``), which every erasure writes. We must NOT key on
+    ``user.is_active`` — ordinary office deactivation
+    (``account_status="inactive"``) also clears it, so a
     cancelled-then-deactivated ex-member would be skipped FOREVER and their PII
-    retained past the statutory window. Re-running anonymize_user on a stale row
+    retained past the statutory window. Re-running the erasure on a stale row
     is safe (it re-checks retention blocks + scrubs in place), so erring toward
     inclusion is correct.
     """
@@ -84,9 +101,8 @@ def _candidates_for_anonymisation(cutoff: datetime.date):
         Member.objects.filter(
             cancelled_effective_at__lte=cutoff,
             cancelled_effective_at__isnull=False,
-            user__isnull=False,
         )
-        .exclude(user__email__endswith="@deleted.invalid")
+        .exclude(anonymized_member_q())
         .select_related("user")
         .order_by("cancelled_effective_at")
     )
@@ -103,8 +119,10 @@ def anonymise_long_cancelled_members() -> dict[str, int]:
     Per-tenant try/except: a single tenant's failure must not stop the
     rest. Within a tenant, each member's anonymisation runs in its own
     ``@transaction.atomic`` block via
-    ``GDPRService.anonymize_user`` — one failed member doesn't roll
-    back the others.
+    ``GDPRService.anonymize_subject`` — one failed member doesn't roll
+    back the others. Then the files earlier erasures kept inside their
+    retention window are deleted once they are past it
+    (``_purge_files_kept_by_erasure``).
 
     Two log channels per anonymisation:
 
@@ -124,13 +142,19 @@ def anonymise_long_cancelled_members() -> dict[str, int]:
         EX_MEMBER_RETENTION_YEARS,
     )
 
-    counters = {"anonymised": 0, "blocked": 0, "tenants_scanned": 0}
+    counters = {
+        "anonymised": 0,
+        "blocked": 0,
+        "files_purged_for": 0,
+        "tenants_scanned": 0,
+    }
 
     def sweep(tenant) -> None:
         counters["tenants_scanned"] += 1
         anonymised, blocked = _run_for_current_schema(cutoff)
         counters["anonymised"] += anonymised
         counters["blocked"] += blocked
+        counters["files_purged_for"] += _purge_files_kept_by_erasure(cutoff)
         if blocked:
             alert_operator(
                 f"{tenant.name}: {blocked} ex-member erasure(s) blocked",
@@ -152,16 +176,14 @@ def anonymise_long_cancelled_members() -> dict[str, int]:
     )
 
     log.info(
-        "gdpr.retention_sweep_done anonymised=%s blocked=%s tenants_scanned=%s",
+        "gdpr.retention_sweep_done anonymised=%s blocked=%s files_purged_for=%s "
+        "tenants_scanned=%s",
         counters["anonymised"],
         counters["blocked"],
+        counters["files_purged_for"],
         counters["tenants_scanned"],
     )
-    return {
-        "anonymised": counters["anonymised"],
-        "blocked": counters["blocked"],
-        "tenants_scanned": counters["tenants_scanned"],
-    }
+    return dict(counters)
 
 
 def _run_for_current_schema(cutoff: datetime.date) -> tuple[int, int]:
@@ -178,16 +200,13 @@ def _run_for_current_schema(cutoff: datetime.date) -> tuple[int, int]:
     today = timezone.localdate()
 
     for member in _candidates_for_anonymisation(cutoff).iterator():
-        user = member.user
-        if user is None:
-            continue
         days_since = (today - member.cancelled_effective_at).days
-        # ``GDPRService.anonymize_user`` is already
+        # ``GDPRService.anonymize_subject`` is already
         # ``@transaction.atomic``; a failure rolls back the per-member
         # scrub. The outer loop is intentionally NOT wrapped, so one
         # failing member doesn't poison the rest of the run.
         try:
-            GDPRService.anonymize_user(user)
+            GDPRService.anonymize_subject(ErasureSubject.of_member(member))
         except RetentionPeriodActive as exc:
             reasons = exc.details.get("reasons", [])
             log.warning(
@@ -212,6 +231,69 @@ def _run_for_current_schema(cutoff: datetime.date) -> tuple[int, int]:
             anonymised += 1
 
     return anonymised, blocked
+
+
+def _purge_files_kept_by_erasure(cutoff: datetime.date) -> int:
+    """Delete the files an erasure kept because they were still inside their
+    retention window, now that they are past it: the SEPA export files of
+    anonymised members' billing runs, and anonymised resellers' invoice and
+    delivery-note PDFs and ZUGFeRD XML. They embed the name (and the IBAN or
+    the postal address) in clear text.
+
+    The erasure's own purge helpers do the deleting, with their retention
+    gate; this only finds the subjects that still have such a file. Returns
+    how many subjects it purged files for. A failure is logged per subject
+    and doesn't stop the others.
+    """
+    from apps.payments.models import BillingRun
+
+    no_file = Q(sepa_xml_export="") | Q(sepa_xml_export__isnull=True)
+    runs_past_retention = BillingRun.objects.filter(
+        created_at__date__lte=cutoff
+    ).exclude(no_file)
+    members = Member.objects.filter(
+        anonymized_member_q(), pk__in=runs_past_retention.values("charges__member")
+    )
+
+    dated_past_retention = Q(date__isnull=True) | Q(date__lte=cutoff)
+    reseller_ids = set(
+        InvoiceReseller.objects.filter(dated_past_retention)
+        .exclude(
+            (Q(file="") | Q(file__isnull=True))
+            & (Q(xml_file="") | Q(xml_file__isnull=True))
+        )
+        .values_list("reseller_id", flat=True)
+    ) | set(
+        DeliveryNoteReseller.objects.filter(dated_past_retention)
+        .exclude(Q(file="") | Q(file__isnull=True))
+        .values_list("order__reseller_id", flat=True)
+    )
+    resellers = Reseller.objects.filter(anonymized_reseller_q(), pk__in=reseller_ids)
+
+    return _purge_files_of(
+        "member", members, GDPRService._purge_member_sepa_exports
+    ) + _purge_files_of("reseller", resellers, GDPRService._purge_reseller_documents)
+
+
+def _purge_files_of(
+    subject_kind: str,
+    subjects: QuerySet[_SubjectT],
+    purge: Callable[[_SubjectT], None],
+) -> int:
+    """Run ``purge`` on each of ``subjects``, logging each outcome; returns
+    how many succeeded."""
+    purged_for = 0
+    for subject in subjects.iterator():
+        try:
+            purge(subject)
+        except Exception:
+            log.exception(
+                "gdpr.retained_files_purge_failed %s_id=%s", subject_kind, subject.pk
+            )
+        else:
+            log.info("gdpr.retained_files_purged %s_id=%s", subject_kind, subject.pk)
+            purged_for += 1
+    return purged_for
 
 
 # ---------------------------------------------------------------

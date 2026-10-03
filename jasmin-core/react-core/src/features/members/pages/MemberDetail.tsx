@@ -45,6 +45,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import ActiveSubscriptionsCard from "../components/ActiveSubscriptionsCard";
+import ConsentWithdrawalAlert from "../components/ConsentWithdrawalAlert";
 import CoopSharesCard from "../components/CoopSharesCard";
 import CurrentWeekDeliveryCard from "../components/CurrentWeekDeliveryCard";
 import DeliveryStationDaysCard from "../components/DeliveryStationDaysCard";
@@ -379,6 +380,8 @@ const MemberDetail = () => {
           </Col>
         </Row>
       </Card>
+
+      <ConsentWithdrawalAlert member={member} />
 
       <Row gutter={[24, 24]}>
         {/* Left column — abos & deliveries: active abos (with "+ new"),

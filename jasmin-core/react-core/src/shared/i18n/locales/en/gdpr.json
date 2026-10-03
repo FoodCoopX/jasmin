@@ -134,5 +134,34 @@
     "erased": "Personal data erased.",
     "blocked_title": "Not erased yet",
     "blocked_intro": "These obligations still need the data. The request waits among the deletion requests until they're settled:"
+  },
+  "preview": {
+    "title": "Approve deletion",
+    "intro": "Approving anonymizes the personal data of {{subject}} at once and for good. It affects:",
+    "blocked": "Not possible yet — these obligations still need the data:",
+    "rows": "Records: {{rows}}",
+    "also_cleared": "Also deleted:",
+    "approve": "Delete for good",
+    "load_error": "The preview could not be loaded.",
+    "model": {
+      "user": "User account",
+      "member": "Member",
+      "subscription": "Subscriptions",
+      "coop_share": "Cooperative shares",
+      "member_loan": "Loans",
+      "coop_share_transfer": "Coop share transfers",
+      "billing_profile": "Payment details",
+      "consent_record": "Consents",
+      "reseller": "Reseller",
+      "contact": "Contact details",
+      "invitation": "Invitations",
+      "email_log": "Email log"
+    },
+    "side_channel": {
+      "auditlog": "The old and new values of these records in the change log",
+      "axes": "The sign-ins and failed sign-in attempts under the person's email addresses",
+      "sepa_export": "The SEPA export files of their collection runs, once their retention period has ended",
+      "reseller_documents": "The PDFs of the invoices and delivery notes and their ZUGFeRD XML, once their retention period has ended"
+    }
   }
 }

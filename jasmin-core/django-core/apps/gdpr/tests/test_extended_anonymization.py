@@ -195,6 +195,50 @@ class TestResellerAnonymization:
         assert InvoiceReseller.objects.filter(pk=invoice.pk).exists()
         assert DeliveryNoteReseller.objects.filter(pk=note.pk).exists()
 
+    def test_audit_entries_of_a_deleted_draft_order_are_scrubbed(self, tenant):
+        """A draft order deleted before the erasure — with its lines and its
+        delivery note — is found through the foreign keys its audit entries
+        store, and every entry of it is blanked."""
+        from auditlog.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        from apps.commissioning.models import (
+            DeliveryNoteReseller,
+            Order,
+            OrderContent,
+        )
+        from apps.commissioning.tests.factories import (
+            DeliveryNoteResellerFactory,
+            OrderContentFactory,
+            OrderFactory,
+        )
+
+        user = JasminUserFactory()
+        reseller = ResellerFactory(linked_user=user)
+        order = OrderFactory(reseller=reseller)
+        line = OrderContentFactory(order=order)
+        note = DeliveryNoteResellerFactory(order=order)
+        deleted = [
+            (Order, order.pk),
+            (OrderContent, line.pk),
+            (DeliveryNoteReseller, note.pk),
+        ]
+        # Removing the last line removes the empty order, and its delivery
+        # note with it.
+        line.delete()
+
+        GDPRService.anonymize_user(user)
+
+        for model, pk in deleted:
+            entries = LogEntry.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                object_pk=str(pk),
+            )
+            assert entries.filter(action=LogEntry.Action.DELETE).exists(), model
+            for entry in entries:
+                assert entry.changes is None
+                assert entry.object_repr == "[anonymised]"
+
     def test_no_reseller_link_is_fine(self, tenant):
         """Pure staff user with no Reseller doesn't crash."""
         user = JasminUserFactory()

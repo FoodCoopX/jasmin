@@ -2,7 +2,8 @@
 
 Covers persona detection (Member / Customer / Staff), the ``preview_deletion``
 payload shape + fidelity to ``FIELD_CLASSIFICATION`` and the retention check,
-the "writes nothing" guarantee, and the admin-only endpoint (200 / 403 / 404).
+the preview of a member or reseller without a login, the "writes nothing"
+guarantee, and the two admin-only endpoints — by user and by pending request.
 """
 
 from __future__ import annotations
@@ -20,7 +21,9 @@ from apps.commissioning.tests.factories import (
     MemberFactory,
     ResellerFactory,
 )
+from apps.gdpr.models import DeletionRequestState
 from apps.gdpr.services import GDPRService, Persona
+from apps.gdpr.services.subjects import ErasureSubject
 
 
 def _models_by_label(preview: dict) -> dict[str, dict]:
@@ -197,5 +200,103 @@ class TestPreviewEndpoint:
         admin = JasminUserFactory(roles=["admin"])
         client = APIClient()
         client.force_authenticate(user=admin)
+        resp = client.get(self._url("does-not-exist"))
+        assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+class TestPreviewWithoutLogin:
+    def test_member_without_login(self, tenant):
+        member = MemberFactory(user=None, email="paper@example.com")
+
+        preview = GDPRService.preview_subject_deletion(ErasureSubject.of_member(member))
+
+        assert preview["persona"] == "member"
+        assert preview["user_id"] == ""
+        assert preview["user_email"] == "paper@example.com"
+        models = _models_by_label(preview)
+        assert "commissioning.Member" in models
+        # No login, so no account and no invitations to scrub.
+        assert "accounts.JasminUser" not in models
+        assert "commissioning.UserInvitation" not in models
+
+    def test_reseller_without_login(self, tenant):
+        reseller = ResellerFactory(linked_user=None)
+
+        preview = GDPRService.preview_subject_deletion(
+            ErasureSubject.of_reseller(reseller)
+        )
+
+        assert preview["persona"] == "customer"
+        assert preview["has_reseller"] is True
+        assert "commissioning.Reseller" in _models_by_label(preview)
+        assert "accounts.JasminUser" not in _models_by_label(preview)
+
+
+@pytest.mark.django_db
+class TestPendingRequestPreviewEndpoint:
+    def _url(self, request_id: str) -> str:
+        return reverse(
+            "gdpr-admin-preview-pending-deletion", kwargs={"request_id": request_id}
+        )
+
+    def _admin_client(self) -> tuple[APIClient, object]:
+        admin = JasminUserFactory(roles=["admin"])
+        client = APIClient()
+        client.force_authenticate(user=admin)
+        return client, admin
+
+    def test_previews_a_request_filed_for_a_member_without_login(self, tenant):
+        client, admin = self._admin_client()
+        member = MemberFactory(user=None)
+        deletion_request = GDPRService.file_deletion_for_subject(
+            ErasureSubject.of_member(member), admin_user=admin, channel="letter"
+        )
+
+        resp = client.get(self._url(str(deletion_request.pk)))
+
+        assert resp.status_code == 200
+        assert resp.data["persona"] == "member"
+        assert resp.data["user_id"] == ""
+        assert "commissioning.Member" in {m["model"] for m in resp.data["models"]}
+
+    def test_previews_a_self_service_request(self, tenant):
+        client, _admin = self._admin_client()
+        user = JasminUserFactory(roles=["member"])
+        MemberFactory(user=user)
+        deletion_request = GDPRService.request_deletion(user)
+        deletion_request.state = DeletionRequestState.PENDING_ADMIN
+        deletion_request.save(update_fields=["state"])
+
+        resp = client.get(self._url(str(deletion_request.pk)))
+
+        assert resp.status_code == 200
+        assert resp.data["user_id"] == str(user.pk)
+
+    def test_request_not_waiting_for_approval_is_409(self, tenant):
+        client, _admin = self._admin_client()
+        user = JasminUserFactory(roles=["member"])
+        deletion_request = GDPRService.request_deletion(user)  # PENDING_EMAIL
+
+        resp = client.get(self._url(str(deletion_request.pk)))
+
+        assert resp.status_code == 409
+        assert resp.data["code"] == "gdpr.deletion_not_pending_admin"
+
+    def test_non_admin_forbidden(self, tenant):
+        _client, admin = self._admin_client()
+        member = MemberFactory(user=None)
+        deletion_request = GDPRService.file_deletion_for_subject(
+            ErasureSubject.of_member(member), admin_user=admin, channel="phone"
+        )
+        client = APIClient()
+        client.force_authenticate(user=JasminUserFactory(roles=["office"]))
+
+        resp = client.get(self._url(str(deletion_request.pk)))
+
+        assert resp.status_code == 403
+
+    def test_unknown_request_404(self, tenant):
+        client, _admin = self._admin_client()
         resp = client.get(self._url("does-not-exist"))
         assert resp.status_code == 404

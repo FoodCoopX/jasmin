@@ -45,7 +45,7 @@ from apps.authz.permissions import (
 )
 from apps.shared.pii_logging import PIIReadLoggingMixin
 from apps.shared.query_params import parse_body_bool
-from apps.shared.request_utils import auth_user, body
+from apps.shared.request_utils import auth_user, body, client_ip
 from core.pagination import OptionalLimitOffsetPagination
 from core.serializers import ErrorResponseSerializer
 
@@ -84,9 +84,10 @@ from ..serializers import (
     MemberOnboardingSerializer,
     MemberSelfReadSerializer,
     MemberSerializer,
+    SubscriptionCreateRequestSerializer,
     SubscriptionSerializer,
 )
-from ..services import MemberService, SubscriptionService
+from ..services import ConsentService, MemberService, SubscriptionService
 from ..services.onboarding_policy import (
     assert_departed_member_subscription_confirmable,
     assert_member_email_action_allowed,
@@ -149,6 +150,7 @@ def _build_member_queryset(request: Request, *, filtered: bool) -> QuerySet[Memb
                 "is_trial",
                 "only_with_subscriptions",
                 "exclude_trial_members",
+                "consent_withdrawn",
             ],
         )
         if filtered
@@ -163,6 +165,9 @@ def _build_member_queryset(request: Request, *, filtered: bool) -> QuerySet[Memb
         queryset = queryset.filter(is_trial=False)
     if filters.get("only_with_subscriptions"):
         queryset = queryset.filter(subscriptions__isnull=False).distinct()
+    consent_withdrawn = filters.get("consent_withdrawn")
+    if consent_withdrawn is not None:
+        queryset = queryset.filter(consent_withdrawn_at__isnull=not consent_withdrawn)
 
     today = timezone.now().date()
     active_count_sq = (
@@ -364,6 +369,14 @@ class MemberViewSet(
                 "exclude_trial_members",
                 required=False,
                 description="Exclude trial members from results",
+            ),
+            catalogue_param(
+                "consent_withdrawn",
+                required=False,
+                description=(
+                    "true: only members who withdrew a consent the office has "
+                    "not reviewed yet; false: only the others"
+                ),
             ),
         ],
         # Office/staff get the full ``MemberSerializer``; a member-role caller
@@ -628,6 +641,27 @@ class MemberViewSet(
             },
             status=status.HTTP_200_OK,
         )
+
+    @extend_schema(
+        description=(
+            "Office only. Marks the review of the member's withdrawn consent "
+            "as done: clears ``consent_withdrawn_at``. The withdrawal itself "
+            "stays on its consent record."
+        ),
+        request=None,
+        responses={200: MemberSerializer},
+    )
+    @action(detail=True, methods=["post"])
+    def mark_consent_reviewed(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        enforce_privileged(
+            request, "Only office staff may mark a consent review as done."
+        )
+        member: Member = self.get_object()
+        ConsentService.mark_withdrawal_reviewed(member)
+        updated_member = self.refetch_for_response(member)
+        return Response(self.get_serializer(updated_member).data)
 
     @extend_schema(
         description=(
@@ -950,20 +984,47 @@ class SubscriptionViewSet(
         )
 
     @extend_schema(
-        description="Create a draft (unconfirmed) subscription.",
+        description=(
+            "Create a draft (unconfirmed) subscription. While a subscription "
+            "contract is in force, ``subscription_contract_document`` must name "
+            "it; the member's consent is recorded with the subscription."
+        ),
+        request=SubscriptionCreateRequestSerializer,
         # Returns the created row (re-fetched through the annotated
         # ``_build_subscription_queryset``) at 201.
-        responses={201: SubscriptionSerializer},
+        responses={
+            201: SubscriptionSerializer,
+            # ``SubscriptionContractAgreementRequired`` and field errors.
+            400: ErrorResponseSerializer,
+        },
     )
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        serializer = self.get_serializer(data=request.data)
+        from django.db import transaction
+
+        serializer = SubscriptionCreateRequestSerializer(
+            data=request.data, context=self.get_serializer_context()
+        )
         serializer.is_valid(raise_exception=True)
+        validated_data = dict(serializer.validated_data)
+        contract = ConsentService.accepted_subscription_contract(
+            validated_data.pop("subscription_contract_document", None)
+        )
 
         service = SubscriptionService()
-        # ``created_by`` is read-only on the serializer — stamp it here.
-        subscription = service.create_bare_subscription(
-            {**serializer.validated_data, "created_by": auth_user(request)}
-        )
+        with transaction.atomic():
+            # ``created_by`` is read-only on the serializer — stamp it here.
+            subscription = service.create_bare_subscription(
+                {**validated_data, "created_by": auth_user(request)}
+            )
+            if contract is not None:
+                # Recorded by the office on the member's behalf, like a
+                # consent the office enters through the consents endpoint.
+                ConsentService.record(
+                    member=subscription.member,
+                    document=contract,
+                    ip_address=client_ip(request) or None,
+                    user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                )
 
         created_subscription = self.refetch_for_response(subscription)
         response_serializer = self.get_serializer(created_subscription)

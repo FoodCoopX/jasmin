@@ -18,6 +18,7 @@
     "invalid_composite_id": "Invalid stock entry id."
   },
   "subscription": {
+    "contract_agreement_required": "The subscription contract hasn't been accepted — the subscription can't be created without it.",
     "start_too_soon": "The subscription can't start before {{earliest}} ({{min_weeks}} week(s) lead time).",
     "additional_requires_base": "This is an additional share and can only be added when the member already has a base share active for the same period.",
     "additional_exceeds_base": "An additional share cannot run longer than the base share it is packed into. Set the end date to {{suggested_valid_until}} (the base share's end) to continue.",
@@ -88,7 +89,7 @@
     "exit_before_transfer": "The exit date is before a coop share transfer of this member ({{transfer_date}}). A member can't leave before their own transfer: if the exit really is earlier, the transfer was recorded wrongly."
   },
   "coop_share": {
-    "contract_agreement_required": "Please agree to the subscription contract to subscribe cooperative shares.",
+    "contract_agreement_required": "Please agree to the cooperative-share contract to subscribe cooperative shares.",
     "value_not_configured": "The value of one cooperative share is not configured. Please contact the office.",
     "invalid_amount": "The number of coop shares must be a whole number greater than 0.",
     "confirmed_immutable": "A confirmed cooperative share can't be deleted — cancel the share (or the member) instead.",

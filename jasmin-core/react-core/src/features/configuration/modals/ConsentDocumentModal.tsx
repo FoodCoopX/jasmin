@@ -19,7 +19,10 @@ import {
   getCommissioningConsentDocumentsListQueryKey,
   useCommissioningConsentDocumentsCreate,
 } from "@shared/api/generated/commissioning/commissioning";
-import type { ConsentDocument } from "@shared/api/generated/models";
+import {
+  ConsentKindEnum,
+  type ConsentDocument,
+} from "@shared/api/generated/models";
 import { notify, toApiDate } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 
@@ -53,7 +56,7 @@ interface ConsentDocumentModalProps {
 }
 
 interface NewVersionFormValues {
-  kind: string;
+  kind: ConsentKindEnum;
   version: string;
   title?: string;
   valid_from: Dayjs;
@@ -81,17 +84,14 @@ export default function ConsentDocumentModal({
   const queryClient = useQueryClient();
   const [form] = Form.useForm<NewVersionFormValues>();
 
-  // Translated options — keyed off ``t`` so a language switch at
-  // runtime re-renders the dropdown with the new labels. Module-level
-  // constants don't have access to ``t``, hence ``useMemo``.
+  // Every kind the backend knows, except ``coop_cancellation``: nothing
+  // asks anyone to consent to it yet, so a published version would never be
+  // shown. Keyed off ``t`` so a language switch re-renders the labels.
   const kindOptions = useMemo(
     () =>
-      (["privacy", "sepa", "withdrawal", "terms", "coop_contract"] as const).map(
-        (k) => ({
-          value: k,
-          label: t(`consent.kind.${k}`, k),
-        }),
-      ),
+      Object.values(ConsentKindEnum)
+        .filter((kind) => kind !== ConsentKindEnum.coop_cancellation)
+        .map((kind) => ({ value: kind, label: t(`consent.kind.${kind}`) })),
     [t],
   );
 
@@ -130,7 +130,7 @@ export default function ConsentDocumentModal({
     }
     createMutation.mutate({
       data: {
-        kind: values.kind as never,
+        kind: values.kind,
         version: values.version,
         locale: tenantLanguage,
         title: values.title || "",
@@ -148,8 +148,7 @@ export default function ConsentDocumentModal({
         // only when a document genuinely has no title).
         title={
           document
-            ? document.title ||
-              t(`consent.kind.${document.kind}`, document.kind)
+            ? document.title || t(`consent.kind.${document.kind}`)
             : ""
         }
         onCancel={onClose}

@@ -422,6 +422,10 @@ class MySubscriptionSubscribeView(APIView):
     reusing the office ``create_bare_subscription`` path, which reserves its
     station-day capacity); the office confirms it through the existing abo
     confirmation flow, which materialises the deliveries.
+
+    While the tenant has a subscription contract ("Abo-Vertrag") in force, the
+    request must name the version the member accepted; the consent is recorded
+    in the same transaction as the subscription.
     """
 
     permission_classes = [IsMember]
@@ -431,13 +435,17 @@ class MySubscriptionSubscribeView(APIView):
         request=MySubscriptionSubscribeSerializer,
         responses={
             201: SubscriptionSerializer,
+            # ``SubscriptionContractAgreementRequired`` and field errors.
+            400: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
     )
     def post(self, request: Request) -> Response:
+        from django.db import transaction
+
         from ..errors import MemberAlreadyCancelled
         from ..models import ShareTypeVariationGrossPrice
-        from ..services import SubscriptionService
+        from ..services import ConsentService, SubscriptionService
 
         member: Member | None = getattr(request.user, "member_profile", None)
         if member is None:
@@ -453,6 +461,9 @@ class MySubscriptionSubscribeView(APIView):
         in_serializer = MySubscriptionSubscribeSerializer(data=request.data)
         in_serializer.is_valid(raise_exception=True)
         choice = in_serializer.validated_data
+        contract = ConsentService.accepted_subscription_contract(
+            choice.get("subscription_contract_document")
+        )
 
         # The variation's gross-price window effective AT THE SUBSCRIPTION'S
         # START (``valid_from``), not today — ``ShareTypeVariationGrossPrice`` is
@@ -515,14 +526,24 @@ class MySubscriptionSubscribeView(APIView):
         }
         sub_serializer = SubscriptionSerializer(data=data, context={"request": request})
         sub_serializer.is_valid(raise_exception=True)
-        subscription = SubscriptionService().create_bare_subscription(
-            sub_serializer.validated_data
-        )
+        # The subscription and the contract ConsentRecord are one unit.
+        with transaction.atomic():
+            subscription = SubscriptionService().create_bare_subscription(
+                sub_serializer.validated_data
+            )
+            if contract is not None:
+                ConsentService.record(
+                    member=member,
+                    document=contract,
+                    ip_address=client_ip(request) or None,
+                    user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                )
         logger.info(
             "commissioning.subscription.self_subscribe member=%s variation=%s "
-            "tenant=%s ip=%s",
+            "contract_consent=%s tenant=%s ip=%s",
             member.id,
             choice["share_type_variation"],
+            contract is not None,
             connection.schema_name,
             client_ip(request),
         )

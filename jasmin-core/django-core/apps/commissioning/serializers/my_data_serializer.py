@@ -84,6 +84,15 @@ class MySubscriptionSubscribeSerializer(serializers.Serializer):
     # A full station-day turns the draft into a waiting-list entry: it holds no
     # capacity and only materialises once the office confirms a freed-up spot.
     on_waiting_list = serializers.BooleanField(required=False, default=False)
+    subscription_contract_document = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text=(
+            "Id of the subscription contract (a consent document) the member "
+            "accepted. Required while one is in force; recorded as their "
+            "consent together with the subscription."
+        ),
+    )
 
 
 class MyMemberDataReadSerializer(MaskedIBANFieldMixin, serializers.ModelSerializer):

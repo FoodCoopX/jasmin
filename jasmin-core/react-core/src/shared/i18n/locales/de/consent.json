@@ -17,6 +17,7 @@
     "withdrawal": "Widerrufsbelehrung",
     "terms": "Nutzungsbedingungen",
     "coop_contract": "Zeichnungsvertrag",
+    "coop_cancellation": "Kündigung der Mitgliedschaft",
     "subscription_contract": "Abo-Vertrag"
   },
   "admin": {
@@ -58,5 +59,11 @@
     "signature_line": "Ort, Datum, Unterschrift"
   },
   "accept_prefix": "Ich habe gelesen und akzeptiere:",
-  "document": "das Dokument"
+  "document": "das Dokument",
+  "review": {
+    "title": "Einwilligung widerrufen am {{date}}",
+    "description": "Das Mitglied hat eine Einwilligung widerrufen (Datenschutz oder Widerrufsbelehrung). Bitte prüfen, welche Verarbeitung darauf beruht und enden muss.",
+    "mark_done": "Prüfung erledigt",
+    "marked_done": "Prüfung als erledigt vermerkt."
+  }
 }

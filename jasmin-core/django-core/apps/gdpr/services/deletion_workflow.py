@@ -216,8 +216,9 @@ class DeletionWorkflowMixin:
                 "The confirmation link has expired. " "Please request deletion again."
             )
 
-        # Step 1 — consume the token + (optionally) execute. This is
-        # the only path that needs the row-lock + transaction wrapper.
+        # Step 1 — consume the token and hand the request to the office.
+        # This is the only path that needs the row-lock + transaction
+        # wrapper.
         return GDPRService._consume_pending_email_request(deletion_request.pk, ip=ip)
 
     @staticmethod
@@ -277,8 +278,8 @@ class DeletionWorkflowMixin:
         *,
         admin_user: JasminUser,
     ) -> DeletionRequest:
-        """Step 3 (only when the admin gate is on): an office/admin
-        approves the request, which then immediately executes.
+        """Step 3: an office/admin approves the request, which then
+        immediately executes.
 
         Uses :meth:`AdminConfirmableMixin.confirm` to stamp the
         ``admin_confirmed`` / ``admin_confirmed_by`` /
@@ -356,9 +357,8 @@ class DeletionWorkflowMixin:
     @staticmethod
     def _execute_deletion(deletion_request: DeletionRequest) -> DeletionRequest:
         """Run the anonymization and stamp the request as executed.
-        Called from both ``confirm_deletion_token`` (no-admin path)
-        and ``admin_approve_deletion`` — keeps the bookkeeping in
-        one place.
+        Called by ``admin_approve_deletion``, the only path that
+        executes a request.
 
         Checks retention obligations at execution time: the request
         may have sat in ``PENDING_ADMIN`` for hours / days during which

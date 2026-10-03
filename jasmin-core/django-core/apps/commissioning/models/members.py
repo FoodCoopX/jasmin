@@ -112,8 +112,10 @@ class Member(
     privacy_consent = models.DateTimeField(blank=True, null=True)
     # Set when the member withdraws a privacy / withdrawal-terms consent (a
     # processing-legal-basis withdrawal that needs office review); cleared when
-    # they re-consent. Surfaces "needs a consent review" to the office, which is
-    # also emailed at withdrawal time (ConsentService.revoke).
+    # they re-consent or the office marks the review done
+    # (ConsentService.mark_withdrawal_reviewed). Surfaces "needs a consent
+    # review" to the office, which is also emailed at withdrawal time
+    # (ConsentService.revoke).
     consent_withdrawn_at = models.DateTimeField(blank=True, null=True)
     # Office stamp: when the signed PAPER membership declaration was physically
     # received. Only relevant when the tenant requires a paper signature for

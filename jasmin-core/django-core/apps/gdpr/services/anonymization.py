@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Model, Q, QuerySet
 
 from apps.commissioning.models import (
     ConsentRecord,
@@ -151,6 +152,17 @@ class AnonymizationMixin:
         through rolls back everything — you're never left with a
         half-anonymized user that the next call sees as already-done.
         """
+        # Lock the member row and work on it as it is now. The instance the
+        # subject was built with can be stale, and ``_anonymize_member`` saves
+        # the row in full: an office cancellation committed in the meantime
+        # would be overwritten and replaced by one dated today. Locked before
+        # anything is written, as the cancellation path locks it too.
+        if subject.member is not None:
+            subject = replace(
+                subject,
+                member=Member.objects.select_for_update().get(pk=subject.member.pk),
+            )
+
         reasons = GDPRService.check_retention_blocks_for_subject(subject)
         if reasons:
             raise RetentionPeriodActive(reasons)
@@ -330,7 +342,11 @@ class AnonymizationMixin:
     @staticmethod
     def _anonymize_member(member: Member) -> None:
         """Scrub the Member row in place. Field-set from
-        ``FIELD_CLASSIFICATION``; status transitions inline."""
+        ``FIELD_CLASSIFICATION``; status transitions inline.
+
+        ``member`` is the row as it is now, locked by
+        :meth:`anonymize_subject` — the full save below would otherwise write
+        a stale copy back."""
         from apps.commissioning.services.member_cancellation import (
             cancel_member_with_coop_shares,
         )
@@ -539,8 +555,9 @@ class AnonymizationMixin:
 
     @staticmethod
     def _scrub_logentries_for(model: type, pks: Any) -> None:
-        """Bulk-blank the auditlog ``changes`` + ``object_repr`` for the
-        ``model`` rows in ``pks``. One UPDATE per model regardless of
+        """Bulk-blank the auditlog diffs (``changes``, the older
+        ``changes_text`` and ``serialized_data``) and ``object_repr`` for
+        the ``model`` rows in ``pks``. One UPDATE per model regardless of
         row count (a heavy member/reseller can have thousands of
         ShareDelivery / OrderContent audit rows).
 
@@ -556,7 +573,47 @@ class AnonymizationMixin:
         content_type = ContentType.objects.get_for_model(model)
         LogEntry.objects.filter(
             content_type=content_type, object_pk__in=pk_strs
-        ).update(changes=None, object_repr="[anonymised]")
+        ).update(
+            changes=None,
+            changes_text="",
+            serialized_data=None,
+            object_repr="[anonymised]",
+        )
+
+    @staticmethod
+    def _deleted_rows_named_in_logentries(
+        model: type[Model], field: str, parent_pks: Iterable[Any]
+    ) -> set[str]:
+        """Pks of deleted ``model`` rows whose audit entries record one of
+        ``parent_pks`` in the foreign key ``field``.
+
+        A queryset no longer finds a deleted row, but the CREATE and DELETE
+        entries it left behind still store its foreign keys, each as an
+        ``[old, new]`` pair of strings.
+        """
+        from auditlog.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+        from django.db.models.fields.json import KT
+
+        parents = [str(pk) for pk in parent_pks]
+        if not parents:
+            return set()
+        logged = set(
+            LogEntry.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                action__in=(LogEntry.Action.CREATE, LogEntry.Action.DELETE),
+            )
+            .annotate(
+                old_parent=KT(f"changes__{field}__0"),
+                new_parent=KT(f"changes__{field}__1"),
+            )
+            .filter(Q(old_parent__in=parents) | Q(new_parent__in=parents))
+            .values_list("object_pk", flat=True)
+        )
+        if not logged:
+            return set()
+        live = model._base_manager.filter(pk__in=logged).values_list("pk", flat=True)
+        return logged - {str(pk) for pk in live}
 
     @staticmethod
     def _remove_note_from_logentries(model: type, pks: Any) -> None:
@@ -592,8 +649,14 @@ class AnonymizationMixin:
         e.g. ``"CoopShare 5 for Anna Müller"``, ``"Order #7 - Hof
         Müller - …"``) are wiped. ``mask_fields`` on the registrations
         only covers a subset of columns; this wipes the rest. Records are
-        found through their live rows, so the entries of a record deleted
-        before the erasure keep both.
+        found through their live rows and, once deleted (a draft
+        subscription, the future deliveries a cancellation removes, an
+        unconfirmed coop share, a draft order), through the foreign keys
+        their CREATE and DELETE entries store.
+
+        The entries the subject made as the acting user lose the email
+        address and the IP address recorded next to them; the actor link
+        to the anonymized user stays.
 
         Coverage MUST track ``auditlog.register(...)`` across the apps
         (commissioning/apps.py, payments/apps.py): every registered
@@ -602,91 +665,92 @@ class AnonymizationMixin:
         ``ConsentDocument`` / ``PaymentCycle`` carry no subject PII and
         are intentionally omitted.
         """
+        from auditlog.models import LogEntry
+
         scrub = GDPRService._scrub_logentries_for
+        deleted = GDPRService._deleted_rows_named_in_logentries
+
+        def pks(queryset: QuerySet[Any]) -> set[str]:
+            return {str(pk) for pk in queryset.values_list("pk", flat=True)}
 
         if user is not None:
             scrub(type(user), [user.pk])
-            scrub(
-                UserInvitation,
-                UserInvitation.objects.filter(user=user).values_list("pk", flat=True),
+            scrub(UserInvitation, pks(UserInvitation.objects.filter(user=user)))
+            LogEntry.objects.filter(actor=user).update(
+                actor_email=None, remote_addr=None
             )
 
         if member is not None:
-            scrub(Member, [member.pk])
-            scrub(
-                BillingProfile,
-                BillingProfile.objects.filter(member=member).values_list(
-                    "pk", flat=True
-                ),
-            )
-            scrub(
-                ConsentRecord,
-                ConsentRecord.objects.filter(member=member).values_list(
-                    "pk", flat=True
-                ),
-            )
-            scrub(
-                CoopShare,
-                CoopShare.objects.filter(member=member).values_list("pk", flat=True),
-            )
+            member_pks = [member.pk]
+            scrub(Member, member_pks)
+            for model in (BillingProfile, ConsentRecord, CoopShare):
+                scrub(
+                    model,
+                    pks(model.objects.filter(member=member))
+                    | deleted(model, "member", member_pks),
+                )
             # A transfer's note and the notes of the other member's rows it created
             # name this member; the rest of those records is the other member's
             # history, so only the note leaves their diffs.
-            transfers = GDPRService._coop_share_transfers_of(member)
+            transfers = (
+                pks(GDPRService._coop_share_transfers_of(member))
+                | deleted(CoopShareTransfer, "from_member", member_pks)
+                | deleted(CoopShareTransfer, "to_member", member_pks)
+            )
             remove_note = GDPRService._remove_note_from_logentries
-            remove_note(CoopShareTransfer, transfers.values_list("pk", flat=True))
+            remove_note(CoopShareTransfer, transfers)
             remove_note(
                 CoopShare,
-                CoopShare.objects.filter(transfer__in=transfers)
-                .exclude(member=member)
-                .values_list("pk", flat=True),
+                pks(
+                    CoopShare.objects.filter(transfer__in=transfers).exclude(
+                        member=member
+                    )
+                )
+                | deleted(CoopShare, "transfer", transfers),
             )
-            scrub(
-                Subscription,
-                Subscription.objects.filter(member=member).values_list("pk", flat=True),
+            subscriptions = pks(Subscription.objects.filter(member=member)) | deleted(
+                Subscription, "member", member_pks
             )
+            scrub(Subscription, subscriptions)
             scrub(
                 ShareDelivery,
-                ShareDelivery.objects.filter(subscription__member=member).values_list(
-                    "pk", flat=True
-                ),
+                pks(ShareDelivery.objects.filter(subscription__member=member))
+                | deleted(ShareDelivery, "subscription", subscriptions),
             )
 
         if reseller is not None:
-            scrub(Reseller, [reseller.pk])
-            scrub(
-                Order,
-                Order.objects.filter(reseller=reseller).values_list("pk", flat=True),
+            reseller_pks = [reseller.pk]
+            scrub(Reseller, reseller_pks)
+            orders = pks(Order.objects.filter(reseller=reseller)) | deleted(
+                Order, "reseller", reseller_pks
             )
+            scrub(Order, orders)
             scrub(
                 OrderContent,
-                OrderContent.objects.filter(order__reseller=reseller).values_list(
-                    "pk", flat=True
-                ),
+                pks(OrderContent.objects.filter(order__reseller=reseller))
+                | deleted(OrderContent, "order", orders),
             )
-            scrub(
-                InvoiceReseller,
-                InvoiceReseller.objects.filter(reseller=reseller).values_list(
-                    "pk", flat=True
-                ),
+            invoices = pks(InvoiceReseller.objects.filter(reseller=reseller)) | deleted(
+                InvoiceReseller, "reseller", reseller_pks
             )
+            scrub(InvoiceReseller, invoices)
             scrub(
                 InvoiceResellerContent,
-                InvoiceResellerContent.objects.filter(
-                    invoice__reseller=reseller
-                ).values_list("pk", flat=True),
+                pks(InvoiceResellerContent.objects.filter(invoice__reseller=reseller))
+                | deleted(InvoiceResellerContent, "invoice", invoices),
             )
-            scrub(
-                DeliveryNoteReseller,
-                DeliveryNoteReseller.objects.filter(
-                    order__reseller=reseller
-                ).values_list("pk", flat=True),
-            )
+            delivery_notes = pks(
+                DeliveryNoteReseller.objects.filter(order__reseller=reseller)
+            ) | deleted(DeliveryNoteReseller, "order", orders)
+            scrub(DeliveryNoteReseller, delivery_notes)
             scrub(
                 DeliveryNoteContent,
-                DeliveryNoteContent.objects.filter(
-                    delivery_note__order__reseller=reseller
-                ).values_list("pk", flat=True),
+                pks(
+                    DeliveryNoteContent.objects.filter(
+                        delivery_note__order__reseller=reseller
+                    )
+                )
+                | deleted(DeliveryNoteContent, "delivery_note", delivery_notes),
             )
 
             # Mirror ``_anonymize_reseller``: a contact shared with

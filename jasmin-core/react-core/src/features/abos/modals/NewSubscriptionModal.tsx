@@ -23,11 +23,13 @@ import { type FC, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   commissioningAbosCreate,
-  commissioningConsentsCreate,
   commissioningMySubscriptionsSubscribeCreate,
   useCommissioningDeliveryExceptionPeriodsList,
 } from "@shared/api/generated/commissioning/commissioning";
-import type { Subscription } from "@shared/api/generated/models";
+import type {
+  Subscription,
+  SubscriptionCreateRequest,
+} from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
 import ConsentDocumentField from "@shared/consent/ConsentDocumentField";
 import { useCurrentConsentDoc } from "@shared/consent/useCurrentConsentDoc";
@@ -136,7 +138,8 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
 
   // Subscription-contract consent: shown + required ONLY when the tenant has
   // published a ``subscription_contract`` ConsentDocument (no doc → not
-  // required). Recorded on save — office records it on the member's behalf,
+  // required). The accepted version goes with the subscription request and the
+  // server records the consent with it — the office on the member's behalf,
   // member/public for the applicant.
   const { doc: subscriptionContractDoc } = useCurrentConsentDoc(
     "subscription_contract",
@@ -649,6 +652,13 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
       try {
         const validFromStr = formatDateForAPI(values.valid_from) ?? "";
         const validUntilStr = formatDateForAPI(values.valid_until);
+        // The server refuses the subscription without the accepted contract
+        // while one is in force, and records the consent in the same
+        // transaction.
+        const acceptedContract =
+          subscriptionContractDoc?.id && subscriptionContractAccepted
+            ? { subscription_contract_document: subscriptionContractDoc.id }
+            : {};
         if (isMemberOnly) {
           // Member self-service: the endpoint takes the member from the token,
           // forces is_trial=false, and (unless solidarity pricing is on) derives
@@ -668,9 +678,10 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
             ...(allowsSolidarity && values.price_per_delivery != null
               ? { price_per_delivery: String(values.price_per_delivery) }
               : {}),
+            ...acceptedContract,
           });
         } else {
-          const payload: Partial<Subscription> = {
+          const payload: Partial<SubscriptionCreateRequest> = {
             member: memberId,
             share_type_variation: selectedVariation.value,
             valid_from: validFromStr,
@@ -681,27 +692,9 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
             default_delivery_station_day: values.default_delivery_station_day,
             is_trial: values.is_trial ?? false,
             on_waiting_list: asWaitingList,
+            ...acceptedContract,
           };
-          await commissioningAbosCreate(payload as Subscription);
-        }
-        // Record the subscription-contract consent once the subscription
-        // exists. Office records it on the member's behalf (``member``);
-        // a member self-subscribing is pinned to their own record server-side.
-        // Non-fatal: the subscription is already saved, so a failed consent
-        // write only warns rather than rolling back.
-        if (subscriptionContractDoc?.id && subscriptionContractAccepted) {
-          try {
-            await commissioningConsentsCreate({
-              document_id: subscriptionContractDoc.id,
-              ...(isMemberOnly ? {} : { member: memberId }),
-            });
-          } catch (consentError) {
-            console.error(
-              "Failed to record subscription-contract consent:",
-              consentError,
-            );
-            notify.warning(t("abos.subscription_contract_record_failed"));
-          }
+          await commissioningAbosCreate(payload as SubscriptionCreateRequest);
         }
         setWaitingListOffer(null);
         notify.success(

@@ -8,6 +8,10 @@
 
 export type CommissioningMembersListParams = {
 /**
+ * true: only members who withdrew a consent the office has not reviewed yet; false: only the others
+ */
+consent_withdrawn?: boolean;
+/**
  * Exclude trial members from results
  */
 exclude_trial_members?: boolean;

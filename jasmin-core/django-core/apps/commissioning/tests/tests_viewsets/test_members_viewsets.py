@@ -1053,3 +1053,69 @@ class TestMemberCreateIdentityFloor:
         assert resp.status_code == status.HTTP_200_OK, resp.data
         member.refresh_from_db()
         assert member.note == "edited"
+
+
+@pytest.mark.django_db
+class TestConsentWithdrawalReview:
+    """The office finds the members who withdrew a consent and marks the
+    review done, which clears ``consent_withdrawn_at``."""
+
+    LIST_URL = reverse("member-list")
+
+    @staticmethod
+    def _review_url(member: Member) -> str:
+        return reverse("member-mark-consent-reviewed", kwargs={"pk": member.pk})
+
+    def test_list_filters_by_withdrawn_consent(self, api_client, tenant):
+        withdrawn = MemberFactory(
+            consent_withdrawn_at=datetime.datetime(2026, 9, 1, tzinfo=datetime.UTC)
+        )
+        not_withdrawn = MemberFactory(consent_withdrawn_at=None)
+
+        flagged = api_client.get(self.LIST_URL, {"consent_withdrawn": "true"})
+        others = api_client.get(self.LIST_URL, {"consent_withdrawn": "false"})
+
+        assert flagged.status_code == status.HTTP_200_OK
+        flagged_ids = {row["id"] for row in flagged.data}
+        other_ids = {row["id"] for row in others.data}
+        assert str(withdrawn.pk) in flagged_ids
+        assert str(not_withdrawn.pk) not in flagged_ids
+        assert str(not_withdrawn.pk) in other_ids
+        assert str(withdrawn.pk) not in other_ids
+
+    def test_office_marks_the_review_done(self, api_client, tenant):
+        member = MemberFactory(
+            consent_withdrawn_at=datetime.datetime(2026, 9, 1, tzinfo=datetime.UTC)
+        )
+
+        resp = api_client.post(self._review_url(member))
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert resp.data["consent_withdrawn_at"] is None
+        member.refresh_from_db()
+        assert member.consent_withdrawn_at is None
+
+    def test_marking_an_unflagged_member_changes_nothing(self, api_client, tenant):
+        member = MemberFactory(consent_withdrawn_at=None)
+
+        resp = api_client.post(self._review_url(member))
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert resp.data["consent_withdrawn_at"] is None
+
+    def test_member_cannot_clear_their_own_flag(self, tenant):
+        from rest_framework.test import APIClient
+
+        user = JasminUserFactory(roles=["member"])
+        member = MemberFactory(
+            user=user,
+            consent_withdrawn_at=datetime.datetime(2026, 9, 1, tzinfo=datetime.UTC),
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        resp = client.post(self._review_url(member))
+
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        member.refresh_from_db()
+        assert member.consent_withdrawn_at is not None

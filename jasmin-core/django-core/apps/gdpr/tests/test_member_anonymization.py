@@ -15,15 +15,20 @@ from __future__ import annotations
 import datetime
 
 import pytest
+import time_machine
 from django.db.models import F
 
-from apps.commissioning.models import CoopShare, CoopShareTransfer
+from apps.commissioning.models import CoopShare, CoopShareTransfer, Member
+from apps.commissioning.services.member_cancellation import (
+    cancel_member_with_coop_shares,
+)
 from apps.commissioning.tests.factories import (
     CoopShareFactory,
     JasminUserFactory,
     MemberFactory,
 )
 from apps.gdpr.services import GDPRService
+from apps.gdpr.services.subjects import ErasureSubject
 
 
 @pytest.mark.django_db
@@ -493,3 +498,121 @@ class TestSepaExportPurge:
 
         run.refresh_from_db()
         assert run.sepa_xml_export.name  # still within retention — kept
+
+
+@pytest.mark.django_db
+class TestCancellationCommittedDuringErasure:
+    def test_the_office_cancellation_is_kept(self, tenant):
+        """The erasure's copy of the member predates an office cancellation.
+        Erasing keeps that cancellation instead of writing the stale copy back
+        and cancelling again, dated on the day of the erasure."""
+        member = MemberFactory(entry_date=datetime.date(2026, 1, 5))
+        subject = ErasureSubject.of_member(Member.objects.get(pk=member.pk))
+
+        with time_machine.travel(datetime.datetime(2026, 9, 7, 12, 0), tick=False):
+            cancel_member_with_coop_shares(
+                Member.objects.get(pk=member.pk),
+                cancelled_effective_at=datetime.date(2026, 9, 30),
+                notify=False,
+            )
+        cancelled_at = Member.objects.get(pk=member.pk).cancelled_at
+
+        with time_machine.travel(datetime.datetime(2026, 10, 5, 12, 0), tick=False):
+            GDPRService.anonymize_subject(subject)
+
+        member.refresh_from_db()
+        assert member.cancelled_at == cancelled_at
+        assert member.cancelled_effective_at == datetime.date(2026, 9, 30)
+        assert member.first_name == "Gelöscht"
+
+
+@pytest.mark.django_db
+class TestAuditEntriesOfDeletedRecords:
+    """Records deleted before the erasure are gone from every queryset, but
+    their audit entries still name the member: the erasure finds them through
+    the foreign keys those entries store."""
+
+    def test_entries_of_deleted_records_are_scrubbed(self, tenant):
+        from auditlog.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        from apps.commissioning.models import ShareDelivery, Subscription
+        from apps.commissioning.tests.factories import (
+            ShareDeliveryFactory,
+            ShareFactory,
+            SubscriptionFactory,
+        )
+
+        def entries_of(model, pk):
+            return LogEntry.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                object_pk=str(pk),
+            )
+
+        user = JasminUserFactory(email="hanna@example.com")
+        member = MemberFactory(user=user, first_name="Hanna", last_name="Beispiel")
+        share = CoopShareFactory(member=member)
+        subscription = SubscriptionFactory(member=member, admin_confirmed=False)
+        # Reuse the subscription's delivery day: a fresh one trips the
+        # ``sharesdeliveryday_one_open_per_day_number`` guard.
+        station_day = subscription.default_delivery_station_day
+        delivery = ShareDeliveryFactory(
+            subscription=subscription,
+            share=ShareFactory(
+                delivery_day=station_day.delivery_day,
+                share_type_variation=subscription.share_type_variation,
+            ),
+            delivery_station_day=station_day,
+        )
+        other_share = CoopShareFactory(
+            member=MemberFactory(first_name="Olga", last_name="Other")
+        )
+        # ``delete()`` clears the instance's pk, so keep them first.
+        deleted = [
+            (CoopShare, share.pk),
+            (ShareDelivery, delivery.pk),
+            (Subscription, subscription.pk),
+        ]
+        other_share_pk = other_share.pk
+        delivery.delete()
+        subscription.delete()
+        share.delete()
+        other_share.delete()
+        assert any(
+            "Hanna" in entry.object_repr
+            for entry in entries_of(CoopShare, deleted[0][1])
+        )
+
+        GDPRService.anonymize_user(user)
+
+        for model, pk in deleted:
+            entries = entries_of(model, pk)
+            assert entries.filter(action=LogEntry.Action.DELETE).exists()
+            for entry in entries:
+                assert entry.changes is None
+                assert entry.object_repr == "[anonymised]"
+        # Another member's deleted record keeps its history.
+        other_entries = entries_of(CoopShare, other_share_pk)
+        assert other_entries.exists()
+        for entry in other_entries:
+            assert entry.object_repr != "[anonymised]"
+            assert entry.changes is not None
+
+    def test_entries_the_member_made_lose_their_email_and_address(self, tenant):
+        from auditlog.context import set_actor
+        from auditlog.models import LogEntry
+
+        user = JasminUserFactory(email="ines@example.com")
+        member = MemberFactory(user=user)
+        with set_actor(user, remote_addr="203.0.113.7"):
+            member.pickup_name = "Ines"
+            member.save()
+        made = LogEntry.objects.filter(actor=user)
+        assert made.filter(actor_email="ines@example.com").exists()
+
+        GDPRService.anonymize_user(user)
+
+        assert made.exists()
+        for entry in made:
+            assert entry.actor_email is None
+            assert entry.remote_addr is None

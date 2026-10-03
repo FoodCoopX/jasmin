@@ -112,3 +112,37 @@ class TestTenantCreditorStepUp:
         assert resp.status_code == 200, resp.content
         assert _stored(tenant, "phone_number") == "+41 44 111 11 11"
         assert _stored(tenant, "iban") == STORED_CREDITOR["iban"]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("stored_creditor")
+class TestTenantUpdateTrail:
+    """The Tenant row is outside django-auditlog's reach, so an admin's edit
+    leaves a ``tenant.updated`` line naming the actor and the changed fields —
+    never the values."""
+
+    def test_an_edit_logs_the_actor_and_the_changed_fields(
+        self, admin_step_up_client, admin, tenant, caplog
+    ):
+        with caplog.at_level("INFO", logger="apps.shared.tenants.viewsets"):
+            resp = admin_step_up_client.patch(
+                _detail_url(tenant),
+                {**STORED_CREDITOR, "iban": CHANGED_CREDITOR["iban"]},
+                format="json",
+            )
+
+        assert resp.status_code == 200, resp.content
+        lines = [r.getMessage() for r in caplog.records if "tenant.updated" in r.msg]
+        assert len(lines) == 1
+        assert f"actor={admin.id}" in lines[0]
+        assert "fields=iban" in lines[0]
+        assert CHANGED_CREDITOR["iban"] not in lines[0]
+
+    def test_an_unchanged_autosave_logs_nothing(self, admin_client, tenant, caplog):
+        with caplog.at_level("INFO", logger="apps.shared.tenants.viewsets"):
+            resp = admin_client.patch(
+                _detail_url(tenant), STORED_CREDITOR, format="json"
+            )
+
+        assert resp.status_code == 200, resp.content
+        assert not [r for r in caplog.records if "tenant.updated" in r.msg]

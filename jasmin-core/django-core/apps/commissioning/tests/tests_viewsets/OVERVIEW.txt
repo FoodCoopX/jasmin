@@ -1,6 +1,6 @@
 Viewset Tests Overview
 ======================
-1057 tests | 196 test classes | 33 files
+1066 tests | 198 test classes | 34 files
 Run: poetry run pytest apps/commissioning/tests/tests_viewsets/ --no-header --tb=short -q
 
 Counts are collected cases, so a parametrized method counts once per case.
@@ -254,7 +254,7 @@ test_member_onboarding_fields.py (23 tests) — onboarding mode: member_number /
                                                existing or new trial member → member.number_not_allowed_for_trial;
                                                trial row without a number still saves
 
-test_members_viewsets.py (78 tests)
+test_members_viewsets.py (82 tests)
 ───────────────────────────────────
   TestMemberViewSet                       24   list, payback-due and coop-share totals, filters (is_active,
                                                is_trial, exclude_trial_members incl. its =false case), confirm,
@@ -287,6 +287,9 @@ test_members_viewsets.py (78 tests)
                                                and no row; any one of first / last / company /
                                                pickup name or email 1-3 is enough; an ordinary
                                                create and PATCH unaffected
+  TestConsentWithdrawalReview              4   ?consent_withdrawn=true/false narrows the list;
+                                               office mark_consent_reviewed clears the flag (a no-op
+                                               when unset); the member's own POST → 403, flag kept
 
 test_offer_group_default.py (7 tests)
 ─────────────────────────────────────
@@ -552,6 +555,14 @@ test_shares_viewsets.py (144 tests)
                                                details, while one per pair — and an explicit
                                                false half — still answers; the import branch applies
                                                is_packed_bulk to the columns and the counts
+
+test_subscription_contract.py (5 tests) — subscription contract on the office create (frozen clock)
+───────────────────────────────────────────────────────────────────────────────────────────────────
+  TestOfficeSubscriptionContract           5   none in force → no acceptance needed; in force and not
+                                               named, or another kind named → 400
+                                               subscription.contract_agreement_required and no row;
+                                               accepted → consent recorded, field write-only; a failed
+                                               consent write leaves no subscription
 
 test_subscription_onboarding_start.py (19 tests) — onboarding mode: subscription start lead time (frozen clock)
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────

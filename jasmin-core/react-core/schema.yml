@@ -1190,20 +1190,22 @@ paths:
           description: Error response.
     post:
       operationId: commissioning_abos_create
-      description: Create a draft (unconfirmed) subscription.
+      description: Create a draft (unconfirmed) subscription. While a subscription
+        contract is in force, ``subscription_contract_document`` must name it; the
+        member's consent is recorded with the subscription.
       tags:
       - commissioning
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Subscription'
+              $ref: '#/components/schemas/SubscriptionCreateRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Subscription'
+              $ref: '#/components/schemas/SubscriptionCreateRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Subscription'
+              $ref: '#/components/schemas/SubscriptionCreateRequest'
         required: true
       security:
       - tenantBoundJwtAuth: []
@@ -1214,13 +1216,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Subscription'
           description: ''
-        '401':
+        '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Error response.
-        '400':
+          description: ''
+        '401':
           content:
             application/json:
               schema:
@@ -11357,6 +11359,12 @@ paths:
       operationId: commissioning_members_list
       parameters:
       - in: query
+        name: consent_withdrawn
+        schema:
+          type: boolean
+        description: 'true: only members who withdrew a consent the office has not
+          reviewed yet; false: only the others'
+      - in: query
         name: exclude_trial_members
         schema:
           type: boolean
@@ -11829,6 +11837,48 @@ paths:
                 $ref: '#/components/schemas/PaginatedMemberEmailLogList'
           description: ''
         '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+  /api/commissioning/members/{id}/mark_consent_reviewed/:
+    post:
+      operationId: commissioning_members_mark_consent_reviewed_create
+      description: 'Office only. Marks the review of the member''s withdrawn consent
+        as done: clears ``consent_withdrawn_at``. The withdrawal itself stays on its
+        consent record.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Ein eindeutiger Wert, der member identifiziert.
+        required: true
+      tags:
+      - commissioning
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '403':
           content:
             application/json:
               schema:
@@ -12331,6 +12381,10 @@ paths:
         reusing the office ``create_bare_subscription`` path, which reserves its
         station-day capacity); the office confirms it through the existing abo
         confirmation flow, which materialises the deliveries.
+
+        While the tenant has a subscription contract ("Abo-Vertrag") in force, the
+        request must name the version the member accepted; the consent is recorded
+        in the same transaction as the subscription.
       tags:
       - commissioning
       requestBody:
@@ -12354,6 +12408,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Subscription'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
         '404':
           content:
             application/json:
@@ -12361,12 +12421,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Error response.
-        '400':
           content:
             application/json:
               schema:
@@ -22468,6 +22522,57 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/gdpr/admin/pending-deletions/{request_id}/preview/:
+    get:
+      operationId: gdpr_admin_pending_deletions_preview_retrieve
+      description: |-
+        Dry-run of approving ``request_id``: the same payload as
+        :func:`gdpr_admin_preview_deletion_view`, for the request's subject — a
+        login user, or the member or reseller the office filed it for, who may
+        have no login. Writes nothing.
+      summary: 'Admin: preview what approving a pending deletion request would anonymize'
+      parameters:
+      - in: path
+        name: request_id
+        schema:
+          type: string
+        description: Id of the deletion request waiting for admin approval.
+        required: true
+      tags:
+      - gdpr
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionPreview'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/gdpr/admin/preview-deletion/{user_id}/:
     get:
       operationId: gdpr_admin_preview_deletion_retrieve
@@ -22869,8 +22974,7 @@ paths:
 
         Creates a pending ``DeletionRequest`` and emails the user a 24h
         confirmation link. NEVER anonymizes immediately — that only
-        happens after the user clicks the link (and, if the tenant /
-        persona requires it, the office approves).
+        happens after the user clicks the link and the office approves.
       summary: Request deletion of personal data (Art. 17) — step 1 (email confirm)
       tags:
       - gdpr
@@ -29118,9 +29222,10 @@ components:
     DeletionPreview:
       type: object
       description: |-
-        Dry-run of what an Art-17 deletion would do to a user — persona,
+        Dry-run of what an Art-17 deletion would do to a subject — persona,
         retention blockers and the per-model field list — without writing.
-        Built by :meth:`apps.gdpr.services.GDPRService.preview_deletion`.
+        Built by :meth:`apps.gdpr.services.GDPRService.preview_subject_deletion`;
+        ``user_id`` is empty for a member or reseller without a login.
       properties:
         user_id:
           type: string
@@ -32854,6 +32959,11 @@ components:
         on_waiting_list:
           type: boolean
           default: false
+        subscription_contract_document:
+          type: string
+          description: Id of the subscription contract (a consent document) the member
+            accepted. Required while one is in force; recorded as their consent together
+            with the subscription.
       required:
       - default_delivery_station_day
       - payment_cycle
@@ -38214,6 +38324,257 @@ components:
       - quantity
       - share_type_variation
       - valid_from
+    SubscriptionCreateRequest:
+      type: object
+      description: |-
+        The office create: a subscription plus the subscription contract the
+        member accepted.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        display_id:
+          type: string
+          description: Get human-readable display ID
+          readOnly: true
+        renewal_display_id:
+          type: string
+          readOnly: true
+        member:
+          type: string
+        share_type_variation:
+          type: string
+        member_first_name:
+          type: string
+          readOnly: true
+        member_last_name:
+          type: string
+          readOnly: true
+        member_string:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          readOnly: true
+        pickup_name:
+          type: string
+          readOnly: true
+          nullable: true
+        member_cancelled_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        share_type_variation_string:
+          type: string
+          readOnly: true
+        share_type_name:
+          type: string
+          readOnly: true
+        share_type_variation_size:
+          type: string
+          readOnly: true
+        delivery_cycle:
+          type: string
+          readOnly: true
+          nullable: true
+        requires_optin:
+          type: boolean
+          readOnly: true
+        payment_cycle_name:
+          type: string
+          readOnly: true
+        delivery_day_number:
+          type: integer
+          readOnly: true
+          nullable: true
+        delivery_station_name:
+          type: string
+          readOnly: true
+          nullable: true
+        cancellation_reason:
+          type: string
+          readOnly: true
+          nullable: true
+        is_trial:
+          type: boolean
+        quantity:
+          type: integer
+          minimum: 1
+        price_per_delivery:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        notice_period_duration:
+          type: integer
+          readOnly: true
+          nullable: true
+        valid_from:
+          type: string
+          format: date
+        valid_until:
+          type: string
+          format: date
+          nullable: true
+        can_be_deleted:
+          type: boolean
+          readOnly: true
+        deliveries_count:
+          type: integer
+          readOnly: true
+        jokers_taken:
+          type: integer
+          readOnly: true
+        amount_of_jokers:
+          type: integer
+          readOnly: true
+        donation_jokers_taken:
+          type: integer
+          readOnly: true
+        amount_of_donation_jokers:
+          type: integer
+          readOnly: true
+        automatically_renewed_at:
+          type: string
+          nullable: true
+          description: |-
+            Cancellation deadline = valid_until - N weeks. None when blank.
+
+            Computed server-side so Abos.tsx doesn't compute it per row per render
+            and the "when does this column light up" rule lives in one place.
+
+            Skip cases (return None):
+              * ``is_trial`` — trial subs don't auto-renew (see TrialPolicy).
+              * No ``valid_until`` — open-ended subs have no deadline.
+              * The deadline would fall before ``valid_from`` — short terms
+                (4-week trials, half-season subs) shouldn't surface a
+                deadline that pre-dates the subscription itself.
+            Pass-through cases:
+              * ``min_weeks_to_cancel_before_ending`` unset / 0 → return
+                ``valid_until`` itself; the column means "you must cancel
+                before this date" and a 0-week window collapses to
+                valid_until.
+          readOnly: true
+        subscription_contract_document:
+          type: string
+          writeOnly: true
+          description: Id of the subscription contract (a consent document) the member
+            accepted. Required while one is in force; recorded as the member's consent
+            together with the subscription.
+        admin_confirmed:
+          type: boolean
+          readOnly: true
+        admin_confirmed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        admin_rejected_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        admin_rejection_reason:
+          type: string
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        cancelled_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        cancelled_effective_at:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        on_waiting_list:
+          type: boolean
+        waiting_list_status:
+          allOf:
+          - $ref: '#/components/schemas/WaitingListStatusEnum'
+          readOnly: true
+        waiting_list_position:
+          type: integer
+          readOnly: true
+          nullable: true
+        notification_sent_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        notification_expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        response_received_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        notification_token:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        waiting_list_reason:
+          allOf:
+          - $ref: '#/components/schemas/WaitingListReasonEnum'
+          readOnly: true
+          nullable: true
+        subscription_number:
+          type: integer
+          readOnly: true
+          nullable: true
+        renewal_generation:
+          type: integer
+          readOnly: true
+        admin_confirmed_by:
+          type: string
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          readOnly: true
+          nullable: true
+        cancelled_by:
+          type: string
+          readOnly: true
+          nullable: true
+        previous_subscription:
+          type: string
+          readOnly: true
+          nullable: true
+        payment_cycle:
+          type: string
+        default_delivery_station_day:
+          type: string
+          nullable: true
+        admin_confirmed_by_name:
+          type: string
+          readOnly: true
+          nullable: true
+        created_by_name:
+          type: string
+          readOnly: true
+          nullable: true
+        cancelled_by_name:
+          type: string
+          readOnly: true
+          nullable: true
+      required:
+      - is_trial
+      - member
+      - payment_cycle
+      - price_per_delivery
+      - quantity
+      - share_type_variation
+      - valid_from
     SubscriptionMemberEmailsResponse:
       type: object
       description: Distinct member e-mails for a subscription filter (AbosEmails page).
@@ -39123,10 +39484,8 @@ components:
             banking days.
         require_admin_approval_for_gdpr_deletion:
           type: boolean
-          description: If on (default), every deletion request needs an office/admin
-            to approve after the email-confirm step. Turn off to honour Art. 17 requests
-            automatically once the user clicks the email link. Staff/admin deletions
-            always need admin approval regardless of this.
+          description: 'Has no effect: every deletion request needs an office/admin
+            approval after the email-confirm step, whatever this says.'
         requires_paper_signature_for_membership:
           type: boolean
         requires_paper_signature_for_cancellation_of_membership:
@@ -39421,10 +39780,8 @@ components:
             banking days.
         require_admin_approval_for_gdpr_deletion:
           type: boolean
-          description: If on (default), every deletion request needs an office/admin
-            to approve after the email-confirm step. Turn off to honour Art. 17 requests
-            automatically once the user clicks the email link. Staff/admin deletions
-            always need admin approval regardless of this.
+          description: 'Has no effect: every deletion request needs an office/admin
+            approval after the email-confirm step, whatever this says.'
         requires_paper_signature_for_membership:
           type: boolean
         requires_paper_signature_for_cancellation_of_membership:

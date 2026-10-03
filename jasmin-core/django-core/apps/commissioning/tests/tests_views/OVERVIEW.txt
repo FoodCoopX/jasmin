@@ -165,7 +165,7 @@ alphabetical order.
      - test_single_query_regardless_of_id_count
 
 ================================================================================
-6. test_my_data_views.py  (58 tests)
+6. test_my_data_views.py  (68 tests)
    Views: my_member_data_view (GET/PATCH), my_customer_data_view (GET/PATCH),
           member self-service coop-share / subscription subscribe, membership
           cancel
@@ -210,8 +210,8 @@ alphabetical order.
      - test_invalid_amount_is_rejected
      - test_cancelled_member_cannot_subscribe
 
-   TestMySubscriptionSubscribe  (21 cases — solidarity floor / reference price
-   matrix)
+   TestMySubscriptionSubscribe  (24 cases — solidarity floor / reference price
+   matrix, subscription contract)
      - test_anonymous_returns_401
      - test_user_without_member_returns_404
      - test_cancelled_member_cannot_subscribe
@@ -233,6 +233,9 @@ alphabetical order.
      - test_gross_price_clean_allows_trial_pair_both_set
      - test_cannot_subscribe_for_another_member
      - test_member_cannot_force_trial_or_price
+     - test_subscription_contract_required_while_one_is_in_force
+     - test_accepted_subscription_contract_is_recorded_with_the_subscription
+     - test_a_contract_not_in_force_is_refused
 
    TestMyMembershipCancel  (7 cases)
      - test_anonymous_returns_401

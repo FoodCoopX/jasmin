@@ -134,5 +134,34 @@
     "erased": "Personenbezogene Daten gelöscht.",
     "blocked_title": "Noch nicht gelöscht",
     "blocked_intro": "Diese Pflichten brauchen die Daten noch. Die Anfrage wartet bei den Löschanfragen, bis sie erledigt sind:"
+  },
+  "preview": {
+    "title": "Löschung freigeben",
+    "intro": "Die Freigabe anonymisiert sofort und endgültig die personenbezogenen Daten von {{subject}}. Betroffen sind:",
+    "blocked": "Noch nicht möglich — diese Pflichten brauchen die Daten noch:",
+    "rows": "Datensätze: {{rows}}",
+    "also_cleared": "Außerdem gelöscht:",
+    "approve": "Endgültig löschen",
+    "load_error": "Die Vorschau konnte nicht geladen werden.",
+    "model": {
+      "user": "Benutzerkonto",
+      "member": "Mitglied",
+      "subscription": "Abos",
+      "coop_share": "Genossenschaftsanteile",
+      "member_loan": "Darlehen",
+      "coop_share_transfer": "Anteilsübertragungen",
+      "billing_profile": "Zahlungsdaten",
+      "consent_record": "Einwilligungen",
+      "reseller": "Empfänger",
+      "contact": "Kontaktdaten",
+      "invitation": "Einladungen",
+      "email_log": "E-Mail-Protokoll"
+    },
+    "side_channel": {
+      "auditlog": "Im Änderungsprotokoll die alten und neuen Werte dieser Datensätze",
+      "axes": "Die Anmeldungen und fehlgeschlagenen Anmeldeversuche unter den E-Mail-Adressen der Person",
+      "sepa_export": "Die SEPA-Exportdateien ihrer Einzugsläufe, sobald deren Aufbewahrungsfrist abgelaufen ist",
+      "reseller_documents": "Die PDFs der Rechnungen und Lieferscheine samt ZUGFeRD-XML, sobald deren Aufbewahrungsfrist abgelaufen ist"
+    }
   }
 }

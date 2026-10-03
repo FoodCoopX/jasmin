@@ -487,6 +487,102 @@ export function useGdprAdminPendingDeletionsRetrieve<TData = Awaited<ReturnType<
 
 
 /**
+ * Dry-run of approving ``request_id``: the same payload as
+:func:`gdpr_admin_preview_deletion_view`, for the request's subject — a
+login user, or the member or reseller the office filed it for, who may
+have no login. Writes nothing.
+ * @summary Admin: preview what approving a pending deletion request would anonymize
+ */
+export const gdprAdminPendingDeletionsPreviewRetrieve = (
+    requestId: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<DeletionPreview>(
+      {url: `/api/gdpr/admin/pending-deletions/${requestId}/preview/`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
+
+export const getGdprAdminPendingDeletionsPreviewRetrieveQueryKey = (requestId?: string,) => {
+    return [
+    `/api/gdpr/admin/pending-deletions/${requestId}/preview/`
+    ] as const;
+    }
+
+    
+export const getGdprAdminPendingDeletionsPreviewRetrieveQueryOptions = <TData = Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError = ErrorResponse>(requestId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGdprAdminPendingDeletionsPreviewRetrieveQueryKey(requestId);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>> = ({ signal }) => gdprAdminPendingDeletionsPreviewRetrieve(requestId, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(requestId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GdprAdminPendingDeletionsPreviewRetrieveQueryResult = NonNullable<Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>>
+export type GdprAdminPendingDeletionsPreviewRetrieveQueryError = ErrorResponse
+
+
+export function useGdprAdminPendingDeletionsPreviewRetrieve<TData = Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError = ErrorResponse>(
+ requestId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGdprAdminPendingDeletionsPreviewRetrieve<TData = Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError = ErrorResponse>(
+ requestId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGdprAdminPendingDeletionsPreviewRetrieve<TData = Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError = ErrorResponse>(
+ requestId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Admin: preview what approving a pending deletion request would anonymize
+ */
+
+export function useGdprAdminPendingDeletionsPreviewRetrieve<TData = Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError = ErrorResponse>(
+ requestId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof gdprAdminPendingDeletionsPreviewRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGdprAdminPendingDeletionsPreviewRetrieveQueryOptions(requestId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
  * Dry-run the deletion for ``user_id``: return the subject's persona,
 the retention obligations that would currently refuse it, and the exact
 per-model field list that WOULD be scrubbed — writing nothing.
@@ -1273,8 +1369,7 @@ export function useGdprProcessingActivitiesRetrieve<TData = Awaited<ReturnType<t
 
 Creates a pending ``DeletionRequest`` and emails the user a 24h
 confirmation link. NEVER anonymizes immediately — that only
-happens after the user clicks the link (and, if the tenant /
-persona requires it, the office approves).
+happens after the user clicks the link and the office approves.
  * @summary Request deletion of personal data (Art. 17) — step 1 (email confirm)
  */
 export const gdprRequestDeletionCreate = (

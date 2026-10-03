@@ -218,6 +218,28 @@ class TenantViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             return Tenant.objects.none()
         return Tenant.objects.filter(pk=tenant.pk)
 
+    def perform_update(self, serializer: Any) -> None:
+        # The Tenant row lives in the public schema, which django-auditlog
+        # can't record (its actor is a tenant-schema user), so this line is
+        # the only trail of an admin's edit — the IBAN and SEPA creditor
+        # included: who changed which fields, never the values. A
+        # configuration autosave that changes nothing writes no line.
+        tenant = serializer.instance
+        changed_fields = sorted(
+            field
+            for field, value in serializer.validated_data.items()
+            if getattr(tenant, field, None) != value
+        )
+        serializer.save()
+        if changed_fields:
+            logger.info(
+                "tenant.updated actor=%s schema=%s ip=%s fields=%s",
+                auth_user(self.request).id,
+                tenant.schema_name,
+                client_ip(self.request),
+                ",".join(changed_fields),
+            )
+
 
 class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
     # Tenant settings drive tax rates, year-numbering rules and other
@@ -243,13 +265,10 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
 
     # Settings whose change is high-impact enough to demand fresh step-up auth
     # in ``update_current_settings`` (mirrors MemberViewSet._SEPA_SENSITIVE_FIELDS).
-    # The GDPR-deletion gate controls whether self-service member/customer
-    # deletions auto-execute without admin approval; the billing/SEPA/tax fields
-    # drive money collection. ``onboarding_mode`` unlocks member-number edits
-    # and back-dated confirmations and stops member emails. A stolen office
-    # session must not flip these silently.
+    # The billing/SEPA/tax fields drive money collection. ``onboarding_mode``
+    # unlocks member-number edits and back-dated confirmations and stops member
+    # emails. A stolen office session must not flip these silently.
     _STEP_UP_SENSITIVE_FIELDS = (
-        "require_admin_approval_for_gdpr_deletion",
         "onboarding_mode",
         "billing_strategy",
         "billing_due_day_of_month",
@@ -371,10 +390,9 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
     ) -> dict[str, tuple[str, str]]:
         """Detect changes to step-up-sensitive fields and gate them.
 
-        Weakening the GDPR self-service-deletion gate, or changing the
-        billing strategy / SEPA collection day / tax rates, is a
-        high-impact config change a stolen office session must not make
-        silently. Gate those specific fields behind fresh step-up auth —
+        Changing the billing strategy / SEPA collection day / tax rates,
+        or switching onboarding mode, is a high-impact config change a
+        stolen office session must not make silently. Gate those specific fields behind fresh step-up auth —
         only when a value actually changes (so a PATCH echoing the
         unchanged value doesn't prompt) — and return the changes so the
         caller can record an audit line after the save, since

@@ -65,6 +65,7 @@
   "pending_coop_shares_confirmation": "Cooperative shares awaiting confirmation",
   "attention_chip_members": "Members pending",
   "attention_chip_coop": "Coop shares pending",
+  "attention_chip_consent": "Consent withdrawn",
   "coop_shares_awaiting_confirmation": "{{count}} coop share(s) still awaiting confirmation",
   "transfer_coop_shares": "Transfer shares",
   "transfer_submit": "Transfer",

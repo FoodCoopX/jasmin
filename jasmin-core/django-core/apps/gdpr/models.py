@@ -153,15 +153,17 @@ DELETION_TOKEN_TTL = timedelta(hours=24)
 
 
 class DeletionRequestState(models.TextChoices):
-    """State machine for a two-step (optionally three-step) deletion flow.
+    """State machine of a deletion request.
 
     Transitions (driven exclusively by ``GDPRService``):
 
         PENDING_EMAIL  ─► PENDING_ADMIN ─► APPROVED ─► EXECUTED
-                       └► APPROVED      ─► EXECUTED
                        └► EXPIRED   (24h elapsed without confirm)
                        └► CANCELLED (user re-requests / admin cancels)
         PENDING_ADMIN  ─► REJECTED   (admin denies)
+
+    A request the office files for someone who asked by letter, email,
+    phone or in person starts at PENDING_ADMIN.
 
     States are stored explicitly (not derived from timestamps) so
     auditor reports never have to second-guess what state a row was
@@ -180,16 +182,17 @@ class DeletionRequestState(models.TextChoices):
 class DeletionRequest(AdminConfirmableMixin, JasminModel):
     """A pending / completed GDPR Art. 17 deletion request.
 
-    The request is created by the user (self-service) or by an admin
-    acting on a written request. It then goes through a confirmation
-    chain before ``GDPRService.anonymize_user`` is actually called:
+    The request is created by the user (self-service) or by the office
+    for someone who asked by letter, email, phone or in person. It then
+    goes through a confirmation chain before
+    ``GDPRService.anonymize_subject`` is actually called:
 
-      1. **Email confirmation** (always required) — proves the
+      1. **Email confirmation** (self-service requests) — proves the
          requester controls the inbox, defending against the
-         leaked-JWT scenario.
-      2. **Admin approval** (only if ``requires_admin_approval=True``)
-         — extra safety net for high-risk personas (staff/admin
-         deletions) or tenants who want every deletion human-reviewed.
+         leaked-JWT scenario. An office-filed request skips it.
+      2. **Admin approval** (always required) — an office/admin
+         reviews every request, and its retention blockers, before
+         anything is erased.
 
     Reuses :class:`apps.commissioning.models.mixin.AdminConfirmableMixin`
     for the admin-approval audit fields (``admin_confirmed``,
@@ -283,15 +286,14 @@ class DeletionRequest(AdminConfirmableMixin, JasminModel):
     email_confirmed_at = models.DateTimeField(blank=True, null=True)
     email_confirmed_ip = models.GenericIPAddressField(blank=True, null=True)
 
-    # --- admin approval gate (only consulted if requires_admin_approval) ---
+    # --- admin approval ----------------------------------------------
     # admin_confirmed / admin_confirmed_by / admin_confirmed_at /
     # admin_rejection_reason come from AdminConfirmableMixin.
     requires_admin_approval = models.BooleanField(
         default=True,
-        help_text="True (default) means an office/admin must approve "
-        "after the email-confirm step. Set at create time by "
-        "``GDPRService.request_deletion`` from tenant settings + "
-        "persona role; never flipped on a live request.",
+        help_text="Whether an office/admin must approve after the "
+        "email-confirm step. True on every new request; older rows keep "
+        "the value they were created with.",
     )
 
     # --- execution -------------------------------------------------

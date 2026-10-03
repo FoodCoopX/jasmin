@@ -90,6 +90,7 @@ from .members_serializer import (
     MemberOnboardingSerializer,
     MemberSelfReadSerializer,
     MemberSerializer,
+    SubscriptionCreateRequestSerializer,
     SubscriptionMemberEmailsResponseSerializer,
     SubscriptionSerializer,
 )

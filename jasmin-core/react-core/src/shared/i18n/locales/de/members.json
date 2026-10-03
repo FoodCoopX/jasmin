@@ -67,6 +67,7 @@
   "pending_coop_shares_confirmation": "Einlagen, die auf Bestätigung warten",
   "attention_chip_members": "noch unbestätigte Mitglieder",
   "attention_chip_coop": "Einlagen offen",
+  "attention_chip_consent": "Einwilligung widerrufen",
   "coop_shares_awaiting_confirmation": "{{count}} Einlage(n) warten noch auf Bestätigung",
   "transfer_coop_shares": "Anteile übertragen",
   "transfer_submit": "Übertragen",

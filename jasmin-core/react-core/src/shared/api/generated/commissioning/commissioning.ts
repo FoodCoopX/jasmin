@@ -297,6 +297,7 @@ import type {
   Storage,
   StorageLoggingEntry,
   Subscription,
+  SubscriptionCreateRequest,
   SubscriptionMemberEmailsResponse,
   TheoreticalCleanAmount,
   TheoreticalHarvest,
@@ -433,10 +434,10 @@ export function useCommissioningAbosList<TData = Awaited<ReturnType<typeof commi
 
 
 /**
- * Create a draft (unconfirmed) subscription.
+ * Create a draft (unconfirmed) subscription. While a subscription contract is in force, ``subscription_contract_document`` must name it; the member's consent is recorded with the subscription.
  */
 export const commissioningAbosCreate = (
-    subscription: NonReadonly<Subscription>,
+    subscriptionCreateRequest: NonReadonly<SubscriptionCreateRequest>,
  signal?: AbortSignal
 ) => {
       
@@ -444,7 +445,7 @@ export const commissioningAbosCreate = (
       return axiosService<Subscription>(
       {url: `/api/commissioning/abos/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: subscription, signal
+      data: subscriptionCreateRequest, signal
     },
       );
     }
@@ -452,8 +453,8 @@ export const commissioningAbosCreate = (
 
 
 export const getCommissioningAbosCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningAbosCreate>>, TError,{data: NonReadonly<Subscription>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof commissioningAbosCreate>>, TError,{data: NonReadonly<Subscription>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningAbosCreate>>, TError,{data: NonReadonly<SubscriptionCreateRequest>}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof commissioningAbosCreate>>, TError,{data: NonReadonly<SubscriptionCreateRequest>}, TContext> => {
 
 const mutationKey = ['commissioningAbosCreate'];
 const {mutation: mutationOptions} = options ?
@@ -465,7 +466,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commissioningAbosCreate>>, {data: NonReadonly<Subscription>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commissioningAbosCreate>>, {data: NonReadonly<SubscriptionCreateRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  commissioningAbosCreate(data,)
@@ -477,15 +478,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CommissioningAbosCreateMutationResult = NonNullable<Awaited<ReturnType<typeof commissioningAbosCreate>>>
-    export type CommissioningAbosCreateMutationBody = NonReadonly<Subscription>
+    export type CommissioningAbosCreateMutationBody = NonReadonly<SubscriptionCreateRequest>
     export type CommissioningAbosCreateMutationError = ErrorResponse
 
     export const useCommissioningAbosCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningAbosCreate>>, TError,{data: NonReadonly<Subscription>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningAbosCreate>>, TError,{data: NonReadonly<SubscriptionCreateRequest>}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof commissioningAbosCreate>>,
         TError,
-        {data: NonReadonly<Subscription>},
+        {data: NonReadonly<SubscriptionCreateRequest>},
         TContext
       > => {
 
@@ -14863,6 +14864,65 @@ export function useCommissioningMembersEmailsList<TData = Awaited<ReturnType<typ
 
 
 /**
+ * Office only. Marks the review of the member's withdrawn consent as done: clears ``consent_withdrawn_at``. The withdrawal itself stays on its consent record.
+ */
+export const commissioningMembersMarkConsentReviewedCreate = (
+    id: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<Member>(
+      {url: `/api/commissioning/members/${id}/mark_consent_reviewed/`, method: 'POST', signal
+    },
+      );
+    }
+  
+
+
+export const getCommissioningMembersMarkConsentReviewedCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningMembersMarkConsentReviewedCreate>>, TError,{id: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof commissioningMembersMarkConsentReviewedCreate>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['commissioningMembersMarkConsentReviewedCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commissioningMembersMarkConsentReviewedCreate>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  commissioningMembersMarkConsentReviewedCreate(id,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommissioningMembersMarkConsentReviewedCreateMutationResult = NonNullable<Awaited<ReturnType<typeof commissioningMembersMarkConsentReviewedCreate>>>
+    
+    export type CommissioningMembersMarkConsentReviewedCreateMutationError = ErrorResponse
+
+    export const useCommissioningMembersMarkConsentReviewedCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningMembersMarkConsentReviewedCreate>>, TError,{id: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof commissioningMembersMarkConsentReviewedCreate>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getCommissioningMembersMarkConsentReviewedCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Reject a pending member with an optional reason.
  */
 export const commissioningMembersRejectCreate = (
@@ -15565,6 +15625,10 @@ date. The subscription is created as a DRAFT (``admin_confirmed=False``,
 reusing the office ``create_bare_subscription`` path, which reserves its
 station-day capacity); the office confirms it through the existing abo
 confirmation flow, which materialises the deliveries.
+
+While the tenant has a subscription contract ("Abo-Vertrag") in force, the
+request must name the version the member accepted; the consent is recorded
+in the same transaction as the subscription.
  */
 export const commissioningMySubscriptionsSubscribeCreate = (
     mySubscriptionSubscribe: MySubscriptionSubscribe,

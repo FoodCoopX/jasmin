@@ -19,6 +19,7 @@ from core.tenant_db import connection
 from core.throttling import set_throttle_scope
 
 from .errors import (
+    DeletionRequestNotPending,
     InvalidDeletionChannel,
     MissingRejectionReason,
     RetentionPeriodActive,
@@ -87,15 +88,15 @@ set_throttle_scope(gdpr_my_data_view, "gdpr_sar_export")
 
 
 # ---------------------------------------------------------------------------
-# Two-step deletion flow.
+# Deletion flow.
 #
 # - ``gdpr_request_deletion_view`` never anonymizes directly. It
 #   creates a ``DeletionRequest(PENDING_EMAIL)`` and sends a 24h
 #   confirmation link.
-# - ``gdpr_confirm_deletion_view`` accepts the token. If the request
-#   doesn't need admin approval, anonymization runs right away.
+# - ``gdpr_confirm_deletion_view`` accepts the token and hands the
+#   request to the office (``PENDING_ADMIN``).
 # - ``gdpr_admin_approve_deletion_view`` / ``..._reject_deletion_view``
-#   are the office-side endpoints used when the admin gate is on.
+#   are the office-side endpoints that decide it; approval anonymizes.
 # ---------------------------------------------------------------------------
 
 
@@ -122,8 +123,7 @@ def gdpr_request_deletion_view(request: Request) -> Response:
 
     Creates a pending ``DeletionRequest`` and emails the user a 24h
     confirmation link. NEVER anonymizes immediately — that only
-    happens after the user clicks the link (and, if the tenant /
-    persona requires it, the office approves).
+    happens after the user clicks the link and the office approves.
     """
     user = auth_user(request)
     deletion_request = GDPRService.request_deletion(
@@ -389,6 +389,56 @@ def gdpr_admin_preview_deletion_view(request: Request, user_id: str) -> Response
         "gdpr.deletion_previewed actor=%s target=%s persona=%s tenant=%s ip=%s",
         auth_user(request).email,
         user_id,
+        preview["persona"],
+        connection.schema_name,
+        client_ip(request),
+    )
+    return Response(DeletionPreviewSerializer(preview).data)
+
+
+@extend_schema(
+    tags=["gdpr"],
+    summary="Admin: preview what approving a pending deletion request would anonymize",
+    parameters=[
+        OpenApiParameter(
+            name="request_id",
+            location=OpenApiParameter.PATH,
+            type=str,
+            description="Id of the deletion request waiting for admin approval.",
+        )
+    ],
+    responses={
+        200: DeletionPreviewSerializer,
+        401: ErrorResponseSerializer,
+        403: ErrorResponseSerializer,
+        404: ErrorResponseSerializer,
+        # ``DeletionRequestNotPending`` — not waiting for approval (any more).
+        409: ErrorResponseSerializer,
+    },
+)
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def gdpr_admin_preview_pending_deletion_view(
+    request: Request, request_id: str
+) -> Response:
+    """Dry-run of approving ``request_id``: the same payload as
+    :func:`gdpr_admin_preview_deletion_view`, for the request's subject — a
+    login user, or the member or reseller the office filed it for, who may
+    have no login. Writes nothing."""
+    from core.errors import NotFoundError
+
+    deletion_request = _get_pending_request(request_id)
+    if deletion_request.state != DeletionRequestState.PENDING_ADMIN:
+        raise DeletionRequestNotPending(str(deletion_request.state))
+    subject = GDPRService.subject_of_request(deletion_request)
+    if subject is None:
+        raise NotFoundError("This deletion request has no subject left.")
+
+    preview = GDPRService.preview_subject_deletion(subject)
+    logger.info(
+        "gdpr.deletion_previewed actor=%s request_id=%s persona=%s tenant=%s ip=%s",
+        auth_user(request).email,
+        deletion_request.pk,
         preview["persona"],
         connection.schema_name,
         client_ip(request),

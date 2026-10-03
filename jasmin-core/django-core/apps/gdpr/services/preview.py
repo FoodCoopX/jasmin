@@ -1,14 +1,14 @@
 """Persona classification + deletion preview (dry-run) for Art. 17 erasure.
 
-``preview_deletion`` reports EXACTLY what :meth:`anonymize_user` would scrub —
-the subject's persona, the retention blockers that would currently refuse the
-deletion, and the per-model field list — WITHOUT writing anything, so an admin
-can review before firing the irreversible erasure.
+``preview_subject_deletion`` reports EXACTLY what :meth:`anonymize_subject`
+would scrub — the subject's persona, the retention blockers that would
+currently refuse the deletion, and the per-model field list — WITHOUT writing
+anything, so an admin can review before firing the irreversible erasure.
 
 It reads the SAME sources of truth the executor does
-(:meth:`check_retention_blocks` + ``FIELD_CLASSIFICATION``) and mirrors which
-rows :meth:`anonymize_user` touches, so the preview can't silently drift from
-what actually happens on execute.
+(:meth:`check_retention_blocks_for_subject` + ``FIELD_CLASSIFICATION``) and
+mirrors which rows :meth:`anonymize_subject` touches, so the preview can't
+silently drift from what actually happens on execute.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ from apps.payments.models import BillingProfile
 
 from ..field_classes import FieldClass, get_classification
 from .anonymization import _ci_recipient_q
+from .subjects import ErasureSubject
 
 if TYPE_CHECKING:
     # Type-only: the runtime path uses ``get_user_model()``, so this module
@@ -45,11 +46,11 @@ if TYPE_CHECKING:
 
 
 class Persona(StrEnum):
-    """Which legal shape a user is, for deletion purposes.
+    """Which legal shape a subject is, for deletion purposes.
 
-    Structural signal — the same one :meth:`anonymize_user` branches on via
+    Structural signal — the same one :meth:`anonymize_subject` branches on via
     presence checks: a ``Member`` row makes them a co-op **MEMBER** (GenG
-    registry + HGB retention); a ``Reseller`` link with no Member makes them a
+    registry + HGB retention); a ``Reseller`` with no Member makes them a
     B2B **CUSTOMER** (UStG §14b); a JasminUser with neither is **STAFF** (they
     act as ``created_by`` on documents, not as a data subject with retention).
 
@@ -87,9 +88,14 @@ class PreviewMixin:
     @staticmethod
     def detect_persona(user: JasminUser) -> Persona:
         """Classify ``user`` as MEMBER / CUSTOMER / STAFF (see :class:`Persona`)."""
-        if Member.objects.filter(user=user).exists():
+        return GDPRService.detect_subject_persona(ErasureSubject.of_user(user))
+
+    @staticmethod
+    def detect_subject_persona(subject: ErasureSubject) -> Persona:
+        """Classify ``subject`` as MEMBER / CUSTOMER / STAFF (see :class:`Persona`)."""
+        if subject.member is not None:
             return Persona.MEMBER
-        if Reseller.objects.filter(linked_user=user).exists():
+        if subject.reseller is not None:
             return Persona.CUSTOMER
         return Persona.STAFF
 
@@ -99,24 +105,31 @@ class PreviewMixin:
 
     @staticmethod
     def preview_deletion(user: JasminUser) -> dict[str, Any]:
-        """Dry-run of :meth:`anonymize_user`: report persona, retention
+        """:meth:`preview_subject_deletion` for a login user and the member
+        and reseller records tied to it."""
+        return GDPRService.preview_subject_deletion(ErasureSubject.of_user(user))
+
+    @staticmethod
+    def preview_subject_deletion(subject: ErasureSubject) -> dict[str, Any]:
+        """Dry-run of :meth:`anonymize_subject`: report persona, retention
         blockers and every field that WOULD be scrubbed — writing nothing.
 
         Shape (see :class:`apps.gdpr.serializers.DeletionPreviewSerializer`):
-        ``persona``, ``has_member`` / ``has_reseller``, ``can_anonymize_now``
-        (False while retention blocks exist), ``retention_blocks`` (the
-        human-readable reasons), ``models`` (per present model: label +
-        affected ``row_count`` + the ``scrubbed_fields`` list), and
-        ``side_channels`` (auditlog / axes / on-disk exports that are also
-        cleared but aren't field-classified).
+        ``user_id`` (empty for a subject without a login), ``user_email``
+        (the address the subject is best known by), ``persona``,
+        ``has_member`` / ``has_reseller``, ``can_anonymize_now`` (False while
+        retention blocks exist), ``retention_blocks`` (the human-readable
+        reasons), ``models`` (per present model: label + affected
+        ``row_count`` + the ``scrubbed_fields`` list), and ``side_channels``
+        (auditlog / axes / on-disk exports that are also cleared but aren't
+        field-classified).
         """
-        member = Member.objects.filter(user=user).first()
-        reseller = Reseller.objects.filter(linked_user=user).first()
-        persona = GDPRService.detect_persona(user)
-        retention_blocks = GDPRService.check_retention_blocks(user)
-        known_emails = GDPRService._collect_known_emails(user)
+        user, member, reseller = subject.user, subject.member, subject.reseller
+        persona = GDPRService.detect_subject_persona(subject)
+        retention_blocks = GDPRService.check_retention_blocks_for_subject(subject)
+        known_emails = GDPRService._collect_subject_emails(subject)
 
-        presence = GDPRService._preview_presence(user, member, reseller, known_emails)
+        presence = GDPRService._preview_presence(subject, known_emails)
 
         models: list[dict[str, Any]] = []
         field_count = 0
@@ -148,8 +161,8 @@ class PreviewMixin:
         side_channels = GDPRService._preview_side_channels(member, reseller)
 
         return {
-            "user_id": str(user.pk),
-            "user_email": user.email,
+            "user_id": str(user.pk) if user is not None else "",
+            "user_email": subject.email,
             "persona": str(persona),
             "has_member": member is not None,
             "has_reseller": reseller is not None,
@@ -163,13 +176,11 @@ class PreviewMixin:
 
     @staticmethod
     def _preview_presence(
-        user: JasminUser,
-        member: Member | None,
-        reseller: Reseller | None,
-        known_emails: set[str],
+        subject: ErasureSubject, known_emails: set[str]
     ) -> dict[str, tuple[bool, int]]:
         """``{model_label: (present, row_count)}`` for every classified model,
-        scoped to this user — mirrors which rows :meth:`anonymize_user` touches.
+        scoped to this subject — mirrors which rows :meth:`anonymize_subject`
+        touches.
 
         ``row_count`` is the number of rows that would actually change; for the
         Subscription / CoopShare / MemberLoan reasons the executor's bulk
@@ -182,7 +193,10 @@ class PreviewMixin:
             row_count = model.objects.filter(**filters).count()
             return (row_count > 0, row_count)
 
-        presence: dict[str, tuple[bool, int]] = {settings.AUTH_USER_MODEL: (True, 1)}
+        user, member, reseller = subject.user, subject.member, subject.reseller
+        presence: dict[str, tuple[bool, int]] = {}
+        if user is not None:
+            presence[settings.AUTH_USER_MODEL] = (True, 1)
 
         if member is not None:
             presence["commissioning.Member"] = (True, 1)
@@ -220,9 +234,10 @@ class PreviewMixin:
                 1,
             )
 
-        presence["commissioning.UserInvitation"] = presence_and_row_count(
-            UserInvitation, user=user
-        )
+        if user is not None:
+            presence["commissioning.UserInvitation"] = presence_and_row_count(
+                UserInvitation, user=user
+            )
 
         # ``_ci_recipient_q`` on an EMPTY set is an empty ``Q()`` that matches
         # every row — guard it so an emailless user doesn't "match all".

@@ -12,6 +12,8 @@ Covers the contract the rest of the consent system depends on:
     are.
   - ``supersede`` closes a member's earlier records of a kind without
     any of ``revoke``'s withdrawal side effects.
+  - ``mark_withdrawal_reviewed`` clears the office review flag a
+    withdrawal set, through the audit log.
 
 These are audit-critical paths — a silent regression here is a
 DSGVO finding that compounds with every new signup until someone
@@ -655,3 +657,26 @@ class TestConsentWithdrawalReview:
         member.refresh_from_db()
         assert member.consent_withdrawn_at is None
         assert len(callbacks) == 0
+
+    def test_marking_the_review_done_clears_the_flag_and_keeps_the_withdrawal(
+        self, tenant
+    ):
+        from auditlog.models import LogEntry
+
+        member = MemberFactory()
+        doc = _make_document(kind=ConsentKind.PRIVACY)
+        record = ConsentService.record(member=member, document=doc)
+        ConsentService.revoke(record)
+
+        ConsentService.mark_withdrawal_reviewed(member)
+
+        member.refresh_from_db()
+        record.refresh_from_db()
+        assert member.consent_withdrawn_at is None
+        assert record.revoked_at is not None
+        # Saved through the model, so the audit log has the change.
+        assert (
+            LogEntry.objects.get_for_object(member)
+            .filter(changes__has_key="consent_withdrawn_at")
+            .exists()
+        )

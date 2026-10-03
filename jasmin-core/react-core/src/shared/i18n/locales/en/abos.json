@@ -191,7 +191,6 @@
   "set_up_sepa_mandate": "Set up SEPA mandate",
   "accept_subscription_contract": "I have read and accept the subscription contract:",
   "subscription_contract_required": "Please accept the subscription contract before continuing.",
-  "subscription_contract_record_failed": "The subscription was created, but the subscription-contract consent could not be saved.",
   "emails_select_filter_hint": "Pick a filter above to show the recipient list.",
   "emails_no_recipients": "No recipients for this selection.",
   "emails_recipients": "{{count}} recipients",

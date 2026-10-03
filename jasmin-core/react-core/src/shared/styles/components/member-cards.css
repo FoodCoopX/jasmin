@@ -110,3 +110,13 @@
   margin-bottom: 16px;
   color: var(--color-text-muted);
 }
+
+/* Members list "needs attention" chips, between the toolbar and the table. */
+.members-attention-chips {
+  margin-bottom: 12px;
+}
+
+/* The withdrawn-consent warning at the top of a member's page. */
+.member-consent-review-alert {
+  margin-bottom: 24px;
+}

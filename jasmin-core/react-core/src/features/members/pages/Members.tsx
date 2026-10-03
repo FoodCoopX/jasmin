@@ -57,7 +57,9 @@ import {
 } from "@shared/ui";
 import MembersImportModal from "@features/members/modals/MembersImportModal";
 import CoopShareImportModal from "@features/members/modals/CoopShareImportModal";
+import MemberAttentionChips from "@features/members/components/MemberAttentionChips";
 import MemberStatsCards from "@features/members/components/MemberStatsCards";
+import { useMemberAttentionFilter } from "@features/members/hooks/useMemberAttentionFilter";
 import {
   OnboardingModeBanner,
   OnboardingModeSwitch,
@@ -205,39 +207,7 @@ export default function Members() {
     [rawData],
   );
 
-  // "Needs attention" quick filter, toggled by the page badges below: "members"
-  // (awaiting admin confirmation) or "coop" (has coop shares awaiting
-  // confirmation). Filters the loaded rows client-side; toggling the active
-  // badge off restores the full list.
-  const [attentionFilter, setAttentionFilter] = useState<
-    "members" | "coop" | null
-  >(null);
-  const pendingMembersCount = useMemo(
-    () =>
-      data.filter(
-        (record) => !record.admin_confirmed && !record.admin_rejected_at,
-      ).length,
-    [data],
-  );
-  const pendingCoopCount = useMemo(
-    () =>
-      data.filter((record) => Number(record.coop_shares_pending_count ?? 0) > 0)
-        .length,
-    [data],
-  );
-  const attentionFilteredRows = useMemo(() => {
-    if (attentionFilter === "members") {
-      return data.filter(
-        (record) => !record.admin_confirmed && !record.admin_rejected_at,
-      );
-    }
-    if (attentionFilter === "coop") {
-      return data.filter(
-        (record) => Number(record.coop_shares_pending_count ?? 0) > 0,
-      );
-    }
-    return data;
-  }, [data, attentionFilter]);
+  const attention = useMemberAttentionFilter(data);
 
   // Total Einlagen (coop-share equity) across the rows currently in
   // view. Only shown when the tenant has coop shares enabled — for
@@ -797,48 +767,18 @@ export default function Members() {
         )}
       </div>
 
-      {(pendingMembersCount > 0 ||
-        (has_coop_shares && pendingCoopCount > 0)) && (
-        <Space style={{ marginBottom: 12 }} size="large" wrap>
-          {pendingMembersCount > 0 && (
-            <Badge count={pendingMembersCount} size="small">
-              <Button
-                size="small"
-                type={attentionFilter === "members" ? "primary" : "default"}
-                onClick={() =>
-                  setAttentionFilter((prev) =>
-                    prev === "members" ? null : "members",
-                  )
-                }
-              >
-                {t("members.attention_chip_members")}
-              </Button>
-            </Badge>
-          )}
-          {has_coop_shares && pendingCoopCount > 0 && (
-            <Badge count={pendingCoopCount} size="small" color="gold">
-              <Button
-                size="small"
-                type={attentionFilter === "coop" ? "primary" : "default"}
-                onClick={() =>
-                  setAttentionFilter((prev) =>
-                    prev === "coop" ? null : "coop",
-                  )
-                }
-              >
-                {t("members.attention_chip_coop")}
-              </Button>
-            </Badge>
-          )}
-          <ToolTipIcon title={t("tooltip.open_members")} />
-        </Space>
-      )}
+      <MemberAttentionChips
+        attention={attention.attention}
+        counts={attention.counts}
+        onToggle={attention.toggle}
+        showCoopShares={has_coop_shares}
+      />
 
       <EditableTable
         columns={columns}
         apiFunctions={apiFunctions}
         focusIndex="first_name"
-        initialData={attentionFilteredRows}
+        initialData={attention.rows}
         loading={isLoading}
         onSaveSuccess={onSaveSuccess}
         onDeleteSuccess={onDeleteSuccess}
