@@ -1393,6 +1393,88 @@ class CoopShareTransferDateBeforeEntry(BadRequestError):
         )
 
 
+class CoopShareTransferBeforeAnother(BadRequestError):
+    """A coop share transfer is dated before another transfer of the giving or
+    the receiving member that is already recorded. Transfers are recorded in
+    date order: the share window and the giver's exit are checked on today's
+    holdings, which hold from the transfer date on only when no later transfer
+    follows. ``details.context`` names the side (``from_member`` /
+    ``to_member``)."""
+
+    code = "coop_share_transfer.before_another"
+
+    def __init__(self, *, transfer_date: str, member: str) -> None:
+        side = "giving" if member == "from_member" else "receiving"
+        super().__init__(
+            f"The {side} member already has a coop share transfer dated "
+            f"{transfer_date}; transfers are recorded in date order.",
+            field="transfer_date",
+            details={"transfer_date": transfer_date, "context": member},
+        )
+
+
+class CoopShareNotFromTransfer(BadRequestError):
+    """Undoing a transfer was asked of a coop share no transfer created."""
+
+    code = "coop_share.not_from_a_transfer"
+
+    def __init__(self) -> None:
+        super().__init__("This coop share was not created by a transfer.")
+
+
+class CoopShareTransferReversalBlocked(ConflictError):
+    """A later coop share transfer of the giving or the receiving member —
+    dated after this one, or recorded after it — may build on the shares this
+    one moved, so it has to be undone first."""
+
+    code = "coop_share_transfer.reversal_blocked"
+
+    def __init__(self, *, transfer_date: str) -> None:
+        super().__init__(
+            "A later coop share transfer of one of these members "
+            f"({transfer_date}) builds on this one; undo that one first.",
+            details={"transfer_date": transfer_date},
+        )
+
+
+class CoopShareTransferReversalAfterExit(ConflictError):
+    """One of the members has left since the transfer, and that exit settled
+    the shares the transfer moved."""
+
+    code = "coop_share_transfer.reversal_after_exit"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "A member of this transfer has left since, and that exit settled the "
+            "transferred shares."
+        )
+
+
+class CoopShareTransferReversalGiverInactive(ConflictError):
+    """The transfer ended the giving member's membership, and that member's
+    record has since been deactivated or erased, so it can't be reopened."""
+
+    code = "coop_share_transfer.reversal_giver_inactive"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The giving member's record has been deactivated or erased since the "
+            "transfer, so the membership the transfer ended can't be reopened."
+        )
+
+
+class CoopShareTransferReversalEmptiesReceiver(ConflictError):
+    """Undoing the transfer would leave the receiving member — still a member —
+    without confirmed shares."""
+
+    code = "coop_share_transfer.reversal_empties_receiver"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Undoing this transfer would leave the receiving member without shares."
+        )
+
+
 class CoopShareTransferCancellationNotConfirmed(BadRequestError):
     """The transfer leaves the giving member without confirmed shares, which
     cancels the membership, and the request didn't confirm that."""
@@ -1524,6 +1606,43 @@ class RenewalChainNumberMissing(ConflictError):
     number, then renew again."""
 
     code = "subscription.renewal_chain_number_missing"
+
+
+class SubscriptionTermAlreadyRenewed(ConflictError):
+    """A new subscription continues a term that already has its next term — a
+    renewal draft, typically, which the new one would duplicate: confirming
+    both doubles the member's deliveries and charges."""
+
+    code = "subscription.term_already_renewed"
+
+    def __init__(
+        self, *, predecessor: str, renewal: str, renewal_valid_from: str
+    ) -> None:
+        super().__init__(
+            f"Subscription {predecessor} already continues with {renewal} from "
+            f"{renewal_valid_from}; confirm or edit that one, or delete it "
+            "first, instead of adding another next term.",
+            details={
+                "predecessor": predecessor,
+                "renewal": renewal,
+                "renewal_valid_from": renewal_valid_from,
+            },
+        )
+
+
+class SubscriptionTermPredecessorAmbiguous(ConflictError):
+    """Several subscriptions of the member and share type end the day before a
+    new one starts, so it can't be told which one the new one continues — and
+    left unlinked, the renewal sweep would draft a second next term for it."""
+
+    code = "subscription.term_predecessor_ambiguous"
+
+    def __init__(self, *, valid_until: str, count: int) -> None:
+        super().__init__(
+            f"{count} subscriptions of this member and share type end on "
+            f"{valid_until}; it can't be told which one this one continues.",
+            details={"valid_until": valid_until, "count": count},
+        )
 
 
 # --------------------------------------------------------------------------- #

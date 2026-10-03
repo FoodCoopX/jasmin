@@ -106,6 +106,10 @@ class MemberSerializer(
     coop_shares_total = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
     )
+    # What those shares are worth, each at the value it was subscribed at.
+    coop_shares_value = serializers.DecimalField(
+        max_digits=14, decimal_places=2, read_only=True
+    )
     # Count of the member's coop shares still awaiting office confirmation,
     # annotated by ``_build_member_queryset``. Drives the gold pending-count
     # badge on the office Members table's coop-shares button + the detail card.
@@ -927,6 +931,14 @@ class CoopShareSerializer(
             "transfer",
             "settled_by_transfer",
         )
+        extra_kwargs = {
+            "value_one_coop_share": {
+                "help_text": (
+                    "Value of one share when this one was subscribed. Set on "
+                    "create; an update keeps the stored value."
+                )
+            }
+        }
 
     def validate_amount_of_coop_shares(self, value):
         from ..services.coop_share_service import CoopShareService
@@ -942,9 +954,15 @@ class CoopShareSerializer(
     def validate(self, attrs):
         from ..services.coop_share_service import CoopShareService
 
-        # Once confirmed, the committed terms are part of the GenG register.
-        # ``CoopShareViewSet.perform_update`` re-applies this under the row lock.
         if self.instance is not None:
+            # A share keeps the value it was subscribed at, pending or not: the
+            # paid-in capital in the register and in transfers is counted from
+            # it, so an edit (which may re-send the tenant's current value)
+            # never rewrites it.
+            attrs.pop("value_one_coop_share", None)
+            # Once confirmed, the committed terms are part of the GenG register.
+            # ``CoopShareViewSet.perform_update`` re-applies this under the row
+            # lock.
             CoopShareService.apply_confirmed_share_edit_lock(self.instance, attrs)
         return super().validate(attrs)
 
@@ -1045,6 +1063,22 @@ class CoopShareTransferSerializer(serializers.ModelSerializer):
 
     def get_from_member_cancelled(self, obj: CoopShareTransfer) -> bool:
         return bool(self.context.get("from_member_cancelled", False))
+
+
+class CoopShareTransferReversalSerializer(serializers.Serializer):
+    """Response of ``POST /api/commissioning/coop_shares/{id}/reverse_transfer/``."""
+
+    transfer = serializers.CharField(
+        help_text="Id of the transfer that was undone; it no longer exists."
+    )
+    from_member = serializers.CharField()
+    to_member = serializers.CharField()
+    from_member_reinstated = serializers.BooleanField(
+        help_text=(
+            "The transfer had ended the giving member's membership, which is "
+            "reopened."
+        )
+    )
 
 
 class MemberLoanSerializer(MemberStringFieldMixin, serializers.ModelSerializer):

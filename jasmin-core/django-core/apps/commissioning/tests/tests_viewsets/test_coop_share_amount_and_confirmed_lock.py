@@ -1,10 +1,11 @@
 """CoopShareViewSet — the whole-Geschäftsanteil amount rule on the office path,
-and the edit lock on admin-confirmed coop shares.
+the edit lock on admin-confirmed coop shares, and the value a share keeps.
 
 The office grid (``CoopSharesModal``) sends the WHOLE row on every save — the
-disabled amount / due date / increase cells ride along unchanged, plus the
-tenant's CURRENT ``value_one_coop_share`` — so the lock compares values, and a
-bookkeeping edit of a confirmed share must keep working.
+disabled amount / due date / increase cells ride along unchanged — so the lock
+compares values, and a bookkeeping edit of a confirmed share must keep working.
+A share's ``value_one_coop_share`` is set on create and kept on every update,
+pending or confirmed, whatever value the client sends.
 
 No test here depends on the wall clock: the dates are plain stored values and
 no past/future guard runs on this endpoint.
@@ -67,6 +68,7 @@ class TestOfficeCoopShareAmount:
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
         share = CoopShare.objects.get(pk=resp.data["id"])
         assert share.amount_of_coop_shares == Decimal("3")
+        assert share.value_one_coop_share == 100
 
     def test_patch_rejects_changed_invalid_amount_on_unconfirmed_share(
         self, api_client, tenant
@@ -151,10 +153,10 @@ class TestConfirmedCoopShareEditLock:
         assert share.amount_of_coop_shares == Decimal("2")
 
     def test_office_grid_bookkeeping_save_is_allowed(self, api_client, tenant):
-        # The exact body ``CoopSharesModal`` sends when the office stamps the
-        # paid-back date on a confirmed share: the disabled cells unchanged, a
-        # non-model column, and the tenant's CURRENT share value (changed since
-        # this share was snapshotted at 100).
+        # The body the office grid sends when the office stamps the paid-back
+        # date on a confirmed share: the disabled cells unchanged and a
+        # non-model column, plus the tenant's current share value (changed
+        # since this share was subscribed at 100) as a client may re-send it.
         share = self._confirmed_share()
         resp = api_client.patch(
             _detail_url(share),
@@ -186,18 +188,32 @@ class TestConfirmedCoopShareEditLock:
         )
         resp = api_client.patch(
             _detail_url(share),
-            {
-                "amount_of_coop_shares": 3,
-                "is_increase": True,
-                "value_one_coop_share": 120,
-            },
+            {"amount_of_coop_shares": 3, "is_increase": True},
             format="json",
         )
         assert resp.status_code == status.HTTP_200_OK, resp.data
         share.refresh_from_db()
         assert share.amount_of_coop_shares == Decimal("3")
         assert share.is_increase is True
-        assert share.value_one_coop_share == 120
+
+    def test_an_edit_keeps_a_pending_share_at_its_subscribed_value(
+        self, api_client, tenant
+    ):
+        # Imported or self-subscribed at a value the tenant has since changed:
+        # the paid-in capital is counted from the share's own value.
+        share = CoopShareFactory(
+            admin_confirmed=False, amount_of_coop_shares=2, value_one_coop_share=100
+        )
+        resp = api_client.patch(
+            _detail_url(share),
+            {"note": "paid in cash", "value_one_coop_share": 120},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert resp.data["value_one_coop_share"] == 100
+        share.refresh_from_db()
+        assert share.value_one_coop_share == 100
+        assert share.note == "paid in cash"
 
     def test_confirmation_committed_after_load_still_locks_the_terms(
         self, api_client, tenant

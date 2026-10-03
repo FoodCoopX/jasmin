@@ -36,6 +36,7 @@ export interface CoopShare {
   /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */
   amount_of_coop_shares: string;
   /**
+   * Value of one share when this one was subscribed. Set on create; an update keeps the stored value.
    * @minimum 0
    * @maximum 2147483647
    */

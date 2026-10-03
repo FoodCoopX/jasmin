@@ -28,7 +28,7 @@ import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 import { getWeekdayChoices } from "@shared/utils/weekdayChoices";
 import type { ShareDelivery } from "@shared/api/generated/models";
-import { useRoles } from "@shared/auth";
+import { useMemberSelfService } from "@shared/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -60,7 +60,9 @@ const MemberDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const { logoUrl, displayLogoUrl, tenantName } = useTenant();
-  const { isMemberOnly } = useRoles();
+  // The member's own view — for a member on their page, whatever staff roles
+  // they also hold; office users get the office view.
+  const selfService = useMemberSelfService(id);
   // The office's approval email is not sent while onboarding mode is on, so the
   // pending page doesn't promise one then.
   const onboardingMode = useOnboardingMode();
@@ -223,8 +225,8 @@ const MemberDetail = () => {
   }
 
   // Pending / rejected gate — shown ONLY to members viewing their own
-  // profile (``isMemberOnly``). Office / staff viewers still see the
-  // full profile because they're the ones reviewing the application.
+  // profile (``selfService``). Office viewers still see the full
+  // profile because they're the ones reviewing the application.
   //
   // We don't actually leak any sensitive data by skipping this gate
   // for office viewers — every endpoint is own-data-scoped — but the
@@ -282,7 +284,7 @@ const MemberDetail = () => {
     </>
   );
 
-  if (isMemberOnly && member.admin_rejected_at) {
+  if (selfService && member.admin_rejected_at) {
     return (
       <div style={{ padding: "24px", maxWidth: 720, margin: "0 auto" }}>
         {gateLogo}
@@ -325,7 +327,7 @@ const MemberDetail = () => {
     );
   }
 
-  if (isMemberOnly && !member.admin_confirmed) {
+  if (selfService && !member.admin_confirmed) {
     return (
       <div style={{ padding: "24px", maxWidth: 720, margin: "0 auto" }}>
         {gateLogo}
@@ -427,7 +429,7 @@ const MemberDetail = () => {
               confirmed, not-yet-cancelled membership. The endpoint refuses
               while active subscriptions remain (the office can force-cancel
               from the members table instead). */}
-          {isMemberOnly && member.admin_confirmed && !member.cancelled_at && (
+          {selfService && member.admin_confirmed && !member.cancelled_at && (
             <Card style={{ marginTop: 16 }}>
               <Text type="secondary">
                 {t("members.cancel_membership_self_hint")}
@@ -497,7 +499,7 @@ const MemberDetail = () => {
       {/* Coop-shares ("Genossenschaftsanteile") view / subscribe modal.
           Members self-subscribe (pending office confirmation) via the slim
           MemberCoopSharesModal; office/staff get the full editable modal. */}
-      {isMemberOnly ? (
+      {selfService ? (
         <MemberCoopSharesModal
           isOpen={coopSharesModalVisible}
           memberId={id!}

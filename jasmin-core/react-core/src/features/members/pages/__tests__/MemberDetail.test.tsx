@@ -59,7 +59,7 @@ vi.mock("@hooks/index", async () => {
 const logoutMock = vi.fn();
 // The logged-in user; ``useRoles`` reads its roles. No user means no roles.
 const authState = vi.hoisted(() => ({
-  user: null as { roles: string[] } | null,
+  user: null as { roles: string[]; member_id?: string } | null,
 }));
 vi.mock("@shared/contexts/AuthContext", () => ({
   useAuth: () => ({ logout: logoutMock, user: authState.user }),
@@ -456,7 +456,8 @@ describe("MemberDetail (integration)", () => {
   });
   describe("pending application page", () => {
     beforeEach(() => {
-      authState.user = { roles: ["member"] };
+      // The applicant on their own page.
+      authState.user = { roles: ["member"], member_id: MEMBER_ID };
       server.use(
         http.get(`/api/commissioning/members/${MEMBER_ID}/`, () =>
           HttpResponse.json({ ...baseMember, admin_confirmed: false }),

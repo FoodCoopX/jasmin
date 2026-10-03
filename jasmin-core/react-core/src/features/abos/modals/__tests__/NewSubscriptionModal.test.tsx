@@ -5,15 +5,16 @@
  * tenant has ``allows_solidarity_pricing`` on; otherwise the field is disabled
  * and the price is NOT sent (the backend forces the reference price). The OFFICE
  * path always sends the price (and office can always override it). A refactor
- * of the ``isMemberOnly && !allowsSolidarity`` condition (or the spread-when-on
+ * of the ``selfService && !allowsSolidarity`` condition (or the spread-when-on
  * payload) could silently let a member submit a custom price with solidarity
  * off. These tests pin the user-visible gate.
  *
  * Boundary mocked: every ``@hooks/index`` hook (the modal's data layer),
- * ``useRoles`` (member vs office), the two generated create fns, ``notify`` and
- * ``getErrorMessage``. AntD ``InputNumber`` and ``DatePicker`` are stubbed to
- * plain controlled inputs (jsdom-friendly + lets us read the ``disabled`` /
- * ``min`` props directly); the real AntD ``Form`` / ``Modal`` run unmocked.
+ * ``useRoles`` / ``useMemberSelfService`` (member vs office), the two
+ * generated create fns, ``notify`` and ``getErrorMessage``. AntD
+ * ``InputNumber`` and ``DatePicker`` are stubbed to plain controlled inputs
+ * (jsdom-friendly + lets us read the ``disabled`` / ``min`` props directly);
+ * the real AntD ``Form`` / ``Modal`` run unmocked.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
@@ -34,6 +35,9 @@ vi.mock("react-i18next", () => ({
 const rolesMock = vi.fn();
 vi.mock("@shared/auth", () => ({
   useRoles: () => rolesMock(),
+  // ``isMemberOnly`` in a test's roles stands for a member subscribing for
+  // themselves.
+  useMemberSelfService: () => Boolean(rolesMock()?.isMemberOnly),
 }));
 
 // ── Generated create fns (the boundary under assertion) ────────────────────

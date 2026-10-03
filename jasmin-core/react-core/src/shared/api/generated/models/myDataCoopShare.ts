@@ -16,6 +16,7 @@ export interface MyDataCoopShare {
   readonly id?: string;
   /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */
   readonly amount_of_coop_shares?: string;
+  readonly value_one_coop_share?: number;
   /** @nullable */
   readonly due_date?: string | null;
   /** @nullable */

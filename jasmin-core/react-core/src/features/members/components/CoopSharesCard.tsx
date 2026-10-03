@@ -1,7 +1,7 @@
-import { useCurrency, useDateFormat, useTenant } from "@hooks/index";
+import { useCurrency, useDateFormat } from "@hooks/index";
 import { useCommissioningMyMemberDataRetrieve } from "@shared/api/generated/commissioning/commissioning";
 import type { Member } from "@shared/api/generated/models";
-import { useRoles } from "@shared/auth";
+import { useMemberSelfService } from "@shared/auth";
 import { Alert, Badge, Button, Card, Typography } from "antd";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,34 +25,38 @@ export default function CoopSharesCard({
   onManage,
 }: CoopSharesCardProps) {
   const { t } = useTranslation();
-  const { getSetting } = useTenant();
   const { formatCurrency } = useCurrency();
-  const { isMemberOnly } = useRoles();
+  // The member's own view of their equity, or the office's.
+  const selfService = useMemberSelfService(member.id);
   const { formatDate } = useDateFormat();
-
-  // ``value_one_coop_share`` is a whole-unit tenant setting (number on the wire).
-  const valueOneRaw = getSetting("value_one_coop_share");
-  const valueOne = valueOneRaw == null ? 0 : Number(valueOneRaw);
 
   // Member self-view: fetch the per-share data so we can split confirmed
   // (owned equity) from pending (subscribed, awaiting office confirmation).
   // Office viewers use the server-computed ``coop_shares_total`` on the member.
   const { data: myData } = useCommissioningMyMemberDataRetrieve({
-    query: { enabled: isMemberOnly },
+    query: { enabled: selfService },
   });
 
-  const { confirmedShares, pendingShares, liveShares } = useMemo(() => {
-    const live = (myData?.coop_shares ?? []).filter((s) => !s.cancelled_at);
-    const sum = (admin: boolean) =>
-      live
-        .filter((s) => Boolean(s.admin_confirmed) === admin)
-        .reduce((acc, s) => acc + Number(s.amount_of_coop_shares ?? 0), 0);
-    return {
-      confirmedShares: sum(true),
-      pendingShares: sum(false),
-      liveShares: live,
-    };
-  }, [myData]);
+  const { confirmedShares, confirmedValue, pendingShares, liveShares } =
+    useMemo(() => {
+      const live = (myData?.coop_shares ?? []).filter((s) => !s.cancelled_at);
+      const confirmed = live.filter((s) => s.admin_confirmed);
+      const shares = (rows: typeof live) =>
+        rows.reduce((acc, s) => acc + Number(s.amount_of_coop_shares ?? 0), 0);
+      return {
+        confirmedShares: shares(confirmed),
+        // Each share at the value it was subscribed at.
+        confirmedValue: confirmed.reduce(
+          (acc, s) =>
+            acc +
+            Number(s.amount_of_coop_shares ?? 0) *
+              Number(s.value_one_coop_share ?? 0),
+          0,
+        ),
+        pendingShares: shares(live.filter((s) => !s.admin_confirmed)),
+        liveShares: live,
+      };
+    }, [myData]);
 
   // Coop shares still awaiting office confirmation for this member (annotated
   // on the member row). Drives the gold pending badge on the manage button so
@@ -61,11 +65,15 @@ export default function CoopSharesCard({
 
   // For the member, the headline figure is their CONFIRMED equity; the office
   // figure (``coop_shares_total``) already nets out cancelled shares.
-  const totalShares = isMemberOnly
+  const totalShares = selfService
     ? confirmedShares
     : Number(member.coop_shares_total ?? 0);
-  const pending = isMemberOnly ? pendingShares : 0;
-  const totalValue = totalShares * valueOne;
+  const pending = selfService ? pendingShares : 0;
+  // Every share at the value it was subscribed at; the office figure
+  // (``coop_shares_value``) is computed the same way on the server.
+  const totalValue = selfService
+    ? confirmedValue
+    : Number(member.coop_shares_value ?? 0);
 
   // Membership lifecycle: entry date (GenG §30 Eintrittsdatum) and, once the
   // member has left, the exit date. (Per-share payback due / paid-back dates
@@ -83,7 +91,7 @@ export default function CoopSharesCard({
         // A member who has left the co-op can't subscribe new shares (the
         // backend rejects with MemberAlreadyCancelled) — hide the entry point
         // in their self-view. The office keeps it: their modal gates adding.
-        isMemberOnly && cancelledEffectiveAt ? null : (
+        selfService && cancelledEffectiveAt ? null : (
           <Badge
             count={pendingCoopSharesCount}
             color="gold"
@@ -114,7 +122,7 @@ export default function CoopSharesCard({
 
       {/* Per-purchase payment status (member self-view): paid shares show their
           paid-on date in grey; unpaid ones show the due date in amber. */}
-      {isMemberOnly && liveShares.length > 0 && (
+      {selfService && liveShares.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           {liveShares.map((s) => {
             const amount = Number(s.amount_of_coop_shares ?? 0);

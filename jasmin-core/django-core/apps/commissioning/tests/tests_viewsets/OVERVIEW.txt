@@ -1,6 +1,6 @@
 Viewset Tests Overview
 ======================
-1080 tests | 198 test classes | 35 files
+1101 tests | 202 test classes | 36 files
 Run: poetry run pytest apps/commissioning/tests/tests_viewsets/ --no-header --tb=short -q
 
 Counts are collected cases, so a parametrized method counts once per case.
@@ -80,29 +80,31 @@ test_consents_viewsets.py (55 tests) — DSGVO-critical access matrix
                                                sha unchanged; unchanged values → 200; draft edit → 200 +
                                                stored PDF re-rendered
 
-test_coop_share_amount_and_confirmed_lock.py (16 tests) — coop-share amount rule + confirmed-share edit lock
-───────────────────────────────────────────────────────────────────────────────────────────────────────────
+test_coop_share_amount_and_confirmed_lock.py (17 tests) — coop-share amount rule, confirmed-share edit lock, kept share value
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   TestOfficeCoopShareAmount                6   office create -2 / 0 / 2.5 → 400 coop_share.invalid_amount;
                                                whole amount 201; PATCH to a fractional amount → 400;
                                                unchanged legacy fractional amount stays editable
-  TestConfirmedCoopShareEditLock           8   PATCH amount / is_increase / due_date / member on a confirmed
+  TestConfirmedCoopShareEditLock           9   PATCH amount / is_increase / due_date / member on a confirmed
                                                share → 409 coop_share.confirmed_fields_locked; PUT rewriting
                                                amount → 409; office-grid bookkeeping save → 200 keeping the
-                                               value snapshot; unconfirmed terms editable; confirm committed
-                                               after load still locks (row re-read under lock)
+                                               value snapshot; unconfirmed terms editable, but an edit keeps a
+                                               pending share at the value it was subscribed at; confirm
+                                               committed after load still locks (row re-read under lock)
   TestCoopShareUpdateBoundsLock            2   update takes the per-member coop_share_bounds advisory lock;
                                                reassignment locks both members in sorted order
 
-test_coop_share_transfer.py (39 tests) — office coop share transfer between members as ledger rows (frozen clock)
-─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+test_coop_share_transfer.py (50 tests) — office coop share transfer between members as ledger rows, and undoing one (frozen clock)
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   TestCoopShareTransfer                   22   negative row for the giver + positive row for the receiver
                                                (confirmed, paid on the transfer date, notes, existing rows
                                                untouched); share value with the most recent payment first; a
-                                               later transfer only gives what is left; a backdated transfer is
-                                               capped per share value by the lowest holding from its date on;
+                                               later transfer only gives what is left; one dated before another
+                                               transfer of the giver or the receiver → 400 before_another; a
+                                               backdated transfer can't give shares paid after its date;
                                                giving every share needs confirm_member_cancellation, then
                                                settles the giver's rows and cancels them, effective on the
-                                               giver's latest transfer date, with a no-settlement email;
+                                               transfer date, with a no-settlement email;
                                                member register counts transfer rows from the transfer date,
                                                each share once, and keeps a future exit's shares until the
                                                exit; an exit before the member's own transfer → 400
@@ -114,6 +116,14 @@ test_coop_share_transfer.py (39 tests) — office coop share transfer between me
                                                amount 0 / -1 / 2.5 → 400; anonymous refused
   TestDateTransferExitsByTheLatestTransfer 2   migration 0030 moves an emptied giver's exit and settled rows to
                                                their latest transfer date; leaves an office-recorded exit alone
+  TestCoopShareTransferReversal           11   undoing through either member's row deletes both rows and the
+                                               transfer; an emptying transfer's undo reopens the giver's
+                                               membership and the rows and pending shares its exit closed; a
+                                               later transfer of either member → 409 reversal_blocked, one
+                                               recorded before doesn't block; a member who left since → 409
+                                               reversal_after_exit; an inactive giver → 409; the receiver
+                                               keeps shares (409) and its minimum (400); a row no transfer
+                                               created → 400; anonymous refused
 
 test_crates_viewsets.py (48 tests)
 ──────────────────────────────────
@@ -160,7 +170,7 @@ test_delivery_station_query_count.py (1 test)
 ─────────────────────────────────────────────
   (module-level)                           1   delivery-station list is scale-invariant
 
-test_delivery_viewsets.py (48 tests)
+test_delivery_viewsets.py (49 tests)
 ────────────────────────────────────
   TestDeliveryStationViewSet               8   list, is_active filter, retrieve, can_be_deleted, filter by
                                                member (confirmed subscriptions only), member-role read
@@ -176,6 +186,8 @@ test_delivery_viewsets.py (48 tests)
                                                open row on a versioned station-day
   TestUpdateToursCreatesStationDay         2   assigning a station without a station-day creates one; on a
                                                future-dated day it opens at that day's own start
+  TestUpdateToursKeepsStationDayStart      1   moving an existing station-day to another tour and stop keeps
+                                               its start
   TestDeliveryStationIbanStepUp            9   rewriting or first setting a station's IBAN, on update or create,
                                                needs a fresh step-up claim (a linked reseller shares the
                                                ContactEntity); resending the stored IBAN, other edits and no or a
@@ -245,6 +257,12 @@ test_logs_viewsets.py (16 tests) — theoretical harvest/purchase/wash/clean rec
                                                still reaches a row outside the window; an explicitly requested
                                                past ?year= is not narrowed
 
+test_member_create_links_login.py (4 tests) — create with an existing login: one transaction, confirmed only when admissible
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  TestMemberCreateLinksAnExistingLogin     4   below the minimum → linked and pending; a member that can be
+                                               admitted → confirmed; onboarding mode only links; a failing link
+                                               leaves no member behind
+
 test_member_detail_scoping.py (15 tests)
 ────────────────────────────────────────
   TestMemberDetail_MemberRoleScoping      10   list returns only self; office-internal fields hidden from the
@@ -263,9 +281,10 @@ test_member_onboarding_fields.py (23 tests) — onboarding mode: member_number /
                                                existing or new trial member → member.number_not_allowed_for_trial;
                                                trial row without a number still saves
 
-test_members_viewsets.py (82 tests)
+test_members_viewsets.py (83 tests)
 ───────────────────────────────────
-  TestMemberViewSet                       24   list, payback-due and coop-share totals, filters (is_active,
+  TestMemberViewSet                       25   list, payback-due and coop-share totals (the value at each
+                                               share's own value), filters (is_active,
                                                is_trial, exclude_trial_members incl. its =false case), confirm,
                                                reject, retrieve
   TestMemberRegisterHoldings               7   register holdings as of date_to, by the exit's effective date: a
@@ -573,14 +592,17 @@ test_subscription_contract.py (5 tests) — subscription contract on the office 
                                                accepted → consent recorded, field write-only; a failed
                                                consent write leaves no subscription
 
-test_subscription_onboarding_start.py (19 tests) — onboarding mode: subscription start lead time (frozen clock)
-───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+test_subscription_onboarding_start.py (22 tests) — onboarding mode: subscription start lead time, next-term link (frozen clock)
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   TestOfficeStartFlagOff                   2   office create / PATCH with a past start → subscription.start_too_soon
   TestOfficeStartFlagOn                    4   office create / PATCH with a past start accepted; end date still
                                                required; member self-subscribe still → subscription.start_too_soon
   TestSerializerLeadTimeSkip               3   skip only with onboarding_mode in the context AND an office request
   TestSubscriptionViewSetContext          10   create/update/partial_update carry the flag (off / on); list,
                                                retrieve, confirm and schema generation leave it out
+  TestOnboardingCreateLinksTheTermBefore   3   a create starting the day after a term ends continues it as its
+                                               renewal; a term with its next one already → 409
+                                               term_already_renewed; outside onboarding mode nothing is linked
 
 test_subscription_price_bounds.py (16 tests) — office subscription quantity/price bounds + solidarity floor on PATCH (frozen clock)
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

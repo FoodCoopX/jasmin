@@ -23,6 +23,10 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, QuerySet
 
+from apps.commissioning.errors import (
+    SubscriptionTermAlreadyRenewed,
+    SubscriptionTermPredecessorAmbiguous,
+)
 from apps.commissioning.models import (
     ShareTypeVariation,
     ShareTypeVariationGrossPrice,
@@ -30,6 +34,63 @@ from apps.commissioning.models import (
 )
 
 ops_log = logging.getLogger("tasks")
+
+
+def term_predecessor(
+    *,
+    member_id: str,
+    share_type_id: str,
+    valid_from: datetime.date,
+    subscription_number: int | None = None,
+) -> Subscription | None:
+    """The subscription a new term starting ``valid_from`` continues: the one
+    of the same member and share type that ends the day before and isn't
+    cancelled, rejected or a trial. ``None`` when there is none — the new term
+    starts a chain of its own.
+
+    Linked as the new term's ``previous_subscription``, it no longer counts as
+    unrenewed, so the renewal sweep doesn't draft a second next term for it.
+
+    Raises ``SubscriptionTermAlreadyRenewed`` when it already has its next term,
+    and ``SubscriptionTermPredecessorAmbiguous`` when several qualify — a
+    ``subscription_number`` shared with exactly one of them, as the renewals
+    of an earlier system carry it, settles that.
+    """
+    ends_the_day_before = valid_from - datetime.timedelta(days=1)
+    candidates = list(
+        Subscription.objects.filter(
+            member_id=member_id,
+            share_type_variation__share_type_id=share_type_id,
+            valid_until=ends_the_day_before,
+            cancelled_at__isnull=True,
+            admin_rejected_at__isnull=True,
+            is_trial=False,
+        )
+        .prefetch_related("renewals")
+        .order_by("pk")
+    )
+    if subscription_number is not None:
+        numbered = [
+            candidate
+            for candidate in candidates
+            if candidate.subscription_number == subscription_number
+        ]
+        if numbered:
+            candidates = numbered
+    unrenewed = [candidate for candidate in candidates if not candidate.renewals.all()]
+    if candidates and not unrenewed:
+        predecessor = candidates[0]
+        renewal = predecessor.renewals.all()[0]
+        raise SubscriptionTermAlreadyRenewed(
+            predecessor=predecessor.renewal_display_id,
+            renewal=renewal.renewal_display_id,
+            renewal_valid_from=renewal.valid_from.isoformat(),
+        )
+    if len(unrenewed) > 1:
+        raise SubscriptionTermPredecessorAmbiguous(
+            valid_until=ends_the_day_before.isoformat(), count=len(unrenewed)
+        )
+    return unrenewed[0] if unrenewed else None
 
 
 def find_renewable_subscriptions(

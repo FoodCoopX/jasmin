@@ -264,3 +264,91 @@ class TestSubscriptionViewSetContext:
         )
         view.request = _request_for(JasminUserFactory(roles=["office"]))
         assert "onboarding_mode" not in view.get_serializer_context()
+
+
+@pytest.mark.django_db
+class TestOnboardingCreateLinksTheTermBefore:
+    """In onboarding mode a subscription starting the day after a term of the
+    member and share type ends continues that term as its renewal, so the
+    renewal sweep doesn't draft a second next term for it."""
+
+    def _term_before(self, variation, station_day, member, *, valid_until):
+        return SubscriptionFactory(
+            member=member,
+            share_type_variation=variation,
+            default_delivery_station_day=station_day,
+            valid_from=datetime.date(2026, 1, 5),
+            valid_until=valid_until,
+        )
+
+    def test_the_new_term_continues_the_one_before(
+        self, api_client, onboarding_mode, variation, station_day
+    ):
+        member = MemberFactory()
+        before = self._term_before(
+            variation, station_day, member, valid_until=datetime.date(2026, 5, 31)
+        )
+
+        resp = api_client.post(
+            ABOS_URL,
+            _payload(variation, station_day, member=str(member.id)),
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        created = Subscription.objects.get(pk=resp.data["id"])
+        assert created.previous_subscription_id == before.pk
+        assert created.subscription_number == before.subscription_number
+        assert created.renewal_generation == before.renewal_generation + 1
+
+    def test_a_term_that_already_has_its_next_is_refused(
+        self, api_client, onboarding_mode, variation, station_day
+    ):
+        member = MemberFactory()
+        before = self._term_before(
+            variation, station_day, member, valid_until=datetime.date(2026, 5, 31)
+        )
+        SubscriptionFactory(
+            member=member,
+            share_type_variation=variation,
+            default_delivery_station_day=station_day,
+            previous_subscription=before,
+            valid_from=PAST_MONDAY,
+            valid_until=TERM_END,
+        )
+
+        resp = api_client.post(
+            ABOS_URL,
+            _payload(variation, station_day, member=str(member.id)),
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_409_CONFLICT, resp.data
+        assert resp.data["code"] == "subscription.term_already_renewed"
+        assert resp.data["details"]["renewal_valid_from"] == PAST_MONDAY.isoformat()
+        assert Subscription.objects.filter(member=member).count() == 2
+
+    def test_outside_onboarding_mode_nothing_is_linked(
+        self, api_client, onboarding_mode_off, variation, station_day
+    ):
+        member = MemberFactory()
+        self._term_before(
+            variation, station_day, member, valid_until=datetime.date(2026, 9, 6)
+        )
+
+        resp = api_client.post(
+            ABOS_URL,
+            _payload(
+                variation,
+                station_day,
+                member=str(member.id),
+                valid_from=FUTURE_MONDAY.isoformat(),
+            ),
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        assert (
+            Subscription.objects.get(pk=resp.data["id"]).previous_subscription_id
+            is None
+        )

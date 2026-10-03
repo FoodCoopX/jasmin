@@ -6,6 +6,16 @@ import ToolTipIcon from "@shared/ui/ToolTipIcon";
 import { isFieldDisabled } from "@shared/utils";
 import { useDateFormat } from "../configuration/useDateFormat";
 
+/** Where a saved row's start may move — see ``validFromEarlierMove``. */
+export interface EarlierStartWindow {
+  /** The row's stored start. */
+  savedStart: Dayjs;
+  /** The earliest start the backend accepts for the row; ``null`` if none is known. */
+  floor: Dayjs | null;
+  /** Whether later Mondays stay open too, under the usual rules. */
+  laterAllowed: boolean;
+}
+
 /**
  * Returns reusable valid_from (Monday-only) and valid_until (Sunday-only)
  * column definitions for any EditableTable backed by a TimeBoundMixin model.
@@ -24,6 +34,21 @@ interface TimeBoundColumnOptions {
    * back-dated surfaces keep the past open.
    */
   validFromFutureOnly?: boolean;
+  /**
+   * The window a SAVED row's start may move back in (the tenant's onboarding
+   * mode), or ``null`` to keep the row on the usual rules. With a window the
+   * picker offers the Mondays from ``floor`` up to the stored start, later
+   * Mondays only when ``laterAllowed``, and the start stays editable even on
+   * an in-use row. New rows stay future-only: the backend refuses a past start
+   * on create. Pass a stable function (``useEarlierStartWindow``).
+   */
+  validFromEarlierMove?: (record: TableRecord) => EarlierStartWindow | null;
+  /**
+   * Lock ``valid_from`` on every saved row, not only on in-use ones (a start
+   * set on create only) — except for a move back in its
+   * ``validFromEarlierMove`` window.
+   */
+  validFromLockedOnSave?: boolean;
   /**
    * Per-row lower bound for ``valid_until``: dates before ``minDate`` are
    * disabled, and ``blockAll`` disables EVERY date (a still-active child — e.g.
@@ -44,6 +69,8 @@ export const useTimeBoundColumns = (options: TimeBoundColumnOptions = {}) => {
     validUntilRequired = false,
     width = "10em",
     validFromFutureOnly = false,
+    validFromEarlierMove,
+    validFromLockedOnSave = false,
     validUntilFloor,
   } = options;
 
@@ -60,23 +87,41 @@ export const useTimeBoundColumns = (options: TimeBoundColumnOptions = {}) => {
   }, []);
 
   // valid_from: Mondays only, and — when ``validFromFutureOnly`` — not before
-  // the first upcoming Monday. Uses core ``day()`` rather than the ``isoWeek``
+  // the first upcoming Monday, except for a saved row's move back into its
+  // ``validFromEarlierMove`` window. Uses core ``day()`` rather than the ``isoWeek``
   // plugin's ``isoWeekday()``: ``day()`` needs no ``dayjs.extend`` and is
   // immune to chunk load-order. Relying on the plugin here would crash the
   // picker if this column mounted before any module had run
   // ``dayjs.extend(isoWeek)`` (``isoWeekday`` undefined).
   const disabledDateValidFrom = useMemo(
-    () => (current: unknown) => {
+    () => (current: unknown, record?: TableRecord) => {
       const day = current as Dayjs | undefined;
       if (!day) return false;
       if (day.day() !== 1) return true;
+      const moveWindow = record ? validFromEarlierMove?.(record) : null;
+      if (moveWindow) {
+        if (moveWindow.floor && day.isBefore(moveWindow.floor, "day")) {
+          return true;
+        }
+        if (!day.isAfter(moveWindow.savedStart, "day")) return false;
+        if (!moveWindow.laterAllowed) return true;
+      }
       if (validFromFutureOnly && day.isBefore(earliestValidFrom, "day")) {
         return true;
       }
       return false;
     },
-    [validFromFutureOnly, earliestValidFrom],
+    [validFromFutureOnly, earliestValidFrom, validFromEarlierMove],
   );
+
+  // A saved row's start is locked when in use (or on every saved row with
+  // ``validFromLockedOnSave``), unless it may move back in onboarding mode.
+  const validFromDisabled = useMemo(() => {
+    if (!validFromEarlierMove && !validFromLockedOnSave) return isFieldDisabled;
+    return (record: TableRecord) =>
+      !validFromEarlierMove?.(record) &&
+      (validFromLockedOnSave ? record.key !== -1 : isFieldDisabled(record));
+  }, [validFromEarlierMove, validFromLockedOnSave]);
 
   // valid_until: Sundays only; strictly AFTER the (live) valid_from — a range
   // end can never precede its start; and not before any supplied per-row floor
@@ -119,10 +164,10 @@ export const useTimeBoundColumns = (options: TimeBoundColumnOptions = {}) => {
       width,
       align: "center",
       disabledDate: disabledDateValidFrom,
-      disabled: isFieldDisabled,
+      disabled: validFromDisabled,
       render: (value: unknown) => (value ? dayjs(value as string).format(dateFormat) : (value as string)),
     }),
-    [t, dateFormat, validFromRequired, width, disabledDateValidFrom],
+    [t, dateFormat, validFromRequired, width, disabledDateValidFrom, validFromDisabled],
   );
 
   const validUntilColumn = useMemo<EditableColumnConfig<TableRecord>>(

@@ -1,7 +1,9 @@
 /**
  * ``CoopSharesModal`` grid wiring for the tenant's onboarding mode: ``paid_at``
  * is editable only while the mode is on, and its edit cell starts from the
- * calendar day in the display format although the API sends a datetime.
+ * calendar day in the display format although the API sends a datetime. A share
+ * is shown and saved at the value it was subscribed at; only a new row takes
+ * the tenant's current value.
  *
  * Boundary mocked: react-i18next, the generated coop share API, the roles,
  * the ``@hooks/index`` barrel, the confirm / transfer modals and the
@@ -39,6 +41,10 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
     isPending: false,
   }),
   useCommissioningCoopSharesList: () => ({ data: [], isFetching: false }),
+  useCommissioningCoopSharesReverseTransferCreate: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 vi.mock("@shared/auth", () => ({
@@ -95,8 +101,16 @@ vi.mock("@hooks/index", () => {
 
 import CoopSharesModal from "../CoopSharesModal";
 
-type ColumnConfig = { key: string; disabled?: unknown };
+type ColumnConfig = {
+  key: string;
+  disabled?: unknown;
+  render?: (value: unknown, record: Record<string, unknown>) => React.ReactNode;
+};
 type CustomEdit = (record: Record<string, unknown>) => Record<string, unknown>;
+type CustomSave = (
+  transformedData: Record<string, unknown>,
+  currentRecord: Record<string, unknown>,
+) => Record<string, unknown>;
 
 function renderModal() {
   const queryClient = new QueryClient({
@@ -115,11 +129,15 @@ function renderModal() {
   );
 }
 
-function paidAtColumn(): ColumnConfig {
+function column(key: string): ColumnConfig {
   const columns = (modalState.tableProps?.columns ?? []) as ColumnConfig[];
-  const column = columns.find((col) => col.key === "paid_at");
-  if (!column) throw new Error("paid_at column not found");
-  return column;
+  const found = columns.find((col) => col.key === key);
+  if (!found) throw new Error(`${key} column not found`);
+  return found;
+}
+
+function paidAtColumn(): ColumnConfig {
+  return column("paid_at");
 }
 
 beforeEach(() => {
@@ -160,3 +178,55 @@ describe("CoopSharesModal paid_at", () => {
     expect(customEdit(record)).toBe(record);
   });
 });
+
+describe("CoopSharesModal share value", () => {
+  it("sends the tenant's current value with a new row", () => {
+    renderModal();
+
+    const customSave = modalState.tableProps?.customSave as CustomSave;
+    expect(
+      customSave({ amount_of_coop_shares: 2 }, { key: -1 }),
+    ).toEqual({
+      amount_of_coop_shares: 2,
+      member: "member-1",
+      value_one_coop_share: 100,
+    });
+  });
+
+  it("sends no value when a saved row is edited", () => {
+    renderModal();
+
+    const customSave = modalState.tableProps?.customSave as CustomSave;
+    const payload = customSave(
+      { amount_of_coop_shares: 2, note: "paid in cash" },
+      { key: "share-1", id: "share-1", value_one_coop_share: 80 },
+    );
+    expect(payload).not.toHaveProperty("value_one_coop_share");
+    expect(payload).toMatchObject({ member: "member-1", note: "paid in cash" });
+  });
+
+  it("values a saved row at its own share value, a new row at the tenant's", () => {
+    renderModal();
+
+    const render = column("value").render!;
+    const { rerender } = renderStandalone(
+      render(undefined, {
+        key: "share-1",
+        amount_of_coop_shares: "2.00",
+        value_one_coop_share: 80,
+      }),
+    );
+    expect(screen.getByTestId("value-cell")).toHaveTextContent("160 €");
+
+    rerender(
+      <div data-testid="value-cell">
+        {render(undefined, { key: -1, amount_of_coop_shares: 2 })}
+      </div>,
+    );
+    expect(screen.getByTestId("value-cell")).toHaveTextContent("200 €");
+  });
+});
+
+function renderStandalone(node: React.ReactNode) {
+  return render(<div data-testid="value-cell">{node}</div>);
+}

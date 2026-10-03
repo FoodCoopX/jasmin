@@ -30,6 +30,7 @@ import type {
   EditableColumnConfig,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
+import { useTransferUndoColumn } from "@features/members/hooks/columns/useTransferUndoColumn";
 import AdminConfirmationModalCoopShares from "./AdminConfirmationModalCoopShares";
 import CoopShareTransferModal from "./CoopShareTransferModal";
 import {
@@ -124,6 +125,12 @@ export default function CoopSharesModal({
   const { format } = useNumberFormat();
   const { formatDate, formatDateWithColor } = useDateFormat();
   const { noteColumn } = useNoteColumn();
+  // Undoing a transfer that reopened this member's exit leaves the exit props
+  // of this modal stale, so it closes.
+  const transferUndoColumn = useTransferUndoColumn({
+    enabled: isOffice,
+    onMemberReinstated: onClose,
+  });
 
   // Mirror backend rule (CoopShareService._bounds_apply_to): the
   // [min, max] window only constrains non-trial admin-confirmed
@@ -257,7 +264,10 @@ export default function CoopSharesModal({
         readOnly: true,
         width: "6em",
         render: (_value: unknown, record: CoopShareRecord) => {
-          if (!record.amount_of_coop_shares || !value_one_coop_share) return "";
+          // A share is worth what one share was worth when it was subscribed;
+          // only the new row being added takes the tenant's current value.
+          const valueOne = record.value_one_coop_share ?? value_one_coop_share;
+          if (!record.amount_of_coop_shares || !valueOne) return "";
           return (
             <div
               style={{
@@ -266,11 +276,7 @@ export default function CoopSharesModal({
                 textAlign: "center",
               }}
             >
-              {format(
-                Number(record.amount_of_coop_shares) *
-                  (value_one_coop_share || 0),
-                0,
-              )}{" "}
+              {format(Number(record.amount_of_coop_shares) * valueOne, 0)}{" "}
               {currencySymbol}
             </div>
           );
@@ -351,6 +357,7 @@ export default function CoopSharesModal({
       },
 
       noteColumn,
+      transferUndoColumn,
     ],
     [
       t,
@@ -360,6 +367,7 @@ export default function CoopSharesModal({
       currencySymbol,
       value_one_coop_share,
       noteColumn,
+      transferUndoColumn,
       onboardingMode,
     ],
   );
@@ -375,12 +383,13 @@ export default function CoopSharesModal({
     [formatDate],
   );
 
-  // ``customSave`` runs once per save. We use it both for the payload
-  // shape (member id + value_one_coop_share for the create endpoint)
-  // AND as a client-side gate against out-of-range totals: throwing
-  // surfaces the message in the table's save-error banner BEFORE the
-  // round-trip, so the office gets immediate feedback. Backend still
-  // re-validates — see ``CoopShareService.assert_within_min_max``.
+  // ``customSave`` runs once per save. We use it both for the payload shape
+  // (the member id, and on a new row the tenant's current share value — a
+  // saved row keeps the value it was subscribed at) AND as a client-side gate
+  // against out-of-range totals: throwing surfaces the message in the table's
+  // save-error banner BEFORE the round-trip, so the office gets immediate
+  // feedback. Backend still re-validates — see
+  // ``CoopShareService.assert_within_min_max``.
   const customSave = useCallback(
     (
       transformedData: Record<string, unknown>,
@@ -401,20 +410,12 @@ export default function CoopSharesModal({
 
         if (minShares != null && newTotal < minShares) {
           throw new Error(
-            t("members.below_min_shares", {
-              total: newTotal,
-              min: minShares,
-              defaultValue: `Total ({{total}}) would be below the minimum ({{min}}).`,
-            }),
+            t("members.below_min_shares", { total: newTotal, min: minShares }),
           );
         }
         if (maxShares != null && newTotal > maxShares) {
           throw new Error(
-            t("members.above_max_shares", {
-              total: newTotal,
-              max: maxShares,
-              defaultValue: `Total ({{total}}) would exceed the maximum ({{max}}).`,
-            }),
+            t("members.above_max_shares", { total: newTotal, max: maxShares }),
           );
         }
       }
@@ -422,7 +423,7 @@ export default function CoopSharesModal({
       return {
         ...transformedData,
         member: memberId,
-        value_one_coop_share: value_one_coop_share,
+        ...(currentRecord.id == null ? { value_one_coop_share } : {}),
       };
     },
     [

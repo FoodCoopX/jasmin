@@ -35,17 +35,19 @@ class TestMemberDashboardStatistics:
             cancelled_effective_at=today,
         )
 
-        # Live cooperative shares on the confirmed member: 3 paid + confirmed,
-        # 2 unpaid + pending.
+        # Live cooperative shares on the confirmed member: 3 paid + confirmed
+        # at 100, 2 unpaid + pending at 120 (the share value changed since).
         CoopShareFactory(
             member=confirmed,
             amount_of_coop_shares=Decimal("3"),
+            value_one_coop_share=100,
             admin_confirmed=True,
             paid_at=timezone.now(),
         )
         CoopShareFactory(
             member=confirmed,
             amount_of_coop_shares=Decimal("2"),
+            value_one_coop_share=120,
             admin_confirmed=False,
             paid_at=None,
         )
@@ -53,6 +55,7 @@ class TestMemberDashboardStatistics:
         CoopShareFactory(
             member=cancelled,
             amount_of_coop_shares=Decimal("5"),
+            value_one_coop_share=100,
             admin_confirmed=True,
             paid_at=timezone.now(),
             cancelled_at=timezone.now(),
@@ -78,6 +81,40 @@ class TestMemberDashboardStatistics:
         assert stats["unpaid_coop_shares"] == 2.0
         # The cancelled share is owed back.
         assert stats["payback_due_coop_shares"] == 5.0
+        # Each share counted at the value it was subscribed at.
+        assert stats["total_coop_shares_value"] == Decimal("540.00")
+        assert stats["confirmed_coop_shares_value"] == Decimal("300.00")
+        assert stats["pending_coop_shares_value"] == Decimal("240.00")
+        assert stats["paid_coop_shares_value"] == Decimal("300.00")
+        assert stats["unpaid_coop_shares_value"] == Decimal("240.00")
+        assert stats["payback_due_coop_shares_value"] == Decimal("500.00")
+
+    def test_payback_due_value_nets_per_member(self, tenant):
+        today = timezone.localdate()
+        due = {
+            "admin_confirmed": True,
+            "cancelled_at": timezone.now(),
+            "cancelled_effective_at": today,
+            "payback_due_date": today,
+            "paid_back_date": None,
+        }
+        # Gave all three shares away by a transfer: the negative row nets them.
+        gave_away = MemberFactory(admin_confirmed=True)
+        CoopShareFactory(
+            member=gave_away, amount_of_coop_shares=3, value_one_coop_share=100, **due
+        )
+        CoopShareFactory(
+            member=gave_away, amount_of_coop_shares=-3, value_one_coop_share=100, **due
+        )
+        owed = MemberFactory(admin_confirmed=True)
+        CoopShareFactory(
+            member=owed, amount_of_coop_shares=2, value_one_coop_share=120, **due
+        )
+
+        stats = calculate_member_dashboard_statistics()
+
+        assert stats["payback_due_coop_shares"] == 2.0
+        assert stats["payback_due_coop_shares_value"] == Decimal("240.00")
 
     def test_empty_tenant_is_zeroed(self, tenant):
         stats = calculate_member_dashboard_statistics()
@@ -85,6 +122,8 @@ class TestMemberDashboardStatistics:
         assert stats["average_age"] == 0.0
         assert stats["total_coop_shares"] == 0.0
         assert stats["payback_due_coop_shares"] == 0.0
+        assert stats["total_coop_shares_value"] == Decimal("0.00")
+        assert stats["payback_due_coop_shares_value"] == Decimal("0.00")
 
     def test_endpoint(self, api_client, tenant):
         from django.urls import reverse

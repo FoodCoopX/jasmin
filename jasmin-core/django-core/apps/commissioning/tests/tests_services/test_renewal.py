@@ -13,13 +13,19 @@ import datetime
 from decimal import Decimal
 
 import pytest
+import time_machine
 from django.utils import timezone
 
+from apps.commissioning.errors import (
+    SubscriptionTermAlreadyRenewed,
+    SubscriptionTermPredecessorAmbiguous,
+)
 from apps.commissioning.models import Member, Subscription
 from apps.commissioning.services.renewal import (
     create_renewal_draft,
     resolve_variation_for_term,
     run_renewals,
+    term_predecessor,
 )
 from apps.commissioning.tests.factories import (
     DeliveryStationDayFactory,
@@ -725,3 +731,99 @@ class TestRenewalValidUntilOverride:
         assert result["created"] == 1
         renewal = Subscription.objects.get(previous_subscription=sub)
         assert renewal.valid_until == override
+
+
+@pytest.mark.django_db
+class TestTermPredecessor:
+    """``term_predecessor``: the term a new subscription starting the day after
+    it ends continues, so it is linked as that term's renewal."""
+
+    _NEXT_FROM = _VALID_UNTIL + datetime.timedelta(days=1)
+
+    @pytest.fixture(autouse=True)
+    def _freeze(self):
+        with time_machine.travel(datetime.datetime(2026, 1, 5, 12, 0), tick=False):
+            yield
+
+    @pytest.fixture()
+    def term(self, tenant) -> Subscription:
+        return SubscriptionFactory(valid_from=_VALID_FROM, valid_until=_VALID_UNTIL)
+
+    @staticmethod
+    def _sibling(term: Subscription, **kwargs) -> Subscription:
+        """Another subscription of the same member, variation and station day."""
+        defaults = dict(
+            member=term.member,
+            share_type_variation=term.share_type_variation,
+            default_delivery_station_day=term.default_delivery_station_day,
+            valid_from=_VALID_FROM,
+            valid_until=_VALID_UNTIL,
+        )
+        defaults.update(kwargs)
+        return SubscriptionFactory(**defaults)
+
+    def _find(self, term: Subscription, **kwargs) -> Subscription | None:
+        return term_predecessor(
+            member_id=term.member_id,
+            share_type_id=term.share_type_variation.share_type_id,
+            valid_from=self._NEXT_FROM,
+            **kwargs,
+        )
+
+    def test_finds_the_term_ending_the_day_before(self, term):
+        assert self._find(term) == term
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            pytest.param(
+                {"cancelled_at": "now", "cancelled_effective_at": _VALID_UNTIL},
+                id="cancelled",
+            ),
+            pytest.param({"admin_rejected_at": "now"}, id="rejected"),
+            pytest.param({"is_trial": True}, id="trial"),
+        ],
+    )
+    def test_a_cancelled_rejected_or_trial_term_is_none(self, term, change):
+        now = timezone.now()
+        Subscription.objects.filter(pk=term.pk).update(
+            **{key: now if value == "now" else value for key, value in change.items()}
+        )
+
+        assert self._find(term) is None
+
+    def test_a_term_of_another_share_type_is_none(self, term):
+        other_type = ShareTypeFactory(share_option="HONEY_SHARE")
+
+        assert (
+            term_predecessor(
+                member_id=term.member_id,
+                share_type_id=other_type.pk,
+                valid_from=self._NEXT_FROM,
+            )
+            is None
+        )
+
+    def test_a_term_with_its_next_term_already_is_refused(self, term):
+        renewal = self._sibling(
+            term,
+            previous_subscription=term,
+            valid_from=self._NEXT_FROM,
+            valid_until=datetime.date(2027, 12, 26),
+        )
+
+        with pytest.raises(SubscriptionTermAlreadyRenewed) as raised:
+            self._find(term)
+
+        assert raised.value.details == {
+            "predecessor": term.renewal_display_id,
+            "renewal": renewal.renewal_display_id,
+            "renewal_valid_from": "2026-12-28",
+        }
+
+    def test_two_terms_ending_the_same_day_need_the_number(self, term):
+        other = self._sibling(term)
+
+        with pytest.raises(SubscriptionTermPredecessorAmbiguous):
+            self._find(term)
+        assert self._find(term, subscription_number=other.subscription_number) == other

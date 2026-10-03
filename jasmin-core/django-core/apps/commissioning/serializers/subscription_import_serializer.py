@@ -20,6 +20,12 @@ deliberately does NOT run:
 
 It still respects the hard model invariants (``TimeBoundMixin`` Monday/Sunday
 date rules, DB constraints) via ``Subscription.save() → full_clean()``.
+
+A row that starts the day after a term of the same member and share type ends
+is that term's next term: it is linked as its renewal (``term_predecessor``),
+continuing its renewal chain, so the renewal sweep doesn't draft a second one.
+A term that already has its next term refuses the row. The import runs the
+rows in start-date order, so the terms of one chain may come in any order.
 """
 
 from __future__ import annotations
@@ -28,6 +34,10 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from ..errors import (
+    SubscriptionTermAlreadyRenewed,
+    SubscriptionTermPredecessorAmbiguous,
+)
 from ..models import (
     DeliveryStationDay,
     Member,
@@ -242,12 +252,50 @@ class SubscriptionImportSerializer(serializers.Serializer):
                     )
                 }
             )
+        attrs["_previous_subscription"] = (
+            None if attrs["is_trial"] else self._resolve_previous_term(attrs)
+        )
         return attrs
+
+    @staticmethod
+    def _resolve_previous_term(attrs) -> Subscription | None:
+        """The term this row continues, if any (see ``term_predecessor``)."""
+        from ..services.renewal import term_predecessor
+
+        valid_from = attrs["valid_from"]
+        try:
+            return term_predecessor(
+                member_id=attrs["_member"].pk,
+                share_type_id=attrs["_variation"].share_type_id,
+                valid_from=valid_from,
+                subscription_number=attrs.get("subscription_number"),
+            )
+        except SubscriptionTermAlreadyRenewed as exc:
+            if exc.details["renewal_valid_from"] == valid_from.isoformat():
+                message = (
+                    f"Subscription {exc.details['predecessor']} already continues "
+                    f"with {exc.details['renewal']} from {valid_from} — skipped "
+                    "(imported before, or drafted by the renewal; delete that "
+                    "draft first if this row should replace it)."
+                )
+            else:
+                message = exc.message
+            raise serializers.ValidationError({"valid_from": message}) from exc
+        except SubscriptionTermPredecessorAmbiguous as exc:
+            raise serializers.ValidationError(
+                {
+                    "subscription_number": (
+                        f"{exc.message} Give this row the subscription_number of "
+                        "the one it continues."
+                    )
+                }
+            ) from exc
 
     def create(self, validated_data) -> Subscription:
         # Draft only — no capacity reservation, no live guards, no
         # materialisation. Confirmation (through the normal flow) is what
         # creates deliveries + charges under the proper gates.
+        predecessor = validated_data["_previous_subscription"]
         return Subscription.objects.create(
             member=validated_data["_member"],
             share_type_variation=validated_data["_variation"],
@@ -258,6 +306,11 @@ class SubscriptionImportSerializer(serializers.Serializer):
             quantity=validated_data["quantity"],
             price_per_delivery=validated_data.get("price_per_delivery"),
             is_trial=validated_data["is_trial"],
-            subscription_number=validated_data.get("subscription_number"),
+            previous_subscription=predecessor,
+            # A next term continues its predecessor's chain — ``save()`` takes
+            # the number from it; a row's own number names a chain's first term.
+            subscription_number=(
+                None if predecessor else validated_data.get("subscription_number")
+            ),
             admin_confirmed=False,
         )

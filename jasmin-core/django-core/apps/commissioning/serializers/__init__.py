@@ -81,6 +81,7 @@ from .members_serializer import (
     CoopShareOnboardingSerializer,
     CoopShareSerializer,
     CoopShareTransferRequestSerializer,
+    CoopShareTransferReversalSerializer,
     CoopShareTransferSerializer,
     MemberCreateRequestSerializer,
     MemberEmailLogSerializer,

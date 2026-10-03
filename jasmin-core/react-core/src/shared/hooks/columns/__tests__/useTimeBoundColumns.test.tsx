@@ -175,3 +175,78 @@ describe("useTimeBoundColumns — validFromFutureOnly", () => {
     expect(validFrom(dayjs("2020-01-06"))).toBe(false); // a past Monday still allowed
   });
 });
+
+describe("useTimeBoundColumns — validFromEarlierMove", () => {
+  // A saved row's start may move back to the floor in onboarding mode. All
+  // dates are past Mondays, so the future-only floor blocks them otherwise.
+  const savedStart = dayjs("2026-03-02");
+  const floor = dayjs("2026-01-05");
+  const saved = { key: "row-1", id: "row-1", can_be_deleted: false };
+  const newRow = { key: -1 };
+
+  type Predicate = (current: Dayjs, record?: Record<string, unknown>) => boolean;
+  type Disabled = (record: Record<string, unknown>) => boolean;
+
+  const columns = (laterAllowed: boolean, lockedOnSave = false) => {
+    const { result } = renderHook(() =>
+      useTimeBoundColumns({
+        validFromFutureOnly: true,
+        validFromLockedOnSave: lockedOnSave,
+        validFromEarlierMove: (record) =>
+          record.key === -1 ? null : { savedStart, floor, laterAllowed },
+      }),
+    );
+    return {
+      validFrom: result.current.validFromColumn.disabledDate! as Predicate,
+      disabled: result.current.validFromColumn.disabled as Disabled,
+    };
+  };
+
+  it("offers the Mondays from the floor up to the saved start", () => {
+    const { validFrom } = columns(false);
+
+    expect(validFrom(floor, saved)).toBe(false);
+    expect(validFrom(dayjs("2026-02-02"), saved)).toBe(false);
+    expect(validFrom(savedStart, saved)).toBe(false);
+    expect(validFrom(dayjs("2025-12-29"), saved)).toBe(true); // before the floor
+    expect(validFrom(dayjs("2026-02-03"), saved)).toBe(true); // not a Monday
+  });
+
+  it("blocks later Mondays unless the row may also move later", () => {
+    const today = dayjs().startOf("day");
+    const upcoming = today.day(1).isBefore(today, "day")
+      ? today.day(1).add(7, "day")
+      : today.day(1);
+
+    expect(columns(false).validFrom(upcoming, saved)).toBe(true);
+    expect(columns(true).validFrom(upcoming, saved)).toBe(false);
+    // A later past Monday stays blocked by the future-only rule.
+    expect(columns(true).validFrom(dayjs("2026-03-09"), saved)).toBe(true);
+  });
+
+  it("keeps a new row future-only", () => {
+    const { validFrom } = columns(true);
+
+    expect(validFrom(savedStart, newRow)).toBe(true);
+  });
+
+  it("keeps a row's start editable while it has a window", () => {
+    expect(columns(false).disabled(saved)).toBe(false);
+    expect(columns(false, true).disabled(saved)).toBe(false);
+    expect(columns(false, true).disabled(newRow)).toBe(false);
+  });
+
+  it("locks a start without a window as before", () => {
+    const { result } = renderHook(() =>
+      useTimeBoundColumns({
+        validFromLockedOnSave: true,
+        validFromEarlierMove: () => null,
+      }),
+    );
+    const disabled = result.current.validFromColumn.disabled as Disabled;
+
+    expect(disabled({ key: "row-1", can_be_deleted: true })).toBe(true);
+    expect(disabled(newRow)).toBe(false);
+  });
+});
+

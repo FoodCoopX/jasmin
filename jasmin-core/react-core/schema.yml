@@ -1192,7 +1192,10 @@ paths:
       operationId: commissioning_abos_create
       description: Create a draft (unconfirmed) subscription. While a subscription
         contract is in force, ``subscription_contract_document`` must name it; the
-        member's consent is recorded with the subscription.
+        member's consent is recorded with the subscription. In onboarding mode a subscription
+        starting the day after a term of the same member and share type ends is linked
+        as that term's renewal; it is refused when that term already has its next
+        term (``subscription.term_already_renewed``) or several terms qualify (``subscription.term_predecessor_ambiguous``).
       tags:
       - commissioning
       requestBody:
@@ -1217,6 +1220,12 @@ paths:
                 $ref: '#/components/schemas/Subscription'
           description: ''
         '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
           content:
             application/json:
               schema:
@@ -3710,6 +3719,65 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Error response.
+  /api/commissioning/coop_shares/{id}/reverse_transfer/:
+    post:
+      operationId: commissioning_coop_shares_reverse_transfer_create
+      description: |-
+        Undo the coop share transfer that created this row, when it was
+        recorded by mistake: both members' rows from it are deleted, the rows it
+        settled are reopened and, when it ended the giving member's membership,
+        that membership too. Refused while a later transfer of either member
+        builds on it (``coop_share_transfer.reversal_blocked``), when a member
+        has left since (``coop_share_transfer.reversal_after_exit``), and when
+        the result leaves a member outside the share window.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Ein eindeutiger Wert, der coop share identifiziert.
+        required: true
+      tags:
+      - commissioning
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoopShareTransferReversal'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
   /api/commissioning/coop_shares/transfer/:
     post:
       operationId: commissioning_coop_shares_transfer_create
@@ -3722,9 +3790,10 @@ paths:
         the final state of both members: a giving member left above 0 but below
         the minimum is refused (``member.coop_shares_out_of_range``). A giving
         member left without confirmed shares has those rows closed without a
-        payback date and is cancelled effective on their latest transfer date —
-        this one's, unless a later-dated transfer of theirs is already recorded —
-        which the request has to confirm with ``confirm_member_cancellation``.
+        payback date and is cancelled effective on the transfer date, which the
+        request has to confirm with ``confirm_member_cancellation``. Transfers
+        are recorded in date order: one dated before another transfer of either
+        member is refused (``coop_share_transfer.before_another``).
       tags:
       - commissioning
       requestBody:
@@ -11485,7 +11554,7 @@ paths:
       operationId: commissioning_members_create
       description: |
         Create a Member. If the supplied email matches an existing JasminUser, the new Member is linked to that user (instead of rejecting with a uniqueness error). The behaviour depends on the user's account status:
-          * ``active``              → link, auto-confirm the member, and (if ``notify_user=true``) send a 'you are now a member' email.
+          * ``active``              → link, and confirm the member when its coop shares already fit the tenant's window (a trial member, or a tenant without a minimum), sending a 'you are now a member' email if ``notify_user=true``. Otherwise the member stays pending until the office confirms it. In onboarding mode the member is only linked.
           * ``pending_invitation``  → link only; the member is auto-confirmed when the user accepts the invitation.
           * ``pending_approval``    → 409 conflict; the user already has a pending member application.
           * ``inactive``            → 409 conflict.
@@ -27949,6 +28018,8 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+          description: Value of one share when this one was subscribed. Set on create;
+            an update keeps the stored value.
         is_increase:
           type: boolean
         note:
@@ -28067,6 +28138,26 @@ components:
       - from_member
       - to_member
       - transfer_date
+    CoopShareTransferReversal:
+      type: object
+      description: Response of ``POST /api/commissioning/coop_shares/{id}/reverse_transfer/``.
+      properties:
+        transfer:
+          type: string
+          description: Id of the transfer that was undone; it no longer exists.
+        from_member:
+          type: string
+        to_member:
+          type: string
+        from_member_reinstated:
+          type: boolean
+          description: The transfer had ended the giving member's membership, which
+            is reopened.
+      required:
+      - from_member
+      - from_member_reinstated
+      - to_member
+      - transfer
     Crate:
       type: object
       description: |-
@@ -31906,6 +31997,11 @@ components:
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           readOnly: true
+        coop_shares_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+          readOnly: true
         coop_shares_pending_count:
           type: integer
           readOnly: true
@@ -32165,6 +32261,11 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        coop_shares_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
           readOnly: true
         coop_shares_pending_count:
           type: integer
@@ -32429,19 +32530,49 @@ components:
           type: number
           format: double
           description: Shares owed back to cancelled members, not yet paid back
+        total_coop_shares_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        confirmed_coop_shares_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        pending_coop_shares_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        paid_coop_shares_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        unpaid_coop_shares_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
+        payback_due_coop_shares_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,2})?$
       required:
       - average_age
       - cancelled_members
       - confirmed_coop_shares
+      - confirmed_coop_shares_value
       - confirmed_members
       - paid_coop_shares
+      - paid_coop_shares_value
       - payback_due_coop_shares
+      - payback_due_coop_shares_value
       - pending_coop_shares
+      - pending_coop_shares_value
       - pending_members
       - total_coop_shares
+      - total_coop_shares_value
       - total_members
       - trial_members
       - unpaid_coop_shares
+      - unpaid_coop_shares_value
     MemberEmail:
       type: object
       description: One recipient in a subscription-based email distribution list.
@@ -32805,6 +32936,9 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        value_one_coop_share:
+          type: integer
           readOnly: true
         due_date:
           type: string

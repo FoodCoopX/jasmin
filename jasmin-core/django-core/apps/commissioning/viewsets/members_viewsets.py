@@ -51,12 +51,19 @@ from core.serializers import ErrorResponseSerializer
 
 from ..errors import (
     CoopShareConfirmedImmutable,
+    CoopShareNotFromTransfer,
     MemberConfirmedImmutable,
     SubscriptionAlreadyConfirmed,
     SubscriptionConfirmedImmutable,
     SubscriptionPriceInvalid,
 )
-from ..models import CoopShare, Member, ShareDelivery, Subscription
+from ..models import (
+    CoopShare,
+    Member,
+    ShareDelivery,
+    ShareTypeVariation,
+    Subscription,
+)
 from ..models.choices import InvitationStatus
 from ..models.managers import active_on_date_q
 from ..models.members import MemberLoan, UserInvitation
@@ -77,6 +84,7 @@ from ..serializers import (
     CoopShareOnboardingSerializer,
     CoopShareSerializer,
     CoopShareTransferRequestSerializer,
+    CoopShareTransferReversalSerializer,
     CoopShareTransferSerializer,
     MemberCreateRequestSerializer,
     MemberEmailLogSerializer,
@@ -94,6 +102,7 @@ from ..services.onboarding_policy import (
     confirmation_datetime,
     onboarding_mode_enabled,
 )
+from ..services.renewal import term_predecessor
 from ..services.waiting_list_offer_service import offer_price_fits_column
 from ..utils.optional_filters import apply_optional_filters
 from ..utils.query_params import validate_query_params
@@ -200,6 +209,20 @@ def _build_member_queryset(request: Request, *, filtered: bool) -> QuerySet[Memb
         .annotate(total=Sum("amount_of_coop_shares"))
         .values("total")
     )
+    # What those live shares are worth, each at the value it was subscribed
+    # at — the tenant's share value may have changed since.
+    coop_shares_value_sq = (
+        CoopShare.objects.filter(member=OuterRef("pk"), cancelled_at__isnull=True)
+        .order_by()
+        .values("member")
+        .annotate(
+            total=Sum(
+                F("amount_of_coop_shares") * F("value_one_coop_share"),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            )
+        )
+        .values("total")
+    )
     # Latest cooperative-equity payback date across ALL the member's coop
     # shares. ``CoopShare.payback_due_date`` is snapshotted per share when it's
     # cancelled (NULL on live shares, so ``Max`` ignores them) — the member's
@@ -245,6 +268,14 @@ def _build_member_queryset(request: Request, *, filtered: bool) -> QuerySet[Memb
             ),
             Value(Decimal("0")),
             output_field=DecimalField(max_digits=10, decimal_places=2),
+        ),
+        coop_shares_value=Coalesce(
+            Subquery(
+                coop_shares_value_sq,
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            ),
+            Value(Decimal("0")),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
         ),
         payback_due_date=Subquery(payback_due_date_sq, output_field=DateField()),
         coop_shares_pending_count=Coalesce(
@@ -398,9 +429,12 @@ class MemberViewSet(
             "JasminUser, the new Member is linked to that user (instead of "
             "rejecting with a uniqueness error). The behaviour depends on "
             "the user's account status:\n"
-            "  * ``active``              → link, auto-confirm the member, "
-            "and (if ``notify_user=true``) send a 'you are now a member' "
-            "email.\n"
+            "  * ``active``              → link, and confirm the member when "
+            "its coop shares already fit the tenant's window (a trial member, "
+            "or a tenant without a minimum), sending a 'you are now a member' "
+            "email if ``notify_user=true``. Otherwise the member stays pending "
+            "until the office confirms it. In onboarding mode the member is "
+            "only linked.\n"
             "  * ``pending_invitation``  → link only; the member is "
             "auto-confirmed when the user accepts the invitation.\n"
             "  * ``pending_approval``    → 409 conflict; the user already "
@@ -445,20 +479,24 @@ class MemberViewSet(
         # Volume cap on member creation — an uncapped loop pollutes the
         # legally-relevant Genossenschaft member register. Atomic with the save
         # so only a successful create counts; the cap is platform-owned (public
-        # Tenant), so a compromised office account can't raise it.
+        # Tenant), so a compromised office account can't raise it. The link to
+        # an existing login is in the same transaction: a link that fails
+        # leaves no member behind for a retry to duplicate.
         with transaction.atomic():
             enforce_action_quota(RateLimitedAction.MEMBER_CREATION, actor=request.user)
             # ``created_by`` is read-only on the serializer — stamp it here.
             member: Member = serializer.save(created_by=auth_user(request))
-
-        if existing_user is not None:
-            service.link_to_user(
-                member,
-                existing_user,
-                admin_user=auth_user(request),
-                notify_user=notify_user,
-                request=request,
-            )
+            if existing_user is not None:
+                service.link_to_user(
+                    member,
+                    existing_user,
+                    admin_user=auth_user(request),
+                    notify_user=notify_user,
+                    request=request,
+                    # Onboarding mode only links: the office confirms the member
+                    # later with its historical date, as the CSV import does.
+                    confirm_active_user=not onboarding_mode_enabled(),
+                )
 
         headers = self.get_success_headers(serializer.data)
         out = self.refetch_for_response(member)
@@ -987,7 +1025,12 @@ class SubscriptionViewSet(
         description=(
             "Create a draft (unconfirmed) subscription. While a subscription "
             "contract is in force, ``subscription_contract_document`` must name "
-            "it; the member's consent is recorded with the subscription."
+            "it; the member's consent is recorded with the subscription. In "
+            "onboarding mode a subscription starting the day after a term of the "
+            "same member and share type ends is linked as that term's renewal; "
+            "it is refused when that term already has its next term "
+            "(``subscription.term_already_renewed``) or several terms qualify "
+            "(``subscription.term_predecessor_ambiguous``)."
         ),
         request=SubscriptionCreateRequestSerializer,
         # Returns the created row (re-fetched through the annotated
@@ -996,6 +1039,9 @@ class SubscriptionViewSet(
             201: SubscriptionSerializer,
             # ``SubscriptionContractAgreementRequired`` and field errors.
             400: ErrorResponseSerializer,
+            # ``SubscriptionTermAlreadyRenewed`` /
+            # ``SubscriptionTermPredecessorAmbiguous`` (onboarding mode).
+            409: ErrorResponseSerializer,
         },
     )
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -1012,6 +1058,10 @@ class SubscriptionViewSet(
 
         service = SubscriptionService()
         with transaction.atomic():
+            if onboarding_mode_enabled() and not validated_data.get("is_trial"):
+                predecessor = self._term_predecessor(validated_data)
+                if predecessor is not None:
+                    validated_data["previous_subscription"] = predecessor
             # ``created_by`` is read-only on the serializer — stamp it here.
             subscription = service.create_bare_subscription(
                 {**validated_data, "created_by": auth_user(request)}
@@ -1029,6 +1079,25 @@ class SubscriptionViewSet(
         created_subscription = self.refetch_for_response(subscription)
         response_serializer = self.get_serializer(created_subscription)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _term_predecessor(validated_data: dict[str, Any]) -> Subscription | None:
+        """The term a subscription entered from an earlier system continues
+        (``term_predecessor``): left unlinked, the renewal sweep would draft a
+        second next term for that one. An unknown variation is left to the
+        create, which refuses it."""
+        share_type_id = (
+            ShareTypeVariation.objects.filter(pk=validated_data["share_type_variation"])
+            .values_list("share_type_id", flat=True)
+            .first()
+        )
+        if share_type_id is None:
+            return None
+        return term_predecessor(
+            member_id=validated_data["member"],
+            share_type_id=share_type_id,
+            valid_from=validated_data["valid_from"],
+        )
 
     @extend_schema(
         description=(
@@ -1662,9 +1731,10 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         the final state of both members: a giving member left above 0 but below
         the minimum is refused (``member.coop_shares_out_of_range``). A giving
         member left without confirmed shares has those rows closed without a
-        payback date and is cancelled effective on their latest transfer date —
-        this one's, unless a later-dated transfer of theirs is already recorded —
-        which the request has to confirm with ``confirm_member_cancellation``."""
+        payback date and is cancelled effective on the transfer date, which the
+        request has to confirm with ``confirm_member_cancellation``. Transfers
+        are recorded in date order: one dated before another transfer of either
+        member is refused (``coop_share_transfer.before_another``)."""
         from ..services.coop_share_service import CoopShareService
 
         serializer = CoopShareTransferRequestSerializer(data=request.data)
@@ -1686,6 +1756,40 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             context={"from_member_cancelled": result.from_member_cancelled},
         )
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: CoopShareTransferReversalSerializer,
+            400: ErrorResponseSerializer,
+            409: ErrorResponseSerializer,
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="reverse_transfer")
+    def reverse_transfer(self, request: Request, pk: str | None = None) -> Response:
+        """Undo the coop share transfer that created this row, when it was
+        recorded by mistake: both members' rows from it are deleted, the rows it
+        settled are reopened and, when it ended the giving member's membership,
+        that membership too. Refused while a later transfer of either member
+        builds on it (``coop_share_transfer.reversal_blocked``), when a member
+        has left since (``coop_share_transfer.reversal_after_exit``), and when
+        the result leaves a member outside the share window."""
+        from ..services.coop_share_service import CoopShareService
+
+        coop_share: CoopShare = self.get_object()
+        if coop_share.transfer is None:
+            raise CoopShareNotFromTransfer()
+        result = CoopShareService.reverse_transfer(coop_share.transfer)
+        return Response(
+            CoopShareTransferReversalSerializer(
+                {
+                    "transfer": result.transfer_id,
+                    "from_member": result.from_member_id,
+                    "to_member": result.to_member_id,
+                    "from_member_reinstated": result.from_member_reinstated,
+                }
+            ).data
+        )
 
 
 # Stock DRF CRUD: ``retrieve`` / ``create`` / ``update`` / ``partial_update``

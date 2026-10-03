@@ -36,6 +36,20 @@ class MemberDashboardStatisticsSerializer(serializers.Serializer):
     payback_due_coop_shares = serializers.FloatField(
         help_text="Shares owed back to cancelled members, not yet paid back"
     )
+    # What each figure above is worth, every share at the value it was
+    # subscribed at (a 2dp money string).
+    total_coop_shares_value = serializers.DecimalField(max_digits=14, decimal_places=2)
+    confirmed_coop_shares_value = serializers.DecimalField(
+        max_digits=14, decimal_places=2
+    )
+    pending_coop_shares_value = serializers.DecimalField(
+        max_digits=14, decimal_places=2
+    )
+    paid_coop_shares_value = serializers.DecimalField(max_digits=14, decimal_places=2)
+    unpaid_coop_shares_value = serializers.DecimalField(max_digits=14, decimal_places=2)
+    payback_due_coop_shares_value = serializers.DecimalField(
+        max_digits=14, decimal_places=2
+    )
 
 
 class PurchaseCostByWeekSerializer(serializers.Serializer):

@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { RequireRole } from "@shared/auth";
+import { RequireOfficeOrOwnMember, RequireRole } from "@shared/auth";
 import type { AppRoute } from "../types";
 
 const DashboardMembers = lazy(
@@ -46,11 +46,13 @@ export const membersRoutes: AppRoute[] = [
     ),
   },
   {
+    // Also a member's own page, for one who holds staff roles too (their menu
+    // links it).
     path: "/members/members/:id",
     element: (
-      <RequireRole flag="isOffice">
+      <RequireOfficeOrOwnMember>
         <MemberDetail />
-      </RequireRole>
+      </RequireOfficeOrOwnMember>
     ),
   },
 

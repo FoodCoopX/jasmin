@@ -94,8 +94,12 @@ class TestMyMemberDataGet:
             account_owner="Ada Lovelace",
             is_trial=False,
         )
-        CoopShareFactory(member=member, amount_of_coop_shares=1)
-        CoopShareFactory(member=member, amount_of_coop_shares=2)
+        CoopShareFactory(
+            member=member, amount_of_coop_shares=1, value_one_coop_share=100
+        )
+        CoopShareFactory(
+            member=member, amount_of_coop_shares=2, value_one_coop_share=120
+        )
 
         resp = _client_for(member_user).get(URL_MY_MEMBER)
         assert resp.status_code == status.HTTP_200_OK
@@ -111,9 +115,11 @@ class TestMyMemberDataGet:
         # Coop shares are projected.
         assert len(data["coop_shares"]) == 2
         amounts = sorted(
-            Decimal(str(s["amount_of_coop_shares"])) for s in data["coop_shares"]
+            (Decimal(str(s["amount_of_coop_shares"])), s["value_one_coop_share"])
+            for s in data["coop_shares"]
         )
-        assert amounts == [Decimal("1.00"), Decimal("2.00")]
+        # Each share with the value it was subscribed at.
+        assert amounts == [(Decimal("1.00"), 100), (Decimal("2.00"), 120)]
 
 
 @pytest.mark.django_db

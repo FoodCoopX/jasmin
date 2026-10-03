@@ -166,6 +166,7 @@ import type {
   CoopShare,
   CoopShareTransfer,
   CoopShareTransferRequest,
+  CoopShareTransferReversal,
   Crate,
   CrateContentInvoiceReseller,
   CrateDeliveryNoteContent,
@@ -434,7 +435,7 @@ export function useCommissioningAbosList<TData = Awaited<ReturnType<typeof commi
 
 
 /**
- * Create a draft (unconfirmed) subscription. While a subscription contract is in force, ``subscription_contract_document`` must name it; the member's consent is recorded with the subscription.
+ * Create a draft (unconfirmed) subscription. While a subscription contract is in force, ``subscription_contract_document`` must name it; the member's consent is recorded with the subscription. In onboarding mode a subscription starting the day after a term of the same member and share type ends is linked as that term's renewal; it is refused when that term already has its next term (``subscription.term_already_renewed``) or several terms qualify (``subscription.term_predecessor_ambiguous``).
  */
 export const commissioningAbosCreate = (
     subscriptionCreateRequest: NonReadonly<SubscriptionCreateRequest>,
@@ -3749,6 +3750,71 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
+ * Undo the coop share transfer that created this row, when it was
+recorded by mistake: both members' rows from it are deleted, the rows it
+settled are reopened and, when it ended the giving member's membership,
+that membership too. Refused while a later transfer of either member
+builds on it (``coop_share_transfer.reversal_blocked``), when a member
+has left since (``coop_share_transfer.reversal_after_exit``), and when
+the result leaves a member outside the share window.
+ */
+export const commissioningCoopSharesReverseTransferCreate = (
+    id: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<CoopShareTransferReversal>(
+      {url: `/api/commissioning/coop_shares/${id}/reverse_transfer/`, method: 'POST', signal
+    },
+      );
+    }
+  
+
+
+export const getCommissioningCoopSharesReverseTransferCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningCoopSharesReverseTransferCreate>>, TError,{id: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof commissioningCoopSharesReverseTransferCreate>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['commissioningCoopSharesReverseTransferCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commissioningCoopSharesReverseTransferCreate>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  commissioningCoopSharesReverseTransferCreate(id,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommissioningCoopSharesReverseTransferCreateMutationResult = NonNullable<Awaited<ReturnType<typeof commissioningCoopSharesReverseTransferCreate>>>
+    
+    export type CommissioningCoopSharesReverseTransferCreateMutationError = ErrorResponse
+
+    export const useCommissioningCoopSharesReverseTransferCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commissioningCoopSharesReverseTransferCreate>>, TError,{id: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof commissioningCoopSharesReverseTransferCreate>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getCommissioningCoopSharesReverseTransferCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Transfer confirmed, paid coop shares from one member to another (GenG §76).
 
 Existing coop share rows stay unchanged: the giving member gets a negative
@@ -3757,9 +3823,10 @@ confirmed and paid on the transfer date. The min/max window is checked on
 the final state of both members: a giving member left above 0 but below
 the minimum is refused (``member.coop_shares_out_of_range``). A giving
 member left without confirmed shares has those rows closed without a
-payback date and is cancelled effective on their latest transfer date —
-this one's, unless a later-dated transfer of theirs is already recorded —
-which the request has to confirm with ``confirm_member_cancellation``.
+payback date and is cancelled effective on the transfer date, which the
+request has to confirm with ``confirm_member_cancellation``. Transfers
+are recorded in date order: one dated before another transfer of either
+member is refused (``coop_share_transfer.before_another``).
  */
 export const commissioningCoopSharesTransferCreate = (
     coopShareTransferRequest: CoopShareTransferRequest,
@@ -14386,7 +14453,7 @@ export function useCommissioningMembersList<TData = Awaited<ReturnType<typeof co
 
 /**
  * Create a Member. If the supplied email matches an existing JasminUser, the new Member is linked to that user (instead of rejecting with a uniqueness error). The behaviour depends on the user's account status:
-  * ``active``              → link, auto-confirm the member, and (if ``notify_user=true``) send a 'you are now a member' email.
+  * ``active``              → link, and confirm the member when its coop shares already fit the tenant's window (a trial member, or a tenant without a minimum), sending a 'you are now a member' email if ``notify_user=true``. Otherwise the member stays pending until the office confirms it. In onboarding mode the member is only linked.
   * ``pending_invitation``  → link only; the member is auto-confirmed when the user accepts the invitation.
   * ``pending_approval``    → 409 conflict; the user already has a pending member application.
   * ``inactive``            → 409 conflict.

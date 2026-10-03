@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import datetime
 import io
 from dataclasses import dataclass, field
 from typing import Any
@@ -477,6 +478,31 @@ def _too_many_rows(model_name: str) -> DataImportInvalid:
     )
 
 
+def _subscription_start(headers: list[str], line: _CsvLine) -> datetime.date:
+    """A subscription row's start (``valid_from``, ISO), for the order the rows
+    are imported in. A row whose start can't be read sorts last; its
+    validation reports it."""
+    try:
+        return datetime.date.fromisoformat(
+            line.cells[headers.index("valid_from")].strip()
+        )
+    except (ValueError, IndexError, AttributeError):
+        return datetime.date.max
+
+
+def _rows_in_import_order(
+    model_name: str, headers: list[str], data_lines: list[_CsvLine]
+) -> list[tuple[int, _CsvLine]]:
+    """The data lines with their offsets, in the order they are imported: the
+    file's, except for subscriptions. A next term links to the term it
+    continues only once that one exists (``SubscriptionImportSerializer``), so
+    subscriptions go in by start date, whatever order the file lists them in."""
+    rows = list(enumerate(data_lines))
+    if model_name == "subscription":
+        rows.sort(key=lambda row: _subscription_start(headers, row[1]))
+    return rows
+
+
 def import_rows_from_csv(
     model_name: str,
     file_bytes: bytes,
@@ -540,7 +566,7 @@ def import_rows_from_csv(
     result = DataImportResult(model_name=model_name)
 
     with _dry_run_scope(dry_run):
-        for offset, line in enumerate(data_lines):
+        for offset, line in _rows_in_import_order(model_name, headers, data_lines):
             row_number = first_data_row_number + offset
             if line.parse_error:
                 # The CSV parser itself refused this line (broken quoting, a
@@ -591,13 +617,13 @@ def import_rows_from_csv(
                     else:
                         # One transaction PER ROW (requests run in autocommit). The
                         # member path is multi-step — ``serializer.save()`` then
-                        # ``link_to_user`` → ``Member.confirm`` (which can raise
-                        # e.g. ``MemberCoopSharesOutOfRange``) — so without this the
-                        # member would commit on save() and a later link/confirm
-                        # failure would strand an orphaned row that is nonetheless
-                        # reported as failed (and duplicated on re-run). Wrapping
-                        # makes each row atomic: a mid-row failure rolls the insert
-                        # back, leaving a clean per-row error and nothing persisted.
+                        # ``link_to_user`` → ``Member.confirm`` — so without this
+                        # the member would commit on save() and a later
+                        # link/confirm failure would strand an orphaned row that
+                        # is nonetheless reported as failed (and duplicated on
+                        # re-run). Wrapping makes each row atomic: a mid-row
+                        # failure rolls the insert back, leaving a clean per-row
+                        # error and nothing persisted.
                         with transaction.atomic():
                             instance = _persist_import_row(
                                 serializer,
@@ -653,4 +679,6 @@ def import_rows_from_csv(
 
         release_action_quota(reserved_member_quota_ids[len(result.results) :])
 
+    result.results.sort(key=lambda entry: entry["row"])
+    result.errors.sort(key=lambda entry: entry["row"])
     return result

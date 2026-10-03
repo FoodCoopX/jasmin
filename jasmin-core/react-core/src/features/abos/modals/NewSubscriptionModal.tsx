@@ -30,7 +30,7 @@ import type {
   Subscription,
   SubscriptionCreateRequest,
 } from "@shared/api/generated/models";
-import { useRoles } from "@shared/auth";
+import { useMemberSelfService } from "@shared/auth";
 import ConsentDocumentField from "@shared/consent/ConsentDocumentField";
 import { useCurrentConsentDoc } from "@shared/consent/useCurrentConsentDoc";
 import { ModalCancelSaveFooter } from "@shared/modals/shared";
@@ -118,15 +118,15 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
   const { currencySymbol, formatCurrency } = useCurrency();
   const { dateFormat, formatDate, formatDateForAPI } = useDateFormat();
   const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
-  // A member subscribing for THEMSELVES uses the member-scoped endpoint. The
-  // price is read-only (derived server-side) UNLESS the tenant allows
-  // solidarity pricing, in which case the member may choose it (>= the
-  // variation's floor); there's no trial toggle for members either.
-  const { isMemberOnly } = useRoles();
+  // A member subscribing for THEMSELVES, whatever staff roles they also hold,
+  // uses the member-scoped endpoint. The price is read-only (server-derived)
+  // UNLESS the tenant allows solidarity pricing, in which case the member may
+  // choose it (>= the variation's floor); no trial toggle for members either.
+  const selfService = useMemberSelfService(memberId);
   const publicMode = mode === "public";
   // Public registration renders the simplified member view (no office-only
   // fields: trial toggle, payment cycle, valid_until) but never writes.
-  const simplified = isMemberOnly || publicMode;
+  const simplified = selfService || publicMode;
   const { getSetting, tenant } = useTenant();
   // Fall back to the top-level anon-payload scalar (public registration has no
   // settings overlay) so solidarity pricing shows there too.
@@ -176,7 +176,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
   const needsSepaMandate = !publicMode && !!memberId;
   const { data: billingProfiles, refetch: refetchBillingProfiles } =
     usePaymentsBillingProfilesList(
-      isMemberOnly ? {} : { member: memberId ?? "" },
+      selfService ? {} : { member: memberId ?? "" },
       { query: { enabled: needsSepaMandate } },
     );
   const sepaReady =
@@ -659,7 +659,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
           subscriptionContractDoc?.id && subscriptionContractAccepted
             ? { subscription_contract_document: subscriptionContractDoc.id }
             : {};
-        if (isMemberOnly) {
+        if (selfService) {
           // Member self-service: the endpoint takes the member from the token,
           // forces is_trial=false, and (unless solidarity pricing is on) derives
           // price_per_delivery server-side. valid_until is the auto-filled
@@ -736,7 +736,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
       onSuccess,
       selectedVariation,
       t,
-      isMemberOnly,
+      selfService,
       allowsSolidarity,
       allowsWaitingList,
       isFullForTerm,
@@ -1224,7 +1224,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                 showIcon
                 style={{ marginTop: 12 }}
                 message={t(
-                  isMemberOnly
+                  selfService
                     ? "abos.sepa_mandate_missing_self"
                     : "abos.sepa_mandate_missing",
                 )}
@@ -1259,7 +1259,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
         <SepaSetupModal
           open={sepaModalOpen}
           memberId={memberId}
-          officeMode={!isMemberOnly}
+          officeMode={!selfService}
           onClose={() => {
             setSepaModalOpen(false);
             refetchBillingProfiles();

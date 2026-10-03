@@ -393,24 +393,27 @@ class DeliveryToursViewSet(RolePermissionsMixin, viewsets.ViewSet):
                     # The valid_until filter narrows the lookup only; a genuinely
                     # new station-day still creates an open row (valid_until NULL).
 
+                    placement = {
+                        "tour_number": tour_number,
+                        "stop_order": position["position"],
+                    }
                     station_day, created = DeliveryStationDay.objects.filter(
                         valid_until__isnull=True
                     ).update_or_create(
                         delivery_station_id=position["delivery_station_id"],
                         delivery_day=shares_delivery_day,
-                        defaults={
-                            "tour_number": tour_number,
-                            "stop_order": position["position"],
-                            # Required on create: TimeBoundMixin.valid_from is
-                            # NOT NULL with no default, and full_clean() also
-                            # enforces the project-wide "valid_from is always a
-                            # Monday" invariant, so omitting it makes the create
-                            # branch a 400 "Validation failed". The current
-                            # week's Monday (clamped — see above), because the
-                            # update branch takes effect immediately (it just
-                            # re-stamps the open row) and a newly assigned
-                            # station should not behave differently from a
-                            # reassigned one.
+                        # An existing row only moves to its new tour and stop.
+                        # Its start stays: moved later, it would leave the
+                        # deliveries before it outside its window and stop
+                        # covering the subscriptions it serves; an earlier
+                        # start set in the station's modal (onboarding mode)
+                        # would be lost on the next tour edit.
+                        defaults=placement,
+                        # A new row needs a start — TimeBoundMixin.valid_from is
+                        # NOT NULL, and full_clean() requires a Monday — and
+                        # opens this week (clamped, see above).
+                        create_defaults={
+                            **placement,
                             "valid_from": assignment_valid_from,
                         },
                     )

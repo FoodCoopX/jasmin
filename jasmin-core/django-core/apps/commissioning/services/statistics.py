@@ -6,7 +6,7 @@ from django.db.models import Count, Q, QuerySet
 from django.db.models.functions import TruncMonth, TruncWeek, TruncYear
 from django.utils import timezone
 
-from apps.shared.money import CENT
+from apps.shared.money import CENT, round_money
 
 from ..models import Member, ShareContent
 from ..models.choices import UnitOptions, VegetableSizeOptions
@@ -258,10 +258,11 @@ def calculate_member_dashboard_statistics() -> dict:
     """Snapshot ("today") of member + cooperative-share statistics.
 
     Cooperative-share figures are SUMS of ``amount_of_coop_shares`` (the number
-    of shares), not row counts. "Live" excludes cancelled shares; the payback
+    of shares), not row counts, each with its value: every share counted at the
+    value it was subscribed at. "Live" excludes cancelled shares; the payback
     figure is the opposite — shares owed back to exited members.
     """
-    from django.db.models import Sum
+    from django.db.models import DecimalField, F, Sum
     from django.utils import timezone
 
     from ..models import CoopShare, Member
@@ -283,22 +284,40 @@ def calculate_member_dashboard_statistics() -> dict:
     ages = [(today - bd).days / 365.25 for bd in birth_dates]
     average_age = round(sum(ages) / len(ages), 1) if ages else 0.0
 
-    def _shares(qs) -> float:
-        return float(qs.aggregate(s=Sum("amount_of_coop_shares"))["s"] or 0)
+    worth = Sum(
+        F("amount_of_coop_shares") * F("value_one_coop_share"),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
+    )
 
-    def _payback_due_shares() -> float:
+    def _shares(qs) -> tuple[float, Decimal]:
+        totals = qs.aggregate(shares=Sum("amount_of_coop_shares"), value=worth)
+        return float(totals["shares"] or 0), round_money(totals["value"])
+
+    def _payback_due() -> tuple[float, Decimal]:
         # Per member: a negative transfer row nets against the rows its shares
         # came from, and a member whose due rows sum to zero or below owes nothing.
-        due_by_member = (
+        due_by_member = list(
             CoopShare.objects.filter(
                 payback_due_date__isnull=False, paid_back_date__isnull=True
             )
             .values("member_id")
-            .annotate(total=Sum("amount_of_coop_shares"))
+            .annotate(shares=Sum("amount_of_coop_shares"), value=worth)
         )
-        return float(sum(max(row["total"], 0) for row in due_by_member))
+        shares = sum(max(row["shares"], 0) for row in due_by_member)
+        value = sum(
+            (max(row["value"], Decimal(0)) for row in due_by_member), Decimal(0)
+        )
+        return float(shares), round_money(value)
 
     live = CoopShare.objects.filter(cancelled_at__isnull=True)
+    coop_share_figures = {
+        "total_coop_shares": _shares(live),
+        "confirmed_coop_shares": _shares(live.filter(admin_confirmed=True)),
+        "pending_coop_shares": _shares(live.filter(admin_confirmed=False)),
+        "paid_coop_shares": _shares(live.filter(paid_at__isnull=False)),
+        "unpaid_coop_shares": _shares(live.filter(paid_at__isnull=True)),
+        "payback_due_coop_shares": _payback_due(),
+    }
     return {
         "total_members": total_members,
         "trial_members": trial_members,
@@ -306,12 +325,11 @@ def calculate_member_dashboard_statistics() -> dict:
         "pending_members": pending_members,
         "cancelled_members": cancelled_members,
         "average_age": average_age,
-        "total_coop_shares": _shares(live),
-        "confirmed_coop_shares": _shares(live.filter(admin_confirmed=True)),
-        "pending_coop_shares": _shares(live.filter(admin_confirmed=False)),
-        "paid_coop_shares": _shares(live.filter(paid_at__isnull=False)),
-        "unpaid_coop_shares": _shares(live.filter(paid_at__isnull=True)),
-        "payback_due_coop_shares": _payback_due_shares(),
+        **{key: shares for key, (shares, _value) in coop_share_figures.items()},
+        **{
+            f"{key}_value": value
+            for key, (_shares, value) in coop_share_figures.items()
+        },
     }
 
 

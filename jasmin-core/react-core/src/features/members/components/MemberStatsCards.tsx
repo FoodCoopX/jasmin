@@ -32,9 +32,6 @@ export default function MemberStatsCards({
   const allowsTrialMembers =
     !!getSetting("allows_trial_subscriptions", true) &&
     !!getSetting("allows_trial_subscriptions_for_trial_members", true);
-  const valueOneCoopShareRaw = getSetting("value_one_coop_share");
-  const valueOneCoopShare =
-    valueOneCoopShareRaw == null ? undefined : Number(valueOneCoopShareRaw);
 
   const { data: memberStats } = useCommissioningMemberDashboardStatisticsRetrieve(
     { query: { enabled: isOffice } },
@@ -83,29 +80,28 @@ export default function MemberStatsCards({
             : "—",
       },
     ];
-    // Each coop-share count also shows its monetary worth (count ×
-    // value_one_coop_share) beneath it, in a smaller muted line.
-    const coopValue = (count: number) => (
+    // Each coop-share count also shows its monetary worth beneath it, in a
+    // smaller muted line: every share at the value it was subscribed at, as
+    // the server sums it.
+    const coopValue = (count: number, worth: string) => (
       <>
         {format(count, 0)}
-        {valueOneCoopShare != null && (
-          <span
-            className="summary-stats-card__subvalue"
-            style={{ display: "block" }}
-          >
-            {formatCurrency(count * valueOneCoopShare)}
-          </span>
-        )}
+        <span
+          className="summary-stats-card__subvalue"
+          style={{ display: "block" }}
+        >
+          {formatCurrency(Number(worth))}
+        </span>
       </>
     );
     const coopItems = hasCoopShares
       ? [
-          { label: t("statistics.kpi_coopshares"), value: coopValue(memberStats.total_coop_shares) },
-          { label: t("statistics.kpi_confirmed_coopshares"), value: coopValue(memberStats.confirmed_coop_shares) },
-          { label: t("statistics.kpi_pending_coopshares"), value: coopValue(memberStats.pending_coop_shares) },
-          { label: t("statistics.kpi_paid_coopshares"), value: coopValue(memberStats.paid_coop_shares) },
-          { label: t("statistics.kpi_unpaid_coopshares"), value: coopValue(memberStats.unpaid_coop_shares) },
-          { label: t("statistics.kpi_payback_due_coopshares"), value: coopValue(memberStats.payback_due_coop_shares) },
+          { label: t("statistics.kpi_coopshares"), value: coopValue(memberStats.total_coop_shares, memberStats.total_coop_shares_value) },
+          { label: t("statistics.kpi_confirmed_coopshares"), value: coopValue(memberStats.confirmed_coop_shares, memberStats.confirmed_coop_shares_value) },
+          { label: t("statistics.kpi_pending_coopshares"), value: coopValue(memberStats.pending_coop_shares, memberStats.pending_coop_shares_value) },
+          { label: t("statistics.kpi_paid_coopshares"), value: coopValue(memberStats.paid_coop_shares, memberStats.paid_coop_shares_value) },
+          { label: t("statistics.kpi_unpaid_coopshares"), value: coopValue(memberStats.unpaid_coop_shares, memberStats.unpaid_coop_shares_value) },
+          { label: t("statistics.kpi_payback_due_coopshares"), value: coopValue(memberStats.payback_due_coop_shares, memberStats.payback_due_coop_shares_value) },
         ]
       : [];
     return { memberItems, coopItems };
@@ -113,7 +109,6 @@ export default function MemberStatsCards({
     memberStats,
     hasCoopShares,
     allowsTrialMembers,
-    valueOneCoopShare,
     fallbackMemberCount,
     fallbackCoopShares,
     formatCurrency,

@@ -58,13 +58,26 @@ export default function MemberCoopSharesModal({
   const { data: myData } = useCommissioningMyMemberDataRetrieve({
     query: { enabled: isOpen },
   });
-  const currentTotal = useMemo(
-    () =>
-      (myData?.coop_shares ?? [])
-        .filter((s) => s.admin_confirmed && !s.cancelled_at)
-        .reduce((acc, s) => acc + Number(s.amount_of_coop_shares ?? 0), 0),
-    [myData],
-  );
+  // Held shares count at the value each was subscribed at; the shares being
+  // subscribed now take the tenant's current value.
+  const { currentTotal, currentValue } = useMemo(() => {
+    const held = (myData?.coop_shares ?? []).filter(
+      (s) => s.admin_confirmed && !s.cancelled_at,
+    );
+    return {
+      currentTotal: held.reduce(
+        (acc, s) => acc + Number(s.amount_of_coop_shares ?? 0),
+        0,
+      ),
+      currentValue: held.reduce(
+        (acc, s) =>
+          acc +
+          Number(s.amount_of_coop_shares ?? 0) *
+            Number(s.value_one_coop_share ?? 0),
+        0,
+      ),
+    };
+  }, [myData]);
 
   const reset = () => {
     setAmount(null);
@@ -147,7 +160,7 @@ export default function MemberCoopSharesModal({
           {valueOne > 0 && (
             <Statistic
               title={t("members.coop_shares_total_value")}
-              value={currentTotal * valueOne}
+              value={currentValue}
               prefix={currencySymbol}
               precision={2}
             />
@@ -176,7 +189,7 @@ export default function MemberCoopSharesModal({
           <Text type="secondary">
             {t("members.coop_subscribe_new_total", { total: newTotal })} —{" "}
             {currencySymbol}
-            {(newTotal * valueOne).toFixed(2)}
+            {(currentValue + amount * valueOne).toFixed(2)}
           </Text>
         )}
 

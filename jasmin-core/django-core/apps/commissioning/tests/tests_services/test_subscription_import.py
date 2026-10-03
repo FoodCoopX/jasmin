@@ -221,3 +221,160 @@ class TestSubscriptionImportPriceBound:
         assert result.successful == 1, result.errors
         subscription = Subscription.objects.get()
         assert str(subscription.price_per_delivery) == "0.00"
+
+
+_NEXT_FROM = "2026-12-28"  # Monday after _VALID_UNTIL
+_NEXT_UNTIL = "2027-12-26"  # Sunday
+_NUMBERED_HEADER = (
+    "member_number,share_type,size,payment_cycle,valid_from,"
+    "valid_until,quantity,is_trial,subscription_number"
+)
+
+
+def _numbered_csv(*rows: str) -> bytes:
+    lines = [_NUMBERED_HEADER, _NUMBERED_HEADER, _NUMBERED_HEADER, *rows]
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+@pytest.mark.django_db
+class TestImportedNextTermContinuesTheTermBefore:
+    """A row starting the day after a term of the member and share type ends is
+    that term's next term: linked as its renewal and continuing its chain, so
+    the renewal sweep doesn't draft a second one."""
+
+    @pytest.fixture(autouse=True)
+    def _freeze(self):
+        with time_machine.travel(_FROZEN, tick=False):
+            yield
+
+    @pytest.fixture()
+    def natural_key(self, tenant):
+        MemberFactory(member_number=4242)
+        variation = ShareTypeVariationFactory()
+        PaymentCycle.objects.get_or_create(choice=PaymentCycleOptions.MONTHLY)
+        return variation.share_type.name, variation.size
+
+    @staticmethod
+    def _terms() -> tuple[Subscription, Subscription]:
+        return (
+            Subscription.objects.get(valid_from=datetime.date(2026, 1, 5)),
+            Subscription.objects.get(valid_from=datetime.date(2026, 12, 28)),
+        )
+
+    def test_the_next_term_is_linked_to_the_term_before(self, natural_key):
+        st, size = natural_key
+        result = import_rows_from_csv(
+            "subscription",
+            _csv(
+                f"4242,{st},{size},MONTHLY,{_VALID_FROM},{_VALID_UNTIL},1,false",
+                f"4242,{st},{size},MONTHLY,{_NEXT_FROM},{_NEXT_UNTIL},1,false",
+            ),
+        )
+
+        assert result.successful == 2, result.errors
+        first, following = self._terms()
+        assert following.previous_subscription_id == first.pk
+        assert following.subscription_number == first.subscription_number
+        assert following.renewal_generation == 1
+
+    def test_the_terms_may_come_in_any_order(self, natural_key):
+        st, size = natural_key
+        result = import_rows_from_csv(
+            "subscription",
+            _csv(
+                f"4242,{st},{size},MONTHLY,{_NEXT_FROM},{_NEXT_UNTIL},1,false",
+                f"4242,{st},{size},MONTHLY,{_VALID_FROM},{_VALID_UNTIL},1,false",
+            ),
+        )
+
+        assert result.successful == 2, result.errors
+        # Reported by the file's rows, whatever order they went in.
+        assert [entry["row"] for entry in result.results] == [4, 5]
+        first, following = self._terms()
+        assert following.previous_subscription_id == first.pk
+
+    def test_a_term_that_already_has_its_next_refuses_the_row(self, natural_key):
+        st, size = natural_key
+        import_rows_from_csv(
+            "subscription",
+            _csv(f"4242,{st},{size},MONTHLY,{_VALID_FROM},{_VALID_UNTIL},1,false"),
+        )
+        first = Subscription.objects.get()
+        # The renewal sweep's draft for it.
+        Subscription.objects.create(
+            member=first.member,
+            share_type_variation=first.share_type_variation,
+            payment_cycle=first.payment_cycle,
+            previous_subscription=first,
+            valid_from=datetime.date(2026, 12, 28),
+            valid_until=datetime.date(2027, 12, 26),
+            quantity=1,
+            admin_confirmed=False,
+        )
+
+        result = import_rows_from_csv(
+            "subscription",
+            _csv(f"4242,{st},{size},MONTHLY,{_NEXT_FROM},{_NEXT_UNTIL},1,false"),
+        )
+
+        assert result.successful == 0
+        assert "already continues" in result.errors[0]["error"]
+        assert "skipped" in result.errors[0]["error"]
+        assert Subscription.objects.count() == 2
+
+    def test_reimporting_a_linked_next_term_skips_it(self, natural_key):
+        st, size = natural_key
+        csv_bytes = _numbered_csv(
+            f"4242,{st},{size},MONTHLY,{_VALID_FROM},{_VALID_UNTIL},1,false,7001",
+            f"4242,{st},{size},MONTHLY,{_NEXT_FROM},{_NEXT_UNTIL},1,false,7001",
+        )
+        assert import_rows_from_csv("subscription", csv_bytes).successful == 2
+
+        again = import_rows_from_csv("subscription", csv_bytes)
+
+        assert again.successful == 0
+        assert again.failed == 2
+        assert Subscription.objects.count() == 2
+
+    def test_the_number_tells_two_terms_ending_the_same_day_apart(self, natural_key):
+        st, size = natural_key
+        import_rows_from_csv(
+            "subscription",
+            _numbered_csv(
+                f"4242,{st},{size},MONTHLY,{_VALID_FROM},{_VALID_UNTIL},1,false,7001",
+                f"4242,{st},{size},MONTHLY,{_VALID_FROM},{_VALID_UNTIL},1,false,7002",
+            ),
+        )
+
+        unnumbered = import_rows_from_csv(
+            "subscription",
+            _numbered_csv(
+                f"4242,{st},{size},MONTHLY,{_NEXT_FROM},{_NEXT_UNTIL},1,false,"
+            ),
+        )
+        numbered = import_rows_from_csv(
+            "subscription",
+            _numbered_csv(
+                f"4242,{st},{size},MONTHLY,{_NEXT_FROM},{_NEXT_UNTIL},1,false,7002"
+            ),
+        )
+
+        assert unnumbered.successful == 0
+        assert "subscription_number" in unnumbered.errors[0]["error"]
+        assert numbered.successful == 1, numbered.errors
+        following = Subscription.objects.get(valid_from=datetime.date(2026, 12, 28))
+        assert following.previous_subscription.subscription_number == 7002
+
+    def test_a_trial_row_starts_a_chain_of_its_own(self, natural_key):
+        st, size = natural_key
+        result = import_rows_from_csv(
+            "subscription",
+            _csv(
+                f"4242,{st},{size},MONTHLY,{_VALID_FROM},{_VALID_UNTIL},1,false",
+                f"4242,{st},{size},MONTHLY,{_NEXT_FROM},{_NEXT_UNTIL},1,true",
+            ),
+        )
+
+        assert result.successful == 2, result.errors
+        _first, following = self._terms()
+        assert following.previous_subscription_id is None

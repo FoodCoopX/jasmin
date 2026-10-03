@@ -788,9 +788,8 @@ class TestUpdateToursCreatesStationDay:
         # to supply it — and the project invariant is that it is always a Monday.
         assert created.valid_from is not None
         assert created.valid_from.weekday() == 0, "valid_from must be a Monday"
-        # Effective from the current week, matching the update branch, which
-        # re-stamps the open row and so takes effect immediately. This day
-        # started long ago, so the clamp to its own start doesn't bite.
+        # Effective from the current week. This day started long ago, so the
+        # clamp to its own start doesn't bite.
         assert created.valid_from == previous_monday(timezone.localdate())
 
     def test_assignment_on_a_future_dated_day_opens_at_that_days_start(
@@ -825,6 +824,53 @@ class TestUpdateToursCreatesStationDay:
                 delivery_station=station, delivery_day=day
             )
             assert created.valid_from == datetime.date(2026, 10, 5)
+
+
+@pytest.mark.django_db
+class TestUpdateToursKeepsStationDayStart:
+    """The UPDATE branch of ``update_tours`` moves an existing station day to
+    its new tour and stop and leaves its start alone — a start moved back in
+    the station's modal (onboarding mode) survives the next tour edit, and
+    the deliveries before this week stay inside the row's window."""
+
+    def test_an_existing_station_day_keeps_its_start(self, api_client, tenant):
+        station = DeliveryStationFactory()
+        day = SharesDeliveryDayFactory(day_number=4)
+        station_day = DeliveryStationDayFactory(
+            delivery_station=station,
+            delivery_day=day,
+            valid_from=datetime.date(2026, 1, 5),
+            tour_number=1,
+            stop_order=1,
+        )
+
+        resp = api_client.post(
+            reverse("delivery_tours-update-tours"),
+            {
+                "delivery_day": str(day.id),
+                "tours": [
+                    {
+                        "tour_number": 2,
+                        "positions": [
+                            {"position": 3, "delivery_station_id": str(station.id)}
+                        ],
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        station_day.refresh_from_db()
+        assert station_day.tour_number == 2
+        assert station_day.stop_order == 3
+        assert station_day.valid_from == datetime.date(2026, 1, 5)
+        assert (
+            DeliveryStationDay.objects.filter(
+                delivery_station=station, delivery_day=day
+            ).count()
+            == 1
+        )
 
 
 # ---------------------------------------------------------------------------

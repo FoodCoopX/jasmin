@@ -4,6 +4,7 @@ export { useAllShareTypeVariations } from './useAllShareTypeVariations';
 export { useNoteColumn } from './columns/useNoteColumn';
 export { useContactColumns } from './columns/useContactColumns';
 export { useTimeBoundColumns } from './columns/useTimeBoundColumns';
+export { useEarlierStartWindow } from './columns/useEarlierStartWindow';
 export { useCurrency } from './configuration/useCurrency';
 export {
   useDefaultTaxRates,

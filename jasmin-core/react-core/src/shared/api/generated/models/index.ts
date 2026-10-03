@@ -224,6 +224,7 @@ export * from './consentRecordRevoke';
 export * from './coopShare';
 export * from './coopShareTransfer';
 export * from './coopShareTransferRequest';
+export * from './coopShareTransferReversal';
 export * from './crate';
 export * from './crateContentInvoiceReseller';
 export * from './crateDeliveryNoteContent';

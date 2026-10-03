@@ -24,4 +24,16 @@ export interface MemberDashboardStatistics {
   unpaid_coop_shares: number;
   /** Shares owed back to cancelled members, not yet paid back */
   payback_due_coop_shares: number;
+  /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
+  total_coop_shares_value: string;
+  /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
+  confirmed_coop_shares_value: string;
+  /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
+  pending_coop_shares_value: string;
+  /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
+  paid_coop_shares_value: string;
+  /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
+  unpaid_coop_shares_value: string;
+  /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
+  payback_due_coop_shares_value: string;
 }

@@ -21,6 +21,7 @@ from django.db import transaction
 from ..errors import (
     MemberAlreadyCancelled,
     MemberAlreadyConfirmed,
+    MemberCoopSharesOutOfRange,
     MemberEmailAlreadyHasUser,
     MemberEmailHeldByNonMemberLogin,
     MemberHasNoEmail,
@@ -82,18 +83,25 @@ class MemberService:
     ) -> Member:
         """Link `member` to an existing `user` and apply status side-effects.
 
-        For an `active` user: auto-confirms the Member and (when
-        `notify_user` is true) sends a welcome email. For other statuses
-        the link is set but no further action is taken.
+        For an `active` user: confirms the Member and (when `notify_user` is
+        true) sends a welcome email — when the Member can be admitted already.
+        A non-trial member whose coop shares don't fit the tenant's window yet
+        (a new one holds none) stays linked and pending; the office confirms
+        it once its shares are in. For other statuses the link is set but no
+        further action is taken.
 
-        ``confirm_active_user=False`` (the CSV import in onboarding mode) only
-        links: the office confirms the member later with its historical date.
+        ``confirm_active_user=False`` (onboarding mode) only links: the office
+        confirms the member later with its historical date.
         """
         member.user = user
         member.save(update_fields=["user"])
 
         if confirm_active_user and user.account_status == "active":
-            member.confirm(admin_user=admin_user, save=True)
+            try:
+                with transaction.atomic():
+                    member.confirm(admin_user=admin_user, save=True)
+            except MemberCoopSharesOutOfRange:
+                return member
             if notify_user and member.email:
                 # ``accounts.welcome_user`` is a USER-account event — the
                 # template expects ``user.first_name`` + ``portal_url``,

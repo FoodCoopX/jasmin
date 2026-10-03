@@ -51,7 +51,9 @@
       "invalid_valid_until": "Ungültiges Enddatum. Bitte ein gültiges Datum wählen."
     },
     "cancel_draft": "Abo-Entwürfe können nicht gekündigt werden — bitte stattdessen löschen.",
-    "renewal_chain_number_missing": "Das Vorgänger-Abo hat keine Abo-Nummer, die vererbt werden kann — bitte zuerst die Nummerierung des Vorgängers korrigieren und dann erneut verlängern."
+    "renewal_chain_number_missing": "Das Vorgänger-Abo hat keine Abo-Nummer, die vererbt werden kann — bitte zuerst die Nummerierung des Vorgängers korrigieren und dann erneut verlängern.",
+    "term_already_renewed": "Abo {{predecessor}} hat schon eine Folgelaufzeit: {{renewal}} ab {{renewal_valid_from}}. Bestätige oder bearbeite diese – oder lösche sie zuerst –, statt eine weitere anzulegen.",
+    "term_predecessor_ambiguous": "{{count}} Abos dieses Mitglieds mit dieser Anteilsart enden am {{valid_until}}, daher ist nicht erkennbar, welches dieses Abo fortsetzt. Verlängere das richtige über „verlängern“ in der Abo-Liste und passe den Entwurf an."
   },
   "member": {
     "already_confirmed": "Dieses Mitglied ist bereits bestätigt.",
@@ -94,7 +96,8 @@
     "invalid_amount": "Die Anzahl der Genossenschaftsanteile muss eine ganze Zahl größer als 0 sein.",
     "confirmed_immutable": "Ein bestätigter Geschäftsanteil kann nicht gelöscht werden — stattdessen den Anteil (oder das Mitglied) kündigen.",
     "confirmed_fields_locked": "Bei einem bestätigten Geschäftsanteil können Anzahl, Mitglied, Fälligkeitsdatum und Aufstockung nicht mehr geändert werden — stattdessen den Anteil kündigen und einen neuen erfassen.",
-    "not_pending": "Nur ein offener Genossenschaftsanteil (nicht bestätigt, nicht gekündigt) kann bestätigt werden."
+    "not_pending": "Nur ein offener Genossenschaftsanteil (nicht bestätigt, nicht gekündigt) kann bestätigt werden.",
+    "not_from_a_transfer": "Dieser Anteil stammt nicht aus einer Übertragung."
   },
   "coop_share_transfer": {
     "same_member": "Genossenschaftsanteile können nicht an dasselbe Mitglied übertragen werden.",
@@ -106,7 +109,14 @@
     "date_before_entry": "Das Übertragungsdatum liegt vor dem Eintrittsdatum des Mitglieds ({{entry_date}}).",
     "date_before_entry_from_member": "Das Übertragungsdatum liegt vor dem Eintrittsdatum des abgebenden Mitglieds ({{entry_date}}).",
     "date_before_entry_to_member": "Das Übertragungsdatum liegt vor dem Eintrittsdatum des empfangenden Mitglieds ({{entry_date}}).",
-    "cancellation_not_confirmed": "Durch diese Übertragung behält das Mitglied keine Anteile und wird gekündigt. Bitte bestätige die Kündigung."
+    "cancellation_not_confirmed": "Durch diese Übertragung behält das Mitglied keine Anteile und wird gekündigt. Bitte bestätige die Kündigung.",
+    "before_another": "Für dieses Mitglied ist bereits eine Übertragung vom {{transfer_date}} erfasst. Übertragungen werden in Datumsreihenfolge erfasst: Um diese davor einzutragen, mache die späteren rückgängig und trage sie danach erneut ein.",
+    "before_another_from_member": "Für das abgebende Mitglied ist bereits eine Übertragung vom {{transfer_date}} erfasst. Übertragungen werden in Datumsreihenfolge erfasst: Um diese davor einzutragen, mache die späteren rückgängig und trage sie danach erneut ein.",
+    "before_another_to_member": "Für das empfangende Mitglied ist bereits eine Übertragung vom {{transfer_date}} erfasst. Übertragungen werden in Datumsreihenfolge erfasst: Um diese davor einzutragen, mache die späteren rückgängig und trage sie danach erneut ein.",
+    "reversal_blocked": "Eine spätere Übertragung eines dieser Mitglieder ({{transfer_date}}) baut auf dieser auf. Mache zuerst diese rückgängig.",
+    "reversal_after_exit": "Ein Mitglied dieser Übertragung ist inzwischen ausgetreten, und der Austritt hat die übertragenen Anteile abgerechnet. Die Übertragung lässt sich nicht mehr rückgängig machen.",
+    "reversal_giver_inactive": "Das abgebende Mitglied wurde seit der Übertragung deaktiviert oder gelöscht. Die Mitgliedschaft, die die Übertragung beendet hat, lässt sich nicht wieder öffnen.",
+    "reversal_empties_receiver": "Ohne diese Übertragung hätte das empfangende Mitglied keine Anteile mehr."
   },
   "share": {
     "not_found": "Anteil nicht gefunden."

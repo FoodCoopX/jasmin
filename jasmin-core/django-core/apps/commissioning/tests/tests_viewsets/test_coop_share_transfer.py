@@ -1,6 +1,8 @@
 """``POST /api/commissioning/coop_shares/transfer/`` — moving paid coop shares from
 one member to another as ledger rows, and what those rows mean for the GDPR
-retention check, the payback statistics and the GenG §30 member register.
+retention check, the payback statistics and the GenG §30 member register — and
+``POST /api/commissioning/coop_shares/{id}/reverse_transfer/``, which undoes a
+transfer recorded by mistake.
 
 The clock is frozen because the endpoint refuses transfer dates in the future.
 """
@@ -217,31 +219,34 @@ class TestCoopShareTransfer:
         assert resp.data["details"] == {"available": 3}
         assert CoopShareService.member_total_shares(giver) == 3
 
-    def test_backdated_transfer_is_capped_by_what_each_share_value_holds_today(
+    def test_a_transfer_dated_before_another_of_the_giver_is_refused(
         self, api_client, tenant
     ):
-        giver, _ = _member_with_shares(3, value_one_coop_share=100)
-        CoopShareFactory(
-            member=giver,
-            amount_of_coop_shares=2,
-            value_one_coop_share=50,
-            admin_confirmed=True,
-            paid_at=timezone.now() - datetime.timedelta(days=40),
-        )
+        # The share window and the giver's exit are checked on today's
+        # holdings; dated before a transfer already recorded, the days between
+        # would go unchecked.
+        giver, _ = _member_with_shares(5)
         receiver, _ = _member_with_shares(3)
+        other, _ = _member_with_shares(3)
+        assert _post(api_client, giver, receiver, 1).status_code == 201
 
-        # Dated today: the more recently paid share value (50) goes first.
-        assert _post(api_client, giver, receiver, 2).status_code == 201
         resp = _post(
             api_client,
             giver,
-            receiver,
-            2,
+            other,
+            1,
             transfer_date=TODAY - datetime.timedelta(days=30),
         )
 
-        assert resp.status_code == 201, resp.data
-        assert _net_by_value(giver) == {50: Decimal("0"), 100: Decimal("1")}
+        assert resp.status_code == 400, resp.data
+        assert resp.data["code"] == "coop_share_transfer.before_another"
+        assert resp.data["field"] == "transfer_date"
+        assert resp.data["details"] == {
+            "transfer_date": TODAY.isoformat(),
+            "context": "from_member",
+        }
+        assert CoopShareService.member_total_shares(giver) == 4
+        assert CoopShareService.member_total_shares(other) == 3
 
     def test_giving_every_share_needs_the_cancellation_confirmed(
         self, api_client, tenant
@@ -434,7 +439,29 @@ class TestCoopShareTransfer:
         on_exit = _register_counts(api_client, datetime.date(2026, 12, 31))
         assert on_exit["7301"] == dialect.format(Decimal("0"))
 
-    def test_emptying_transfer_backdated_before_another_dates_the_exit_by_the_last(
+    def test_a_transfer_dated_before_another_of_the_receiver_is_refused(
+        self, api_client, tenant
+    ):
+        giver, _ = _member_with_shares(5)
+        sender, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares(3)
+        resp = _post(
+            api_client, sender, receiver, 1, transfer_date=datetime.date(2026, 9, 1)
+        )
+        assert resp.status_code == 201, resp.data
+
+        resp = _post(
+            api_client, giver, receiver, 1, transfer_date=datetime.date(2026, 8, 15)
+        )
+
+        assert resp.status_code == 400, resp.data
+        assert resp.data["code"] == "coop_share_transfer.before_another"
+        assert resp.data["details"] == {
+            "transfer_date": "2026-09-01",
+            "context": "to_member",
+        }
+
+    def test_an_emptying_transfer_dates_the_exit_by_its_own_date(
         self, api_client, tenant
     ):
         giver, _ = _member_with_shares(10, member_kwargs={"member_number": 7401})
@@ -442,16 +469,15 @@ class TestCoopShareTransfer:
         second, _ = _member_with_shares(3, member_kwargs={"member_number": 7403})
         dialect = get_csv_dialect()
         resp = _post(
-            api_client, giver, first, 3, transfer_date=datetime.date(2026, 9, 1)
+            api_client, giver, second, 7, transfer_date=datetime.date(2026, 8, 15)
         )
         assert resp.status_code == 201, resp.data
-        # Recorded afterwards, dated earlier, and it empties the giver.
         resp = _post(
             api_client,
             giver,
-            second,
-            7,
-            transfer_date=datetime.date(2026, 8, 15),
+            first,
+            3,
+            transfer_date=datetime.date(2026, 9, 1),
             confirm_member_cancellation=True,
         )
         assert resp.status_code == 201, resp.data
@@ -469,75 +495,42 @@ class TestCoopShareTransfer:
         assert after["7402"] == dialect.format(Decimal("6.00"))
         assert after["7403"] == dialect.format(Decimal("10.00"))
 
-    def test_a_backdated_transfer_can_t_give_shares_that_come_in_after_its_date(
+    def test_a_backdated_transfer_can_t_give_shares_paid_after_its_date(
         self, api_client, tenant
     ):
         giver, _ = _member_with_shares(5)
-        sender, _ = _member_with_shares(8)
-        first, _ = _member_with_shares(3)
-        second, _ = _member_with_shares(3)
-        received = _post(
-            api_client, sender, giver, 3, transfer_date=datetime.date(2026, 9, 10)
+        CoopShareFactory(
+            member=giver,
+            amount_of_coop_shares=3,
+            admin_confirmed=True,
+            paid_at=timezone.make_aware(datetime.datetime(2026, 9, 10)),
         )
-        assert received.status_code == 201, received.data
-        given = _post(
-            api_client, giver, first, 5, transfer_date=datetime.date(2026, 9, 5)
-        )
-        assert given.status_code == 201, given.data
+        receiver, _ = _member_with_shares(3)
 
-        # On 2026-09-01 the giver held 5, but the transfer dated 2026-09-05 takes
-        # all of them, and the 3 coming in on 2026-09-10 aren't there yet.
+        # On 2026-09-05 the giver held 5; the 3 paid on 2026-09-10 aren't there yet.
         refused = _post(
             api_client,
             giver,
-            second,
-            3,
-            transfer_date=datetime.date(2026, 9, 1),
+            receiver,
+            8,
+            transfer_date=datetime.date(2026, 9, 5),
             confirm_member_cancellation=True,
         )
         assert refused.status_code == 400, refused.data
         assert refused.data["code"] == "coop_share_transfer.exceeds_held"
-        assert refused.data["details"] == {"available": 0}
+        assert refused.data["details"] == {"available": 5}
 
         accepted = _post(
             api_client,
             giver,
-            second,
-            3,
+            receiver,
+            8,
             transfer_date=datetime.date(2026, 9, 10),
             confirm_member_cancellation=True,
         )
         assert accepted.status_code == 201, accepted.data
         giver.refresh_from_db()
         assert giver.cancelled_effective_at == datetime.date(2026, 9, 10)
-
-    def test_a_received_transfer_counts_from_its_transfer_date_whatever_its_paid_at(
-        self, api_client, tenant
-    ):
-        giver, _ = _member_with_shares(3)
-        sender, _ = _member_with_shares(5)
-        receiver, _ = _member_with_shares(3)
-        received = _post(
-            api_client, sender, giver, 2, transfer_date=datetime.date(2026, 9, 10)
-        )
-        assert received.status_code == 201, received.data
-        # Onboarding mode lets the office edit paid_at on a confirmed row.
-        CoopShare.objects.filter(member=giver, transfer__isnull=False).update(
-            paid_at=timezone.make_aware(datetime.datetime(2026, 8, 1))
-        )
-
-        refused = _post(
-            api_client,
-            giver,
-            receiver,
-            5,
-            transfer_date=datetime.date(2026, 8, 15),
-            confirm_member_cancellation=True,
-        )
-
-        assert refused.status_code == 400, refused.data
-        assert refused.data["code"] == "coop_share_transfer.exceeds_held"
-        assert refused.data["details"] == {"available": 3}
 
     @pytest.mark.parametrize("side", ["giver", "receiver"])
     def test_an_exit_before_the_member_s_own_transfer_is_refused(
@@ -826,19 +819,20 @@ class TestDateTransferExitsByTheLatestTransfer:
         first, _ = _member_with_shares(3)
         second, _ = _member_with_shares(3)
         resp = _post(
-            api_client, giver, first, 3, transfer_date=datetime.date(2026, 9, 1)
+            api_client, giver, second, 7, transfer_date=datetime.date(2026, 8, 15)
         )
         assert resp.status_code == 201, resp.data
         resp = _post(
             api_client,
             giver,
-            second,
-            7,
-            transfer_date=datetime.date(2026, 8, 15),
+            first,
+            3,
+            transfer_date=datetime.date(2026, 9, 1),
             confirm_member_cancellation=True,
         )
         assert resp.status_code == 201, resp.data
-        # The exit as an emptying transfer used to store it: its own date.
+        # The state the migration repairs: an emptied giver's exit dated before
+        # their latest transfer, as transfers recorded out of date order left it.
         too_early = datetime.date(2026, 8, 15)
         Member.objects.filter(pk=giver.pk).update(cancelled_effective_at=too_early)
         settled = CoopShare.objects.filter(
@@ -876,3 +870,196 @@ class TestDateTransferExitsByTheLatestTransfer:
 
         giver.refresh_from_db()
         assert giver.cancelled_effective_at == datetime.date(2026, 8, 31)
+
+
+def _reverse(api_client, row: CoopShare):
+    return api_client.post(
+        reverse("coop_shares-reverse-transfer", kwargs={"pk": row.pk}), format="json"
+    )
+
+
+def _transfer_row(member: Member) -> CoopShare:
+    return CoopShare.objects.get(member=member, transfer__isnull=False)
+
+
+@pytest.mark.django_db
+class TestCoopShareTransferReversal:
+    def test_reversing_a_transfer_restores_both_members(self, api_client, tenant):
+        giver, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares(3)
+        assert _post(api_client, giver, receiver, 2).status_code == 201
+        transfer = CoopShareTransfer.objects.get()
+
+        resp = _reverse(api_client, _transfer_row(receiver))
+
+        assert resp.status_code == 200, resp.data
+        assert resp.data == {
+            "transfer": transfer.pk,
+            "from_member": giver.pk,
+            "to_member": receiver.pk,
+            "from_member_reinstated": False,
+        }
+        assert not CoopShareTransfer.objects.exists()
+        assert not CoopShare.objects.filter(transfer__isnull=False).exists()
+        assert CoopShareService.member_total_shares(giver) == 5
+        assert CoopShareService.member_total_shares(receiver) == 3
+
+    def test_the_giver_s_row_undoes_it_too(self, api_client, tenant):
+        giver, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares(3)
+        assert _post(api_client, giver, receiver, 2).status_code == 201
+
+        resp = _reverse(api_client, _transfer_row(giver))
+
+        assert resp.status_code == 200, resp.data
+        assert not CoopShareTransfer.objects.exists()
+        assert _net_by_value(giver) == {100: Decimal("5")}
+
+    def test_reversing_an_emptying_transfer_reopens_the_membership(
+        self, api_client, tenant
+    ):
+        giver, rows = _member_with_shares(3)
+        pending = CoopShareFactory(
+            member=giver, amount_of_coop_shares=1, admin_confirmed=False
+        )
+        receiver, _ = _member_with_shares(3)
+        resp = _post(api_client, giver, receiver, 3, confirm_member_cancellation=True)
+        assert resp.data["from_member_cancelled"] is True
+        Member.objects.filter(pk=giver.pk).update(
+            cancellation_email_sent_at=timezone.now()
+        )
+
+        resp = _reverse(api_client, _transfer_row(receiver))
+
+        assert resp.status_code == 200, resp.data
+        assert resp.data["from_member_reinstated"] is True
+        giver.refresh_from_db()
+        assert giver.cancelled_at is None
+        assert giver.cancelled_effective_at is None
+        assert giver.cancelled_by is None
+        assert giver.cancellation_email_sent_at is None
+        for row in [*rows, pending]:
+            row.refresh_from_db()
+            assert row.cancelled_at is None
+            assert row.cancelled_effective_at is None
+            assert row.settled_by_transfer is None
+            assert row.payback_due_date is None
+        assert CoopShareService.member_total_shares(giver) == 4
+        assert CoopShareService.member_total_shares(receiver) == 3
+
+    def test_a_later_transfer_of_either_member_blocks_it(self, api_client, tenant):
+        giver, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares(3)
+        other, _ = _member_with_shares(3)
+        first = _post(
+            api_client, giver, receiver, 2, transfer_date=datetime.date(2026, 9, 1)
+        )
+        assert first.status_code == 201, first.data
+        later = _post(
+            api_client, receiver, other, 1, transfer_date=datetime.date(2026, 9, 10)
+        )
+        assert later.status_code == 201, later.data
+
+        resp = _reverse(
+            api_client,
+            CoopShare.objects.get(transfer_id=first.data["id"], member=giver),
+        )
+
+        assert resp.status_code == 409, resp.data
+        assert resp.data["code"] == "coop_share_transfer.reversal_blocked"
+        assert resp.data["details"] == {"transfer_date": "2026-09-10"}
+        assert CoopShareTransfer.objects.count() == 2
+
+    def test_a_transfer_recorded_before_it_does_not_block_it(self, api_client, tenant):
+        giver, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares(3)
+        other, _ = _member_with_shares(3)
+        with time_machine.travel(FROZEN_NOW - datetime.timedelta(hours=1), tick=False):
+            earlier = _post(
+                api_client, giver, other, 1, transfer_date=datetime.date(2026, 9, 1)
+            )
+        assert earlier.status_code == 201, earlier.data
+        mistake = _post(
+            api_client, giver, receiver, 2, transfer_date=datetime.date(2026, 9, 10)
+        )
+        assert mistake.status_code == 201, mistake.data
+
+        resp = _reverse(
+            api_client,
+            CoopShare.objects.get(transfer_id=mistake.data["id"], member=receiver),
+        )
+
+        assert resp.status_code == 200, resp.data
+        assert list(CoopShareTransfer.objects.values_list("pk", flat=True)) == [
+            earlier.data["id"]
+        ]
+        assert CoopShareService.member_total_shares(giver) == 4
+
+    def test_a_member_who_left_since_blocks_it(self, api_client, tenant):
+        giver, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares(3)
+        assert _post(api_client, giver, receiver, 2).status_code == 201
+        cancel_member_with_coop_shares(
+            receiver, cancelled_effective_at=TODAY, notify=False
+        )
+
+        resp = _reverse(api_client, _transfer_row(giver))
+
+        assert resp.status_code == 409, resp.data
+        assert resp.data["code"] == "coop_share_transfer.reversal_after_exit"
+        assert CoopShareTransfer.objects.exists()
+
+    def test_an_inactive_giver_can_t_be_reopened(self, api_client, tenant):
+        giver, _ = _member_with_shares(3)
+        receiver, _ = _member_with_shares(3)
+        resp = _post(api_client, giver, receiver, 3, confirm_member_cancellation=True)
+        assert resp.status_code == 201, resp.data
+        Member.objects.filter(pk=giver.pk).update(is_active=False)
+
+        resp = _reverse(api_client, _transfer_row(receiver))
+
+        assert resp.status_code == 409, resp.data
+        assert resp.data["code"] == "coop_share_transfer.reversal_giver_inactive"
+        giver.refresh_from_db()
+        assert giver.cancelled_at is not None
+
+    def test_the_receiver_keeps_some_shares(self, api_client, tenant):
+        giver, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares()
+        assert _post(api_client, giver, receiver, 2).status_code == 201
+
+        resp = _reverse(api_client, _transfer_row(receiver))
+
+        assert resp.status_code == 409, resp.data
+        assert resp.data["code"] == "coop_share_transfer.reversal_empties_receiver"
+        assert CoopShareTransfer.objects.exists()
+
+    def test_the_receiver_keeps_its_minimum(self, api_client, tenant):
+        _settings(tenant, min_number_coop_shares=3, max_number_coop_shares=10)
+        giver, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares(1)
+        assert _post(api_client, giver, receiver, 2).status_code == 201
+
+        resp = _reverse(api_client, _transfer_row(receiver))
+
+        assert resp.status_code == 400, resp.data
+        assert resp.data["code"] == "member.coop_shares_out_of_range"
+        assert CoopShareTransfer.objects.exists()
+
+    def test_a_row_no_transfer_created_is_refused(self, api_client, tenant):
+        _member, (row,) = _member_with_shares(3)
+
+        resp = _reverse(api_client, row)
+
+        assert resp.status_code == 400, resp.data
+        assert resp.data["code"] == "coop_share.not_from_a_transfer"
+
+    def test_anonymous_is_refused(self, api_client, anon_client, tenant):
+        giver, _ = _member_with_shares(5)
+        receiver, _ = _member_with_shares(3)
+        assert _post(api_client, giver, receiver, 2).status_code == 201
+
+        resp = _reverse(anon_client, _transfer_row(receiver))
+
+        assert resp.status_code == 401
+        assert CoopShareTransfer.objects.exists()

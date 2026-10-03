@@ -8,7 +8,7 @@ from itertools import accumulate
 from typing import TYPE_CHECKING, Any
 
 from django.db import models, transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from core.db_locks import acquire_advisory_xact_lock
@@ -17,6 +17,7 @@ from core.tenant_db import connection
 from ..errors import (
     CoopShareConfirmedFieldsLocked,
     CoopShareInvalidAmount,
+    CoopShareTransferBeforeAnother,
     CoopShareTransferCancellationNotConfirmed,
     CoopShareTransferDateBeforeEntry,
     CoopShareTransferDateInFuture,
@@ -24,6 +25,10 @@ from ..errors import (
     CoopShareTransferGiverNotAdmitted,
     CoopShareTransferReceiverCancelled,
     CoopShareTransferReceiverNotAdmitted,
+    CoopShareTransferReversalAfterExit,
+    CoopShareTransferReversalBlocked,
+    CoopShareTransferReversalEmptiesReceiver,
+    CoopShareTransferReversalGiverInactive,
     CoopShareTransferSameMember,
     MemberAlreadyCancelled,
     MemberCoopSharesOutOfRange,
@@ -39,6 +44,14 @@ class CoopShareTransferResult:
     from_member_cancelled: bool
 
 
+@dataclass(frozen=True)
+class CoopShareTransferReversal:
+    transfer_id: str
+    from_member_id: str
+    to_member_id: str
+    from_member_reinstated: bool
+
+
 class CoopShareService:
     """Business logic for ``CoopShare``: the rules ``CoopShare.clean()`` shares
     with the paths it can't guard, and transfers of shares between members.
@@ -50,11 +63,10 @@ class CoopShareService:
     CONFIRMED_EDITABLE_FIELDS = frozenset(
         {"note", "paid_at", "paid_back_date", "cancellation_reason"}
     )
-    # The per-share value snapshot (GenG §31). The office grid re-sends the
-    # tenant's CURRENT value on every save, so on a confirmed share a differing
+    # The per-share value snapshot (GenG §31). On a confirmed share a differing
     # value is dropped and the snapshot kept, instead of refusing the save —
-    # refusing would block every note / paid-back edit on that share once the
-    # tenant changes its share value.
+    # refusing would block every note / paid-back edit on that share from a
+    # client that sends the tenant's current value once that value changes.
     CONFIRMED_SNAPSHOT_FIELDS = frozenset({"value_one_coop_share"})
 
     @staticmethod
@@ -369,6 +381,10 @@ class CoopShareService:
           given, in whole shares, share value with the most recent payment first.
         - New rows are confirmed, paid on the transfer date and linked to the
           transfer; ``from_member_note`` / ``to_member_note`` become their notes.
+        - Transfers are recorded in date order: one dated before another
+          transfer of either member is refused
+          (``coop_share_transfer.before_another``). So the checks below, which
+          count today's holdings, hold from the transfer date on.
         - The min/max window is checked once on the final state of both members:
           the receiver against the whole window, the giver's confirmed shares
           against the minimum (``member.coop_shares_out_of_range``).
@@ -376,16 +392,15 @@ class CoopShareService:
           ``confirm_member_cancellation`` has to confirm: those rows are closed
           (cancelled without a payback date, linked through
           ``settled_by_transfer``) and ``cancel_member_with_coop_shares`` cancels
-          the member, both effective on the giver's latest transfer date. It
-          refuses a member with active subscriptions and sends the cancellation
-          email, which then says no settlement follows.
+          the member, both effective on the transfer date. It refuses a member
+          with active subscriptions and sends the cancellation email, which then
+          says no settlement follows.
         - A trial receiver is converted to a full member, with the transfer date as
           entry date.
         """
         from apps.commissioning.models import CoopShare, CoopShareTransfer, Member
         from apps.commissioning.services.member_cancellation import (
             cancel_member_with_coop_shares,
-            latest_coop_share_transfer_date,
         )
         from apps.commissioning.services.trial_conversion import (
             convert_trial_member_on_first_coop_share,
@@ -424,6 +439,9 @@ class CoopShareService:
                 raise CoopShareTransferDateBeforeEntry(
                     entry_date=member.entry_date.isoformat(), member=side
                 )
+        CoopShareService._assert_no_later_transfer(
+            from_member, to_member, transfer_date
+        )
 
         given_by_value = CoopShareService._allocate_paid_shares(
             from_member, amount, transfer_date
@@ -467,11 +485,9 @@ class CoopShareService:
         if from_member_cancelled:
             if not confirm_member_cancellation:
                 raise CoopShareTransferCancellationNotConfirmed()
-            # The giver leaves with the last of their transfers, which isn't
-            # this one when it is backdated before another they already made.
-            # Dated by this one, the exit would end the giver's holding before
-            # the later transfer took those shares.
-            exit_date = latest_coop_share_transfer_date(from_member) or transfer_date
+            # No later transfer of the giver exists (see above), so the giver
+            # leaves with this one.
+            exit_date = transfer_date
             for row in CoopShare.objects.filter(
                 member=from_member, admin_confirmed=True, cancelled_at__isnull=True
             ):
@@ -506,6 +522,186 @@ class CoopShareService:
 
         return CoopShareTransferResult(
             transfer=coop_share_transfer, from_member_cancelled=from_member_cancelled
+        )
+
+    @staticmethod
+    @transaction.atomic
+    def reverse_transfer(
+        coop_share_transfer: CoopShareTransfer,
+    ) -> CoopShareTransferReversal:
+        """Undo a coop share transfer recorded by mistake: delete the rows it
+        created, reopen the rows it settled and, when it ended the giving
+        member's membership, reopen that membership too.
+
+        - Refused while a later transfer of either member exists — dated after
+          this one, or recorded after it, which only history recorded out of
+          date order has: it may build on the shares this one moved
+          (``coop_share_transfer.reversal_blocked``). Undo that one first.
+        - Refused when a member has left since and that exit settled the
+          transferred shares (``coop_share_transfer.reversal_after_exit``), and
+          when the membership to reopen belongs to a record deactivated or
+          erased since (``coop_share_transfer.reversal_giver_inactive``).
+        - Reopening the membership clears the giver's exit and reopens the
+          pending shares the exit closed; subscriptions the exit ended or
+          cancelled stay so.
+        - The window is checked on the result: the receiver keeps confirmed
+          shares and its minimum, the giver its maximum.
+
+        The deletions go through each row's ``delete()``, so the audit log
+        records them.
+        """
+        from apps.commissioning.models import Member
+
+        member_ids = sorted(
+            {
+                str(coop_share_transfer.from_member_id),
+                str(coop_share_transfer.to_member_id),
+            }
+        )
+        # The lock ``transfer`` and the coop share writes take.
+        for member_id in member_ids:
+            acquire_advisory_xact_lock(f"coop_share_bounds:{member_id}")
+        locked = {
+            member.pk: member
+            for member in Member.objects.select_for_update()
+            .filter(pk__in=member_ids)
+            .order_by("pk")
+        }
+        from_member = locked[coop_share_transfer.from_member_id]
+        to_member = locked[coop_share_transfer.to_member_id]
+
+        later = (
+            CoopShareService._transfers_of(from_member, to_member)
+            .exclude(pk=coop_share_transfer.pk)
+            .filter(
+                Q(transfer_date__gt=coop_share_transfer.transfer_date)
+                | Q(created_at__gte=coop_share_transfer.created_at)
+            )
+            .order_by("-transfer_date")
+            .first()
+        )
+        if later is not None:
+            raise CoopShareTransferReversalBlocked(
+                transfer_date=later.transfer_date.isoformat()
+            )
+        if (
+            coop_share_transfer.coop_shares.filter(cancelled_at__isnull=False)
+            .exclude(settled_by_transfer=coop_share_transfer)
+            .exists()
+        ):
+            raise CoopShareTransferReversalAfterExit()
+        reinstates_giver = coop_share_transfer.settled_coop_shares.exists()
+        if reinstates_giver and not from_member.is_active:
+            raise CoopShareTransferReversalGiverInactive()
+
+        # The giver's negative rows are among the rows it settled; deleted
+        # first, they no longer hold the transfer through either reference.
+        for row in coop_share_transfer.coop_shares.all():
+            row.delete()
+        for row in coop_share_transfer.settled_coop_shares.all():
+            row.cancelled_at = None
+            row.cancelled_effective_at = None
+            row.cancelled_by = None
+            row.settled_by_transfer = None
+            CoopShareService._save_without_bounds_check(
+                row,
+                update_fields=[
+                    "cancelled_at",
+                    "cancelled_effective_at",
+                    "cancelled_by",
+                    "settled_by_transfer",
+                ],
+            )
+        if reinstates_giver:
+            CoopShareService._reopen_membership(from_member)
+        transfer_id = str(coop_share_transfer.pk)
+        coop_share_transfer.delete()
+
+        if CoopShareService.member_total_shares(to_member, only_confirmed=True) <= 0:
+            raise CoopShareTransferReversalEmptiesReceiver()
+        CoopShareService.assert_not_below_minimum(to_member, only_confirmed=True)
+        CoopShareService.assert_within_min_max(
+            member=from_member, new_amount=Decimal(0)
+        )
+        return CoopShareTransferReversal(
+            transfer_id=transfer_id,
+            from_member_id=str(from_member.pk),
+            to_member_id=str(to_member.pk),
+            from_member_reinstated=reinstates_giver,
+        )
+
+    @staticmethod
+    def _reopen_membership(member: Member) -> None:
+        """Undo the exit a transfer gave ``member``: the member's own exit
+        fields, and the pending shares the exit closed —
+        ``cancel_member_with_coop_shares`` stamps those with the member's own
+        ``cancelled_at``, and they carry no ``settled_by_transfer``."""
+        from apps.commissioning.models import CoopShare
+
+        for row in CoopShare.objects.filter(
+            member=member,
+            cancelled_at=member.cancelled_at,
+            settled_by_transfer__isnull=True,
+        ):
+            row.cancelled_at = None
+            row.cancelled_effective_at = None
+            row.cancelled_by = None
+            row.payback_due_date = None
+            CoopShareService._save_without_bounds_check(
+                row,
+                update_fields=[
+                    "cancelled_at",
+                    "cancelled_effective_at",
+                    "cancelled_by",
+                    "payback_due_date",
+                ],
+            )
+        member.cancelled_at = None
+        member.cancelled_effective_at = None
+        member.cancelled_by = None
+        member.cancellation_email_sent_at = None
+        member.save(
+            update_fields=[
+                "cancelled_at",
+                "cancelled_effective_at",
+                "cancelled_by",
+                "cancellation_email_sent_at",
+            ]
+        )
+
+    @staticmethod
+    def _assert_no_later_transfer(
+        from_member: Member, to_member: Member, transfer_date: date
+    ) -> None:
+        """Refuse a transfer dated before another transfer of either member
+        (``coop_share_transfer.before_another``): transfers are recorded in
+        date order, so the checks on today's holdings hold from the transfer
+        date on."""
+        later = (
+            CoopShareService._transfers_of(from_member, to_member)
+            .filter(transfer_date__gt=transfer_date)
+            .order_by("-transfer_date")
+            .first()
+        )
+        if later is None:
+            return
+        gives_or_receives = (later.from_member_id, later.to_member_id)
+        raise CoopShareTransferBeforeAnother(
+            transfer_date=later.transfer_date.isoformat(),
+            member=(
+                "from_member" if from_member.pk in gives_or_receives else "to_member"
+            ),
+        )
+
+    @staticmethod
+    def _transfers_of(*members: Member) -> models.QuerySet[CoopShareTransfer]:
+        """Every coop share transfer that gives or receives for any of
+        ``members``."""
+        from apps.commissioning.models import CoopShareTransfer
+
+        member_ids = [member.pk for member in members]
+        return CoopShareTransfer.objects.filter(
+            Q(from_member__in=member_ids) | Q(to_member__in=member_ids)
         )
 
     @staticmethod

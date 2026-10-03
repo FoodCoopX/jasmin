@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { usePaymentsChargeSchedulesList } from "@shared/api/generated/payments-—-charge-schedule/payments-—-charge-schedule";
 import type { ChargeSchedule } from "@shared/api/generated/models";
 import { useCurrency, useDateFormat } from "@hooks/index";
-import { useRoles } from "@shared/auth";
+import { useMemberSelfService } from "@shared/auth";
 import { unwrapList } from "@shared/utils";
 import SepaSetupModal from "@features/members/modals/SepaSetupModal";
 
@@ -116,9 +116,10 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
   const { formatCurrency } = useCurrency();
   const { formatDate } = useDateFormat();
   // Office viewer → the SEPA modal opens in office mode (signed date, custom
-  // reference, paper-received). A member viewing their own card gets the plain
-  // self-service form.
-  const { isMemberOnly } = useRoles();
+  // reference, paper-received). A member viewing their own card — whatever
+  // staff roles they also hold — gets the plain self-service form, which the
+  // server signs for the session's own member.
+  const selfService = useMemberSelfService(memberId);
   const [futureCount, setFutureCount] = useState(PAGE_SIZE);
   const [pastCount, setPastCount] = useState(0);
   const [sepaModalOpen, setSepaModalOpen] = useState(false);
@@ -368,7 +369,7 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
         <SepaSetupModal
           open={sepaModalOpen}
           memberId={memberId}
-          officeMode={!isMemberOnly}
+          officeMode={!selfService}
           onClose={() => setSepaModalOpen(false)}
         />
       )}

@@ -21,6 +21,8 @@ export interface MemberCreateRequest {
   readonly active_subscriptions_count?: number;
   /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */
   readonly coop_shares_total?: string;
+  /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
+  readonly coop_shares_value?: string;
   readonly coop_shares_pending_count?: number;
   /** @nullable */
   readonly payback_due_date?: string | null;

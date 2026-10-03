@@ -28,6 +28,7 @@ import {
 } from "@features/abos/utils/stationCapacity";
 import type { CapacityWeekEntry } from "@features/abos/utils/stationCapacity";
 import { useShareDeliveryDays } from "@features/commissioning/hooks";
+import { useStationDayEarlierStart } from "@features/commissioning/hooks/useStationDayEarlierStart";
 import type { ShareDeliveryDayOption } from "@features/commissioning/hooks/useShareDeliveryDays";
 import { getStatusColor, notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
@@ -55,6 +56,8 @@ interface DeliveryStation {
 
 interface StationDayRecord extends TableRecord {
   delivery_day?: string;
+  valid_from?: string;
+  valid_until?: string | null;
   tour_assignment_missing?: boolean;
   capacity?: number;
   capacity_by_week?: Record<string, CapacityWeekEntry> | null;
@@ -86,12 +89,6 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
   const navigate = useNavigate();
   const { formatDate } = useDateFormat();
   const { shareDeliveryDays } = useShareDeliveryDays();
-  const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
-    width: "7em",
-    // A station's opening day can only be scheduled going forward — the backend
-    // rejects a past valid_from; this aligns the picker with that rule.
-    validFromFutureOnly: true,
-  });
 
   const weekdayChoices = useMemo(() => getWeekdayChoices(t), [t]);
 
@@ -128,6 +125,17 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
     () => (rawData ?? []) as unknown as StationDayRecord[],
     [rawData],
   );
+
+  const validFromEarlierMove = useStationDayEarlierStart(data, shareDeliveryDays);
+  const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    width: "7em",
+    // A station's opening day can only be scheduled going forward — the backend
+    // rejects a past valid_from; this aligns the picker with that rule. A saved
+    // one is locked, except for a move back into past weeks in onboarding mode.
+    validFromFutureOnly: true,
+    validFromLockedOnSave: true,
+    validFromEarlierMove,
+  });
 
   // Per station-day: busiest current-or-future week's occupancy — the FLOOR
   // for capacity edits (the backend rejects lower via
@@ -373,10 +381,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
           options: availableDeliveryDayOptions,
           render: renderWeekday,
         },
-        {
-          ...validFromColumn,
-          disabled: (record: StationDayRecord) => record.key !== -1,
-        },
+        validFromColumn,
         validUntilColumn,
         {
           title: (

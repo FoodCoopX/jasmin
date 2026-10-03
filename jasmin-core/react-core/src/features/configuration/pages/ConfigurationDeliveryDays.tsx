@@ -39,6 +39,7 @@ import {
 } from "@shared/ui";
 import {
   useActiveStatusColumn,
+  useEarlierStartWindow,
   useInvalidateAfterTableMutation,
   useTimeBoundColumns,
 } from "@hooks/index";
@@ -46,6 +47,12 @@ import { isFieldDisabled, toApiDate } from "@shared/utils";
 
 type SharesDeliveryDayRecord = SharesDeliveryDay & TableRecord;
 type OrdersDeliveryDayRecord = OrdersDeliveryDay & TableRecord;
+
+// A delivery day's earlier versions are the closed rows of its weekday.
+const sameWeekday = (a: SharesDeliveryDayRecord, b: SharesDeliveryDayRecord) =>
+  a.day_number === b.day_number;
+// A later start would strand what is already on a delivery day in use.
+const notInUse = (row: SharesDeliveryDayRecord) => row.can_be_deleted !== false;
 
 export default function ConfigurationDeliveryDays() {
   const [showAll, setShowAll] = useState(true);
@@ -61,12 +68,6 @@ export default function ConfigurationDeliveryDays() {
   const activeStatusColumn = useActiveStatusColumn({
     defaultSortOrder: "descend",
   });
-  const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
-    // A delivery day can only be scheduled going forward — the backend rejects
-    // a past valid_from; this aligns the picker with that rule.
-    validFromFutureOnly: true,
-  });
-
   const shareParams = useMemo<CommissioningSharesDeliveryDaysListParams>(
     () => (showAll ? {} : { active_at_date: toApiDate(dayjs())! }),
     [showAll],
@@ -84,6 +85,19 @@ export default function ConfigurationDeliveryDays() {
     () => (rawShareData ?? []) as SharesDeliveryDayRecord[],
     [rawShareData],
   );
+
+  const validFromEarlierMove = useEarlierStartWindow({
+    rows: data,
+    sameLineage: sameWeekday,
+    laterAllowed: notInUse,
+  });
+  const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    // A new delivery day can only be scheduled going forward — the backend
+    // rejects a past valid_from; this aligns the picker with that rule.
+    validFromFutureOnly: true,
+    // In onboarding mode a saved one may move back into past weeks.
+    validFromEarlierMove,
+  });
 
   const { data: rawOrderData, isLoading: ordersLoading } =
     useCommissioningOrdersDeliveryDaysList();

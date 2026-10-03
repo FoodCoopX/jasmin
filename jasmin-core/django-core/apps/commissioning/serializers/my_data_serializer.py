@@ -20,10 +20,13 @@ class MyDataCoopShareSerializer(serializers.ModelSerializer):
         # ``admin_confirmed`` / ``admin_confirmed_at`` so the member can see
         # which shares are still pending office confirmation vs already
         # confirmed (and when); ``cancelled_at`` so divested shares can be
-        # excluded from the member's confirmed/pending split.
+        # excluded from the member's confirmed/pending split;
+        # ``value_one_coop_share`` so each share is valued at the value it
+        # was subscribed at.
         fields = [
             "id",
             "amount_of_coop_shares",
+            "value_one_coop_share",
             "due_date",
             "paid_at",
             "admin_confirmed",

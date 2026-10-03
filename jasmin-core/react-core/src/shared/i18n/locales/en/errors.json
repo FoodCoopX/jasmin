@@ -51,7 +51,9 @@
       "invalid_valid_until": "Invalid end date. Please choose a valid date."
     },
     "cancel_draft": "Draft subscriptions cannot be cancelled — delete them instead.",
-    "renewal_chain_number_missing": "The predecessor subscription has no subscription number to inherit — fix the predecessor's numbering first, then renew again."
+    "renewal_chain_number_missing": "The predecessor subscription has no subscription number to inherit — fix the predecessor's numbering first, then renew again.",
+    "term_already_renewed": "Subscription {{predecessor}} already continues with {{renewal}} from {{renewal_valid_from}}. Confirm or edit that one — or delete it first — instead of adding another.",
+    "term_predecessor_ambiguous": "{{count}} subscriptions of this member and share type end on {{valid_until}}, so it can't be told which one this one continues. Renew the right one with “Renew selected” in the subscription list and adjust the draft."
   },
   "member": {
     "already_confirmed": "This member is already confirmed.",
@@ -94,7 +96,8 @@
     "invalid_amount": "The number of coop shares must be a whole number greater than 0.",
     "confirmed_immutable": "A confirmed cooperative share can't be deleted — cancel the share (or the member) instead.",
     "confirmed_fields_locked": "The amount, member, due date and increase flag of a confirmed cooperative share can no longer be changed — cancel the share and record a new one instead.",
-    "not_pending": "Only a pending cooperative share (not confirmed, not cancelled) can be confirmed."
+    "not_pending": "Only a pending cooperative share (not confirmed, not cancelled) can be confirmed.",
+    "not_from_a_transfer": "This share was not created by a transfer."
   },
   "coop_share_transfer": {
     "same_member": "Cooperative shares can't be transferred to the same member.",
@@ -106,7 +109,14 @@
     "date_before_entry": "The transfer date is before the member's entry date ({{entry_date}}).",
     "date_before_entry_from_member": "The transfer date is before the giving member's entry date ({{entry_date}}).",
     "date_before_entry_to_member": "The transfer date is before the receiving member's entry date ({{entry_date}}).",
-    "cancellation_not_confirmed": "This transfer leaves the member without shares, which cancels the membership. Please confirm the cancellation."
+    "cancellation_not_confirmed": "This transfer leaves the member without shares, which cancels the membership. Please confirm the cancellation.",
+    "before_another": "This member already has a transfer dated {{transfer_date}}. Transfers are recorded in date order: to record this one before it, undo the later transfers and record them again afterwards.",
+    "before_another_from_member": "The giving member already has a transfer dated {{transfer_date}}. Transfers are recorded in date order: to record this one before it, undo the later transfers and record them again afterwards.",
+    "before_another_to_member": "The receiving member already has a transfer dated {{transfer_date}}. Transfers are recorded in date order: to record this one before it, undo the later transfers and record them again afterwards.",
+    "reversal_blocked": "A later transfer of one of these members ({{transfer_date}}) builds on this one. Undo that one first.",
+    "reversal_after_exit": "A member of this transfer has left since, and that exit settled the transferred shares. The transfer can no longer be undone.",
+    "reversal_giver_inactive": "The giving member has been deactivated or erased since the transfer, so the membership it ended can't be reopened.",
+    "reversal_empties_receiver": "Undoing this transfer would leave the receiving member without shares."
   },
   "share": {
     "not_found": "Share not found."

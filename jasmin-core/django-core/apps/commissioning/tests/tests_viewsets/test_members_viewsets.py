@@ -62,6 +62,30 @@ class TestMemberViewSet:
         # Live total is 3 (the cancelled 5-share row is excluded), not 8.
         assert Decimal(str(row["coop_shares_total"])) == Decimal("3")
 
+    def test_coop_shares_value_counts_each_share_at_its_own_value(
+        self, api_client, tenant
+    ):
+        # The tenant's share value changed between the two subscriptions; the
+        # cancelled row is no longer live equity.
+        from django.utils import timezone
+
+        member = MemberFactory()
+        CoopShareFactory(
+            member=member, amount_of_coop_shares=3, value_one_coop_share=100
+        )
+        CoopShareFactory(
+            member=member, amount_of_coop_shares=2, value_one_coop_share=120
+        )
+        CoopShareFactory(
+            member=member,
+            amount_of_coop_shares=5,
+            value_one_coop_share=100,
+            cancelled_at=timezone.now(),
+        )
+        resp = api_client.get(self.URL)
+        row = next(m for m in resp.data if m["id"] == str(member.id))
+        assert row["coop_shares_value"] == "540.00"
+
     def test_filter_is_active(self, api_client, tenant):
         MemberFactory(is_active=True)
         MemberFactory(is_active=False)
