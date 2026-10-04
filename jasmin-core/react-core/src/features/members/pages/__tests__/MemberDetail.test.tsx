@@ -348,7 +348,7 @@ describe("MemberDetail (integration)", () => {
   it("only counts admin_confirmed + currently-valid subscriptions as 'active' (filter contract)", async () => {
     // We can't observe the filtered list directly (the cards are stubbed),
     // but we CAN observe that the page renders without crashing and the
-    // SubscriptionsCard receives the unfiltered subs (it has the 'new'
+    // ActiveSubscriptionsCard receives the unfiltered subs (it has the 'new'
     // button). This pins the contract that the page never throws when subs
     // span past, present, future, unconfirmed.
     const today = new Date().toISOString().slice(0, 10);

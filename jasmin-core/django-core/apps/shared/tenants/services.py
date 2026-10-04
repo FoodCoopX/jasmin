@@ -82,7 +82,7 @@ class TenantService:
                     valid_from=timezone.now(),
                 )
 
-            logger.info(f"Created tenant '{name}' (schema={schema_name})")
+            logger.info("tenant.created schema=%s", schema_name)
 
             with schema_context(tenant.schema_name):
                 from django.contrib.auth import get_user_model
@@ -98,7 +98,11 @@ class TenantService:
                     account_status="active",
                     roles=["admin"],
                 )
-                logger.info(f"Created admin user '{admin_email}' for tenant '{name}'")
+                logger.info(
+                    "tenant.admin_created schema=%s user=%s",
+                    tenant.schema_name,
+                    admin_user.pk,
+                )
         except Exception:
             # Any failure after the Tenant row exists would otherwise strand a
             # fully-migrated orphan schema (and possibly an admin-less, locked-out

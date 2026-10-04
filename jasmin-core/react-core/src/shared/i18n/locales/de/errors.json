@@ -506,7 +506,8 @@
   "waiting_list_offer": {
     "expired": "Dieses Angebot ist abgelaufen. Bitte kontaktiere das Büro.",
     "invalid": "Dieser Angebots-Link ist ungültig oder wurde bereits verwendet.",
-    "not_available": "Dieses Abo ist kein offener Wartelisten-Eintrag und kann nicht angeboten werden."
+    "not_available": "Dieses Abo ist kein offener Wartelisten-Eintrag und kann nicht angeboten werden.",
+    "member_has_no_email": "Dieses Mitglied hat keine E-Mail-Adresse, an die das Angebot gehen könnte. Trage beim Mitglied eine Adresse ein und biete den Platz dann an."
   },
   "onboarding_mode": {
     "email_action_blocked": "Diese Aktion schickt dem Mitglied eine E-Mail, und solange der Onboarding-Modus aktiv ist, werden keine E-Mails an Mitglieder verschickt. Bitte zuerst den Onboarding-Modus ausschalten."

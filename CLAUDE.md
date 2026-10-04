@@ -94,6 +94,13 @@ the matching section of Part 1.
   `source_rabatt` (model columns and wire fields), `netto` / `brutto` (the money
   helpers below), `abos` (an API path and the `src/features/abos/` folder), and
   `storno` (the invoice-reversal action). Don't extend the pattern to new names.
+- **Frontend identifiers say `Subscription`, not `Abo`.** The
+  `src/features/abos/` folder keeps its name, but the names inside it don't
+  carry the German word on: name new ones `Subscription…`, and rename an `Abo…`
+  identifier (`AboRecord`, `useAbosColumns`, …) in a file you change anyway —
+  frontend-internal names aren't frozen. The generated client's names
+  (`commissioningAbos…`, `CommissioningAbosListParams`) follow the `abos` API
+  path and stay.
 - **No hard-to-read abbreviations.** Not `dsd` for DeliveryStationDay, not `oc`
   for OrderContent. Longer but readable wins.
 - **Names say what a thing is; no needless constants.** Don't give a trivial

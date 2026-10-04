@@ -12,6 +12,7 @@ export {
 } from './configuration/useDefaultTaxRates';
 export { useAutoSave } from './configuration/useAutoSave';
 export { useDateFormat } from './configuration/useDateFormat';
+export { useErrorDateFormat } from './configuration/useErrorDateFormat';
 export { useDateRangePresets } from './configuration/useDateRangePresets';
 export { useDeliveryDayLabel } from './useDeliveryDayLabel';
 export { useTenantYearOptions } from './configuration/useTenantYearOptions';

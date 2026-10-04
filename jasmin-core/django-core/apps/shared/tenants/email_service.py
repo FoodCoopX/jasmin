@@ -1,6 +1,7 @@
 import logging
 import smtplib
 import uuid
+from datetime import timedelta
 from functools import cached_property
 
 from django.core.mail import EmailMultiAlternatives
@@ -221,7 +222,7 @@ class EmailService:
         # — never read it without a tenant scope).
         config = TenantEmailConfig.get_active_for_schema(self.schema_name)
         if config is None:
-            logger.error(f"No email config found for tenant {self.schema_name}")
+            logger.error("email.config_missing tenant=%s", self.schema_name)
         return config
 
     def send_email(
@@ -280,7 +281,7 @@ class EmailService:
             return False
 
         if not self.config:
-            logger.error(f"Cannot send email: no config for tenant {self.schema_name}")
+            logger.error("email.not_sent_no_config tenant=%s", self.schema_name)
             return False
 
         # A tenant with no SMTP host of its own has email sending disabled —
@@ -294,7 +295,7 @@ class EmailService:
             return False
 
         if not self.config.is_verified:
-            logger.warning(f"Email domain not verified for tenant {self.schema_name}")
+            logger.warning("email.config_unverified tenant=%s", self.schema_name)
 
         # Use config defaults if not provided
         from_email = from_email or self.config.from_email
@@ -520,6 +521,38 @@ class EmailService:
         """
         from apps.notifications.models import EmailLog
 
+        limit = self._hourly_limit_reached(len(to_emails))
+        if limit is not None:
+            # The tenant's mail provider caps sends per hour, and going past
+            # the cap can get the account blocked: the email is not sent, and
+            # its rows say why.
+            held_back = EmailLog.objects.bulk_create(
+                [
+                    EmailLog(
+                        recipient=address,
+                        subject=subject[:_SUBJECT_MAX_LENGTH],
+                        template=log_template_name,
+                        purpose=purpose or slug,
+                        related_object_type=related_object_type,
+                        related_object_id=related_object_id,
+                        status="rate_limited",
+                        error=f"max_emails_per_hour={limit}",
+                    )
+                    for address in to_emails
+                ]
+            )
+            # No recipient addresses in the log line (see below).
+            logger.warning(
+                "email.rate_limited recipients=%d tenant=%s purpose=%s limit=%d "
+                "log_ids=%s",
+                len(to_emails),
+                self.schema_name,
+                purpose or "-",
+                limit,
+                ",".join(str(row.id) for row in held_back),
+            )
+            return False
+
         # Rows are created only AFTER message setup succeeds (just before send),
         # so a failure in connection / header / attachment setup can't
         # leave behind a "pending" EmailLog that never transitions to a final
@@ -635,6 +668,22 @@ class EmailService:
                 exc_info=True,
             )
             return False
+
+    def _hourly_limit_reached(self, recipients: int) -> int | None:
+        """The tenant's ``max_emails_per_hour`` when sending to ``recipients``
+        more addresses would go past it, counted over the emails sent in the
+        last hour; ``None`` while there is room (or no limit is set)."""
+        from apps.notifications.models import EmailLog
+
+        limit = self.config.max_emails_per_hour if self.config else None
+        if not limit or limit <= 0:
+            return None
+        # A row is created just before its send, so its indexed ``created_at``
+        # stands in for the send time.
+        sent = EmailLog.objects.filter(
+            status="sent", created_at__gte=timezone.now() - timedelta(hours=1)
+        ).count()
+        return limit if sent + recipients > limit else None
 
     def _get_connection(self):
         """Open a Django SMTP connection from this tenant's stored creds."""

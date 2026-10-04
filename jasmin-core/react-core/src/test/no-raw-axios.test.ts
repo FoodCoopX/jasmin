@@ -172,22 +172,6 @@ function* walk(dir: string): Generator<string> {
   }
 }
 
-/**
- * Apps the platform owner has explicitly deferred from "use generated
- * clients / TanStack Query" enforcement. Per CLAUDE.md ("For now ignore
- * the apps cultivation/economics/staff, unless i tell you explicitely.")
- * — the rule applies to the frontend pages of those apps too.
- *
- * Anything under ``src/pages/<app>/`` is skipped wholesale; nothing
- * else is. When an app graduates, just delete its entry here and run
- * the test to see what's left to clean up.
- */
-const DEFERRED_APPS = [
-  "src/features/staff/pages/",
-  "src/features/cultivation/pages/",
-  "src/features/economics/pages/",
-];
-
 function isCandidateFile(path: string): boolean {
   if (!/\.(?:tsx?|jsx?)$/.test(path)) return false;
   // Generated Orval client — uses axios under the hood but it's the
@@ -199,11 +183,6 @@ function isCandidateFile(path: string): boolean {
   // The MSW handler files mock axios traffic; they're allowed to
   // reference axios shapes without actually calling out.
   if (path.includes("/test/msw/")) return false;
-  // Deferred apps — see DEFERRED_APPS above for the rationale.
-  const normalized = path.replace(/\\/g, "/");
-  if (DEFERRED_APPS.some((prefix) => normalized.includes(prefix))) {
-    return false;
-  }
   return true;
 }
 

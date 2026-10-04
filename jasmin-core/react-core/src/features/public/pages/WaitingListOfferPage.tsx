@@ -71,7 +71,7 @@ export default function WaitingListOfferPage() {
   const { token = "" } = useParams<{ token: string }>();
   const { formatDate } = useDateFormat();
   const { currencySymbol } = useCurrency();
-  const { displayLogoUrl } = useTenant();
+  const { logoUrl } = useTenant();
   const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
   const { data, isLoading, isError } = useCommissioningWaitingListOffersRetrieve(
     token,
@@ -108,7 +108,7 @@ export default function WaitingListOfferPage() {
 
   if (isLoading) {
     return (
-      <Shell logoUrl={displayLogoUrl}>
+      <Shell logoUrl={logoUrl}>
         <div style={{ textAlign: "center", padding: 24 }}>
           <Spin />
         </div>
@@ -118,7 +118,7 @@ export default function WaitingListOfferPage() {
 
   if (isError || !data) {
     return (
-      <Shell logoUrl={displayLogoUrl}>
+      <Shell logoUrl={logoUrl}>
         <Result
           status="warning"
           title={t("abos.offer_page.invalid_title")}
@@ -130,7 +130,7 @@ export default function WaitingListOfferPage() {
 
   if (outcome === "accepted") {
     return (
-      <Shell logoUrl={displayLogoUrl}>
+      <Shell logoUrl={logoUrl}>
         <Result
           status="success"
           title={t("abos.offer_page.accepted_title")}
@@ -141,7 +141,7 @@ export default function WaitingListOfferPage() {
   }
   if (outcome === "declined") {
     return (
-      <Shell logoUrl={displayLogoUrl}>
+      <Shell logoUrl={logoUrl}>
         <Result
           status="info"
           title={t("abos.offer_page.declined_title")}
@@ -152,7 +152,7 @@ export default function WaitingListOfferPage() {
   }
   if (outcome === "expired" || data.expired) {
     return (
-      <Shell logoUrl={displayLogoUrl}>
+      <Shell logoUrl={logoUrl}>
         <Result
           status="warning"
           title={t("abos.offer_page.expired_title")}
@@ -163,7 +163,7 @@ export default function WaitingListOfferPage() {
   }
   if (outcome === "error") {
     return (
-      <Shell logoUrl={displayLogoUrl}>
+      <Shell logoUrl={logoUrl}>
         <Result
           status="error"
           title={t("abos.offer_page.error_title")}
@@ -189,7 +189,7 @@ export default function WaitingListOfferPage() {
     : "";
 
   return (
-    <Shell logoUrl={displayLogoUrl}>
+    <Shell logoUrl={logoUrl}>
       <Title level={4}>
         {t("abos.offer_page.title", { name: data.member_first_name })}
       </Title>

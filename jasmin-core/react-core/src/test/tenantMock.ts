@@ -47,7 +47,6 @@ export interface UseTenantMockShape {
   tenantName: string | undefined;
   tenantDescription: string | undefined;
   logoUrl: string | null;
-  displayLogoUrl: string | null;
   faviconUrl: string | null;
   getSetting: (key: string, defaultValue?: unknown) => unknown;
   getCurrentSetting: (key: string, defaultValue?: unknown) => unknown;
@@ -70,7 +69,6 @@ export function makeUseTenantMock(
     tenantName: undefined,
     tenantDescription: undefined,
     logoUrl: null,
-    displayLogoUrl: "/jasmin_logo.png",
     faviconUrl: null,
     // Passthrough: ``getSetting("uses_jokers", true)`` returns ``true``
     // — matches production defaults, so feature gates fall through

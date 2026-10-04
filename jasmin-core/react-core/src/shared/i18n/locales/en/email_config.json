@@ -33,6 +33,7 @@
   "api_key_set": "API key is set. Leave empty to keep current.",
   "rate_limit_title": "Rate Limiting",
   "max_per_hour": "Max Emails per Hour",
+  "max_per_hour_description": "Your mail provider's limit. Jasmin sends nothing past it within an hour; those emails show as “Hourly limit reached” in the email log.",
   "invoice_settings_title": "Invoice Settings",
   "test_title": "Send Test Email",
   "test_recipient": "Recipient",

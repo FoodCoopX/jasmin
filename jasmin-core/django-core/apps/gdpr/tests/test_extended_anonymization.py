@@ -344,7 +344,7 @@ class TestEmailLogAnonymization:
         EmailLog.objects.create(
             recipient="alice.member@example.com",
             subject="Invoice March",
-            status="delivered",
+            status="sent",
         )
         EmailLog.objects.create(
             recipient="alice@example.com",

@@ -117,14 +117,9 @@ interface TenantContextValue {
   getCurrentSetting: TenantSettingGetter<TenantOverlaySettings>;
   getCurrency: () => unknown;
   getTimezone: () => unknown;
+  /** Resolved absolute URL for ``tenant.logo``; ``null`` when the tenant has
+   * uploaded none — the nav bar, login and page headers then show no logo. */
   logoUrl: string | null;
-  /** ``logoUrl`` with a fallback to the bundled Jasmin logo when the tenant
-   * has none — for UI chrome (nav bar, login, member/customer headers).
-   * ``null`` when there is neither a tenant logo NOR the bundled fallback
-   * file, so consumers render nothing (not a broken image). Documents/PDFs
-   * keep using the raw ``logoUrl`` (a platform logo on a tenant's invoice
-   * would be wrong). */
-  displayLogoUrl: string | null;
   /** Resolved absolute URL for ``tenant.bio_logo`` (EU organic
    * certification mark). Same shape as ``logoUrl``: ``null`` when the
    * tenant has no bio logo uploaded. Used by invoice / delivery-note
@@ -456,23 +451,6 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     return `${backendUrl}${logo}`;
   }, [currentTenant?.logo]);
 
-  // UI fallback: when the tenant has uploaded no logo, show the bundled
-  // Jasmin logo (public/jasmin_logo.png) so nav/login/headers aren't blank.
-  // If that bundled file is ALSO absent, fall through to null so consumers
-  // render nothing instead of a broken-image icon. Optimistic: assume it's
-  // present (no first-paint flicker) and only drop to null if the probe 404s.
-  const [fallbackLogoMissing, setFallbackLogoMissing] = useState(false);
-  useEffect(() => {
-    const img = new Image();
-    img.onerror = () => setFallbackLogoMissing(true);
-    img.src = "/jasmin_logo.png";
-    return () => {
-      img.onerror = null;
-    };
-  }, []);
-  const displayLogoUrl =
-    logoUrl ?? (fallbackLogoMissing ? null : "/jasmin_logo.png");
-
   // Same resolver as ``logoUrl`` for the organic-certification mark.
   const bioLogoUrl = useMemo(() => {
     const bioLogo = currentTenant?.bio_logo;
@@ -567,7 +545,6 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       getCurrency,
       getTimezone,
       logoUrl,
-      displayLogoUrl,
       bioLogoUrl,
       faviconUrl,
 
@@ -584,7 +561,6 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       getCurrency,
       getTimezone,
       logoUrl,
-      displayLogoUrl,
       bioLogoUrl,
       faviconUrl,
       refreshTenant,

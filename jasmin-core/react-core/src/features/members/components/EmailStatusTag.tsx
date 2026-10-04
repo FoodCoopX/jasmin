@@ -8,17 +8,21 @@ interface EmailStatusTagProps {
   status: string;
 }
 
+// Held back on purpose — in onboarding mode, or past the tenant's hourly limit.
+const HINTED_STATUSES = new Set(["suppressed", "rate_limited"]);
+
 /**
- * An email log status as a colored tag with a short label. A suppressed email
- * also says why it was not sent: in a light tooltip on hover, and as the tag's
- * accessible description.
+ * An email log status as a colored tag with a short label. An email held back
+ * on purpose — suppressed in onboarding mode, or past the tenant's hourly limit
+ * — also says why it was not sent: in a light tooltip on hover, and as the
+ * tag's accessible description.
  */
 export default function EmailStatusTag({ status }: EmailStatusTagProps) {
   const { t } = useTranslation();
   const hintId = useId();
   const label = t(`email_matrix.status.${status}`);
 
-  if (status !== "suppressed") {
+  if (!HINTED_STATUSES.has(status)) {
     return (
       <Tag color={getEmailStatusColor(status)} className="email-status-tag">
         {label}
@@ -26,7 +30,7 @@ export default function EmailStatusTag({ status }: EmailStatusTagProps) {
     );
   }
 
-  const hint = t("email_matrix.status_hint.suppressed");
+  const hint = t(`email_matrix.status_hint.${status}`);
   return (
     <Tooltip
       title={hint}

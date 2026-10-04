@@ -15,7 +15,7 @@ import { useAuth } from "@shared/contexts/AuthContext";
 import { useLocale } from "@shared/contexts/LocaleContext";
 import { ModalProvider } from "@shared/contexts/ModalContext";
 import { NavigationProvider } from "@shared/contexts/NavigationContext";
-import { useTheme } from "@hooks/index";
+import { useErrorDateFormat, useTheme } from "@hooks/index";
 import LoginPage from "@features/auth/pages/LoginPage";
 import RegistrationPage from "@features/auth/pages/registration/RegistrationPage";
 import SetPasswordPage from "@features/auth/pages/SetPasswordPage";
@@ -42,6 +42,7 @@ export default function JasminApp() {
   const { language, theme: userTheme } = useLocale();
   const { user, isAuthenticated, bootstrapping } = useAuth();
   const { i18n } = useTranslation();
+  useErrorDateFormat();
 
   const { defaultAlgorithm, darkAlgorithm } = theme;
 

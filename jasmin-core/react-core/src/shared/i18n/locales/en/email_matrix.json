@@ -4,7 +4,6 @@
     "subject": "Subject",
     "status_col": "Status",
     "sent_at": "Sent",
-    "delivered_at": "Delivered",
     "accounts": {
         "invitation": "Invitation",
         "password_reset": "Password reset",
@@ -33,15 +32,12 @@
     "status": {
         "pending": "Pending",
         "sent": "Sent",
-        "delivered": "Delivered",
-        "bounced": "Hard bounce",
-        "deferred": "Deferred",
-        "complained": "Marked as spam",
-        "rejected": "Provider rejected",
         "failed": "Send failed",
-        "suppressed": "Not sent"
+        "suppressed": "Not sent",
+        "rate_limited": "Hourly limit reached"
     },
     "status_hint": {
-        "suppressed": "Not sent because onboarding mode was on."
+        "suppressed": "Not sent because onboarding mode was on.",
+        "rate_limited": "Not sent because the hourly email limit was reached. Send it again later."
     }
 }

@@ -1580,7 +1580,8 @@ paths:
         entry can be offered; a capacity 409 means the slot filled up between the
         office''s view and the click. Refused with 409 while the tenant''s onboarding
         mode is on, because no member emails are sent then: no capacity is held and
-        no magic link is minted.'
+        no magic link is minted. Refused with 409 for a member without an email address,
+        whom the offer would never reach.'
       parameters:
       - in: path
         name: id
@@ -23170,7 +23171,7 @@ paths:
         Supports filter params:
           * ``recipient`` — case-insensitive partial match
           * ``purpose``   — exact slug (e.g. ``commissioning.invoice``)
-          * ``status``    — exact status choice (sent, failed, bounced, …)
+          * ``status``    — exact status choice (sent, failed, suppressed, …)
       parameters:
       - name: limit
         required: false
@@ -23204,13 +23205,9 @@ paths:
         schema:
           type: string
           enum:
-          - bounced
-          - complained
-          - deferred
-          - delivered
           - failed
           - pending
-          - rejected
+          - rate_limited
           - sent
           - suppressed
         description: Exact delivery status.
@@ -23240,7 +23237,7 @@ paths:
         Supports filter params:
           * ``recipient`` — case-insensitive partial match
           * ``purpose``   — exact slug (e.g. ``commissioning.invoice``)
-          * ``status``    — exact status choice (sent, failed, bounced, …)
+          * ``status``    — exact status choice (sent, failed, suppressed, …)
       parameters:
       - in: path
         name: id
@@ -30556,24 +30553,16 @@ components:
       enum:
       - pending
       - sent
-      - delivered
-      - bounced
-      - deferred
-      - complained
-      - rejected
       - failed
       - suppressed
+      - rate_limited
       type: string
       description: |-
         * `pending` - Pending
         * `sent` - Sent
-        * `delivered` - Delivered
-        * `bounced` - Bounced
-        * `deferred` - Deferred
-        * `complained` - Complained
-        * `rejected` - Rejected
         * `failed` - Failed
         * `suppressed` - Suppressed
+        * `rate_limited` - Rate limited
     EmailTemplateDetail:
       type: object
       properties:

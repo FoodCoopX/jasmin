@@ -10,6 +10,8 @@ from django.db.models import OuterRef, Q, QuerySet, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from isoweek import Week
 
+from apps.shared.languages import LanguageChoices
+
 from ..models import (
     Forecast,
     ForecastOfferGroup,
@@ -27,6 +29,14 @@ from .bulk_email_job import create_send_record_idempotent, emit_progress
 from .share_demand_service import ShareDemandService
 
 logger = logging.getLogger(__name__)
+
+
+def offer_period(delivery_week: int, year: int, language: str | None) -> str:
+    """The delivery week an offer email names, in the email's language."""
+    if language == LanguageChoices.DE:
+        return f"KW {delivery_week}/{year}"
+    return f"Week {delivery_week}, {year}"
+
 
 # Maps unit type to the PU conversion attribute on ShareArticle
 _PU_CONVERSION_ATTRS: dict[str, str] = {
@@ -987,7 +997,11 @@ class OfferService:
                         # delivery day (OrdersDeliveryDay.default_last_possible_
                         # ordering_day/time). The order sheet (offer_url) shows
                         # and enforces each day's cutoff.
-                        "offer": {"period": f"Week {delivery_week}, {year}"},
+                        "offer": {
+                            "period": offer_period(
+                                delivery_week, year, ctx["tenant_language"]
+                            )
+                        },
                         "offer_url": offer_url,
                     },
                     language=ctx["tenant_language"] or None,

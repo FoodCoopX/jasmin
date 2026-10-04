@@ -4,7 +4,6 @@
     "subject": "Betreff",
     "status_col": "Status",
     "sent_at": "versandt",
-    "delivered_at": "zugestellt",
     "accounts": {
         "invitation": "Einladung",
         "password_reset": "Passwort-Reset",
@@ -33,15 +32,12 @@
     "status": {
         "pending": "Ausstehend",
         "sent": "Gesendet",
-        "delivered": "Zugestellt",
-        "bounced": "Bounce (hart)",
-        "deferred": "Verzögert",
-        "complained": "Als Spam markiert",
-        "rejected": "Provider-Ablehnung",
         "failed": "Versand-Fehler",
-        "suppressed": "Nicht verschickt"
+        "suppressed": "Nicht verschickt",
+        "rate_limited": "Stundenlimit erreicht"
     },
     "status_hint": {
-        "suppressed": "Nicht verschickt, weil der Onboarding-Modus aktiv war."
+        "suppressed": "Nicht verschickt, weil der Onboarding-Modus aktiv war.",
+        "rate_limited": "Nicht verschickt, weil das Stundenlimit für E-Mails erreicht war. Später erneut senden."
     }
 }

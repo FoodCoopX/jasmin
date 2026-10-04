@@ -329,6 +329,14 @@ class WaitingListOfferExpired(ConflictError):
     code = "waiting_list_offer.expired"
 
 
+class WaitingListOfferMemberHasNoEmail(ConflictError):
+    """The member has no email address, so the offer — a link only the email
+    carries — would never reach them while the freed spot stayed on hold for
+    them. Add an address to the member, then offer the spot."""
+
+    code = "waiting_list_offer.member_has_no_email"
+
+
 class DeliveryStationCapacityBelowOccupancy(BadRequestError):
     """Refuse setting a station-day's capacity below what's already booked for
     a current/future week.

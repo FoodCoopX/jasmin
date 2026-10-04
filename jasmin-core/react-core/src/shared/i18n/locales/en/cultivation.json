@@ -1,0 +1,20 @@
+{
+  "amounts_for_cultivation": "Cultivation amounts",
+  "outdoors_cultivation": "Open field",
+  "sets_outdoors": "Open-field successions",
+  "sorts_seedlings_outdoors": "Seedling varieties",
+  "sorts_seeds_outdoors": "Seed varieties",
+  "indoors_cultivation": "Greenhouse",
+  "sets_indoors": "Greenhouse successions",
+  "sorts_seedlings_indoors": "Seedling varieties",
+  "sorts_seeds_indoors": "Seed varieties",
+  "list_planting": "Planting list",
+  "list_sowing": "Sowing list",
+  "documentation_fertilizer": "Fertilizers",
+  "documentation_pesticides": "Plant protection products",
+  "data": "Data",
+  "vegetable_families": "Vegetable families",
+  "plant_families": "Plant families",
+  "seller_seedlings": "Seedling suppliers",
+  "seller_seeds": "Seed suppliers"
+}

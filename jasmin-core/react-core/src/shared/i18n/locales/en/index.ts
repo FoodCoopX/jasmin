@@ -27,6 +27,7 @@ import consent from './consent.json';
 import privacy from './privacy.json';
 import sepa from './sepa.json';
 import economics from './economics.json';
+import cultivation from './cultivation.json';
 import profile from './profile.json';
 import users from './users.json';
 import import_shares from './import_shares.json';
@@ -52,6 +53,7 @@ export default {
   statistics,
   errors,
   economics,
+  cultivation,
   tooltip,
   download,
   explainers,

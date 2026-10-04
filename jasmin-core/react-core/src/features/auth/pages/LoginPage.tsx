@@ -21,6 +21,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { HomeScreenSignInNotice } from "../components/HomeScreenSignInNotice";
 import { SessionNoticeAlert } from "../components/SessionNoticeAlert";
 
 const { Title, Text } = Typography;
@@ -50,7 +51,7 @@ const LoginPage = () => {
 
   const {
     tenant,
-    displayLogoUrl,
+    logoUrl,
     loading: tenantLoading,
     getSetting,
   } = useTenant();
@@ -160,11 +161,11 @@ const LoginPage = () => {
       >
         {/* Header banner: the tenant logo (or name), spanning the full
             width of the card row below. */}
-        {(displayLogoUrl || tenant?.name) && (
+        {(logoUrl || tenant?.name) && (
           <Card className="auth-card--shadow auth-banner">
-            {displayLogoUrl ? (
+            {logoUrl ? (
               <img
-                src={displayLogoUrl}
+                src={logoUrl}
                 alt={tenant?.name ?? t("common.logo")}
                 width={200}
                 height={75}
@@ -209,6 +210,7 @@ const LoginPage = () => {
               </div>
 
               <SessionNoticeAlert />
+              <HomeScreenSignInNotice />
 
               {displayError && (
                 <Alert

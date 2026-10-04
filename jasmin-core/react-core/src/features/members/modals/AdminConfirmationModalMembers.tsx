@@ -32,14 +32,11 @@ interface AdminConfirmationModalMembersProps {
    *  onboarding mode is on, empty otherwise. */
   onConfirm?: (body: AdminConfirmationRequest) => void;
   /**
-   * Optional handler that closes this modal and opens the
-   * RejectMemberModal for the same member. When provided, a
-   * destructive "Reject" button appears next to "Confirm" in the
-   * footer for pending members. When omitted, no reject control
-   * shows — keeps the modal backward-compatible for callers that
-   * haven't wired the reject flow yet.
+   * Closes this modal and opens the RejectMemberModal for the same member,
+   * from the destructive "Reject" button next to "Confirm" in the footer of
+   * a pending member.
    */
-  onReject?: () => void;
+  onReject: () => void;
   loading?: boolean;
 }
 

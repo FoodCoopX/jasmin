@@ -441,7 +441,7 @@ class TestEmailLogSection:
         EmailLog.objects.create(
             recipient="alice.member@example.com",
             subject="Invoice March",
-            status="delivered",
+            status="sent",
         )
         # Unrelated row.
         EmailLog.objects.create(

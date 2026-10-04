@@ -43,7 +43,7 @@ vi.mock("@hooks/index", async () => {
   // Built once, outside the hook factories, so a re-render never hands the
   // page a fresh object identity — that would defeat the render-loop smoke
   // test at the bottom of this file.
-  const tenant = makeUseTenantMock({ displayLogoUrl: null });
+  const tenant = makeUseTenantMock({ logoUrl: null });
   const currency = {
     currencyCode: "EUR",
     currencySymbol: "€",

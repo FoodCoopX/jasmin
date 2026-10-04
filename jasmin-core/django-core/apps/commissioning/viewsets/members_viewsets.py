@@ -1237,7 +1237,9 @@ class SubscriptionViewSet(
             "entry can be offered; a capacity 409 means the slot filled up "
             "between the office's view and the click. Refused with 409 while "
             "the tenant's onboarding mode is on, because no member emails are "
-            "sent then: no capacity is held and no magic link is minted."
+            "sent then: no capacity is held and no magic link is minted. "
+            "Refused with 409 for a member without an email address, whom "
+            "the offer would never reach."
         ),
         request=inline_serializer(
             name="OfferSpotRequest",
@@ -1256,8 +1258,9 @@ class SubscriptionViewSet(
             # Not a pending waiting-list entry, waiting list off, or an invalid
             # or below-floor price.
             400: ErrorResponseSerializer,
-            # Capacity full, ``EmailActionBlockedInOnboardingMode``, or
-            # ``EmailSendingNotSetUp`` (no SMTP host of the tenant's own).
+            # Capacity full, ``EmailActionBlockedInOnboardingMode``,
+            # ``EmailSendingNotSetUp`` (no SMTP host of the tenant's own), or
+            # ``WaitingListOfferMemberHasNoEmail``.
             409: ErrorResponseSerializer,
         },
     )

@@ -9,13 +9,9 @@
 /**
  * * `pending` - Pending
 * `sent` - Sent
-* `delivered` - Delivered
-* `bounced` - Bounced
-* `deferred` - Deferred
-* `complained` - Complained
-* `rejected` - Rejected
 * `failed` - Failed
 * `suppressed` - Suppressed
+* `rate_limited` - Rate limited
  */
 export type EmailLogStatusEnum = typeof EmailLogStatusEnum[keyof typeof EmailLogStatusEnum];
 
@@ -24,11 +20,7 @@ export type EmailLogStatusEnum = typeof EmailLogStatusEnum[keyof typeof EmailLog
 export const EmailLogStatusEnum = {
   pending: 'pending',
   sent: 'sent',
-  delivered: 'delivered',
-  bounced: 'bounced',
-  deferred: 'deferred',
-  complained: 'complained',
-  rejected: 'rejected',
   failed: 'failed',
   suppressed: 'suppressed',
+  rate_limited: 'rate_limited',
 } as const;

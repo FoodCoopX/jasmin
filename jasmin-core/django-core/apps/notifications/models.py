@@ -67,16 +67,16 @@ class EmailTemplate(models.Model):
 
 
 class EmailLog(models.Model):
+    # What the send path writes. Delivery, bounces and spam reports never
+    # reach Jasmin: mail goes out over the tenant's own SMTP server, with no
+    # provider webhook behind it.
     STATUS_CHOICES = [
-        ("pending", "Pending"),  # row created, not yet handed to provider
-        ("sent", "Sent"),  # provider accepted the API request
-        ("delivered", "Delivered"),  # recipient mailserver accepted
-        ("bounced", "Bounced"),  # hard bounce: bad address, blocked, ...
-        ("deferred", "Deferred"),  # soft bounce: provider will retry
-        ("complained", "Complained"),  # marked as spam by recipient
-        ("rejected", "Rejected"),  # provider refused (unverified domain ...)
+        ("pending", "Pending"),  # row created, not yet handed to the SMTP server
+        ("sent", "Sent"),  # the SMTP server accepted it
         ("failed", "Failed"),  # network / unknown error during send
         ("suppressed", "Suppressed"),  # not sent: the tenant is in onboarding mode
+        # Not sent: the tenant's ``max_emails_per_hour`` was reached.
+        ("rate_limited", "Rate limited"),
     ]
 
     # Recipient + content snapshot. We do NOT store the rendered HTML body
@@ -103,6 +103,7 @@ class EmailLog(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     sent_at = models.DateTimeField(null=True, blank=True)
+    # Never written (see ``STATUS_CHOICES``); kept because the API serves it.
     delivered_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

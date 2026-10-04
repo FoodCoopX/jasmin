@@ -9,7 +9,7 @@ import pytest
 from django.utils import timezone
 
 from apps.commissioning.models import ForecastOfferGroup, Offer
-from apps.commissioning.services.offer_service import OfferService
+from apps.commissioning.services.offer_service import OfferService, offer_period
 from apps.commissioning.tests.factories import (
     ForecastFactory,
     JasminUserFactory,
@@ -806,7 +806,8 @@ class TestBulkSendOffersViaEmailContext:
         ctx = kwargs["context"]
         assert ctx["tenant_name"] == "Test Coop"
         assert ctx["reseller"] == {"name": reseller.contact.name}
-        assert ctx["offer"]["period"] == "Week 15, 2026"
+        # In the email's language: the tenant's German.
+        assert ctx["offer"]["period"] == "KW 15/2026"
         # No single deadline — the cutoff is per delivery day and enforced
         # on the order sheet.
         assert "deadline" not in ctx["offer"]
@@ -814,6 +815,17 @@ class TestBulkSendOffersViaEmailContext:
         assert ctx["offer_url"] == (
             f"https://test.example.org/commissioning/customer-orders/{reseller.id}"
         )
+
+
+class TestOfferPeriod:
+    """The delivery week an offer email names, in the email's language."""
+
+    def test_german(self):
+        assert offer_period(24, 2026, "de") == "KW 24/2026"
+
+    @pytest.mark.parametrize("language", ["en", None])
+    def test_english_otherwise(self, language):
+        assert offer_period(24, 2026, language) == "Week 24, 2026"
 
 
 @pytest.mark.django_db

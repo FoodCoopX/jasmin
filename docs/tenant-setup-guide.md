@@ -71,36 +71,56 @@ flooding the tenant, but a bigger onboarding runs into them:
 - Inviting a member to their account and confirming a subscription count one
   each.
 
-Only the platform operator can raise the limits. They are stored on the
-tenant's platform record (`Tenant.action_rate_limit_overrides`), out of the
-office's reach on purpose. Before the import, raise them on the server, with
-headroom over the number of members; replace `<schema>` with the tenant's
-schema name:
-
-```shell
-docker compose exec backend python manage.py shell -c "
-from apps.shared.tenants.models import Tenant
-tenant = Tenant.objects.get(schema_name='<schema>')
-tenant.action_rate_limit_overrides = {
-    'member_creation': {'weekly': 5000},
-    'user_creation': {'weekly': 5000},
-    'subscription_confirmation': {'weekly': 5000},
-}
-tenant.save(update_fields=['action_rate_limit_overrides'])
-"
-```
+Only the platform operator can raise the limits: they are part of the tenant's
+platform record, out of the office's reach on purpose. Before the import, open
+the tenant's page in the platform admin and, under **Rate limits**, enter weekly
+limits with headroom over the number of members for *Member creation*, *User
+creation* and *Subscription confirmation*. A blank field keeps the default, and
+saving asks you to confirm your identity again.
 
 A single upload takes at most 5000 rows, so split a bigger file once the limits
 are raised.
 
-When the onboarding is done, put the limits back so the protective defaults
-apply again. If the tenant had overrides before, restore those instead:
+When the onboarding is done, clear those fields again so the protective defaults
+apply. If the tenant had raised limits before, restore those instead.
 
-```shell
-docker compose exec backend python manage.py shell -c "
-from apps.shared.tenants.models import Tenant
-tenant = Tenant.objects.get(schema_name='<schema>')
-tenant.action_rate_limit_overrides = {}
-tenant.save(update_fields=['action_rate_limit_overrides'])
-"
-```
+## 7. Email from the tenant's own domain
+
+Jasmin sends the tenant's mail — invitations, password resets, invoices, offers
+— through the tenant's own mail server, set up under Configuration → Email. A
+successful test email there only proves that the server accepts Jasmin's login.
+Whether Gmail, Outlook and the rest trust the mail depends on three DNS records
+for the sending domain, the part after the @ in the sender address. Without
+them, invitations and password resets land in spam.
+
+The records go in at the domain's DNS host (Strato, IONOS, Cloudflare, …) — not
+in a mailbox and not in Jasmin. They don't change how the existing mailboxes
+work.
+
+- **SPF**, a TXT record on the domain listing the servers that may send for it.
+  The value comes from the mail provider's help pages, for example
+  `v=spf1 include:_spf.google.com ~all` for Google Workspace or
+  `v=spf1 include:spf.protection.outlook.com -all` for Microsoft 365; Strato,
+  IONOS and mailbox.org publish theirs the same way. A domain may have only one
+  SPF record: if there is one already, add the provider's `include:` to it
+  instead of creating a second. If the tenant already sends mail from the domain
+  through the same provider, it is probably right already.
+- **DKIM**, the public key the provider signs each message with, as a CNAME or
+  TXT record whose name ends in `._domainkey`. Every provider generates its own;
+  its admin pages show exactly what to enter.
+- **DMARC**, a TXT record named `_dmarc` that tells receivers what to do with
+  mail failing SPF and DKIM, and where to send their reports. Tighten it in
+  steps, each once the reports show all legitimate mail passing:
+  1. `v=DMARC1; p=none; rua=mailto:dmarc@<domain>` — only reports;
+  2. `v=DMARC1; p=quarantine; rua=mailto:dmarc@<domain>` — failing mail goes
+     to spam;
+  3. `v=DMARC1; p=reject; rua=mailto:dmarc@<domain>` — failing mail is refused.
+
+To check the result, send a mail from the domain to a checker such as
+mail-tester.com, or look the domain up on mxtoolbox.com. In Gmail, "Show
+original" on a received mail lists SPF, DKIM and DMARC as PASS or FAIL.
+
+While there, set **Max emails per hour** under Configuration → Email to the
+provider's limit. Jasmin sends nothing past it in any hour — those emails show
+as not sent in the email log — so a large offer or reminder run can't get the
+account blocked.

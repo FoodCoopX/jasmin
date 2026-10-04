@@ -20,7 +20,7 @@ import GrassIcon from "@mui/icons-material/Grass";
 const { Header } = Layout;
 
 function PrimaryNavigation() {
-  const { displayLogoUrl, tenantName } = useTenant();
+  const { logoUrl, tenantName } = useTenant();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
@@ -49,9 +49,9 @@ function PrimaryNavigation() {
           transform: "translateX(-50%)",
         }}
       >
-        {displayLogoUrl && (
+        {logoUrl && (
           <img
-            src={displayLogoUrl}
+            src={logoUrl}
             alt={tenantName ?? t("common.logo")}
             width={isMobile ? 160 : 200}
             height={isMobile ? 50 : 75}

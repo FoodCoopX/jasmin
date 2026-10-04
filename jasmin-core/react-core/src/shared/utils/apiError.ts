@@ -23,6 +23,36 @@ export interface JasminErrorPayload {
   [key: string]: unknown;
 }
 
+let formatDetailDate: ((isoDate: string) => string) | null = null;
+
+/**
+ * Lets error messages show dates in the tenant's format. `getErrorMessage` is
+ * a plain function with no access to the tenant, so the tenant app hands it
+ * the tenant's formatter once (`useErrorDateFormat`); without one, a date in
+ * an error's `details` stays ISO.
+ */
+export function setErrorDateFormatter(
+  formatter: ((isoDate: string) => string) | null,
+): void {
+  formatDetailDate = formatter;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** `details` with every ISO date (`YYYY-MM-DD`) in the tenant's format. */
+function withDisplayDates(
+  details: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  const format = formatDetailDate;
+  if (!details || !format) return details;
+  return Object.fromEntries(
+    Object.entries(details).map(([key, value]) => [
+      key,
+      typeof value === "string" && ISO_DATE.test(value) ? format(value) : value,
+    ]),
+  );
+}
+
 /**
  * Narrow an unknown caught value to an Axios error, returning `null` for
  * anything else (network blips, non-axios throws, browser bugs).
@@ -92,7 +122,8 @@ export function getErrorMessage(err: unknown, fallback = "Request failed"): stri
  * are already translated server-side; trust the backend's `message`).
  *
  * The error's `details` are passed to i18next as interpolation values, so a
- * keyed message can render specifics (e.g. `{{total}}`, `{{minimum}}`). A
+ * keyed message can render specifics (e.g. `{{total}}`, `{{minimum}}`), with
+ * ISO dates in the tenant's format (`setErrorDateFormatter`). A
  * `details.context` value selects an i18next variant
  * (`errors.<code>_<context>`) — used by errors whose phrasing changes by
  * case, like a two-sided range vs. a single bound.
@@ -103,7 +134,7 @@ function translateByCode(err: unknown): string | undefined {
   // DRF/Django generic codes pass through to the already-translated message.
   if (code === "validation_error" || code === "not_authenticated") return undefined;
   const key = `errors.${code}`;
-  const details = getErrorDetails(err);
+  const details = withDisplayDates(getErrorDetails(err));
   const translated = i18n.t(key, details);
   return translated && translated !== key ? translated : undefined;
 }

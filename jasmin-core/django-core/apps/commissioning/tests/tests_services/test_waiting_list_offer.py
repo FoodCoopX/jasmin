@@ -19,9 +19,10 @@ from django.utils import timezone
 from apps.commissioning.errors import (
     WaitingListOfferExpired,
     WaitingListOfferInvalid,
+    WaitingListOfferMemberHasNoEmail,
     WaitingListOfferNotAvailable,
 )
-from apps.commissioning.models import Subscription
+from apps.commissioning.models import Member, Subscription
 from apps.commissioning.services.variation_capacity_service import (
     VariationCapacityService,
 )
@@ -99,6 +100,20 @@ class TestWaitingListOffer:
         )
         with pytest.raises(WaitingListOfferNotAvailable):
             WaitingListOfferService.offer_spot(sub)
+
+    def test_a_member_without_an_email_is_refused(self, tenant, dsd):
+        # Only the email carries the offer link: the slot would stay on hold
+        # for someone who is never told.
+        variation = ShareTypeVariationFactory(capacity=5)
+        sub = _pending(variation, dsd)
+        Member.objects.filter(pk=sub.member_id).update(email="")
+
+        with pytest.raises(WaitingListOfferMemberHasNoEmail):
+            WaitingListOfferService.offer_spot(Subscription.objects.get(pk=sub.pk))
+
+        sub.refresh_from_db()
+        assert sub.waiting_list_status == Subscription.WaitingListStatus.PENDING
+        assert sub.notification_token is None
 
     def test_offer_sets_spot_available_with_token(self, tenant, dsd):
         variation = ShareTypeVariationFactory(capacity=5)

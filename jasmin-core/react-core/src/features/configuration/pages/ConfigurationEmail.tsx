@@ -287,6 +287,7 @@ export default function ConfigurationEmail() {
           {
             key: "max_emails_per_hour",
             label: t("email_config.max_per_hour"),
+            description: t("email_config.max_per_hour_description"),
             type: "number",
             min: 1,
             max: 100000,

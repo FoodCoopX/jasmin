@@ -96,6 +96,13 @@ class TestMassDeleteAlerts:
         assert str(actor.pk) in kwargs["message"]
         assert "commissioning.Member" in kwargs["message"]
         assert str(gdpr_tasks.MASS_DELETE_THRESHOLD) in kwargs["message"]
+        # Triage starts from a query on the tenant's audit log (no Django
+        # admin is installed).
+        assert (
+            f'FROM "{tenant.schema_name}".auditlog_logentry '
+            f"WHERE actor_id = '{actor.pk}' AND action = {LogEntry.Action.DELETE}"
+        ) in kwargs["message"]
+        assert "/admin/" not in kwargs["message"]
         # Dedup state recorded so the next run inside the cooldown
         # window is suppressed.
         assert (tenant.schema_name, str(actor.pk)) in (

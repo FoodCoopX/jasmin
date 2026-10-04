@@ -45,7 +45,7 @@ const { Text } = Typography;
 export default function CustomerOrderPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { displayLogoUrl } = useTenant();
+  const { logoUrl } = useTenant();
   const { formatCurrency } = useCurrency();
   const { formatDateTime, dateFormat } = useTimeFormat();
   const queryClient = useQueryClient();
@@ -271,7 +271,7 @@ export default function CustomerOrderPage() {
 
   return (
     <div style={{ padding: "24px", maxWidth: "1200px", margin: "0 auto" }}>
-      <CustomerOrderHeader reseller={reseller} logoUrl={displayLogoUrl} />
+      <CustomerOrderHeader reseller={reseller} logoUrl={logoUrl} />
 
       <div style={{ marginBottom: "24px" }}>
         <WeekSelector

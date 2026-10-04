@@ -94,6 +94,7 @@ function renderModal(member: MemberRecord) {
         onClose={vi.fn()}
         member={member}
         onConfirm={onConfirm}
+        onReject={vi.fn()}
       />
     </QueryClientProvider>,
   );

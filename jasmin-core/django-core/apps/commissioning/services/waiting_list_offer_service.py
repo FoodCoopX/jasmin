@@ -40,6 +40,7 @@ from ..errors import (
     SubscriptionPriceInvalid,
     WaitingListOfferExpired,
     WaitingListOfferInvalid,
+    WaitingListOfferMemberHasNoEmail,
     WaitingListOfferNotAvailable,
 )
 from ..models import DeliveryStationDay, Subscription
@@ -116,6 +117,10 @@ class WaitingListOfferService:
         ):
             raise WaitingListOfferNotAvailable(
                 "This subscription is not a pending waiting-list entry."
+            )
+        if not subscription.member.email:
+            raise WaitingListOfferMemberHasNoEmail(
+                "The member has no email address to send the offer to."
             )
 
         # Office-adjusted price (e.g. refreshed after a long wait) — applied

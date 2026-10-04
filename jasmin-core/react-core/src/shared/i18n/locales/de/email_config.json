@@ -33,6 +33,7 @@
   "api_key_set": "API-Schlüssel ist gesetzt. Leer lassen, um den aktuellen beizubehalten.",
   "rate_limit_title": "Ratenbegrenzung",
   "max_per_hour": "Maximale E-Mails pro Stunde",
+  "max_per_hour_description": "Das Limit deines E-Mail-Anbieters. Was in einer Stunde darüber hinausgeht, verschickt Jasmin nicht; im E-Mail-Protokoll steht es als „Stundenlimit erreicht“.",
   "invoice_settings_title": "Rechnungseinstellungen",
   "test_title": "Test-E-Mail senden",
   "test_recipient": "Empfänger",

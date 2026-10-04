@@ -1,6 +1,7 @@
-// EmailStatusTag shows a short status label; a suppressed email also explains,
-// on hover and as the tag's accessible description, that onboarding mode kept
-// it from being sent.
+// EmailStatusTag shows a short status label; an email held back on purpose —
+// suppressed in onboarding mode, or past the tenant's hourly limit — also
+// explains, on hover and as the tag's accessible description, why it wasn't
+// sent.
 
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -44,5 +45,13 @@ describe("EmailStatusTag", () => {
     const tooltip = await screen.findByRole("tooltip");
     expect(tooltip).toHaveTextContent("email_matrix.status_hint.suppressed");
     expect(tooltip.closest(".custom-tooltip")).not.toBeNull();
+  });
+
+  it("explains an email held back by the hourly limit", () => {
+    render(<EmailStatusTag status="rate_limited" />);
+
+    expect(
+      screen.getByText("email_matrix.status.rate_limited"),
+    ).toHaveAccessibleDescription("email_matrix.status_hint.rate_limited");
   });
 });

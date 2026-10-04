@@ -11,17 +11,13 @@
  * guard, so a PR that adds a German key without an English one shows up in the
  * test output instead of slipping in unnoticed.
  *
- * Scope mirrors the German test: the deferred apps (cultivation / economics /
- * staff) are excluded, and French / Italian are intentionally ignored.
+ * French and Italian are intentionally ignored.
  */
 
 import { describe, it } from "vitest";
 
 import de from "../locales/de";
 import en from "../locales/en";
-
-// Top-level namespaces deliberately left to fall back to German for now.
-const EXCLUDED_NAMESPACES = new Set(["cultivation", "economics", "staff"]);
 
 function flatten(obj: unknown, prefix: string, acc: Set<string>): void {
   if (obj === null || typeof obj !== "object") {
@@ -40,15 +36,11 @@ describe("EN i18n coverage (warn-only)", () => {
     flatten(de, "", deKeys);
     flatten(en, "", enKeys);
 
-    const missing = [...deKeys].filter((key) => {
-      const namespace = key.split(".")[0];
-      if (EXCLUDED_NAMESPACES.has(namespace)) return false;
-      return !enKeys.has(key);
-    });
+    const missing = [...deKeys].filter((key) => !enKeys.has(key));
 
     if (missing.length === 0) {
       console.log(
-        "\nEN i18n: complete — every in-scope German key has an English value.\n",
+        "\nEN i18n: complete — every German key has an English value.\n",
       );
       return;
     }

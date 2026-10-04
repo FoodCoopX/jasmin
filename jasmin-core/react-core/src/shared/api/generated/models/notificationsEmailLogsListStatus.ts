@@ -11,13 +11,9 @@ export type NotificationsEmailLogsListStatus = typeof NotificationsEmailLogsList
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const NotificationsEmailLogsListStatus = {
-  bounced: 'bounced',
-  complained: 'complained',
-  deferred: 'deferred',
-  delivered: 'delivered',
   failed: 'failed',
   pending: 'pending',
-  rejected: 'rejected',
+  rate_limited: 'rate_limited',
   sent: 'sent',
   suppressed: 'suppressed',
 } as const;

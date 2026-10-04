@@ -901,7 +901,11 @@ class TenantEmailConfigViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
             # SMTP / connection / config error the tenant hit, not crash
             # the request. Narrow to the realistic family of send-time
             # failures so genuine code bugs still surface as a 500.
-            logger.error(f"Test email failed for tenant {config.tenant_id}: {exc}")
+            logger.error(
+                "email_config.test_failed tenant=%s error=%s",
+                config.tenant_id,
+                type(exc).__name__,
+            )
             raise TestEmailSendFailed(f"Failed to send test email: {exc}") from exc
 
         if not ok:

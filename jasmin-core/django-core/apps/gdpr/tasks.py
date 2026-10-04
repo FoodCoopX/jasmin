@@ -452,9 +452,13 @@ def _send_mass_delete_ops_alert(
 
     Uses ``mail_admins`` (Django built-in) so the same SMTP path the
     platform's transactional mail uses also carries this — no extra
-    config. The email is short on purpose: ops triage starts in
-    ``/admin/auditlog/logentry/`` filtered by actor + last hour.
+    config. The email is short on purpose and names nobody: each burst
+    comes with the query that lists its deletions in the tenant schema's
+    audit log (Django admin isn't installed, so there is no admin page).
     """
+    from auditlog.models import LogEntry
+
+    window_hours = int(MASS_DELETE_WINDOW.total_seconds() // 3600)
     lines = ["The following mass-delete bursts crossed the threshold:", ""]
     for (tenant_schema, actor_id), counter, total in bursts:
         models_breakdown = ", ".join(
@@ -464,13 +468,21 @@ def _send_mass_delete_ops_alert(
             f"  tenant={tenant_schema} actor={actor_id} count={total} "
             f"({models_breakdown})"
         )
+        lines.append(
+            "    SELECT timestamp, content_type_id, object_pk, object_repr "
+            f'FROM "{tenant_schema}".auditlog_logentry '
+            f"WHERE actor_id = '{actor_id}' AND action = {LogEntry.Action.DELETE} "
+            f"AND timestamp >= now() - interval '{window_hours} hours' "
+            "ORDER BY timestamp;"
+        )
     lines.extend(
         [
             "",
-            f"Window: last {int(MASS_DELETE_WINDOW.total_seconds() // 3600)}h",
+            f"Window: last {window_hours}h",
             f"Threshold: {MASS_DELETE_THRESHOLD}",
             "",
-            "Triage at /admin/auditlog/logentry/ filtered by actor + timestamp.",
+            "Triage: run each burst's query in psql on the database "
+            "(docker compose exec postgres psql -U <user> -d <db>).",
         ]
     )
     mail_admins(

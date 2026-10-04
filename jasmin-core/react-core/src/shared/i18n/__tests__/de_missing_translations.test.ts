@@ -46,16 +46,7 @@ const SKIPPED_DIR_NAMES = new Set([
 
 // Substrings matched against the full file path. Useful when a whole
 // area legitimately uses dynamic keys you don't want to flag.
-const SKIPPED_PATH_FRAGMENTS: string[] = [
-  "/i18n/__tests__/",
-  "/api/generated/",
-  // Deferred apps (see CLAUDE.md "ignore the apps cultivation/economics/staff")
-  // — excluded so their in-progress keys don't block the enforced DE-coverage
-  // check for the in-scope apps.
-  "/features/staff/",
-  "/features/cultivation/",
-  "/features/economics/",
-];
+const SKIPPED_PATH_FRAGMENTS: string[] = ["/i18n/__tests__/", "/api/generated/"];
 
 // Exact keys you've decided to allow as missing — e.g. keys resolved
 // at runtime via plural suffixing, or keys you genuinely intend to
@@ -239,8 +230,7 @@ describe("DE i18n coverage", () => {
 
     // Enforced: a key used in code but missing from the DE bundle (the
     // fallbackLng) renders the raw key string to the user — exactly the bug
-    // this guards. Deferred apps are excluded via SKIPPED_PATH_FRAGMENTS so
-    // the in-scope backlog stays empty.
+    // this guards.
     throw new Error(lines.join("\n"));
   });
 });

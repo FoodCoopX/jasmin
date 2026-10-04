@@ -1,8 +1,9 @@
 /**
  * The email log renders ``email_matrix.status.<status>`` with a dynamic key the
  * missing-translation scan can't see, so every status the API can return needs
- * a de and en label here. The onboarding-mode email texts (banner effect,
- * hints, tooltips, rejection copy) must exist in both languages too.
+ * a de and en label here, and a status held back on purpose its hint. The
+ * onboarding-mode email texts (banner effect, hints, tooltips, rejection copy)
+ * must exist in both languages too.
  */
 
 import { describe, expect, it } from "vitest";
@@ -38,6 +39,7 @@ const ONBOARDING_EMAIL_KEYS = [
   "email_matrix.commissioning.subscription_renewal_failures_office",
   "errors.onboarding_mode.email_action_blocked",
   "email_matrix.status_hint.suppressed",
+  "email_matrix.status_hint.rate_limited",
   "members.application_pending_subtitle_no_email",
 ];
 

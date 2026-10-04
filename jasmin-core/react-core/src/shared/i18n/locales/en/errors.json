@@ -506,7 +506,8 @@
   "waiting_list_offer": {
     "expired": "This offer has expired. Please contact the office.",
     "invalid": "This offer link is invalid or has already been used.",
-    "not_available": "This subscription is not a pending waiting-list entry."
+    "not_available": "This subscription is not a pending waiting-list entry.",
+    "member_has_no_email": "This member has no email address to send the offer to. Add one to the member, then offer the spot."
   },
   "onboarding_mode": {
     "email_action_blocked": "This action emails the member, and no member emails are sent while onboarding mode is on. Turn off onboarding mode first."

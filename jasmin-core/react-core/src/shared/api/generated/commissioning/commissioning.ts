@@ -880,7 +880,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Offer a freed spot to a queued waiting-list member: holds both capacity axes (station-day reservation + status-counted variation hold) for the response window and emails the member a magic link to accept/decline without logging in. Optional ``price_per_delivery`` lets the office set the price at offer time (a waiting_list entry may be a year old). Only a PENDING waiting-list entry can be offered; a capacity 409 means the slot filled up between the office's view and the click. Refused with 409 while the tenant's onboarding mode is on, because no member emails are sent then: no capacity is held and no magic link is minted.
+ * Offer a freed spot to a queued waiting-list member: holds both capacity axes (station-day reservation + status-counted variation hold) for the response window and emails the member a magic link to accept/decline without logging in. Optional ``price_per_delivery`` lets the office set the price at offer time (a waiting_list entry may be a year old). Only a PENDING waiting-list entry can be offered; a capacity 409 means the slot filled up between the office's view and the click. Refused with 409 while the tenant's onboarding mode is on, because no member emails are sent then: no capacity is held and no magic link is minted. Refused with 409 for a member without an email address, whom the offer would never reach.
  */
 export const commissioningAbosOfferSpotCreate = (
     id: string,

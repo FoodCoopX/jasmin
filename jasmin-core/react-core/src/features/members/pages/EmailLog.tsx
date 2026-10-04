@@ -18,13 +18,9 @@ import EmailStatusTag from "../components/EmailStatusTag";
 const ALL_STATUSES: readonly NotificationsEmailLogsListStatus[] = [
   "pending",
   "sent",
-  "delivered",
-  "bounced",
-  "deferred",
-  "complained",
-  "rejected",
   "failed",
   "suppressed",
+  "rate_limited",
 ] as const;
 
 const ALL_PURPOSES = [

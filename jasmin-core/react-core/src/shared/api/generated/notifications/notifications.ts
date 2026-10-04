@@ -52,7 +52,7 @@ import { axiosService } from '../../../services/api';
 Supports filter params:
   * ``recipient`` — case-insensitive partial match
   * ``purpose``   — exact slug (e.g. ``commissioning.invoice``)
-  * ``status``    — exact status choice (sent, failed, bounced, …)
+  * ``status``    — exact status choice (sent, failed, suppressed, …)
  */
 export const notificationsEmailLogsList = (
     params?: NotificationsEmailLogsListParams,
@@ -147,7 +147,7 @@ export function useNotificationsEmailLogsList<TData = Awaited<ReturnType<typeof 
 Supports filter params:
   * ``recipient`` — case-insensitive partial match
   * ``purpose``   — exact slug (e.g. ``commissioning.invoice``)
-  * ``status``    — exact status choice (sent, failed, bounced, …)
+  * ``status``    — exact status choice (sent, failed, suppressed, …)
  */
 export const notificationsEmailLogsRetrieve = (
     id: number,

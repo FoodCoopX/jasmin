@@ -85,13 +85,6 @@ const MemberEmailsModal: FC<MemberEmailsModalProps> = ({
         width: "11em",
         render: (value: string | null) => (value ? formatDateTime(value) : "—"),
       },
-      {
-        title: t("email_matrix.delivered_at"),
-        dataIndex: "delivered_at",
-        key: "delivered_at",
-        width: "11em",
-        render: (value: string | null) => (value ? formatDateTime(value) : "—"),
-      },
     ],
     [t, formatDateTime],
   );

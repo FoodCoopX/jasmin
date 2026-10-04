@@ -59,7 +59,7 @@ const { Text } = Typography;
 const MemberDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
-  const { logoUrl, displayLogoUrl, tenantName } = useTenant();
+  const { logoUrl, tenantName } = useTenant();
   // The member's own view — for a member on their page, whatever staff roles
   // they also hold; office users get the office view.
   const selfService = useMemberSelfService(id);
@@ -75,7 +75,7 @@ const MemberDetail = () => {
   const [subscribeSuccessOpen, setSubscribeSuccessOpen] = useState(false);
   const [selectedDelivery, setSelectedDelivery] =
     useState<ShareDelivery | null>(null);
-  const { logoShape, logoAspectRatio } = useLogoShape(displayLogoUrl);
+  const { logoShape, logoAspectRatio } = useLogoShape(logoUrl);
 
   const currentWeek = dayjs().isoWeek();
   const currentYear = dayjs().isoWeekYear();
@@ -365,7 +365,7 @@ const MemberDetail = () => {
         <Row align="middle" gutter={24}>
           <Col>
             <TenantHeaderLogo
-              logoUrl={displayLogoUrl}
+              logoUrl={logoUrl}
               logoShape={logoShape}
               logoAspectRatio={logoAspectRatio}
             />

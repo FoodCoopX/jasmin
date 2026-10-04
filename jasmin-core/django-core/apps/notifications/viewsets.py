@@ -445,7 +445,7 @@ class EmailLogViewSet(RolePermissionsMixin, viewsets.ReadOnlyModelViewSet):
     Supports filter params:
       * ``recipient`` — case-insensitive partial match
       * ``purpose``   — exact slug (e.g. ``commissioning.invoice``)
-      * ``status``    — exact status choice (sent, failed, bounced, …)
+      * ``status``    — exact status choice (sent, failed, suppressed, …)
     """
 
     read_permission = IsOffice
