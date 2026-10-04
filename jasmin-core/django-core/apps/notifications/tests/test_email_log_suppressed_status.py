@@ -1,7 +1,8 @@
 """The ``suppressed`` EmailLog status: a send that onboarding mode blocked.
 
-Suppressed rows are pruned after the retention window like healthy traffic, and
-the email log API accepts ``suppressed`` as a status filter.
+Suppressed rows are pruned after the retention window like healthy traffic —
+as are ``rate_limited`` ones, held back by the hourly cap — and the email log
+API accepts ``suppressed`` as a status filter.
 """
 
 from __future__ import annotations
@@ -60,6 +61,20 @@ class TestCleanup:
             "old-failed@example.org",
             "recent-suppressed@example.org",
         }
+
+    def test_old_rate_limited_rows_are_pruned_too(self, tenant):
+        old_held_back = _log("rate_limited", recipient="old-held-back@example.org")
+        _log("rate_limited", recipient="recent-held-back@example.org")
+        EmailLog.objects.filter(pk=old_held_back.pk).update(
+            created_at=timezone.now()
+            - datetime.timedelta(days=NOTIFICATION_LOG_RETENTION_DAYS + 1)
+        )
+
+        cleanup_stale_email_logs.call_local()
+
+        assert list(EmailLog.objects.values_list("recipient", flat=True)) == [
+            "recent-held-back@example.org"
+        ]
 
 
 @pytest.mark.django_db

@@ -88,8 +88,8 @@ class TestTenantSmtpTestSend:
         )
 
     def test_arbitrary_recipient_is_rejected(self, api_client, tenant):
-        """A6 lock: addresses outside the configuration's own set never
-        reach the send path — no spam relay via a phished office user."""
+        """The recipient lock: addresses outside the configuration's own set
+        never reach the send path — no spam relay via a phished office user."""
         config = _make_config(tenant)
 
         with mock.patch.object(
@@ -123,7 +123,7 @@ class TestTenantSmtpTestSend:
     ):
         """The configured sender / reply-to are NOT valid recipients:
         both are writable by the same office role via ``save_config``,
-        so allowing them would reduce the A6 lock to a two-request
+        so allowing them would reduce the recipient lock to a two-request
         bypass (PATCH reply_to_email, then POST test)."""
         config = _make_config(tenant)
         config.reply_to_email = "victim@example.com"

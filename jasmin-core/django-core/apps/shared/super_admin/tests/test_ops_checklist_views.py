@@ -137,8 +137,8 @@ class TestMarkDone:
     @pytest.mark.parametrize("bad_pk", ["not-a-number", "12x", "", "1.5"])
     def test_returns_404_for_a_non_numeric_pk(self, factory, super_admin, bad_pk):
         """The item has an integer primary key and Django validates the int on
-        ``filter()`` too, so a non-numeric id raised ValueError — a 500 where
-        the endpoint documents a 404."""
+        ``filter()`` too, so a non-numeric id would raise ValueError — a 500
+        where the endpoint documents a 404."""
         request = factory.post(f"/ops-checklist/{bad_pk}/mark-done/", {}, format="json")
         force_authenticate(request, user=super_admin)
         response = _dispatch({"post": "mark_done"}, request, pk=bad_pk)

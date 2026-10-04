@@ -1,16 +1,12 @@
-"""Tests for the two-step deletion flow.
-
-Two-step (optionally three-step) deletion flow:
+"""Tests for the deletion flow:
 
   1. ``GDPRService.request_deletion(user)`` → ``PENDING_EMAIL``
-  2. user clicks emailed link → ``confirm_deletion_token(token)``
-     → either executes immediately (no admin gate) OR transitions to
-     ``PENDING_ADMIN``
-  3. (optional) admin calls ``admin_approve_deletion`` /
-     ``admin_reject_deletion`` — which use the
-     ``AdminConfirmableMixin``'s ``confirm()`` / ``reject()`` methods
-     under the hood (one-way reuse of the commissioning mixin per
-     CLAUDE.md).
+  2. the user clicks the emailed link → ``confirm_deletion_token(token)``
+     → ``PENDING_ADMIN``
+  3. an admin calls ``admin_approve_deletion`` / ``admin_reject_deletion``
+     — which use the ``AdminConfirmableMixin``'s ``confirm()`` /
+     ``reject()`` methods under the hood (one-way reuse of the
+     commissioning mixin per CLAUDE.md); approval anonymizes.
 
 Admin approval is mandatory for every deletion — no per-tenant
 opt-out. Every confirmed request lands in ``PENDING_ADMIN``.

@@ -104,7 +104,7 @@ printf '%s\n' "$rendered" | awk -v host="$super_admin_host" '
 # The apex ${FRONTEND_DOMAIN} is matched by the wildcard server block (which
 # has no IP allowlist) and resolves to the public schema where the super-admin
 # API is mounted. Without an explicit guard there, the platform-root API is
-# reachable on the apex from any IP, bypassing the allowlist entirely (CFG-1).
+# reachable on the apex from any IP, bypassing the allowlist entirely.
 # Assert the wildcard HTTPS block (the one carrying a ``*.`` server_name and
 # listening on 443 — NOT the :80 redirect block) returns/denies on
 # /api/super-admin/ instead of proxying it to the backend.
@@ -132,6 +132,6 @@ printf '%s\n' "$rendered" | awk '
             in_server = 0
         }
     }
-' || fail "the wildcard (tenant + apex) HTTPS block must block /api/super-admin/ — otherwise the apex reaches the platform-root API off-allowlist (CFG-1)"
+' || fail "the wildcard (tenant + apex) HTTPS block must block /api/super-admin/ — otherwise the apex reaches the platform-root API off-allowlist"
 
 echo "OK: super-admin IP allowlist guardrail intact (fail-closed deny-all, no blanket allow, single dedicated server block, allowlist included in that block, wildcard/apex block denies /api/super-admin/)."

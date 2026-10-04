@@ -347,10 +347,8 @@ class TenantNonStaffReadSerializer(
       * Settings overlay: ``settings`` / ``current_settings`` (so
         ``useTenant().getSetting(...)`` works the same as for staff)
 
-    Deliberately omitted (office/admin-only, none of which any
-    member/customer page consumes — confirmed by grep on
-    ``src/pages/customer/``, ``src/pages/abos/``, and
-    ``src/components/layout/``):
+    Deliberately omitted (office/admin-only; no member or customer page
+    reads them off the tenant):
 
       * Banking: ``iban``, ``sepa_creditor_id``, ``sepa_creditor_name``,
         ``sepa_creditor_bic``

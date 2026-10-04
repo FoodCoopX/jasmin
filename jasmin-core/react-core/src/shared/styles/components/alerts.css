@@ -12,8 +12,7 @@
   color: #a8071a;
 }
 
-/* Inline error notice (login forms, tenant detail diagnostics).
-   Replaces the recurring inline triple { background: "#fee", border: "1px solid #fcc", color: "#c33" } */
+/* Inline error notice (login forms, tenant detail diagnostics). */
 .alert-error {
   background: #fee;
   border: 1px solid #fcc;
@@ -29,8 +28,7 @@
   color: #ff7875;
 }
 
-/* Inline success notice (form save confirmations).
-   Replaces the recurring { background: "#e8f5e9", border: "1px solid #a5d6a7" } pattern. */
+/* Inline success notice (form save confirmations). */
 .alert-success {
   background: #e8f5e9;
   border: 1px solid #a5d6a7;

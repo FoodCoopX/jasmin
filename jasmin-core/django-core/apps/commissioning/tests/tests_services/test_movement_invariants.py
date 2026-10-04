@@ -66,7 +66,7 @@ def _theoretical_harvest_movement(article, storage, *, amount, day, size="M"):
 
 
 @pytest.mark.django_db
-class TestMov1CarriesTheoreticals:
+class TestCorrectionGateCarriesTheoreticals:
     def test_gate_includes_long_term_harvest_storage(self, tenant):
         """The correction gate must fire for BOTH short- AND long-term
         harvest storage (a comes_from_long_term line plans its harvest on the
@@ -86,7 +86,7 @@ class TestMov1CarriesTheoreticals:
 
 
 @pytest.mark.django_db
-class TestMov2WashCleanPlaceholderStorage:
+class TestWashCleanPlaceholderStorage:
     def test_placeholders_land_on_short_term_for_long_term_line(self, tenant):
         """The wash/clean ACTUAL placeholders for a long-term line must
         share their theoretical's SHORT-term storage, not the long-term one."""
@@ -127,7 +127,7 @@ class TestMov2WashCleanPlaceholderStorage:
 
 
 @pytest.mark.django_db
-class TestMov3DayScopedTheoreticalSum:
+class TestDayScopedTheoreticalSum:
     def test_sum_nets_only_the_corrections_own_day(self, tenant):
         """_sum_theoretical must net only the theoretical(s) for the
         correction's OWN harvesting day. A cumulative date<= would sum every
@@ -166,7 +166,7 @@ class TestMov3DayScopedTheoreticalSum:
 
 
 @pytest.mark.django_db
-class TestMov6InventoryUniqueness:
+class TestInventoryUniquenessPerDay:
     def test_duplicate_inventory_per_entity_day_rejected_at_db(self, tenant):
         """The DB constraint rejects a second INVENTORY for the same
         (entity, day). bulk_create bypasses full_clean so this exercises the
@@ -203,7 +203,7 @@ class TestMov6InventoryUniqueness:
 
 
 @pytest.mark.django_db
-class TestMov8CascadePreservesNullCounted:
+class TestCascadePreservesNullCounted:
     def test_null_counted_inventory_delta_is_preserved(self, tenant):
         """cascade_future_inventories must NOT zero a future INVENTORY it
         can't recompute (counted_amount is NULL) — that would leave it at amount=0 forever.

@@ -2,7 +2,7 @@
 
 A tenant whose ``TenantSettings.uploads_weekly_share_amount`` is set does not
 use ``Subscription`` / ``ShareDelivery`` as the source of truth for "how many
-share_type_variations do we need". Instead, an office user uploads a CSV/XLSX
+share_type_variations do we need". Instead, an office user uploads a CSV
 once a week, the file is parsed, validated, previewed and finally applied. The
 applied demand lives in :class:`ExternalShareDemand` and is consumed by
 :class:`apps.commissioning.services.ShareDemandService`, which resolves the
@@ -158,9 +158,7 @@ class ExternalShareDemand(JasminModel):
     # directly. Lets the next real upload — and any consumer that cares —
     # tell an estimate apart from confirmed demand. Estimates are still
     # included in demand aggregation so planning has a number to work with.
-    is_estimate = models.BooleanField(
-        default=False, db_index=True
-    )  # this flag is not yet used anywhere
+    is_estimate = models.BooleanField(default=False, db_index=True)
 
     class Meta:
         constraints = [

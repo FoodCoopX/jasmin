@@ -59,8 +59,8 @@
   0 16px 32px rgba(34, 108, 71, 0.05);
 }
 
-/* Storage-logging date range picker: subtle themed border/text
-   (replaces hardcoded near-black inline colors that broke dark mode). */
+/* Storage-logging date range picker: subtle border and text from the
+   tokens, so it follows dark mode. */
 .logging-storage-range-picker {
   border: 1px solid var(--color-border);
   border-radius: 4px;

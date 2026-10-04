@@ -28,16 +28,14 @@ from apps.shared.tenants.sweep import for_each_tenant
 
 log = logging.getLogger("tasks")
 
-# EmailLog statuses we DELETE after the retention window: healthy traffic
-# and ``suppressed`` (not sent because the tenant was in onboarding mode,
-# nothing to investigate). Statuses we KEEP regardless of age (because
-# they're still actionable from an ops / forensic angle) are everything
-# else, i.e. ``pending`` (still in flight), ``deferred`` (provider will
-# retry), ``failed`` (network / unknown error worth investigating),
-# ``rejected`` (permanent config issue worth keeping until fixed),
-# ``complained`` (recipient marked as spam — kept for the suppression-list
-# audit trail).
-DELETABLE_STATUSES = ("sent", "delivered", "bounced", "suppressed")
+# EmailLog statuses we DELETE after the retention window: healthy traffic and
+# the two kinds of send that never went out on purpose — ``suppressed`` (the
+# tenant was in onboarding mode) and ``rate_limited`` (the tenant's hourly cap
+# was reached; the office resends long before the window ends). Statuses we
+# KEEP regardless of age, because they're still actionable from an ops /
+# forensic angle, are the rest: ``pending`` (still in flight, or a send that
+# died mid-way) and ``failed`` (network / unknown error worth investigating).
+DELETABLE_STATUSES = ("sent", "suppressed", "rate_limited")
 
 
 @db_periodic_task(crontab(hour="2", minute="15"), retries=2, retry_delay=300)

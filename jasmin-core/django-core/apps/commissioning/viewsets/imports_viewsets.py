@@ -173,7 +173,7 @@ class ShareImportBatchViewSet(RolePermissionsMixin, viewsets.ReadOnlyModelViewSe
             uploaded_by=request.user,
         )
         # Run parse+validate synchronously so the user gets immediate
-        # feedback. Heavy files can be moved to a Celery task later. A batch
+        # feedback. Heavy files could move to a Huey task. A batch
         # whose status already decided the week never reaches this point —
         # ``ingest_upload`` refuses those bytes with a 409.
         ShareImportService.parse_and_validate(batch)

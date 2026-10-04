@@ -124,3 +124,46 @@ While there, set **Max emails per hour** under Configuration → Email to the
 provider's limit. Jasmin sends nothing past it in any hour — those emails show
 as not sent in the email log — so a large offer or reminder run can't get the
 account blocked.
+
+## 8. Who gets a login
+
+Not everyone who works a delivery needs an account. An employee record links to
+a login only optionally, so the harvest and packing crew can be scheduled and
+appear on the weekly plan without one. Create a login only for someone who
+personally opens a screen.
+
+Each login carries a list of roles, out of these seven:
+
+| Role | What it is for |
+| ---- | -------------- |
+| `admin` | Configuration, and the only role that manages logins |
+| `office` | The commissioning desk — imports, orders, invoices, planning |
+| `management` | Oversight: sees what the crew sees, plus every member's subscriptions, billing profiles and share deliveries, but edits nothing on the crew's screens |
+| `staff`, `gardener` | The crew — picking, packing, harvest documentation. The two grant the same access to every working screen; pick whichever describes the person |
+| `member` | Granted automatically when a member record is linked to the login; never assigned by hand |
+| `customer` | Binds a login to a reseller; valid only alongside `member` |
+
+Because `management` reads members' billing profiles, give it only to people who
+need that oversight.
+
+A tenant that takes its share demand from an external feed needs at least one
+`office` login: the import, its code mappings and the applied demand are
+office-only for reading as well as writing, so the crew can't run the weekly
+upload.
+
+Creating a login sends an invitation email, so the tenant's mail server
+(section 7) has to be set up first — until it is, the invite button is
+disabled.
+
+### When someone leaves
+
+Set their account status to inactive under **`/configuration/users`**. There is
+no delete. Their access ends with their next request; only links to files that
+Jasmin has already handed them, such as an invoice PDF, keep working, for at most
+24 hours.
+
+Someone who hasn't accepted their invitation yet can't be deactivated, but their
+invitation can be cancelled: the emailed link stops working, and resending the
+invitation undoes the cancellation. The last active admin can be neither demoted
+nor deactivated; a tenant left without an administrator needs the platform
+operator to recover it.

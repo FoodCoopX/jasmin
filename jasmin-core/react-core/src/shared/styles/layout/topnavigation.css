@@ -72,7 +72,7 @@
   height: 24px;
 }
 
-/* A11Y-27: skip-to-main-content link — off-screen until keyboard focus, then
+/* Skip-to-main-content link — off-screen until keyboard focus, then
    pinned top-left above the nav. Off-screen (not display:none) so it stays
    focusable as the first Tab stop. */
 .skip-to-main-link {

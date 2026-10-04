@@ -1,10 +1,9 @@
 /* ============================================================
  * Auth pages (login, register, forgot/reset password, set password)
  *
- * Replaces inline `centeredStyle` consts and ad-hoc Card width/shadow
- * styling across the auth page cluster. AntD primary buttons supply
- * the dark-green color via the global theme — auth pages should NOT
- * hardcode `backgroundColor: "#205f52"` on those buttons.
+ * Centring, Card width and shadow for the auth page cluster. AntD primary
+ * buttons supply the dark-green color via the global theme — auth pages
+ * should NOT hardcode `backgroundColor: "#205f52"` on those buttons.
  * ============================================================ */
 
 .auth-page {

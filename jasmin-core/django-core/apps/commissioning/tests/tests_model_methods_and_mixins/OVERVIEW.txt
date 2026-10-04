@@ -267,7 +267,7 @@ loosen the test.
 
   TestLineNettoIsUnitBased
     - line_netto = amount × price_per_unit (amount is in UNITS, price is
-      €/unit); amount_per_pu does NOT enter pricing (DOC-1/DOC-2 fix)
+      €/unit); amount_per_pu does NOT enter pricing
     - ad-hoc OC and offer-bound OC both ignore amount_per_pu for the net,
       keeping order == delivery-note == invoice line totals
 

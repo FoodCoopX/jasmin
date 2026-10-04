@@ -205,7 +205,7 @@ ACTIVITIES: list[Activity] = [
         ),
         retention=(
             "EmailLog: 90 days; rows in a status that still needs attention "
-            "(pending, deferred, failed, rejected, complained) are not pruned"
+            "(pending, failed) are not pruned"
         ),
         security_measures=(
             "TLS to the mail server (STARTTLS or SSL, as configured); its "

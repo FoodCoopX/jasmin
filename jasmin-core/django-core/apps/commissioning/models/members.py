@@ -178,11 +178,13 @@ class Member(
             # ``trial_converted_at`` is a DateTimeField, ``entry_date`` a
             # DateField — cast the timestamp to date so the comparison matches
             # the Python ``trial_converted_at.date() >= entry_date`` check.
-            # NOTE: the DB-level date-cast is pinned to the operator's LOCAL
-            # timezone by migration 0034 (``entry_date`` is a local calendar
-            # day, so Django's default UTC cast fired a day early near the
-            # local/UTC midnight boundary). If this constraint is ever
-            # regenerated, re-apply that local-tz cast.
+            # NOTE: the DB-level date cast runs in the operator's LOCAL
+            # timezone (``AT TIME ZONE 'Europe/Berlin'``): Django compiles
+            # ``__date`` with the time zone active when the migration runs,
+            # which is TIME_ZONE. It has to be local — ``entry_date`` is a
+            # local calendar day, and a UTC cast fires a day early near the
+            # local/UTC midnight boundary. If this constraint is ever
+            # regenerated, check the emitted SQL still casts in local time.
             models.CheckConstraint(
                 condition=Q(trial_converted_at__isnull=True)
                 | Q(entry_date__isnull=True)
@@ -233,8 +235,8 @@ class Member(
         # ``trial_converted_at`` is a UTC DateTimeField, ``entry_date`` a LOCAL
         # calendar day — compare on the trial_converted_at date IN THE OPERATOR'S
         # LOCAL timezone (``.date()`` would give the UTC date, a day early near
-        # the local/UTC midnight boundary; mirrors the DB constraint pinned to
-        # local tz in migration 0034).
+        # the local/UTC midnight boundary; mirrors the DB constraint's
+        # local-time cast).
         if (
             self.trial_converted_at is not None
             and self.entry_date is not None

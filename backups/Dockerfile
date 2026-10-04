@@ -1,4 +1,5 @@
-# Image for the nightly encrypted DB backup container (closes audit CFG-1).
+# Image for the nightly encrypted backup container (database dump and media
+# archive).
 #
 # postgres:15-alpine provides the pg_dump client (matching the 15 server) plus
 # busybox crond/gzip/coreutils; gnupg adds the AES256 symmetric encryption that

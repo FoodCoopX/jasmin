@@ -8,7 +8,7 @@ The endpoint is mounted on BOTH the tenant and public URL confs because
 the CSP header is set by nginx for every server block; we want to receive
 reports regardless of which host the violation occurred on.
 
-Logging tag: `csp.violation` (filterable in security.log).
+Logging tag: `csp.violation` (filterable in the security log).
 """
 
 from __future__ import annotations

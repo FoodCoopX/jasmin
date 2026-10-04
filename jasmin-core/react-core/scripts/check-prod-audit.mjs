@@ -11,20 +11,20 @@ import { execSync } from "node:child_process";
 const ALLOWLIST = {
   // quill HTML-export XSS. No fixed release exists — quill 2.0.3 is the latest
   // and react-quill-new pins it; npm's "fix" only pins quill 2.0.2, which has
-  // the same export behaviour (a paper fix). Mitigated: the single place we
-  // render quill HTML (PrivacyPolicyPage) runs it through DOMPurify.sanitize
-  // first. Remove this entry once a patched quill ships.
+  // the same export behaviour (a paper fix). Mitigated: every place that
+  // renders stored rich-text HTML runs it through DOMPurify.sanitize first.
+  // Remove this entry once a patched quill ships.
   "GHSA-v3m3-f69x-jf25":
     "quill HTML-export XSS — no upstream fix; output is DOMPurify-sanitised on render",
-  // React Router RSC-mode CSRF bypass. No forward fix exists — the latest
-  // published react-router-dom (7.18.1) is inside the advisory range
-  // (7.12.0–8.2.0) and npm's only "fix" is a semver-major DOWNGRADE to 7.11.0.
+  // React Router RSC-mode CSRF bypass. The installed react-router-dom is
+  // inside the advisory range (7.12.0–8.2.0), and npm's only "fix" is a
+  // semver-major DOWNGRADE to 7.11.0.
   // Not exploitable here: this is a client-side Vite SPA that never runs React
   // Router's RSC / server-components mode (no server actions, no data-router
   // RSC handler), which is the sole attack surface for this advisory.
   // Remove this entry once a patched forward release ships.
   "GHSA-qwww-vcr4-c8h2":
-    "React Router RSC-mode CSRF — no forward fix (latest 7.18.1 is in-range); not exploitable in this client-only SPA (no RSC mode)",
+    "React Router RSC-mode CSRF — npm's only fix is a downgrade; not exploitable in this client-only SPA (no RSC mode)",
 };
 
 let raw;

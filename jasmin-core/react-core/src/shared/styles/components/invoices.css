@@ -1,15 +1,12 @@
 /* Invoices page — grouping-mode toggle.
  *
  * Active-selection background for the table-view / group-by-week /
- * group-by-month Radio.Buttons. Previously an inline 8-digit hex literal
- * repeated on each button; centralised here so it lives in the styles
- * system and can be themed in one place. */
+ * group-by-month Radio.Buttons, kept here so it can be themed in one place. */
 /* The active grouping button is also AntD's "checked" button, whose own rule
  * (``.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)``,
  * specificity 0,3,0) paints the wrapper white in the default outline mode.
  * ``!important`` is the robust way to win without coupling to AntD's internal
- * ``-checked``/``-disabled`` class names — the original inline style outranked
- * that rule too. */
+ * ``-checked``/``-disabled`` class names. */
 .invoice-grouping-active {
   background-color: var(--color-primary) !important;
   color: var(--color-bg-base) !important;
@@ -45,8 +42,7 @@
 }
 
 /* Finalized (locked) notice banner shown at the top of the DeliveryNote and
-   Invoice modals when the document has been finalized. Extracted from an
-   identical inline style that was duplicated across both modals. */
+   Invoice modals when the document has been finalized. */
 .finalized-notice {
   margin-bottom: 1em;
   padding: 0.5em;

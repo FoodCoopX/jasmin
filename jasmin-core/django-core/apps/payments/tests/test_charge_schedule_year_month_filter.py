@@ -1,9 +1,9 @@
-"""Regression tests for the year/month query-param filter on
-ChargeScheduleViewSet (powers the ChargesAbos page).
+"""The year/month query-param filter on ChargeScheduleViewSet (powers the
+ChargesAbos page).
 
-The viewset code lives in apps/payments/viewsets.py — the filter is
-applied via ``due_date__year`` / ``due_date__month`` lookups in
-``filter_queryset`` (around lines 134-147).
+``ChargeScheduleViewSet.get_queryset`` (apps/payments/viewsets.py) applies it
+through ``due_date__year`` / ``due_date__month`` lookups; ``month`` requires
+``year``.
 """
 
 from __future__ import annotations

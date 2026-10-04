@@ -628,10 +628,11 @@ def _resolve_backend() -> _DemandBackend:
     # Local import to keep this app loosely coupled from the tenants app.
     from apps.shared.tenants.models import TenantSettings
 
-    # On the Huey worker (deferred recompute) ``connection.tenant`` is a
-    # django-tenants FakeTenant; ``get_current_settings`` resolves it to the
-    # real Tenant by schema_name, so the deferred path picks the same backend
-    # as a request and never wipes an external-CSV tenant's theoreticals.
+    # Outside a request (a Huey task, a management command under
+    # ``schema_context``) ``connection.tenant`` is a django-tenants FakeTenant;
+    # ``get_current_settings`` resolves it to the real Tenant by schema_name,
+    # so such a path picks the same backend as a request and never wipes an
+    # external-CSV tenant's theoreticals.
     settings = TenantSettings.get_current_settings(connection.tenant)
     if settings and settings.uploads_weekly_share_amount:
         return ExternalDemandBackend()

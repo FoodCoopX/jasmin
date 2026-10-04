@@ -81,23 +81,13 @@ dev-reset:
 runserver:
 	cd $(DJANGO_DIR) && $(PYTHON) manage.py runserver 0.0.0.0:8000
 
-# Run the Huey background-task worker locally (no Docker). REQUIRED for async
-# tasks — notably the DEFERRED Forecast recompute (recompute_shares_async):
-# without a running worker a saved Forecast links its ShareContents but never
-# builds their TheoreticalHarvest / stock movements (they just never appear).
-# Run this in a second terminal alongside `make runserver`. NOTE: the docker
-# dev stack (docker-compose.dev.yml) currently has NO huey service either, so
-# a worker must be started this way in BOTH dev flows. Needs Redis or falls
-# back to the SqliteHuey broker per settings.
-#
-# ``-w 1`` (single worker) is just a resource-friendly dev default. It used to
-# be load-bearing: concurrent recompute_shares_async tasks acquired the
-# per-entity ``current_balance:*`` advisory locks in cascade-discovery order
-# and could AB/BA-deadlock. The recompute now defers every intermediate
-# snapshot cascade into ONE sorted union pass per transaction (see
-# ShareContentService.recompute_for_shares / SnapshotService.
-# cascade_for_movements), so overlapping recomputes acquire locks in the same
-# canonical order and multi-worker operation is safe.
+# Run the Huey background-task worker on the host (no Docker), in a second
+# terminal alongside `make runserver`. Needed when REDIS_URL points the host
+# flow at a Redis broker: the enqueued tasks (the bulk email sends) and the
+# periodic jobs queue there, and only a consumer runs them. Without REDIS_URL
+# a DEBUG host runs tasks inline at enqueue (HUEY ``immediate`` in
+# config/settings.py), and the Docker dev stack runs its own ``huey`` service.
+# ``-w 1`` (a single worker) is just a resource-friendly dev default.
 huey:
 	cd $(DJANGO_DIR) && $(PYTHON) manage.py run_huey -w 1 -k thread
 

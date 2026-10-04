@@ -36,8 +36,8 @@
   --color-border-subtle: #e8e8e8;
   --color-text-primary: #213547;
   --color-text-secondary: #666;
-  /* tertiary/muted darkened to clear WCAG AA 4.5:1 on the white base
-     (#999 was ~2.85:1, #8c8c8c ~3.4:1 — both failed). */
+  /* tertiary/muted are dark enough to clear WCAG AA 4.5:1 on the white base
+     (#999 gives ~2.85:1 and #8c8c8c ~3.4:1, both too light). */
   --color-text-tertiary: #767676;
   --color-text-muted: #717171;
   --color-text-disabled: rgba(0, 0, 0, 0.25);
@@ -92,8 +92,8 @@
   --color-border-subtle: #383838;
   --color-text-primary: #e0e0e0;
   --color-text-secondary: #a0a0a0;
-  /* tertiary lightened to clear WCAG AA 4.5:1 on the dark base (#737373 was
-     ~3.9:1); muted #888 already passes (~5.2:1) so it's left as-is. */
+  /* tertiary is light enough to clear WCAG AA 4.5:1 on the dark base
+     (#737373 gives ~3.9:1); muted #888 passes at ~5.2:1. */
   --color-text-tertiary: #808080;
   --color-text-muted: #888;
   --color-text-disabled: rgba(255, 255, 255, 0.25);

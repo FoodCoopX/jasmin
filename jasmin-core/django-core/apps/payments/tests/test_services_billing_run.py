@@ -430,7 +430,7 @@ class TestExportGuards:
 
 
 @pytest.mark.django_db
-class TestLowSeverityAuditFixes:
+class TestSingleCurrencyRunsAndMandateDates:
     """Single-currency runs + no future mandate-signed date."""
 
     def test_create_run_rejects_mixed_currency(

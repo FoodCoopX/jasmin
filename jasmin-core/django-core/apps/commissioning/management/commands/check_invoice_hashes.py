@@ -13,12 +13,12 @@ the tamperer can't also defeat.
 This command IS that step. It iterates every finalized invoice, recomputes
 the canonical payload's SHA-256, and emits a structured WARNING to the
 ``security`` log stream for every row whose hash no longer matches. The
-``security`` log is the auditor's grep target (see logs/security.log),
-and is typically shipped off-box / write-protected.
+``security`` log is the auditor's grep target (the container's stdout in
+Docker, ``logs/security.log`` on bare metal).
 
 Usage
 -----
-    python manage.py check_invoice_hashes --schema=<tenant_schema>
+    python manage.py tenant_command check_invoice_hashes --schema=<tenant_schema>
 
 Exit code
 ---------
@@ -27,9 +27,10 @@ Exit code
 
 Schedule
 --------
-Run nightly via cron / systemd timer / k8s CronJob. Recommended:
-
-    0 3 * * *  python manage.py check_invoice_hashes --schema=<tenant>
+Nothing schedules this command: the Huey periodic task
+``nightly_invoice_hash_check`` (``apps/commissioning/tasks.py``) runs the
+same check for every tenant at 03:00 and emails the operator any drift. Run
+the command by hand to check one tenant on demand.
 """
 
 from __future__ import annotations

@@ -312,8 +312,9 @@ class InvoiceService:
         any whose stored hash no longer matches the recomputed hash.
 
         Returns ``[{"id", "number", "prefix", "stored", "recomputed"}, ...]``.
-        Used by the ``check_invoice_hashes`` management command (run on a
-        schedule) for tamper detection on commercial documents.
+        Used for tamper detection on commercial documents by the nightly
+        ``nightly_invoice_hash_check`` Huey task and the
+        ``check_invoice_hashes`` management command.
         """
         drift: list[dict] = []
         finalized = (

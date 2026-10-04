@@ -45,7 +45,7 @@ describe("isOutsidePurchaseCostRange", () => {
     expect(widest.diff(start, "day")).toBeLessThanOrEqual(SERVER_CAP_DAYS);
   });
 
-  it("refuses the decade-wide range the report used to be asked for", () => {
+  it("refuses a decade-wide range", () => {
     expect(isOutsidePurchaseCostRange(dayjs("2015-01-01"), [null, end])).toBe(
       true,
     );

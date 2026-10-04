@@ -40,9 +40,8 @@
 }
 
 /* Compact icon-only action button for table cells (delivery-station actions,
-   seller certificates, …). Replaces the per-call-site inline min-width/padding;
-   compose with .long-squared-button for the bordered variant. Used by the
-   shared <IconActionButton>. */
+   seller certificates, …); compose with .long-squared-button for the
+   bordered variant. Used by the shared <IconActionButton>. */
 .btn-icon-compact {
   min-width: auto;
   padding: 0 4px;

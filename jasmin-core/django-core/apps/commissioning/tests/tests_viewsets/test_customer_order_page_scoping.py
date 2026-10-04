@@ -1,7 +1,7 @@
 """Permission + scoping smoke tests for the Customer Order page.
 
 A user whose only role is ``customer`` should be able to use every
-endpoint hit by ``src/pages/customer/CustomerOrderPage.tsx`` for *their
+endpoint hit by ``src/features/customer/pages/CustomerOrderPage.tsx`` for *their
 own* reseller (read+edit own reseller, list/create/update/delete own
 order contents and crate orders, read own delivery notes / invoices)
 and must be denied (403) or get nothing for everything else.

@@ -389,8 +389,8 @@ class TestJasminUserRolesAnonymization:
     PRIVILEGED = ("office", "admin", "staff", "gardener", "management")
 
     def test_a_staff_only_login_is_left_with_no_roles(self, tenant):
-        """The case the finding describes: an ex-employee with no member
-        profile. Nothing re-derives anything, so the list empties."""
+        """An ex-employee with no member profile: nothing re-derives a role,
+        so the list empties."""
         user = JasminUserFactory(
             email="ex.office@example.com", roles=["office", "admin"]
         )

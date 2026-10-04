@@ -753,7 +753,7 @@ class TestUpdateRecomputesAffectedShares:
 
             assert mock_recompute.called, (
                 "heavy update scheduled no recompute — the surviving shares' "
-                "wiped harvest theoreticals would never be rebuilt (CORR-7)"
+                "wiped harvest theoreticals would never be rebuilt"
             )
             scheduled_ids: set[str] = set()
             for call in mock_recompute.call_args_list:
@@ -817,7 +817,7 @@ class TestUpdateRecomputesAffectedShares:
             == harvests_before
         ), (
             "the update pre-deleted harvest theoreticals — recompute can no "
-            "longer cascade their movements (SHR-1)"
+            "longer cascade their movements"
         )
 
     def test_light_update_schedules_no_recompute(

@@ -128,7 +128,7 @@ if _SENTRY_DSN:
         dsn=_SENTRY_DSN,
         integrations=[
             DjangoIntegration(),
-            # WARNING-level log lines become Sentry breadcrumbs; ERROR
+            # INFO and WARNING log lines become Sentry breadcrumbs; ERROR
             # and above become Sentry events. Keeps the noise floor
             # honest without flooding the project.
             LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
@@ -549,8 +549,8 @@ SHARED_APPS = [
     # not exist". A single global AUTH_USER_MODEL can't point at both
     # JasminUser (tenant) and SuperAdmin (public), so this gap can't be
     # closed without forking django-auditlog or building a parallel
-    # audit table. Tenant lifecycle is covered by event-log lines
-    # written to auth.log by ``apps.shared.tenants.apps.TenantsConfig``.
+    # audit table. Tenant lifecycle is covered by event-log lines instead
+    # (see the note on ``apps.shared.tenants.apps.TenantsConfig``).
     "apps.shared.tenants",
     "apps.shared.super_admin",
     # Support tickets: a PUBLIC-schema table so the super-admin can aggregate
@@ -564,7 +564,7 @@ TENANT_APPS = [
     # has a FK to AUTH_USER_MODEL (accounts.JasminUser), which is tenant-scoped.
     # Super-admin endpoints therefore must NOT call .blacklist() / verify
     # against the blacklist (no tenant schema -> no table). See
-    # apps/shared/super_admin/views.py.
+    # apps/shared/super_admin/views/auth_views.py.
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "axes",
@@ -1196,7 +1196,7 @@ _HUEY_WORKERS = int(get_env("HUEY_WORKERS", default="4"))
 # Run tasks INLINE (no separate consumer) only in the no-Docker local dev flow
 # — DEBUG on, no Redis broker, and NOT under pytest. Without this, a `make
 # runserver` dev who forgets `make huey` enqueues to the Sqlite broker and the
-# task never runs (forecasts silently don't rebuild). Excluded from pytest
+# task never runs (a bulk send silently never goes out). Excluded from pytest
 # (which also runs DEBUG=on / no-Redis) so tests keep the real async semantics
 # they assert on; Docker dev has Redis so it runs the `huey` compose service;
 # prod is DEBUG=off. ``immediate`` executes the task synchronously at enqueue
@@ -1215,8 +1215,8 @@ if _REDIS_URL:
         "immediate": _HUEY_IMMEDIATE,
         # Match crontabs against local time (TIME_ZONE = Europe/Berlin), which is
         # what every periodic-task docstring and schedule-ordering rationale
-        # assumes. With utc=True huey matched against UTC, firing every job 1-2h
-        # later local than documented.
+        # assumes. With utc=True huey would match against UTC and fire every
+        # job 1-2h later local time than documented.
         "utc": False,
         "consumer": {
             "workers": _HUEY_WORKERS,

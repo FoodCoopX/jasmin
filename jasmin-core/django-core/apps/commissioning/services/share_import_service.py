@@ -3,7 +3,7 @@
 Pipeline stages:
 
 1. ``ingest_upload``  — persist the file + checksum, create a ``ShareImportBatch``.
-2. ``parse_and_validate`` — read CSV/XLSX, resolve external codes via
+2. ``parse_and_validate`` — read the CSV, resolve external codes via
    :class:`ExternalCodeMapping`, run per-row validation, fill
    ``validation_report``. Status -> ``validated`` or ``failed``.
 3. ``build_preview`` — diff incoming rows vs. currently applied
@@ -31,7 +31,8 @@ The pipeline is **idempotent**: same checksum + same week is rejected at
 ingest. A re-upload with a new file fully replaces the week's demand
 inside one transaction.
 
-CSV/XLSX columns (header row required, case-insensitive)::
+CSV columns (header row required, case-insensitive; comma- or
+semicolon-separated)::
 
     year, delivery_week, delivery_station_code, delivery_day_code,
     variation_code, quantity, [external_ref], [note]

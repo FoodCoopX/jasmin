@@ -390,8 +390,9 @@ class TestOversizedUpload:
 @pytest.mark.django_db
 class TestUnreadableRowUpload:
     def test_a_cell_the_parser_refuses_is_a_reported_row_not_a_500(self, api_client):
-        """A stray quote running past csv's field limit used to escape the
-        per-row handling; the office must get the row number back instead."""
+        """A stray quote can run a cell past csv's field limit, which the
+        parser refuses: the office gets that row's number back and the rest
+        import."""
         oversized = '"' + "x" * (csv.field_size_limit() + 10) + '"'
         content = (
             "Name,Number\n"

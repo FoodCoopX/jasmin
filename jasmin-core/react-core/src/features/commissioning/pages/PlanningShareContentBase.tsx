@@ -1003,7 +1003,7 @@ export default function PlanningShareContentBase({
       // from it whenever the effect re-fires — its deps include the row
       // transform, which changes identity with the columns config, a routine
       // occurrence right after a save (granularity refetch / summary-row
-      // rebuild re-renders). That re-seed silently reverted just-saved
+      // rebuild re-renders). That re-seed would silently revert just-saved
       // amounts to their stale values until the next real refetch.
       //
       // The response fully re-describes the slot's dynamic ``day_*`` cells,

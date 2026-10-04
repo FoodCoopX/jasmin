@@ -438,6 +438,9 @@ export function generateZUGFeRDXML(
       )}`
     : t("commissioning.payment_terms_invoice_pdf", { days: paymentTermsDays });
 
+  // The guideline ID is the plain EN 16931 identifier, not XRechnung's:
+  // declaring XRechnung would switch on its BR-DE-* rules, and these invoices
+  // don't implement the XRechnung CIUS extensions.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice 
   xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -448,12 +451,6 @@ export function generateZUGFeRDXML(
   
   <rsm:ExchangedDocumentContext>
     <ram:GuidelineSpecifiedDocumentContextParameter>
-      <!--
-        Plain EN 16931 / Factur-X identifier. Previously we declared
-        xrechnung_2.0 compliance which triggered all BR-DE-* checks
-        even though we don't implement the XRechnung CIUS extensions.
-        Drop the CIUS reference → just the core European standard.
-      -->
       <ram:ID>urn:cen.eu:en16931:2017</ram:ID>
     </ram:GuidelineSpecifiedDocumentContextParameter>
   </rsm:ExchangedDocumentContext>

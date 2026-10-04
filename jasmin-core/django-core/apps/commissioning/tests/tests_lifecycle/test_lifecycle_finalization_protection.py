@@ -205,9 +205,8 @@ class TestInvoiceDocumentHash:
     def test_changing_line_tax_rate_changes_the_hash(self, tenant):
         """Two invoices that differ ONLY in line ``tax_rate`` produce
         different ``document_hash`` values. Tax_rate is a hash-relevant
-        field; if it were silently mutated, the hash would catch it (once
-        a verifier is wired up — currently the hash is set but not
-        re-checked, which is documented under TestInvoiceDocumentHash)."""
+        field, so mutating it after finalization shows up as drift in
+        ``InvoiceService.find_drifted_invoices`` (the nightly hash check)."""
         _ensure_settings(connection.tenant)
 
         # Finalise a baseline invoice with tax_rate=7 on the article line.

@@ -1317,7 +1317,7 @@ class ShareContentService:
         # movements (share_content=NULL, linked via their Theoretical* parent).
         # Deleting the content cascade-kills the theoretical rows + movements, so
         # a dimension whose theoreticals vanish would keep a stale actual
-        # correction (entity total ≠ counted) — mirror recompute_for_share_contents.
+        # correction (entity total ≠ counted) — mirror ``recompute_for_shares``.
         from .theoretical_objects import recalculate_actual_corrections
 
         affected_movements = list(

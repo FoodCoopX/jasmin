@@ -264,12 +264,12 @@ services:
         condition: service_healthy
     networks: [jasmin-net]
 
-  # Nightly encrypted DB backup (closes audit CFG-1). pg_dump | gzip |
-  # gpg(AES256) → the shared ./backups volume, on BACKUP_SCHEDULE (cron, one
+  # Nightly encrypted backup: pg_dump | gzip | gpg(AES256), plus a media
+  # archive, into the shared ./backups volume on BACKUP_SCHEDULE (cron, one
   # dump on startup then on schedule). This is the WRITER that the huey
   # ``prune_old_backups`` task and ``scripts/restore_drill.sh`` assume — without
-  # it there are ZERO backups behind a complete-looking façade. An offsite copy
-  # (e.g. a Hetzner Storage Box) is a separate, later step.
+  # it there are ZERO backups behind a complete-looking façade. The off-host
+  # copy is opt-in through RCLONE_REMOTE below.
   backup:
     build:
       context: ./backups

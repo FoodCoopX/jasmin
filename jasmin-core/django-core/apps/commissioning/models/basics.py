@@ -36,8 +36,9 @@ class Season(JasminModel, TimeBoundMixin):
     )
 
     class Meta:
-        # The "one OPEN season globally" backstop is a partial unique index
-        # installed via migration 0015 (RunSQL): the global overlap group
+        # The "one OPEN season globally" backstop is the ``season_one_open``
+        # partial unique index, installed by RunSQL in migration
+        # 0002_finalized_protection_and_reference_data: the global overlap group
         # (overlap_unique_fields = ()) has no column to scope a Django
         # UniqueConstraint on. An exclusion constraint needs no such column, so
         # it closes the other half — two CLOSED seasons covering the same date,

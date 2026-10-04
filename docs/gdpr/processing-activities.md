@@ -103,7 +103,7 @@ implements all of them — paths refer to `apps/` packages.
 | Categories of personal data | Name, email, message content, send-time metadata                                                                     |
 | Source                      | Triggered by platform events                                                                                         |
 | Recipients                  | Your own mail server (Configuration → Email), which delivers each message                                            |
-| Retention                   | EmailLog: 90 days; rows in a status that still needs attention (pending, deferred, failed, rejected, complained) are not pruned |
+| Retention                   | EmailLog: 90 days; rows in a status that still needs attention (pending, failed) are not pruned |
 | Security measures           | TLS to the mail server (STARTTLS or SSL, as configured); its password stored encrypted; your mail provider's own AVV; EmailLog scrubs subject + recipient on member anonymisation |
 | Code locations              | `apps/notifications/`                                                                                                |
 

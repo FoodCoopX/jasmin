@@ -738,7 +738,7 @@ describe("ZUGFeRD / EN 16931 structural conformance", () => {
   });
 });
 
-describe("EN 16931 line calculation (FIN-1 / FIN-2)", () => {
+describe("EN 16931 line calculation", () => {
   // A small discounted line where a float-recomputed allowance would drift a
   // cent from the authoritative net: amount 1 × 0.10, 25% rabatt → gross 0.10,
   // net 0.08 (the backend rounds 0.075 up). Float discount = 0.025 → "0.03",
@@ -770,7 +770,7 @@ describe("EN 16931 line calculation (FIN-1 / FIN-2)", () => {
   const num = (el: Element, tag: string) =>
     Number(el.getElementsByTagName(tag)[0]!.textContent);
 
-  it("FIN-1: NetPrice BasisQuantity is 1 (price applies per single unit)", () => {
+  it("NetPrice BasisQuantity is 1 (price applies per single unit)", () => {
     const netPrice = line.getElementsByTagName(
       "ram:NetPriceProductTradePrice",
     )[0]!;
@@ -779,7 +779,7 @@ describe("EN 16931 line calculation (FIN-1 / FIN-2)", () => {
     ).toBe("1");
   });
 
-  it("FIN-2: NetPrice × BilledQty − Allowance == LineTotalAmount (BR-CO-10)", () => {
+  it("NetPrice × BilledQty − Allowance == LineTotalAmount (BR-CO-10)", () => {
     const netPrice = num(line, "ram:ChargeAmount");
     const billed = num(line, "ram:BilledQuantity");
     const allowance = num(line, "ram:ActualAmount");
@@ -794,7 +794,7 @@ describe("EN 16931 line calculation (FIN-1 / FIN-2)", () => {
   });
 });
 
-describe("DOC-5: weight-based article line keeps full 3-decimal BilledQuantity", () => {
+describe("weight-based article line keeps full 3-decimal BilledQuantity", () => {
   const input = {
     ...sampleInput,
     lineItems: [

@@ -1683,8 +1683,10 @@ class BulkSendOffersViaEmailView(APIViewRolePermissionsMixin, APIView):
             "the selected resellers. Returns 202 with a ``job_id``; the "
             "frontend polls ``GET /api/notifications/jobs/{job_id}/`` "
             "until status is ``done`` or ``failed``. The job's ``result`` "
-            "field holds the per-reseller results in the same shape this "
-            "endpoint used to return synchronously."
+            "holds ``total_processed``, ``successful``, ``failed`` and "
+            "``results``: one entry per reseller with ``reseller_id``, "
+            "``reseller_name``, ``success`` and, where it applies, ``error`` "
+            "or ``already_sent``."
         ),
         request=BulkSendOffersRequestSerializer,
         responses={202: BackgroundJobEnqueueResponseSerializer},

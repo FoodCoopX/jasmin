@@ -395,9 +395,10 @@ def _force_end_subscription(subscription, *, effective, now, cancelled_by) -> No
     # office has since edited the station-day chain so coverage no longer holds,
     # that re-validation raises SubscriptionDeliveryStationDayOutOfRange (a
     # JasminError) which would otherwise escape and roll back the whole member
-    # exit. The cancellation stamp itself needs no term re-validation, and the
-    # caller's line-220 pre-check guarantees valid_until > effective so the
-    # cancel-before-valid_until constraint holds.
+    # exit. The cancellation stamp itself needs no term re-validation, and
+    # ``_cancel_active_subscriptions`` skips every subscription whose
+    # ``valid_until`` falls on or before the exit, so valid_until > effective
+    # and the cancel-before-valid_until constraint holds.
     Subscription.objects.filter(pk=subscription.pk).update(
         cancelled_at=now,
         cancelled_effective_at=effective,

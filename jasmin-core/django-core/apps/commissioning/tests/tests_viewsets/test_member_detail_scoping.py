@@ -1,7 +1,7 @@
 """Permission + scoping smoke tests for the Member Detail page.
 
 A user whose only role is ``member`` should be able to access the
-endpoints used by ``src/pages/members/MemberDetail.tsx`` for *their own*
+endpoints used by ``src/features/members/pages/MemberDetail.tsx`` for *their own*
 member profile, deliveries and subscriptions, and must be denied (403)
 or get an empty / 404 result for everything else.
 """

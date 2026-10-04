@@ -708,8 +708,8 @@ class EmailService:
 
         # Authoritative SSRF guard: re-check the tenant-supplied host at
         # send time. Write-time validation trusts a DNS resolution the
-        # office user controls, and pre-existing configs were never
-        # validated. A ``ValueError`` here is caught by ``send_email``'s
+        # office user controls, and a stored config may predate that
+        # validation. A ``ValueError`` here is caught by ``send_email``'s
         # except block, so a blocked host fails gracefully (logged, send
         # returns False) exactly like an unreachable host, on every send path.
         if smtp_host_is_blocked(backend_settings["EMAIL_HOST"]):

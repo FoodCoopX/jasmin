@@ -775,8 +775,9 @@ class FinalizedProtectedQuerySet(models.QuerySet):
     ``delete()``.
 
     Pairs with ``FinalizedProtectedMixin``. Together with the per-table
-    Postgres triggers installed by migration ``0002_finalized_protection_triggers.py``
-    this gives three layers of defence:
+    Postgres triggers (installed by migration
+    ``0002_finalized_protection_and_reference_data``; CLAUDE.md lists the
+    later rebuilds of their functions) this gives three layers of defence:
 
     1. ``FinalizedProtectedMixin`` — per-instance ``save()`` / ``delete()``.
     2. ``FinalizedProtectedQuerySet`` (this class) — ORM bulk paths

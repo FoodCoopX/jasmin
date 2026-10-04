@@ -859,8 +859,8 @@ class ShareContent(CreatedMixin, FinalizableMixin, ArchivableMixin, JasminModel)
     packing_station = models.PositiveSmallIntegerField(default=1)
     packing_station_backup = models.PositiveSmallIntegerField(default=1)
 
-    # if there is an object with tour or delivery_station not blank/null, this is ADDITIONAL
-    # otherwise we create too many objects for nothing
+    # Every content row is scoped to one station: demand is keyed by
+    # (day, variation, station) — see ShareContentService._total_quantity_for.
     delivery_station = models.ForeignKey(
         "DeliveryStation",
         on_delete=models.PROTECT,
@@ -1019,9 +1019,9 @@ class ShareDelivery(JasminModel):
     joker_taken = models.BooleanField(default=False)
     # A "donation joker": the member donates this week's box (it goes to the
     # donation pool) instead of receiving it. Unlike ``joker_taken`` (a skip),
-    # the member is STILL billed for the share — so this flag deliberately does
-    # NOT feed into delivery-count or billing logic; it only records the
-    # donation. Mutually exclusive with ``joker_taken`` (see ``clean``).
+    # the member is STILL billed for the share: billing ignores this flag,
+    # while production counts drop the box (``delivery_counts_q``). Mutually
+    # exclusive with ``joker_taken`` (see ``clean``).
     donation_joker_taken = models.BooleanField(default=False)
     note = models.TextField(blank=True, null=True)
 

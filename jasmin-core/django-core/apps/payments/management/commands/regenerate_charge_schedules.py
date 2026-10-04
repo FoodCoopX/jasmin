@@ -1,6 +1,9 @@
 """Regenerate PLANNED ChargeSchedule rows for all subscriptions.
 
-Idempotent. Safe to run on a cron / Celery beat. Schedule it weekly.
+Idempotent. Nothing schedules it: a subscription change re-plans its own
+charges (``notify_subscription_changed``), and the office can regenerate them
+through the API (``ChargeScheduleViewSet.regenerate``). Run it by hand when
+every tenant's schedules need re-planning at once.
 
 Usage:
     python manage.py regenerate_charge_schedules                 # all tenants

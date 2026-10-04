@@ -144,7 +144,7 @@ Operational record of every email sent.
 
 | Field | Category | Purpose | Legal basis | Retention | Notes |
 |---|---|---|---|---|---|
-| `recipient` | Contact | Delivery target | Contract | 90 days rolling — pruned daily (02:15) by `cleanup_stale_email_logs` (`apps/notifications/tasks.py`); rows in a still-actionable status (pending / deferred / failed / rejected / complained) are kept past the window until resolved | Indexed |
+| `recipient` | Contact | Delivery target | Contract | 90 days rolling — pruned daily (02:15) by `cleanup_stale_email_logs` (`apps/notifications/tasks.py`); rows in a still-actionable status (pending / failed) are kept past the window until resolved | Indexed |
 | `subject`, `template`, `purpose` | Comms | What was sent + why | Contract | 90 days | |
 | `provider_message_id` | Audit | The Message-ID header the platform stamps on the mail, to trace a bounce or a mail-server log line back to the row | Legitimate interest | 90 days | |
 | `error` | Audit | Failure reason | Legitimate interest | 90 days | |

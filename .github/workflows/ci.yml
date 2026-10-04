@@ -61,9 +61,8 @@ jobs:
         run: npm run build
 
       - name: Bundle size budget
-        # Fails if a heavy dependency lands on the boot critical path (the
-        # PERF regression class — e.g. a vendor lib pulled into the entry via a
-        # barrel re-export). Parses dist/index.html for the preloaded chunks and
+        # Fails if a heavy dependency lands on the boot critical path (e.g. a
+        # vendor lib pulled into the entry via a barrel re-export). Parses dist/index.html for the preloaded chunks and
         # checks gzip budgets. See scripts/check-bundle-size.mjs.
         run: npm run size
 
@@ -72,9 +71,8 @@ jobs:
         # ``--omit=dev`` excludes dev tooling (lint/build/codegen vulns), which
         # are surfaced advisory-only in the step below. npm has no native
         # per-advisory ignore, so the script filters ``npm audit --json`` and
-        # allow-lists specific advisories with a documented reason — currently
-        # only the quill HTML-export XSS (no upstream fix; quill output is
-        # DOMPurify-sanitised on render). See scripts/check-prod-audit.mjs.
+        # allow-lists specific advisories, each with its reason, in
+        # scripts/check-prod-audit.mjs.
         run: node scripts/check-prod-audit.mjs
 
       - name: Security audit (npm, full tree — advisory only)
@@ -114,7 +112,8 @@ jobs:
       # boot guards (DJANGO_SECRET_KEY / FIELD_ENCRYPTION_KEY must not be the
       # dev defaults) don't fire for the manage.py subprocesses the suite spawns
       # (e.g. the ``spectacular`` schema contract test) or the schema-gen step
-      # below — both run manage.py, which no longer force-enables DEBUG. pytest
+      # below — both run manage.py, which force-enables DEBUG only for
+      # runserver and the shells. pytest
       # itself already defaults DEBUG on; this covers the child processes. The
       # real deploy sets DEBUG=False explicitly, so the fail-safe is intact.
       DEBUG: "True"
@@ -251,8 +250,10 @@ jobs:
         #
         #   PYSEC-2025-183 (pyjwt) — disputed by upstream: "the key
         #     length is chosen by the application that uses the
-        #     library". Our DJANGO_SECRET_KEY is enforced long + random
-        #     in prod, so the advisory does not apply to our usage.
+        #     library". Our DJANGO_SECRET_KEY is long and random in prod
+        #     (scripts/init-env.sh generates 64 random bytes; settings
+        #     refuse to boot with the dev default), so the advisory does
+        #     not apply to our usage.
         #     No patched release available; suppression is permanent
         #     unless the advisory's scope changes.
         #
@@ -264,11 +265,13 @@ jobs:
   gateway:
     name: Gateway (super-admin allowlist + nginx config)
     runs-on: ubuntu-latest
-    # The super-admin platform host is protected ONLY by an nginx IP allowlist
-    # (super-admins skip 2FA on the strength of it — see config/settings.py).
-    # Django enforces nothing, so this job makes that infra control verifiable:
-    # a regression in the allowlist or the dedicated server block fails here
-    # instead of silently leaving super-admin password-only at deploy time.
+    # The super-admin platform host is protected first by an nginx IP
+    # allowlist (super-admins skip 2FA on the strength of it — see
+    # config/settings.py). Django repeats the check only when
+    # SUPER_ADMIN_ALLOWED_IPS is set (SuperAdminIPAllowlistMiddleware), so this
+    # job makes the infra control verifiable: a regression in the allowlist or
+    # the dedicated server block fails here instead of silently leaving
+    # super-admin password-only at deploy time.
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -298,7 +301,7 @@ jobs:
             -out /etc/letsencrypt/live/$FRONTEND_DOMAIN/fullchain.pem \
             -subj "/CN=$FRONTEND_DOMAIN" >/dev/null 2>&1
           cp /work/super_admin_allowed_ips.conf /etc/nginx/super_admin_allowed_ips.conf
-          # Security-header snippets included by the template (CFG-4); the
+          # Security-header snippets included by the template; the
           # gateway mounts these too, so they must be present for `nginx -t`.
           cp /work/security_headers.conf /etc/nginx/security_headers.conf
           cp /work/security_headers_admin.conf /etc/nginx/security_headers_admin.conf

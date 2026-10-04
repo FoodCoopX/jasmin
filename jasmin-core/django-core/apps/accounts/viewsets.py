@@ -1,10 +1,10 @@
 """ViewSets for the accounts app.
 
-Kept separate from ``views.py`` (which still holds the auth-flow RPC
-endpoints: login, refresh, logout, password reset, invitation accept,
-self-register). The endpoints here all operate on the same "tenant
-user" resource and benefit from the standard ViewSet shape — including
-the ``RolePermissionsMixin`` read/write split.
+The auth-flow RPC endpoints (login, refresh, logout, password reset,
+invitation accept, self-register, step-up, 2FA) live in the ``views``
+package. The endpoints here all operate on the same "tenant user"
+resource and benefit from the standard ViewSet shape — including the
+``RolePermissionsMixin`` read/write split.
 """
 
 from __future__ import annotations

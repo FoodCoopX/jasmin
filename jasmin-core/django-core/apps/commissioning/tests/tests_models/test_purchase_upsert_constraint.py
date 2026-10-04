@@ -7,8 +7,8 @@ leaving ``seller`` NULL. The seller-scoped partial constraint only
 fires when ``seller IS NOT NULL``, so concurrent no-seller upserts could
 double-insert (MultipleObjectsReturned + double-counted stock). A separate
 partial UniqueConstraint (condition ``seller IS NULL``, ``nulls_distinct=
-False``) closes that gap while still de-duping the NULL ``day_number`` rows
-that ``bulk_set_purchase_as_expected`` produces.
+False``) closes that gap, and treats NULLs in the key — a NULL
+``day_number`` included — as equal.
 """
 
 from __future__ import annotations

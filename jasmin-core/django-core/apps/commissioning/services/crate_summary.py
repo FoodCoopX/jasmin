@@ -35,7 +35,8 @@ def build_crate_summary_row(
     ``line_netto_value`` — when given (e.g. the SUM of the grouped rows'
     per-row ``line_netto``) it is used verbatim so the displayed per-line
     figure equals what the document footer sums. When ``None`` the net is
-    recomputed from ``amount`` / ``price`` / ``rabatt`` (legacy callers).
+    computed from ``amount`` / ``price`` / ``rabatt`` — right for a single
+    row (``CrateOrderContentService``) and for the empty placeholder row.
     """
     price_d = Decimal(str(price or 0))
     rabatt_d = Decimal(str(rabatt or 0))

@@ -352,8 +352,8 @@ def alert_on_mass_deletes() -> dict[str, int]:
     Walks each tenant's ``auditlog.LogEntry`` table for DELETE actions
     in the last hour, restricts to ``SENSITIVE_DELETION_MODELS``,
     groups by actor, and alerts on any actor that hits the threshold.
-    The signal is a structured ``audit.mass_delete`` line into
-    ``security.log`` plus an ops email via ``ADMINS``.
+    The signal is a structured ``audit.mass_delete`` warning on the
+    ``gdpr`` logger plus an ops email via ``ADMINS``.
 
     Per-tenant try/except: one tenant's failure must not block
     cross-tenant aggregation. Missing data is better than no alert

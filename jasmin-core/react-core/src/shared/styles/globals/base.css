@@ -72,7 +72,8 @@
   gap: 16px;
 }
 
-/* Sized utilities (replaces recurring inline style={{ width: "100%" }} etc.) */
+/* Sizing, spacing and alignment utilities for one-declaration needs that
+   would otherwise go inline. */
 .w-full {
   width: 100%;
 }
@@ -93,7 +94,7 @@
   flex: 1;
 }
 
-/* Page width constraint — recurring `width:100%, maxWidth:800px` pattern. */
+/* Page width constraint: full width, up to 800px. */
 .page-narrow {
   width: 100%;
   max-width: 800px;

@@ -1,5 +1,5 @@
-/* Styles for the NewSubscriptionModal variation picker + detail step.
-   Extracted from inline styles so the markup stays declarative. */
+/* Styles for the NewSubscriptionModal variation picker + detail step, kept
+   out of inline styles so the markup stays declarative. */
 
 .new-subscription-card-image {
   width: 80px;

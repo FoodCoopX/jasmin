@@ -1,7 +1,7 @@
-"""Project-wide middlewares.
-
-Right now this module hosts the request-id middleware. Add other generic,
-app-independent middlewares here as they come up.
+"""Project-wide, app-independent middlewares: ``Cache-Control: no-store``
+on API responses, the ``/health/`` answer ahead of tenant resolution, and
+the request id (with the log filter that stamps it on every record). Add
+other generic middlewares here.
 """
 
 from __future__ import annotations

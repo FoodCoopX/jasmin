@@ -37,8 +37,7 @@
 }
 
 /* Dismiss control for the centred validation-error toast (notify.validationError).
-   A real <button> for keyboard/AT access; styling mirrors the previous inline
-   "×" span (no visual change). */
+   A real <button> for keyboard/AT access, styled to look like a plain "×". */
 .validation-error-dismiss {
   margin-left: 8px;
   padding: 0;

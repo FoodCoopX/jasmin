@@ -124,7 +124,8 @@ class TestDeliveryStationMemberExposure:
     def test_member_still_reads_the_door_code_of_their_own_station(
         self, tenant, member_user
     ):
-        """The pickup modal depends on this — the fix must not black it out."""
+        """The pickup modal depends on this: hiding other stations' block must
+        not hide the member's own."""
         own = _station_with_bank_details()
         member = MemberFactory(user=member_user)
         SubscriptionFactory(

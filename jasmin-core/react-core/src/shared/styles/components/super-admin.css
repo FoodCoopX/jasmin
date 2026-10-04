@@ -1,8 +1,7 @@
 /* Super-admin platform components.
  *
  * Class library used by SuperAdminDashboard, TenantDetail, and the related
- * modals/forms. Replaces the dense inline `style={{}}` objects that were
- * scattered throughout those pages.
+ * modals/forms.
  *
  * Naming: `.sa-*` (super-admin). Generic enough to reuse if other simple
  * white-card / modal screens want the same look without pulling in AntD.

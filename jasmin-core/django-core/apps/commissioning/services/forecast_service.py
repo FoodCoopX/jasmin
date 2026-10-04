@@ -760,7 +760,7 @@ class ForecastService:
 
         Returns ``(created, updated)`` — the genuinely-new rows and the
         re-pointed existing rows — so each caller can build its own
-        affected-share set and schedule recompute (see the two public
+        affected-share set and recompute it (see the two public
         ``*_forecast_with_related_objects`` methods).
         """
         if not forecast_share_type_variations:
@@ -822,11 +822,11 @@ class ForecastService:
             # ``share_contents_to_update`` are EXISTING ShareContents whose
             # ``forecast`` FK was just re-pointed at this Forecast. Re-link any
             # harvest theoreticals they ALREADY have so the FK is consistent
-            # immediately (before the deferred recompute fires). This does NOT
+            # immediately (before the callers' recompute runs). This does NOT
             # cover a row that was previously forecastless: it has no
             # TheoreticalHarvest to re-link, and its harvest theoretical must be
             # CREATED — which only ``recompute_shares`` can do. That is why both
-            # callers additionally schedule a recompute for the ``updated`` rows;
+            # callers additionally recompute the ``updated`` rows;
             # this relink is just best-effort immediate consistency.
             #
             # Only ``TheoreticalHarvest`` carries the ``forecast`` FK —
@@ -840,7 +840,7 @@ class ForecastService:
                 ]
             ).update(forecast=forecast)
 
-        # Recompute is NOT scheduled here — the two callers own that decision
+        # Recompute does NOT run here — the two callers own that decision
         # and build their own affected-share set. Both must recompute the
         # ``updated`` (re-pointed) rows so an adopted forecastless ShareContent
         # gets its harvest theoreticals created; ``update_*`` additionally folds

@@ -1743,7 +1743,7 @@ export const useCommissioningBulkSendInvoiceRemindersViaEmailCreate = <TError = 
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Enqueues a Huey background job that sends offer emails to the selected resellers. Returns 202 with a ``job_id``; the frontend polls ``GET /api/notifications/jobs/{job_id}/`` until status is ``done`` or ``failed``. The job's ``result`` field holds the per-reseller results in the same shape this endpoint used to return synchronously.
+ * Enqueues a Huey background job that sends offer emails to the selected resellers. Returns 202 with a ``job_id``; the frontend polls ``GET /api/notifications/jobs/{job_id}/`` until status is ``done`` or ``failed``. The job's ``result`` holds ``total_processed``, ``successful``, ``failed`` and ``results``: one entry per reseller with ``reseller_id``, ``reseller_name``, ``success`` and, where it applies, ``error`` or ``already_sent``.
  * @summary Enqueue bulk offer-send job
  */
 export const commissioningBulkSendOffersViaEmailCreate = (

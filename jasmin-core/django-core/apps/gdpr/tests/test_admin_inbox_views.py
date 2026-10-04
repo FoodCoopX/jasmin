@@ -27,7 +27,6 @@ from apps.commissioning.tests.factories import (
     MemberFactory,
 )
 from apps.gdpr.models import (
-    DeletionLog,
     DeletionRequest,
     DeletionRequestState,
 )
@@ -242,8 +241,8 @@ class TestAdminDecidedDeletionsView:
 
     @pytest.mark.parametrize("raw", ["abc", "0", "-3"])
     def test_unusable_limit_is_400_instead_of_the_whole_history(self, tenant, raw):
-        """A page size DRF cannot parse used to mean "no limit given" — the
-        caller asking for one page got every decided request instead."""
+        """DRF reads a page size it cannot parse as "no limit given", which
+        would hand a caller asking for one page every decided request."""
         admin = JasminUserFactory(roles=["admin"])
         for i in range(3):
             req = _land_in_pending_admin(
@@ -339,10 +338,3 @@ class TestMyDeletionStatusView:
         client = APIClient()
         resp = client.get(self.URL)
         assert resp.status_code in (401, 403)
-
-
-# ``DeletionLog`` import is unused above but kept so a future
-# "deletion-log endpoint" test added in this file can grab it without
-# updating the import block. Remove on next major test pass if no
-# such test materialises.
-_ = DeletionLog

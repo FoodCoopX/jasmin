@@ -42,7 +42,7 @@ class TestStorageFieldsQueryCount:
         large = self._storage_selects(ctx_large)
 
         assert large - small <= 1, (
-            "active Storage re-queried per row (PERF-9 regression): "
+            "active Storage re-queried per row: "
             f"2 rows -> {small} SELECTs, 6 rows -> {large} SELECTs"
         )
         assert large <= 2, f"expected active Storage fetched ~once, got {large}"

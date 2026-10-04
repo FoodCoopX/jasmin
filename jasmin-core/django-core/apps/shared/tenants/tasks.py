@@ -1,6 +1,6 @@
-"""Huey periodic tasks for the tenants app.
-
-Currently a single task: ``weekly_tenant_health_report``.
+"""Huey periodic tasks for the tenants app: ``weekly_tenant_health_report``,
+``prune_old_backups``, ``alert_on_stale_backups`` and
+``prune_old_action_rate_log``.
 
 Bootstrap reminder: nothing in this file runs until a Huey worker process
 starts.
@@ -47,7 +47,7 @@ def weekly_tenant_health_report() -> None:
     """Emit a weekly per-tenant row-count summary.
 
     Per tenant, counts rows on the ``MONITORED_TABLES`` and (a) logs
-    one structured ``tenant.health.report`` line to ``app.log`` (one
+    one structured ``tenant.health.report`` line to the app log (one
     per tenant) and (b) accumulates a human-readable digest emailed
     once to ``settings.ADMINS``. Catches trend-monitoring failures
     ("auditlog is 50x last month's size") without a Prometheus stack.

@@ -229,7 +229,8 @@ class TestDocumentationOverviewGet:
     ):
         """``delivery_day`` names a SharesDeliveryDay id on the other endpoints
         that take it, so integrations send one here too. It filters nothing —
-        and must not 400, which would break a call that used to answer 200."""
+        and must not 400, which would break the callers that already send
+        it."""
         article = ShareArticleFactory()
         self._two_harvest_days(article)
 

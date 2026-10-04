@@ -164,8 +164,8 @@ class TestShareTypeViewSet:
         assert resp.data["share_option"] == "HONEY_SHARE"
 
     def test_create_non_string_share_option_returns_400(self, api_client, tenant):
-        """A non-string option is the same field-level 400 as an unknown one —
-        the case pre-check used to call ``.upper()`` on it and 500."""
+        """A non-string option is the same field-level 400 as an unknown one,
+        not a 500 from the case pre-check calling ``.upper()`` on it."""
         resp = api_client.post(
             self.URL,
             {"name": "Bad", "share_option": 5, "valid_from": "2028-01-03"},
@@ -1318,9 +1318,9 @@ class TestHarvestSharePlanningViewSet:
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_kg_per_piece_wider_than_the_column_returns_400(self, api_client, tenant):
-        """``ShareContent.kg_per_piece`` is numeric(5,3). A wider value used to
-        pass the serializer and fail at the INSERT as a generic data error; the
-        serializer width now names the field."""
+        """``ShareContent.kg_per_piece`` is numeric(5,3). The serializer
+        carries the same width, so a wider value is a 400 naming the field
+        rather than a generic data error at the INSERT."""
         article, day, variation, _station = self._setup()
         payload = {
             "year": 2026,
@@ -1428,7 +1428,8 @@ class TestHarvestSharePlanningViewSet:
     def test_patch_keeps_the_stored_row_level_fields(self, api_client, tenant):
         """Editing one cell must not reset the slot's washing / cleaning /
         packing-station flags: the rebuild stamps them onto every recreated
-        row, so an omitted flag used to come back as the column default."""
+        row, so an omitted flag must keep its stored value rather than fall
+        back to the column default."""
         article, day, variation, _station = self._setup()
         created = self._create_slot(
             api_client,

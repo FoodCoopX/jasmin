@@ -17,7 +17,8 @@ the file: it belongs to the innermost ``def`` whose decorators, header or body
 span it, else to the innermost enclosing ``class``, else to the module. So a
 ``@pytest.mark.parametrize`` date is the decorated test's data, and a shared
 constant keeps module scope wherever in the file it sits — below a helper
-``def`` as readily as above it.
+``def`` as readily as above it. A ``def`` nested inside a frozen one runs under
+its freeze, so it counts as frozen too.
 
 A literal at MODULE scope — a shared ``_SPAN`` / ``_VALID_UNTIL`` constant — is
 judged differently, because the per-function test does not apply to it: it has
@@ -165,8 +166,9 @@ class _ScannedModule:
         self._function_at: dict[int, ast.FunctionDef | ast.AsyncFunctionDef] = {}
         self._class_at: dict[int, ast.ClassDef] = {}
         self._owner_class: dict[str, ast.ClassDef] = {}
+        self._outer_function: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
         self._tree = ast.parse(source)
-        self._index(self._tree, None)
+        self._index(self._tree, None, None)
         self.module_frozen = any(
             self._is_autouse_fixture(node) and self._body_freezes(node)
             for node in self._tree.body
@@ -177,7 +179,12 @@ class _ScannedModule:
 
     # -- indexing ---------------------------------------------------------
 
-    def _index(self, node: ast.AST, enclosing: ast.ClassDef | None) -> None:
+    def _index(
+        self,
+        node: ast.AST,
+        enclosing: ast.ClassDef | None,
+        outer: ast.FunctionDef | ast.AsyncFunctionDef | None,
+    ) -> None:
         """Map every line to its innermost definition, parents first."""
         for child in ast.iter_child_nodes(node):
             if isinstance(child, _FUNCTION_TYPES):
@@ -186,14 +193,16 @@ class _ScannedModule:
                     self._function_at[lineno] = child
                 if enclosing is not None:
                     self._owner_class[_key(child)] = enclosing
-                self._index(child, enclosing)
+                if outer is not None:
+                    self._outer_function[_key(child)] = outer
+                self._index(child, enclosing, child)
             elif isinstance(child, ast.ClassDef):
                 start, end = _span(child)
                 for lineno in range(start, end + 1):
                     self._class_at[lineno] = child
-                self._index(child, child)
+                self._index(child, child, None)
             else:
-                self._index(child, enclosing)
+                self._index(child, enclosing, outer)
 
     # -- freeze detection -------------------------------------------------
 
@@ -222,9 +231,18 @@ class _ScannedModule:
         )
 
     def _body_freezes(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-        """True if the ``def`` pins the clock somewhere in its body."""
+        """True if the ``def`` pins the clock somewhere in its body.
+
+        The body is read from its first statement on, cut at that statement's
+        column: on a one-line ``def`` it shares the ``def`` line, whose
+        signature must stay out of the search.
+        """
+        first = node.body[0]
         end = node.end_lineno or node.lineno
-        body = "\n".join(self.lines[node.lineno : end])
+        lines = self.lines[first.lineno - 1 : end]
+        # ``col_offset`` counts UTF-8 bytes, not characters.
+        lines[0] = lines[0].encode()[first.col_offset :].decode()
+        body = "\n".join(lines)
         return any(marker in body for marker in _BODY_FREEZE_MARKERS)
 
     def class_frozen(self, node: ast.ClassDef) -> bool:
@@ -251,6 +269,9 @@ class _ScannedModule:
             or self._body_freezes(node)
         ):
             return True
+        outer = self._outer_function.get(_key(node))
+        if outer is not None:
+            return self.function_frozen(outer)
         owner = self._owner_class.get(_key(node))
         return owner is not None and self.class_frozen(owner)
 
@@ -667,6 +688,62 @@ def test_parametrize_literal_belongs_to_the_decorated_test(tmp_path):
         """,
     )
     assert offenders == {"test_sample.py::test_field_is_dropped"}
+
+
+def test_one_line_def_body_is_searched_for_the_pin(tmp_path):
+    """A body that shares the ``def`` line is still the body."""
+    offenders = _scan_source(
+        tmp_path,
+        """
+        import datetime
+
+        import time_machine
+
+
+        def test_term_is_current(): time_machine.travel(datetime.date(2020, 1, 6)).start(); assert FUTURE_DATE  # still in the future
+        """,
+    )
+    assert offenders == set()
+
+
+def test_helper_nested_in_a_frozen_test_is_silent(tmp_path):
+    """A nested ``def`` runs under the freeze of the test that holds it."""
+    offenders = _scan_source(
+        tmp_path,
+        """
+        import datetime
+
+        import time_machine
+
+
+        @time_machine.travel(datetime.datetime(2020, 1, 6, 12, 0), tick=False)
+        def test_subscription_is_current():
+            def term_end():
+                # the term must be in the future for the guard to pass
+                return FUTURE_DATE
+
+            assert term_end()
+        """,
+    )
+    assert offenders == set()
+
+
+def test_helper_nested_in_an_unfrozen_test_is_reported(tmp_path):
+    offenders = _scan_source(
+        tmp_path,
+        """
+        import datetime
+
+
+        def test_subscription_is_current():
+            def term_end():
+                # the term must be in the future for the guard to pass
+                return FUTURE_DATE
+
+            assert term_end()
+        """,
+    )
+    assert offenders == {"test_sample.py::term_end"}
 
 
 def test_literal_without_a_now_relative_context_is_silent(tmp_path):

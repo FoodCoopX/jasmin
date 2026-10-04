@@ -236,7 +236,7 @@ def validate_bulk_document_request(request: Request) -> dict[str, Any]:
     order_ids = parse_bulk_ids(request)
     model = body(request).get("model")
     # A malformed non-empty ``date`` must not reach ``coerce_document_date``:
-    # that helper falls back to the order's ISO-week date, so a typo used to
+    # that helper falls back to the order's ISO-week date, so a typo would
     # issue a delivery note or invoice carrying a date nobody asked for — on a
     # document that is legally immutable once finalized. Absent / empty still
     # means "derive it", which is what the office UI sends.

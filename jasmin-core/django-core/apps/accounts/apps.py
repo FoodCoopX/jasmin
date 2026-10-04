@@ -9,13 +9,14 @@ class AccountConfig(AppConfig):
     def ready(self) -> None:
         from auditlog.registry import auditlog
 
-        # Wire up signal handlers (e.g. axes lockout -> security.log)
+        # Wire up signal handlers (e.g. an axes lockout -> the security log)
         from . import signals  # noqa: F401
         from .models import JasminUser
 
         # Role grants, demotions and deactivations are the first thing an
-        # auditor asks about, and nothing durable recorded them: the service
-        # layer writes one line to auth.log, which rotates.
+        # auditor asks about, and the service layer's one event-log line about
+        # each is no durable record: the log rotates, or in a container ages
+        # out of the host's journal.
         #
         # ``password`` and ``last_login`` are EXCLUDED rather than masked — a
         # hash has no audit value, and a login timestamp would bury the role

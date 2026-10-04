@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { computeLineNetto, roundHalfUp } from "../lineNetto";
 
-describe("computeLineNetto (BL-15: per-line ROUND_HALF_UP)", () => {
+describe("computeLineNetto (per-line ROUND_HALF_UP)", () => {
   it("quantizes a half-cent line up, matching the backend per-line rounding", () => {
     // 3 * 0.335 = 1.005 → 1.01 (half-up), not the raw 1.005. Summing two such
     // lines then yields 2.02 (round-each-then-sum, the backend order), not

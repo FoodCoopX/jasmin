@@ -21,6 +21,7 @@ the matching section of Part 1.
   - [Typing (mypy)](#typing-mypy)
   - [Hygiene gates](#hygiene-gates)
   - [Commissioning isolation](#commissioning-isolation)
+  - [Scheduled work](#scheduled-work)
 - [Frontend rules](#frontend-rules)
   - [Reuse the building blocks](#reuse-the-building-blocks)
   - [EditableTable](#editabletable)
@@ -451,6 +452,23 @@ at extraction):
 
 The frontend mirrors this rule — see [Structure & imports](#structure--imports).
 
+### Scheduled work
+
+**Scheduled and background work runs in Huey, not cron** — a
+`@db_periodic_task` for anything on a schedule, a `@db_task` for anything
+deferred. There is one scheduler to run and monitor; every task runs in the full
+Django context (settings, `for_each_tenant`, the configured loggers), so its
+failures land in the same logs as the rest of the app; and there is no host
+crontab, which nothing commits and every redeploy can drift from. Three jobs stay
+outside Huey on purpose:
+
+- the database dump, on the backup sidecar's own cron (`backups/backup.sh`), so
+  a dead worker can't silently stop the backups;
+- certificate renewal, in certbot's renewal loop, with the gateway's 12-hourly
+  nginx reload that picks the renewed certificate up;
+- the worker's own liveness, through the `huey` container's heartbeat
+  healthcheck (`docker-compose.yml`), since a dead Huey can't report itself.
+
 ## Frontend rules
 
 ### Reuse the building blocks
@@ -543,6 +561,11 @@ cards/sections are co-located in `src/features/<app>/components/`. See
 ### Styling & accessibility
 
 - **Don't use inline styles** unless really necessary — use the CSS files.
+- **A colour in an inline style is a design token.** Write a `var(--color-*)`
+  from `src/shared/styles/globals/variables.css`; when none fits, add one there
+  together with its `:root.dark` override, so dark mode follows.
+  `themes/dark-mode.css` holds component overrides, not tokens. Styles for
+  `@react-pdf/renderer` are exempt — a PDF has no CSS variables.
 - **a11y is a CI gate, not advice.** The `jsx-a11y` recommended set runs at
   `error` over every hand-written `.jsx`/`.tsx` with zero debt, so a missing
   `alt`, a label-less control or a stray `autoFocus` fails `npm run lint`. Add
@@ -569,6 +592,24 @@ flat `"x_template.csv"` is unreachable and renders the key.
 their incompleteness is a deliberate, deferred gap (they degrade to `de` via
 `fallbackLng`). Keep `de` complete (mandatory) and add `en` alongside it; only
 `de` must never miss a key.
+
+**English copy follows one house style.** Sentence case for all UI chrome —
+titles, buttons, labels, menu entries, column headers — while names keep their
+own capitals ("SEPA Direct Debit", day and month names). American spelling,
+straight quotes, "VAT ID", "ZIP code", and the weekday abbreviations "Mon" …
+"Sun". The words:
+
+- **delivery station** — where members collect their shares;
+- **cancellation** / **cancel** for a storno — `storno` stays in code and wire
+  names only;
+- **subscription** is the contract, **share** the box it delivers, and
+  **cooperative share** the equity a member holds in the cooperative;
+- **reseller** is the business object, **customer** the login role bound to
+  one;
+- **share type**, **supplier**, and **PU** for a packaging unit;
+- **the farm** — never "solawi".
+
+Fixing copy changes the value; the key never changes.
 
 ## Testing rules
 
@@ -851,11 +892,17 @@ Import and boundary rules are in [Structure & imports](#structure--imports).
 - PDF generation: @react-pdf/renderer (jsPDF was evaluated and not adopted)
 - Auth: JWT. The refresh token lives in an **HttpOnly cookie** (never visible to
   JS); the access token is held **in memory only** (`shared/services/tokenStore.ts`
-  — a module-scoped variable), deliberately NOT in localStorage/sessionStorage so
-  an XSS payload cannot exfiltrate it. A hard reload drops the in-memory token
-  and AuthContext silently re-obtains one via `/api/auth/refresh/`, which works
-  because the HttpOnly cookie survives. **Don't "fix" the reload by persisting
-  the access token to storage** — losing it on reload is the point.
+  — a module-scoped variable), deliberately NOT in localStorage/sessionStorage,
+  where it would outlive the page and sit readable for any script. That limits
+  what an XSS payload gets without stopping it: running in the page, it can still
+  send API requests as the user and call `/api/auth/refresh/` itself (the cookie
+  rides along) for a fresh access token. It can never read the refresh token, so
+  anything it carries away dies with the access token's 15 minutes. CSP is still
+  report-only (`nginx/security_headers.conf`), so nothing blocks such a payload
+  yet. A hard reload drops the in-memory token and AuthContext silently
+  re-obtains one via `/api/auth/refresh/`, which works because the HttpOnly
+  cookie survives. **Don't "fix" the reload by persisting the access token to
+  storage** — losing it on reload is the point.
 - Locale: i18next with language detection and backend translation loader
 
 ### API generation

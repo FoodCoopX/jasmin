@@ -19,7 +19,9 @@ class TenantsConfig(AppConfig):
     # gap cannot be closed without forking django-auditlog or
     # building a separate audit table for the public schema.
     #
-    # Tenant-lifecycle changes are covered by the structured event
-    # log instead — see ``logs/auth.log`` for the
-    # ``tenant.created / tenant.updated / tenant.admin_created /
-    # user.roles_changed`` lines.
+    # Tenant-lifecycle changes are covered by the structured event log
+    # instead: the super-admin's ``tenant.created`` / ``tenant.updated`` /
+    # ``tenant.admin_created`` / ``user.roles_changed`` lines (``super_admin``
+    # logger) and a tenant admin's ``tenant.updated`` (``apps.shared.tenants``).
+    # In a container they go to stdout like every logger; on bare metal to
+    # auth.log and app.log respectively.

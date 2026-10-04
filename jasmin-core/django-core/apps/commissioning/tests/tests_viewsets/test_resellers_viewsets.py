@@ -397,13 +397,14 @@ class TestResellerHasOrdersWithoutInvoiceFilter:
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
 class TestCrewTierReadsResellerContext:
-    """The crew tier has no ``linked_reseller``, so under the owner-bypass
-    default it scoped to nothing and received an empty 200 — never a 403.
+    """The crew tier has no ``linked_reseller``, so under the default
+    owner-bypass set it would scope to nothing and get an empty 200 — never a
+    403. These viewsets pass the whole internal tier as privileged instead.
 
-    These assert CONTENT deliberately: the status code is ``200 OK`` before and
-    after the fix, so a route-matrix row categorising the response cannot tell
-    the two apart. Only the rows can. Customer scoping must survive unchanged,
-    which is the other half of every case here.
+    These assert CONTENT deliberately: an empty list is ``200 OK`` too, so a
+    route-matrix row categorising the response cannot tell the two apart. Only
+    the rows can. Customer scoping must hold as well, which is the other half
+    of every case here.
     """
 
     RESELLERS = reverse("reseller-list")

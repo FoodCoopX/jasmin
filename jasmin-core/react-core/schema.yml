@@ -2296,10 +2296,12 @@ paths:
   /api/commissioning/bulk_send_offers_via_email/:
     post:
       operationId: commissioning_bulk_send_offers_via_email_create
-      description: Enqueues a Huey background job that sends offer emails to the selected
-        resellers. Returns 202 with a ``job_id``; the frontend polls ``GET /api/notifications/jobs/{job_id}/``
-        until status is ``done`` or ``failed``. The job's ``result`` field holds the
-        per-reseller results in the same shape this endpoint used to return synchronously.
+      description: 'Enqueues a Huey background job that sends offer emails to the
+        selected resellers. Returns 202 with a ``job_id``; the frontend polls ``GET
+        /api/notifications/jobs/{job_id}/`` until status is ``done`` or ``failed``.
+        The job''s ``result`` holds ``total_processed``, ``successful``, ``failed``
+        and ``results``: one entry per reseller with ``reseller_id``, ``reseller_name``,
+        ``success`` and, where it applies, ``error`` or ``already_sent``.'
       summary: Enqueue bulk offer-send job
       tags:
       - commissioning
@@ -39259,10 +39261,8 @@ components:
           * Settings overlay: ``settings`` / ``current_settings`` (so
             ``useTenant().getSetting(...)`` works the same as for staff)
 
-        Deliberately omitted (office/admin-only, none of which any
-        member/customer page consumes — confirmed by grep on
-        ``src/pages/customer/``, ``src/pages/abos/``, and
-        ``src/components/layout/``):
+        Deliberately omitted (office/admin-only; no member or customer page
+        reads them off the tenant):
 
           * Banking: ``iban``, ``sepa_creditor_id``, ``sepa_creditor_name``,
             ``sepa_creditor_bic``

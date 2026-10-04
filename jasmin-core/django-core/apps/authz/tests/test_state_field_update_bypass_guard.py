@@ -31,9 +31,12 @@ How it works
    ``migrations/``).
 2. Tokenise and mask comments + string literals (so docstring text
    that mentions ``.update(account_status=...)`` doesn't match).
-3. Regex for ``.update(...)`` / ``.bulk_update(...)`` calls whose
-   kwargs include any of the protected field names within ~250
-   chars (matches both single-line and broken-across-lines styles).
+3. Regex for ``.update(`` / ``.bulk_update(`` followed, within ~250
+   chars on the same line, by a protected field name as a keyword
+   argument (``field=``). A chain broken across lines is caught when
+   its ``.update(field=…`` part shares a line; a call whose keywords
+   start on the next line, or a ``bulk_update`` whose field list names
+   the field as a string, is not.
 4. For each match, check the *raw* source line for an opt-out
    marker — see "Opt-out" below — and skip if present.
 5. Assert no remaining offenders, with file:line for each.

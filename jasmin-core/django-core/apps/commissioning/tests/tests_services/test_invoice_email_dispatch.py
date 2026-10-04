@@ -72,10 +72,9 @@ def reseller_with_email():
 
 @pytest.fixture
 def finalized_invoice_with_pdf(reseller_with_email):
-    # ``number`` is an IntegerField on NumberedModelMixin (and a
-    # ``PositiveIntegerField`` with a unique constraint on the legacy
-    # variant). Don't pass a string here. ``prefix`` defaults to ``""``,
-    # ``number`` is nullable — leaving both unset is fine for the
+    # ``number`` is an IntegerField on NumberedDocumentMixin, so don't pass
+    # a string here. ``prefix`` defaults to ``""`` and ``number`` is
+    # nullable — leaving both unset is fine for the
     # email-context smoke test; the rendered subject line just shows
     # an empty number, which is what we'd see if a real invoice were
     # email-sent before ``assign_final_number`` ran. The email body

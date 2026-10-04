@@ -52,9 +52,10 @@ They share a prefix and nothing else.
 
 ## Other conventions worth knowing
 
-- **`valid_from` dates are always Mondays.** Time-bound models (`TimeBound`) are
-  aligned to ISO weeks throughout.
-- **Model IDs are strings, not UUIDs or ints.** `TapirModel.id` is a `CharField`,
+- **A validity window is whole ISO weeks.** On `TimeBoundMixin` models
+  `valid_from` is a Monday and `valid_until` a Sunday (`ConsentDocument` opts
+  out: a policy revision goes live the day legal review finishes).
+- **Model IDs are strings, not UUIDs or ints.** `JasminModel.id` is a `CharField`,
   which means `qs.filter(pk=some_instance)` silently matches nothing — always
   pass `.pk` explicitly. See the CharField pitfall section in
   [`CLAUDE.md`](../CLAUDE.md).

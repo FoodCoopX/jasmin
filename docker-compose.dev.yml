@@ -115,7 +115,7 @@ services:
     networks: [jasmin-dev]
 
   # Huey background-task consumer for the dev stack. Without it every enqueued
-  # task (forecast recompute, bulk sends) queues to Redis with no consumer and
+  # task (the bulk email sends) queues to Redis with no consumer and
   # never runs — the no-Docker `make huey` only covers the host flow. The
   # ``backend`` service owns migrations (SKIP_MIGRATIONS here); huey just
   # consumes, after the backend has started.

@@ -275,7 +275,7 @@
   min-height: 0 !important;
 }
 
-/* Same fix for any table inside a modal (DeliveryNoteModal, InvoiceModal, …):
+/* The same for any table inside a modal (DeliveryNoteModal, InvoiceModal, …):
    the ~200px/150px reservation is dead space below a handful of rows in a
    dialog. Standalone page tables keep it (load-time layout-shift guard). */
 .ant-modal-body .ant-table-container,

@@ -89,7 +89,7 @@ def _as_id(value: Any) -> Any:
     but the update path also accepts model instances (the setattr loop in
     ``update_draft_subscription`` assigns those straight to the FK). Both shapes
     have to compare like-for-like against the stored ``*_id``, and the pk is
-    what may reach the rule's queryset: ``TapirModel.id`` is a ``CharField``, so
+    what may reach the rule's queryset: ``JasminModel.id`` is a ``CharField``, so
     filtering it by an instance stringifies the instance and silently matches
     nothing.
     """
