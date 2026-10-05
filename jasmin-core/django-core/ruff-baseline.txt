@@ -60,7 +60,7 @@ apps/commissioning/services/forecast_service.py: C901 `_build_share_content_chan
 apps/commissioning/services/forecast_service.py: PLR0913 Too many arguments in function definition (13 > 5)
 apps/commissioning/services/forecast_service.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/commissioning/services/invoice_reminder.py: C901 `bulk_send_invoice_reminders` is too complex (21 > 10)
-apps/commissioning/services/invoice_reminder.py: PLR0915 Too many statements (81 > 50)
+apps/commissioning/services/invoice_reminder.py: PLR0915 Too many statements (79 > 50)
 apps/commissioning/services/invoice_service.py: C901 `finalize_invoice` is too complex (16 > 10)
 apps/commissioning/services/member_cancellation.py: N806 Variable `_NON_CANCELLATION_ERRORS` in function should be lowercase
 apps/commissioning/services/member_cancellation.py: PLR0913 Too many arguments in function definition (8 > 5)

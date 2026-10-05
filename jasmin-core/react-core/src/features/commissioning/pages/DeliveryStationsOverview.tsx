@@ -228,6 +228,7 @@ export default function DeliveryStationsOverview() {
   return (
     <div>
       <h1>{t("commissioning.tour_lists")}</h1>
+      <p className="page-subtitle">{t("commissioning.tour_lists_subtitle")}</p>
 
       <WeekSelector
         selectedYear={selectedYear}

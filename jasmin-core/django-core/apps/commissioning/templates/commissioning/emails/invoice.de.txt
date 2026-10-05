@@ -5,8 +5,8 @@ Hallo {{ reseller.name }},
 anbei findest du deine Rechnung für {{ invoice.period }}.
 
 Gesamtbetrag: {{ invoice.total }}
-Fällig bis: {{ invoice.due_date }}
-
+{% if invoice.due_date %}Fällig bis: {{ invoice.due_date }}
+{% endif %}
 Bankverbindung: {{ tenant.bank_details }}
 
 — Das Team von {{ tenant_name }}

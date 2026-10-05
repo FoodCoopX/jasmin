@@ -101,6 +101,8 @@
     "min_shares_desc": "Mindestanzahl Anteile für Mitgliedschaft",
     "max_shares": "Maximale Anzahl Anteile",
     "max_shares_desc": "Maximale Anzahl Anteile pro Mitglied",
+    "info_sentence_about_coop_shares": "Erklärung zu den Genossenschaftsanteilen",
+    "info_sentence_about_coop_shares_desc": "Erscheint bei der Registrierung im Schritt Genossenschaftsanteile unter der allgemeinen Einleitung – etwa wofür die Anteile da sind und wann sie zurückgezahlt werden.",
     "coop_payback_retention": "Behaltefrist für Anteile gekündigter Mitglieder",
     "coop_payback_retention_desc": "Monate, die Genossenschaftsanteile nach dem Austritt eines Mitglieds in der Genossenschaft verbleiben, bevor sie zur Rückzahlung fällig werden (0 = sofort fällig).",
     "months_suffix": "Monate",

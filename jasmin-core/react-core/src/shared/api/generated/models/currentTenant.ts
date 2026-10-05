@@ -49,7 +49,8 @@ must render without authentication.)
     term and pricing pre-login:
       - coop shares: ``allows_trial_subscriptions``,
         ``min_number_coop_shares``, ``max_number_coop_shares``,
-        ``value_one_coop_share``, ``requires_paper_signature_for_membership``
+        ``value_one_coop_share``, ``requires_paper_signature_for_membership``,
+        ``info_sentence_about_coop_shares``
       - end-of-term rules: ``allowed_trial_subscription_duration``,
         ``subscriptions_end_at_end_of_season``,
         ``subscriptions_end_after_one_year``, ``season_start_week``,
@@ -145,6 +146,7 @@ export interface CurrentTenant {
   readonly max_number_coop_shares?: number;
   readonly value_one_coop_share?: number;
   readonly requires_paper_signature_for_membership?: boolean;
+  readonly info_sentence_about_coop_shares?: string;
   readonly allowed_trial_subscription_duration?: number;
   readonly subscriptions_end_at_end_of_season?: boolean;
   readonly subscriptions_end_after_one_year?: boolean;

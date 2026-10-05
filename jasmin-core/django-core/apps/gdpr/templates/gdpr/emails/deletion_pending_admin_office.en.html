@@ -10,16 +10,16 @@
     </h1>
 
     <p>
-      Someone has confirmed a GDPR Article 17 ("right to erasure") deletion
-      request at
-      {% if tenant_name %}<strong>{{ tenant_name }}</strong>{% else %}your platform{% endif %}.
+      A new data deletion request (GDPR Article 17) has been received at
+      {% if tenant_name %}<strong>{{ tenant_name }}</strong>{% else %}your platform{% endif %}
+      and confirmed by the requesting person via the email link.
     </p>
 
     <p>
       The request is now in the <em>"awaiting office approval"</em> state and
-      must be reviewed and either approved or rejected (with a reason) before
-      the actual anonymisation runs. The answer to the person is due within
-      one month (GDPR Art. 12(3)).
+      must be manually reviewed and either approved or rejected (with a reason)
+      before the actual anonymization runs. The response to the person is due
+      within one month (GDPR Art. 12(3)).
     </p>
 
     <p style="margin: 32px 0;">
@@ -35,9 +35,9 @@
     </p>
 
     <p style="color: #777; font-size: 13px; margin-top: 32px;">
-      This message intentionally does NOT include any details about the
-      requesting person — the request details are only visible under
-      Members → GDPR deletion requests, for an admin who signs in.
+      This email intentionally does not include any details about the
+      requesting person — the request details are only visible to a
+      signed-in admin, under Members → GDPR deletion requests.
     </p>
   </body>
 </html>

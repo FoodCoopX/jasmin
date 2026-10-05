@@ -44,8 +44,8 @@ immutability at multiple layers:
   03:00, per-tenant) recomputes each invoice's `document_hash`, logs an
   `invoice.hash_drift` warning per drifted invoice and emails the operator
   (`ADMINS`) the list. For an ad-hoc check,
-  run `python manage.py check_invoice_hashes --schema=<tenant>` (exit 1 on
-  drift).
+  run `python manage.py tenant_command check_invoice_hashes --schema=<tenant>`
+  (exit 1 on drift).
 
 Immutability of finalized documents is enforced at three layers:
 `FinalizedProtectedMixin.save()` in Python, the `is_finalized` guard in

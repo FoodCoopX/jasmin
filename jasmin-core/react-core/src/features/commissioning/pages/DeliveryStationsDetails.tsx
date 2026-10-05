@@ -346,6 +346,9 @@ export default function DeliveryStationsDetails() {
     buildMemberMatrix,
   ]);
 
+  const selectedDayName =
+    selectedDeliveryDay !== null ? getDayName(selectedDeliveryDay, t) : "";
+
   // Tenant info for PDF header
   const tenantInfo = useMemo(
     () => ({
@@ -404,6 +407,7 @@ export default function DeliveryStationsDetails() {
       <h1>
         {t("commissioning.delivery_notes_delivery_stations_details_title")}
       </h1>
+      <p className="page-subtitle">{t("commissioning.pickup_lists_subtitle")}</p>
       <div>
         <WeekSelector
           selectedYear={selectedYear}
@@ -440,11 +444,7 @@ export default function DeliveryStationsDetails() {
         <DeliveryStationDetailsPDFGenerator
           pages={currentStationPages}
           week={selectedWeek!}
-          dayName={
-            selectedDeliveryDay !== null
-              ? getDayName(selectedDeliveryDay, t)
-              : ""
-          }
+          dayName={selectedDayName}
           tenant={tenantInfo}
           filename={generatePdfFilename([
             t("commissioning.pickup_list"),
@@ -467,11 +467,7 @@ export default function DeliveryStationsDetails() {
         <DeliveryStationDetailsPDFGenerator
           pages={allStationsDayPages}
           week={selectedWeek!}
-          dayName={
-            selectedDeliveryDay !== null
-              ? getDayName(selectedDeliveryDay, t)
-              : ""
-          }
+          dayName={selectedDayName}
           tenant={tenantInfo}
           filename={generatePdfFilename([
             t("commissioning.pickup_lists"),

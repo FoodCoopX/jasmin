@@ -116,8 +116,9 @@ export default function ConfigurationApp() {
             key: "number_locale",
             label: t("settings.general.numberLocale"),
             type: "select",
-            // BCP-47 tags consumed by Intl.NumberFormat in the UI / PDFs.
-            // Backend persists this on TenantSettings.number_locale.
+            // BCP-47 tags for Intl.NumberFormat in the UI and PDFs; the
+            // backend writes the amounts in its emails with the same tag.
+            // Stored on Tenant.number_locale.
             options: [
               { value: "de-DE", label: "1.234,56" },
               { value: "de-CH", label: "1’234.56" },

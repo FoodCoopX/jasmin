@@ -100,7 +100,8 @@ if (eagerPdf.length) {
   console.error(
     `\u2717 vendor-pdf on the boot critical path: ${eagerPdf.join(", ")}. ` +
       "Something in the entry's static closure shares a dependency with it \u2014 " +
-      "check base64-js and the commissioning components barrel.",
+      "check the Buffer polyfill's chunk rule (buffer, ieee754, base64-js) " +
+      "and the commissioning components barrel.",
   );
   process.exit(1);
 }

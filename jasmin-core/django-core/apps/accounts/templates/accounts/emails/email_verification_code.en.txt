@@ -1,6 +1,6 @@
 Hello{% if first_name %} {{ first_name }}{% endif %},
 
-thanks for your interest in {{ tenant_name }}.
+Thanks for your interest in {{ tenant_name }}.
 
 Enter the following code to confirm your email address and continue your
 registration:

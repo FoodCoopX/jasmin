@@ -9,11 +9,11 @@
 
     <p>Hi {{ reseller.name }},</p>
 
-    <p>please find your invoice for {{ invoice.period }} attached.</p>
+    <p>Please find your invoice for {{ invoice.period }} attached.</p>
 
     <p>
-      Total: <strong>{{ invoice.total }}</strong><br />
-      Due date: {{ invoice.due_date }}
+      Total: <strong>{{ invoice.total }}</strong>{% if invoice.due_date %}<br />
+      Due date: {{ invoice.due_date }}{% endif %}
     </p>
 
     <p>Bank details: {{ tenant.bank_details }}</p>

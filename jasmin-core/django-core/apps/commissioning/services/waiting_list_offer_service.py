@@ -34,6 +34,7 @@ from decimal import Decimal, InvalidOperation
 from django.db import transaction
 from django.utils import timezone
 
+from apps.shared.display_formats import DisplayFormats
 from apps.shared.money import fits_decimal_column, to_decimal
 
 from ..errors import (
@@ -293,6 +294,7 @@ class WaitingListOfferService:
         station_day = subscription.default_delivery_station_day
         base_url = frontend_base_url()
         accept_url = f"{base_url}/waiting-list-offer/{subscription.notification_token}"
+        formats = DisplayFormats.current()
 
         # Flatten to plain scalars — never hand a live ORM instance to the
         # tenant-editable email renderer.
@@ -304,11 +306,9 @@ class WaitingListOfferService:
             },
             "variation_name": share_type.name or "",
             "delivery_station_name": offer_station_name(station_day),
-            "valid_from": subscription.valid_from.strftime("%d.%m.%Y"),
+            "valid_from": formats.format_date(subscription.valid_from),
             # Set by ``notify_spot_available`` just before this email.
-            "expires_at": subscription.notification_expires_at.strftime(
-                "%d.%m.%Y, %H:%M"
-            ),
+            "expires_at": formats.format_datetime(subscription.notification_expires_at),
             "accept_url": accept_url,
         }
         member_email = member.email or ""

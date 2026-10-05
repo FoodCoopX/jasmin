@@ -27,6 +27,8 @@ def prune_orphan_support_tickets() -> int:
         log.warning("support_ticket.prune_orphans.skipped no live tenants found")
         return 0
     orphans = SupportTicket.objects.exclude(tenant_schema__in=live)
-    deleted, _ = orphans.delete()
+    # ``delete()``'s total also counts the cascaded messages; report tickets.
+    _, deleted_per_model = orphans.delete()
+    deleted = deleted_per_model.get(SupportTicket._meta.label, 0)
     log.info("support_ticket.prune_orphans.done deleted=%s", deleted)
     return deleted

@@ -38,6 +38,8 @@ from datetime import date
 from django.db import transaction
 from django.utils import timezone
 
+from apps.shared.display_formats import DisplayFormats
+
 from ..models import Member
 
 logger = logging.getLogger(__name__)
@@ -153,14 +155,9 @@ def _send_trial_converted_email(member: Member) -> None:
             "first_name": member.first_name,
             "member_number": member.member_number,
         },
-        # GenG §30 Eintrittsdatum is a local calendar day — render
-        # it that way too. Templates use ``{{ entry_date }}``
-        # directly so we pre-format with the locale-friendly
-        # dd.mm.yyyy here rather than leaving Django to ISO-format
-        # it.
-        "entry_date": (
-            member.entry_date.strftime("%d.%m.%Y") if member.entry_date else ""
-        ),
+        # Templates use ``{{ entry_date }}`` directly, so it is pre-formatted
+        # here rather than left to Django's ISO default.
+        "entry_date": DisplayFormats.current().format_date(member.entry_date),
         "portal_url": frontend_base_url(),
     }
 

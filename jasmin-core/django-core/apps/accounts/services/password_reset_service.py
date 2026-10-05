@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.exceptions import ValidationError
@@ -143,6 +144,7 @@ def _send_password_reset_email(*, user: JasminUser, uid: str, token: str) -> Non
         "tenant_name": tenant_name(),
         "user": {"first_name": user.first_name},
         "reset_url": reset_url,
+        "expires_minutes": settings.PASSWORD_RESET_TIMEOUT // 60,
     }
     send_email_best_effort(
         slug="accounts.password_reset",

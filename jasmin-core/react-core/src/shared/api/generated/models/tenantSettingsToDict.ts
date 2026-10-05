@@ -54,6 +54,8 @@ export interface TenantSettingsToDict {
    * @maximum 2147483647
    */
   max_number_coop_shares?: number;
+  /** @nullable */
+  info_sentence_about_coop_shares?: string | null;
   /**
    * @minimum 0
    * @maximum 2147483647

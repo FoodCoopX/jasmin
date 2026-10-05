@@ -28903,7 +28903,8 @@ components:
             term and pricing pre-login:
               - coop shares: ``allows_trial_subscriptions``,
                 ``min_number_coop_shares``, ``max_number_coop_shares``,
-                ``value_one_coop_share``, ``requires_paper_signature_for_membership``
+                ``value_one_coop_share``, ``requires_paper_signature_for_membership``,
+                ``info_sentence_about_coop_shares``
               - end-of-term rules: ``allowed_trial_subscription_duration``,
                 ``subscriptions_end_at_end_of_season``,
                 ``subscriptions_end_after_one_year``, ``season_start_week``,
@@ -29042,6 +29043,9 @@ components:
           readOnly: true
         requires_paper_signature_for_membership:
           type: boolean
+          readOnly: true
+        info_sentence_about_coop_shares:
+          type: string
           readOnly: true
         allowed_trial_subscription_duration:
           type: integer
@@ -39450,6 +39454,9 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+        info_sentence_about_coop_shares:
+          type: string
+          nullable: true
         retention_period_cancelled_members_coop_shares_in_months:
           type: integer
           maximum: 2147483647
@@ -39763,6 +39770,9 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+        info_sentence_about_coop_shares:
+          type: string
+          nullable: true
         retention_period_cancelled_members_coop_shares_in_months:
           type: integer
           maximum: 2147483647

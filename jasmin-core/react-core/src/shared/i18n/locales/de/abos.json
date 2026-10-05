@@ -148,7 +148,6 @@
   "donation_joker_taken": "Spenden-Joker?",
   "joker_over_limit_tooltip": "Mehr genommen als für diesen Anteilstyp erlaubt: {{taken}} von {{allowed}}.",
   "overview_jokers": "Übersicht Joker",
-  "pledge_round": "Bietrunde",
   "delivery": "Lieferung",
   "payment_cycle": "Zahlungsrhythmus",
   "price_per_delivery": "Preis pro Lieferung",

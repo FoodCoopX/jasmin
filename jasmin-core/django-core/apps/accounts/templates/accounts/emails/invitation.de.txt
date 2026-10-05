@@ -6,5 +6,5 @@ du wurdest eingeladen, {{ tenant_name }} beizutreten.
 
   {{ accept_url }}
 
-Diese Einladung läuft am {{ expires_at }} ab.
+Diese Einladung gilt bis {{ expires_at }}.
 Wenn du diese E-Mail nicht erwartet hast, kannst du sie einfach ignorieren.

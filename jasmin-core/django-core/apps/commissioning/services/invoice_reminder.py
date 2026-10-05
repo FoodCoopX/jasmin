@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.html import escape as _html_escape
 from django.utils.safestring import SafeString, mark_safe
 
+from apps.shared.display_formats import DisplayFormats
 from apps.shared.tenants.email_service import (
     EmailService,
     capture_tenant_email_context,
@@ -69,7 +70,7 @@ def _build_invoices_text(invoices: list[dict[str, Any]], language: str) -> str:
     return "\n".join(lines)
 
 
-def _invoice_to_dict(invoice) -> dict[str, Any]:
+def _invoice_to_dict(invoice, formats: DisplayFormats) -> dict[str, Any]:
     """Flatten an ``InvoiceReseller`` into the template/registry shape the
     ``commissioning.invoice_reminder`` template expects: ``number``,
     ``total``, ``issue_date``, ``due_date``, ``days_overdue``."""
@@ -79,10 +80,32 @@ def _invoice_to_dict(invoice) -> dict[str, Any]:
     days_overdue = (today - due_date).days if due_date and today > due_date else 0
     return {
         "number": invoice.full_number,
-        "total": f"{invoice.sum_brutto:.2f}",
-        "issue_date": issue_date.isoformat() if issue_date else "",
-        "due_date": due_date.isoformat() if due_date else "",
+        "total": formats.format_money(invoice.sum_brutto),
+        "issue_date": formats.format_date(issue_date),
+        "due_date": formats.format_date(due_date),
         "days_overdue": days_overdue,
+    }
+
+
+def _reminder_context(
+    ctx: dict, formats: DisplayFormats, reseller, invoices_with_orders: list
+) -> dict[str, Any]:
+    """The ``commissioning.invoice_reminder`` context for one reseller.
+
+    Pre-flattened so the template is substitution-only (no ``{% for %}``) and
+    renders identically under a tenant override (safe Mustache renderer).
+    """
+    language = ctx["tenant_language"] or "en"
+    invoice_dicts = [
+        _invoice_to_dict(invoice, formats) for _order, invoice in invoices_with_orders
+    ]
+    return {
+        "tenant_name": ctx["tenant_name"],
+        # ``name`` is None for a contact with no company, first or last name.
+        "reseller": {"name": reseller.contact.name or reseller.invoice_name or ""},
+        "invoices_table": _build_invoices_table(invoice_dicts, language),
+        "invoices_text": _build_invoices_text(invoice_dicts, language),
+        "tenant": {"bank_details": ctx["bank_details"]},
     }
 
 
@@ -193,6 +216,8 @@ def bulk_send_invoice_reminders(
     # view (real Tenant); fall back to the live tenant for synchronous
     # callers. The worker's FakeTenant can't supply these.
     ctx = email_ctx or capture_tenant_email_context()
+    # On the worker this is a lookup by schema, so it runs once per batch.
+    formats = DisplayFormats.current()
 
     total_buckets = len(by_reseller)
     processed = 0
@@ -251,28 +276,11 @@ def bulk_send_invoice_reminders(
             _emit_progress()
             continue
 
-        # ``name`` is None for a contact with no company, first or last name.
-        reseller_name = reseller.contact.name or reseller.invoice_name or ""
-        invoice_dicts = [_invoice_to_dict(inv) for _o, inv in invoices_with_orders]
-        reminder_language = ctx["tenant_language"] or "en"
         try:
             success = email_service.send_email(
                 slug="commissioning.invoice_reminder",
                 to_emails=[reseller.invoice_email],
-                context={
-                    "tenant_name": ctx["tenant_name"],
-                    "reseller": {"name": reseller_name},
-                    # Pre-flattened so the template is substitution-only
-                    # (no {% for %}) and renders identically under a tenant
-                    # override (safe Mustache renderer).
-                    "invoices_table": _build_invoices_table(
-                        invoice_dicts, reminder_language
-                    ),
-                    "invoices_text": _build_invoices_text(
-                        invoice_dicts, reminder_language
-                    ),
-                    "tenant": {"bank_details": ctx["bank_details"]},
-                },
+                context=_reminder_context(ctx, formats, reseller, invoices_with_orders),
                 language=ctx["tenant_language"] or None,
                 related_object_type="reseller",
                 related_object_id=str(reseller.id),

@@ -588,7 +588,8 @@ class CurrentTenantSerializer(serializers.ModelSerializer):
         term and pricing pre-login:
           - coop shares: ``allows_trial_subscriptions``,
             ``min_number_coop_shares``, ``max_number_coop_shares``,
-            ``value_one_coop_share``, ``requires_paper_signature_for_membership``
+            ``value_one_coop_share``, ``requires_paper_signature_for_membership``,
+            ``info_sentence_about_coop_shares``
           - end-of-term rules: ``allowed_trial_subscription_duration``,
             ``subscriptions_end_at_end_of_season``,
             ``subscriptions_end_after_one_year``, ``season_start_week``,
@@ -632,6 +633,7 @@ class CurrentTenantSerializer(serializers.ModelSerializer):
     max_number_coop_shares = serializers.SerializerMethodField()
     value_one_coop_share = serializers.SerializerMethodField()
     requires_paper_signature_for_membership = serializers.SerializerMethodField()
+    info_sentence_about_coop_shares = serializers.SerializerMethodField()
     # End-of-term rules — the registration wizard computes a subscription's
     # ``valid_until`` (trial end / season / one-year) client-side, so it needs
     # these pre-login.
@@ -700,6 +702,7 @@ class CurrentTenantSerializer(serializers.ModelSerializer):
             "max_number_coop_shares",
             "value_one_coop_share",
             "requires_paper_signature_for_membership",
+            "info_sentence_about_coop_shares",
             "allowed_trial_subscription_duration",
             "subscriptions_end_at_end_of_season",
             "subscriptions_end_after_one_year",
@@ -758,6 +761,9 @@ class CurrentTenantSerializer(serializers.ModelSerializer):
 
     def get_value_one_coop_share(self, obj: Tenant) -> int:
         return int(self._overlay(obj).get("value_one_coop_share", 100))
+
+    def get_info_sentence_about_coop_shares(self, obj: Tenant) -> str:
+        return self._overlay(obj).get("info_sentence_about_coop_shares") or ""
 
     def get_requires_paper_signature_for_membership(self, obj: Tenant) -> bool:
         return bool(

@@ -1,7 +1,6 @@
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import AppsIcon from "@mui/icons-material/Apps";
 import BarChartIcon from "@mui/icons-material/BarChart";
-import BlurCircularIcon from "@mui/icons-material/BlurCircular";
 import BrowserNotSupportedIcon from "@mui/icons-material/BrowserNotSupported";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
@@ -26,7 +25,6 @@ export default function AboSidebar({
   const { getSetting } = useTenant();
 
   const uses_jokers = getSetting("uses_jokers", true);
-  const uses_pledge_round = getSetting("abos.uses_pledge_round", false);
   const allows_waiting_list = getSetting(
     "allows_waiting_list_for_subscriptions",
     true,
@@ -104,20 +102,6 @@ export default function AboSidebar({
         <Link to="/abos/sepa-mandates">{t("members.sepa_mandates")}</Link>
       ),
     },
-
-    ...(uses_pledge_round
-      ? [
-          {
-            key: "abos-pledge-round",
-
-            requireRole: "isOffice",
-            icon: <BlurCircularIcon />,
-            label: (
-              <Link to="/abos/pledge-round">{t("abos.pledge_round")}</Link>
-            ),
-          },
-        ]
-      : []),
   ];
 
   return (

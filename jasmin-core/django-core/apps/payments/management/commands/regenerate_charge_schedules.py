@@ -12,7 +12,7 @@ Usage:
 
 from __future__ import annotations
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import schema_context
 
 from apps.payments.services import ChargeScheduleService
@@ -33,6 +33,8 @@ class Command(BaseCommand):
         tenant_slug = options.get("tenant")
         if tenant_slug:
             tenants = Tenant.objects.filter(schema_name=tenant_slug)
+            if not tenants.exists():
+                raise CommandError(f"No tenant with schema '{tenant_slug}'.")
         else:
             tenants = Tenant.objects.filter(is_active=True).exclude(
                 schema_name="public"

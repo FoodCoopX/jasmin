@@ -72,13 +72,16 @@ export default defineConfig({
           // ``locale-de`` reaches the boot path.
           const locale = id.match(/\/shared\/i18n\/locales\/([a-z]{2})\//);
           if (locale) return `locale-${locale[1]}`;
-          // ``base64-js`` gets a chunk of its own. main.tsx imports
+          // The Buffer polyfill gets a chunk of its own. main.tsx imports
           // ``buffer`` eagerly to polyfill ``globalThis.Buffer``, and
-          // ``buffer`` requires base64-js. Left unassigned, Rollup parks
-          // base64-js in the PDF chunk (reachable from @react-pdf too),
-          // which welds the entry to that chunk and drags the whole ~450 kB
-          // PDF stack onto the boot critical path behind a ~1 kB dependency.
-          if (id.includes('node_modules/base64-js')) return 'vendor-buffer';
+          // @react-pdf uses it too. Left unassigned, Rollup may park
+          // ``buffer`` or what it requires (``ieee754``, ``base64-js``) in the
+          // PDF chunk — which one depends on the rest of the module graph —
+          // and that welds the entry to the chunk and drags the whole
+          // ~450 kB PDF stack onto the boot critical path behind a few kB.
+          if (/node_modules\/(?:buffer|ieee754|base64-js)\//.test(id)) {
+            return 'vendor-buffer';
+          }
           // ~450 kB gzip, and only about a fifth of it is @react-pdf
           // itself: the bulk is fontkit, pdfkit and yoga-layout's wasm,
           // which it pulls in. Naming the chunk keeps that whole stack

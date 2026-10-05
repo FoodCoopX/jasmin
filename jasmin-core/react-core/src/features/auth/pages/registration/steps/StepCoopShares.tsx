@@ -26,6 +26,9 @@ export default function StepCoopShares({ data, update, next }: StepProps) {
   const max = Number(tenant?.max_number_coop_shares ?? 100) || 100;
   const shareValue = Number(tenant?.value_one_coop_share ?? 0);
   const paperRequired = tenant?.requires_paper_signature_for_membership === true;
+  const tenantExplanation = String(
+    tenant?.info_sentence_about_coop_shares ?? "",
+  ).trim();
 
   const [count, setCount] = useState<number>(data.coop_shares_count ?? min);
   const [contractAccepted, setContractAccepted] = useState<boolean>(
@@ -64,6 +67,9 @@ export default function StepCoopShares({ data, update, next }: StepProps) {
   return (
     <>
       <Paragraph>{t("auth.registration.coop.intro", { min, max })}</Paragraph>
+      {tenantExplanation && (
+        <Paragraph className="text-preline">{tenantExplanation}</Paragraph>
+      )}
 
       <Form layout="vertical">
         {/* This step drives the input via local state (no Form ``name``), so

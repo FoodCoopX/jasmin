@@ -40,6 +40,7 @@ from apps.commissioning.tests.factories import (
     ResellerFactory,
 )
 from apps.shared.tenants.email_service import EmailService
+from core.tenant_db import connection
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -75,6 +76,16 @@ def finalized_dn_with_pdf(reseller_with_email):
 # ---------------------------------------------------------------------------
 # send_to_reseller — contract tests
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_the_date_is_written_in_the_tenants_date_format(tenant, monkeypatch):
+    monkeypatch.setattr(connection.tenant, "date_format", "MM-DD-YYYY")
+    delivery_note = DeliveryNoteResellerFactory(date=datetime.date(2025, 5, 2))
+
+    ctx = DeliveryNoteService._build_delivery_note_email_context(delivery_note)
+
+    assert ctx["delivery_note"]["date"] == "05-02-2025"
 
 
 @pytest.mark.django_db

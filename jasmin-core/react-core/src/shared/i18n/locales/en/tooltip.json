@@ -90,5 +90,6 @@
   "open_members": "Use this button to filter for members who have not yet been confirmed.",
   "percentage_added_to_commissioning_list_packing": "% added to the quantities provided to the packing stations, for waste, etc.",
   "percentage_bulk_packing_list": "% added to the packing list, for shares delivered in bulk.",
-  "short_name_share_type": "Readable abbreviation, e.g. 'Honey' for a honey share, max. 6 letters."
+  "short_name_share_type": "Readable abbreviation, e.g. 'Honey' for a honey share, max. 6 letters.",
+  "number_of_tours": "Count every delivery run, plus one if members also collect at the farm: the farm's pickup station needs a tour of its own, or its boxes end up on a driver's tour list."
 }

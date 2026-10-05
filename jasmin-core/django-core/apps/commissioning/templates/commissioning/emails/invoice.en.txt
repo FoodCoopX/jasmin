@@ -5,8 +5,8 @@ Hi {{ reseller.name }},
 Please find your invoice for {{ invoice.period }} attached.
 
 Total: {{ invoice.total }}
-Due date: {{ invoice.due_date }}
-
+{% if invoice.due_date %}Due date: {{ invoice.due_date }}
+{% endif %}
 Bank details: {{ tenant.bank_details }}
 
 — The {{ tenant_name }} team

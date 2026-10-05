@@ -4,8 +4,8 @@
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1f1f1f; max-width: 560px; margin: 0 auto; padding: 24px;">
     <h1 style="font-size: 22px; font-weight: 600;">Hallo {{ member.first_name }},</h1>
     <p>
-      gute Nachrichten — bei
-      {% if tenant_name %}<strong>{{ tenant_name }}</strong>{% endif %}
+      gute Nachrichten —
+      {% if tenant_name %}bei <strong>{{ tenant_name }}</strong>{% endif %}
       ist ein Platz für das Abo frei geworden, für das du auf der Warteliste stehst:
     </p>
     <ul>

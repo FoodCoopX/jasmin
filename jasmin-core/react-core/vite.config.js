@@ -106,12 +106,12 @@ export default defineConfig({
         // walks the dep graph and reliably co-locates packages into
         // the named chunk regardless of how callers import them.
         //
-        // ``base64-js`` is named so it cannot land in the pdf chunk.
-        // main.jsx imports ``buffer`` eagerly to polyfill
-        // ``globalThis.Buffer`` (used by @react-pdf/renderer's image
-        // loader) and ``buffer`` requires base64-js; if Rollup parks that
-        // shared dependency inside the pdf chunk, the entry statically
-        // imports it and the entire heavy pdf chunk is preloaded on boot.
+        // The Buffer polyfill (``buffer``, ``ieee754``, ``base64-js``) is
+        // named so none of it can land in the pdf chunk. main.tsx imports
+        // ``buffer`` eagerly to polyfill ``globalThis.Buffer`` (used by
+        // @react-pdf/renderer's image loader); if Rollup parks any of it
+        // inside the pdf chunk, the entry statically imports that chunk and
+        // the entire heavy pdf stack is preloaded on boot.
         manualChunks(id) {
           // One chunk per language, named explicitly: an un-named dynamic
           // import is named after its module's basename, and every locale
@@ -120,7 +120,9 @@ export default defineConfig({
           // ``locale-de`` reaches the boot path.
           const locale = id.match(/\/shared\/i18n\/locales\/([a-z]{2})\//);
           if (locale) return `locale-${locale[1]}`;
-          if (id.includes('node_modules/base64-js')) return 'buffer';
+          if (/node_modules\/(?:buffer|ieee754|base64-js)\//.test(id)) {
+            return 'buffer';
+          }
           if (id.includes('node_modules/@react-pdf/')) return 'pdf';
           if (id.includes('node_modules/react-router')) return 'router';
           if (

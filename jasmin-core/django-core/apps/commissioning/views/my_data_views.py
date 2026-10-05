@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.authz.permissions import IsCustomer, IsMember
+from apps.shared.display_formats import DisplayFormats
 from apps.shared.request_utils import auth_user, body, client_ip
 from apps.shared.tenants.models import TenantSettings
 from core.errors import NotFoundError
@@ -60,10 +61,8 @@ def _notify_office_of_self_cancel(member: Member) -> None:
             "last_name": member.last_name,
             "member_number": member.member_number,
         },
-        "cancelled_effective_at": (
-            member.cancelled_effective_at.strftime("%d.%m.%Y")
-            if member.cancelled_effective_at
-            else ""
+        "cancelled_effective_at": DisplayFormats.current().format_date(
+            member.cancelled_effective_at
         ),
         "review_url": f"{frontend_base_url()}/members/members/{member.id}",
     }

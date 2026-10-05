@@ -12,8 +12,8 @@
     <p>anbei findest du deine Rechnung für {{ invoice.period }}.</p>
 
     <p>
-      Gesamtbetrag: <strong>{{ invoice.total }}</strong><br />
-      Fällig bis: {{ invoice.due_date }}
+      Gesamtbetrag: <strong>{{ invoice.total }}</strong>{% if invoice.due_date %}<br />
+      Fällig bis: {{ invoice.due_date }}{% endif %}
     </p>
 
     <p>Bankverbindung: {{ tenant.bank_details }}</p>

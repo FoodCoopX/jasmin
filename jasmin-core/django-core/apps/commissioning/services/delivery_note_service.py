@@ -5,6 +5,7 @@ from datetime import date
 
 from django.db import models, transaction
 
+from apps.shared.display_formats import DisplayFormats
 from apps.shared.tenants.models import RateLimitedAction
 from apps.shared.tenants.rate_limits import enforce_action_quota
 from core.errors import ConflictError
@@ -200,10 +201,7 @@ class DeliveryNoteService:
 
         delivery_note_number = delivery_note.full_number
 
-        if delivery_note.date:
-            date_str = delivery_note.date.strftime("%d.%m.%Y")
-        else:
-            date_str = ""
+        date_str = DisplayFormats.current().format_date(delivery_note.date)
 
         order_number = delivery_note.order.full_number
 

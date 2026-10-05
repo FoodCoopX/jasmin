@@ -15,10 +15,13 @@ Two contracts pinned down:
 
 from __future__ import annotations
 
+import datetime
+from decimal import Decimal
 from unittest import mock
 
 import pytest
 
+from apps.commissioning.models import InvoiceReseller
 from apps.commissioning.services.invoice_reminder import (
     bulk_send_invoice_reminders,
 )
@@ -90,6 +93,53 @@ class TestBulkSendInvoiceReminders:
         # (no Django {% for %} loop, which the safe Mustache renderer can't do).
         assert invoice.full_number in ctx["invoices_table"]
         assert invoice.full_number in ctx["invoices_text"]
+
+    def test_amounts_and_dates_are_written_the_way_the_tenant_writes_them(self, tenant):
+        reseller = ResellerFactory(invoice_email="reseller@example.org")
+        order = OrderFactory(reseller=reseller)
+        DeliveryNoteResellerFactory(order=order)
+        invoice = InvoiceResellerFactory(
+            reseller=reseller,
+            is_finalized=True,
+            date=datetime.date(2025, 5, 1),
+            due_date=datetime.date(2025, 5, 15),
+        )
+
+        with (
+            mock.patch(
+                "apps.commissioning.services.invoice_service."
+                "InvoiceService.get_invoices_for_delivery_notes",
+                side_effect=lambda dn_ids: {dn_id: invoice for dn_id in dn_ids},
+            ),
+            mock.patch.object(
+                InvoiceReseller,
+                "sum_brutto",
+                new_callable=mock.PropertyMock,
+                return_value=Decimal("1234.5"),
+            ),
+            mock.patch(
+                "apps.shared.tenants.email_service.EmailService.send_email",
+                autospec=True,
+                return_value=True,
+            ) as send_email,
+        ):
+            bulk_send_invoice_reminders(
+                order_ids=[str(order.id)],
+                email_ctx={
+                    "tenant_name": "Test Coop",
+                    "tenant_language": "de",
+                    "bank_details": "",
+                    "frontend_base_url": "https://test.example.org",
+                },
+            )
+
+        context = send_email.call_args.kwargs["context"]
+        assert (
+            f"{invoice.full_number} (1.234,50 €), ausgestellt am 01.05.2025, "
+            "fällig am 15.05.2025"
+        ) in context["invoices_text"]
+        for cell in ("1.234,50 €", "01.05.2025", "15.05.2025"):
+            assert f">{cell}</td>" in context["invoices_table"]
 
     @pytest.mark.parametrize(
         "invoice_name, greeting",

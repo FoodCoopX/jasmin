@@ -1,9 +1,9 @@
-Hallo {{ user.first_name }},
+Hallo {{ user.first_name|default:"zusammen" }},
 
 deine Anfrage, alle deine personenbezogenen Daten bei {{ tenant_name }} zu löschen, wurde vom Büro freigegeben und ist jetzt abgeschlossen (DSGVO Art. 17).
 
 Entfernt bzw. anonymisiert sind: Name, Anschrift, Kontaktdaten, Zahlungsinformationen und alle weiteren direkt mit deiner Person verknüpften Felder.
 
-Hinweis zur gesetzlichen Aufbewahrung: Einzelne Datensätze (z. B. Genossenschaftsanteile-Historie, abgeschlossene Rechnungen) müssen wir gemäß GenG §31 bzw. HGB §257 noch gesetzlich vorgeschrieben aufbewahren. Diese Datensätze enthalten keine direkten Identifikationsmerkmale mehr.
+Hinweis zur gesetzlichen Aufbewahrung: Einzelne Datensätze (z. B. Historie der Genossenschaftsanteile, abgeschlossene Rechnungen) müssen wir gemäß § 31 GenG bzw. § 257 HGB noch aufbewahren. Diese Datensätze enthalten keine direkten Identifikationsmerkmale mehr.
 
 Bei Rückfragen antworte gerne auf diese E-Mail.

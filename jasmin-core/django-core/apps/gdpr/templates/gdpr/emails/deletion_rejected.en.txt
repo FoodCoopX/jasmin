@@ -1,6 +1,6 @@
-Hello {{ user.first_name }},
+Hello {{ user.first_name|default:"there" }},
 
-your request to delete all your personal data at {{ tenant_name }} cannot be carried out at this time.
+Unfortunately, your request to delete all your personal data at {{ tenant_name }} cannot be carried out at this time.
 
 Reason from the office:
 {{ reason }}

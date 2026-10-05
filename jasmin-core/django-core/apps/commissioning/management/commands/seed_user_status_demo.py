@@ -23,8 +23,9 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 from django_tenants.utils import schema_context
@@ -82,6 +83,12 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError(
+                "seed_user_status_demo is a development helper and refuses to "
+                "run with DEBUG=False. It plants demo members and resellers, "
+                "some with a fixed-password login, in the tenant it is given."
+            )
         schema = options["schema"]
         clean = options["clean"]
 
@@ -172,9 +179,6 @@ class Command(BaseCommand):
             email=email,
             first_name=f"Demo {label}",
             last_name="User",
-            # The field is ``user_language`` — a plain ``language=`` kwarg made
-            # ``JasminUser()`` raise TypeError on the very first user, so this
-            # command has never seeded anything.
             user_language="en",
             roles=[],
             account_status=status,

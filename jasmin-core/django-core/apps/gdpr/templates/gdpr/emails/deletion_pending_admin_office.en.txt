@@ -1,16 +1,17 @@
 A GDPR deletion request is waiting for approval
 
-Someone has confirmed a GDPR Article 17 ("right to erasure") deletion request
-at {{ tenant_name|default:"your platform" }}.
+A new data deletion request (GDPR Article 17) has been received at
+{{ tenant_name|default:"your platform" }} and confirmed by the requesting
+person via the email link.
 
 The request is now in the "awaiting office approval" state and must be
-reviewed and either approved or rejected (with a reason) before the actual
-anonymisation runs. The answer to the person is due within one month (GDPR
-Art. 12(3)).
+manually reviewed and either approved or rejected (with a reason) before the
+actual anonymization runs. The response to the person is due within one
+month (GDPR Art. 12(3)).
 
 Open in the office:
 {{ review_url }}
 
-This message intentionally does NOT include any details about the requesting
-person — the request details are only visible under Members → GDPR deletion
-requests, for an admin who signs in.
+This email intentionally does not include any details about the requesting
+person — the request details are only visible to a signed-in admin, under
+Members → GDPR deletion requests.

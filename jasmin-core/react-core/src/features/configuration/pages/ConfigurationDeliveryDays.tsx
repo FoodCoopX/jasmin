@@ -36,6 +36,7 @@ import {
   DateRangeStatusLegend,
   ExplainerText,
   LabeledSwitch,
+  ToolTipIcon,
 } from "@shared/ui";
 import {
   useActiveStatusColumn,
@@ -263,7 +264,12 @@ export default function ConfigurationDeliveryDays() {
           disabled: isFieldDisabled,
         },
         {
-          title: t("configuration.number_of_tours"),
+          title: (
+            <>
+              {t("configuration.number_of_tours")}
+              <ToolTipIcon title={t("tooltip.number_of_tours")} />
+            </>
+          ),
           dataIndex: "number_of_tours",
           key: "number_of_tours",
           inputType: "positive_integer",

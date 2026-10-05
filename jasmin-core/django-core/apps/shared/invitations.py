@@ -26,6 +26,7 @@ from django.utils import timezone
 from django.utils.crypto import get_random_string
 
 from apps.authz.roles import VALID_ROLES, Role
+from apps.shared.display_formats import DisplayFormats
 from apps.shared.languages import DEFAULT_LANGUAGE_CODE, SUPPORTED_LANGUAGE_CODES
 from apps.shared.tenant_urls import frontend_base_url, tenant_name
 from apps.shared.tenants.onboarding_emails import EmailCategory
@@ -432,14 +433,9 @@ def _send_invitation_email(
         "tenant_name": tenant_name(),
         "user": {"first_name": user.first_name, "email": user.email},
         "accept_url": accept_url,
-        # Pre-format to a substitution-safe string (mirrors
-        # member_cancellation) so the template needs no Django ``|date`` filter
-        # and renders identically under the safe Mustache renderer for overrides.
-        "expires_at": (
-            invitation.expires_at.strftime("%d.%m.%Y, %H:%M")
-            if invitation.expires_at
-            else ""
-        ),
+        # Pre-formatted, so the template needs no Django ``|date`` filter and
+        # renders identically under the safe Mustache renderer for overrides.
+        "expires_at": DisplayFormats.current().format_datetime(invitation.expires_at),
     }
     user_email = user.email
 

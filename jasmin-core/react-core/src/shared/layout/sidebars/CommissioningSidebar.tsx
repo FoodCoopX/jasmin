@@ -344,16 +344,6 @@ export default function CommissioningSidebar({
                 ),
               },
               {
-                key: "commissioning-labels",
-
-                requireRole: "isOffice",
-                label: (
-                  <Link to="/commissioning/labels">
-                    {t("commissioning.labels")}
-                  </Link>
-                ),
-              },
-              {
                 key: "commissioning-delivery-notes",
 
                 requireRole: "isOffice",

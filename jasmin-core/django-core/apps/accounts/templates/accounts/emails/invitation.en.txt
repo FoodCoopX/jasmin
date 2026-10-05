@@ -2,9 +2,9 @@ Hi {{ user.first_name }},
 
 You've been invited to join {{ tenant_name }}.
 
-Open this link to set your password and finish creating your account:
+Open this link to set your password and activate your account:
 
   {{ accept_url }}
 
 This invitation expires on {{ expires_at }}.
-If you weren't expecting this email you can safely ignore it.
+If you weren't expecting this email, you can safely ignore it.

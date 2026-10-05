@@ -1,8 +1,8 @@
 Hi {{ member.first_name }},
 
-this is to confirm your withdrawal from {{ tenant_name }}.
+This is to confirm your withdrawal from {{ tenant_name }}.
 
-{% if cancelled_effective_at %}Date of withdrawal (GenG §30): {{ cancelled_effective_at }}.{% endif %}
+{% if cancelled_effective_at %}Date of withdrawal (§ 30 GenG): {{ cancelled_effective_at }}.{% endif %}
 {% if member.member_number %}Your former member number is #{{ member.member_number }}. We retain it for the statutory record-keeping period.{% endif %}
 
 {% if shares_transferred %}Your cooperative shares were transferred to another member, so there

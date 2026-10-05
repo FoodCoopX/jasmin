@@ -11,6 +11,7 @@ from typing import Any
 from django.db import transaction
 from django.utils import timezone
 
+from apps.shared.display_formats import DisplayFormats
 from apps.shared.tenants.models import RateLimitedAction
 from apps.shared.tenants.rate_limits import enforce_action_quota
 from core.errors import ConflictError
@@ -996,11 +997,14 @@ class InvoiceService:
             # ``schema_name``; fall back to the default terms.
             terms_days = 14
 
+        formats = DisplayFormats.current()
         # A storno / correction is a credit note — it has no payment "due
         # date", so don't render a misleading pay-by date for it.
         is_storno = invoice.document_type in ("storno", "correction")
         if invoice.date and not is_storno:
-            due_date_str = (invoice.date + timedelta(days=terms_days)).isoformat()
+            due_date_str = formats.format_date(
+                invoice.date + timedelta(days=terms_days)
+            )
             period_str = invoice.date.strftime("%m/%Y")
         elif invoice.date:
             due_date_str = ""
@@ -1009,7 +1013,7 @@ class InvoiceService:
             due_date_str = ""
             period_str = ""
 
-        total_str = f"{invoice.sum_brutto:.2f}"
+        total_str = formats.format_money(invoice.sum_brutto)
 
         invoice_number = invoice.full_number
 

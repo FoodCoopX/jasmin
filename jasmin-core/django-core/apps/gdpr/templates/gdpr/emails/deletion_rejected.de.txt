@@ -1,4 +1,4 @@
-Hallo {{ user.first_name }},
+Hallo {{ user.first_name|default:"zusammen" }},
 
 deine Anfrage, alle deine personenbezogenen Daten bei {{ tenant_name }} zu löschen, kann zum jetzigen Zeitpunkt leider nicht ausgeführt werden.
 

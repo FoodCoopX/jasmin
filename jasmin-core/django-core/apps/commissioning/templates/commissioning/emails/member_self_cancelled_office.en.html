@@ -12,7 +12,7 @@
       Member: <strong>{{ member.first_name }} {{ member.last_name }}</strong>{% if member.member_number %} (member number <strong>#{{ member.member_number }}</strong>){% endif %}
     </p>
     {% if cancelled_effective_at %}
-      <p>Date of withdrawal (GenG §30): <strong>{{ cancelled_effective_at }}</strong></p>
+      <p>Date of withdrawal (§ 30 GenG): <strong>{{ cancelled_effective_at }}</strong></p>
     {% endif %}
     <p>
       Please review the withdrawal and handle the payout of the
@@ -20,7 +20,7 @@
     </p>
     <p><a href="{{ review_url }}">{{ review_url }}</a></p>
     <p style="color: #666; font-size: 12px; margin-top: 32px;">
-      Automatic notification from {{ tenant_name }}.
+      Automated notification from {{ tenant_name }}.
     </p>
   </body>
 </html>

@@ -11,7 +11,7 @@
       <p>Deine Mitgliedsnummer ist <strong>#{{ member.member_number }}</strong>.</p>
     {% endif %}
     {% if entry_date %}
-      <p>Eintrittsdatum (GenG §30): <strong>{{ entry_date }}</strong>.</p>
+      <p>Eintrittsdatum (§ 30 GenG): <strong>{{ entry_date }}</strong>.</p>
     {% endif %}
     {% if portal_url %}
       <p>
@@ -22,5 +22,6 @@
     <p style="color: #666; font-size: 12px; margin-top: 32px;">
       Falls dir etwas unklar ist, melde dich gerne bei uns.
     </p>
+    <p style="color: #777; font-size: 13px;">— Das Team von {{ tenant_name }}</p>
   </body>
 </html>

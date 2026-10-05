@@ -7,6 +7,7 @@ from huey import crontab
 from huey.contrib.djhuey import db_periodic_task, db_task
 
 from apps.commissioning.services import InvoiceService
+from apps.shared.display_formats import DisplayFormats
 from apps.shared.ops_alerts import alert_operator
 from apps.shared.retention import IMPORT_BATCH_RETENTION_DAYS
 from apps.shared.tenants.sweep import for_each_tenant
@@ -233,7 +234,7 @@ def _notify_office_of_renewal_failures(tenant, failed: list[dict], run_date) -> 
     context = {
         "tenant_name": tenant.name,
         "failure_count": str(len(failed)),
-        "run_date": run_date.strftime("%d.%m.%Y"),
+        "run_date": DisplayFormats.of(tenant).format_date(run_date),
         "renewal_failures_html": _build_renewal_failures_html(failed, language),
         "renewal_failures_text": _build_renewal_failures_text(failed, language),
         "review_url": _office_review_url(tenant, "/abos/abos"),

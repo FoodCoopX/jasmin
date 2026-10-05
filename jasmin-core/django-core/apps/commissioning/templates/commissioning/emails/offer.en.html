@@ -7,16 +7,16 @@
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1f1f1f; max-width: 640px; margin: 0 auto; padding: 24px;">
     <h1 style="font-size: 22px; font-weight: 600;">Hi {{ reseller.name }},</h1>
 
-    <p>Your offer for the period {{ offer.period }} is ready. Open the order sheet to place your order — each delivery day shows its own order deadline there.</p>
+    <p>Your offer for {{ offer.period }} is ready. Open the order form to place your order — each delivery day shows its own order deadline there.</p>
 
     <p style="margin: 32px 0;">
       <a href="{{ offer_url }}"
          style="display: inline-block; padding: 12px 20px; background: #1d603e; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
-        Open the order sheet
+        Open the order form
       </a>
     </p>
 
-    <p style="color: #555; font-size: 14px;">If the button doesn't work, paste this link in your browser:<br />
+    <p style="color: #555; font-size: 14px;">If the button doesn't work, copy this link into your browser:<br />
       <a href="{{ offer_url }}" style="color: #1d603e; word-break: break-all;">{{ offer_url }}</a>
     </p>
 

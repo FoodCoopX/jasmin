@@ -1,6 +1,6 @@
 Hi {{ tenant_name }} team,
 
-a member withdrew their consent to {% if consent_kind == "withdrawal" %}the withdrawal terms{% else %}the privacy policy{% endif %}.
+A member withdrew their consent to {% if consent_kind == "withdrawal" %}the withdrawal terms{% else %}the privacy policy{% endif %}.
 
 Please check whether processing their data may continue on another legal
 basis (the contract, retention under the Cooperatives Act) or must be

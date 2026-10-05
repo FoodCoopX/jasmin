@@ -34,6 +34,7 @@ from django.db.models import DateField, F, Max, Q, Value
 from django.db.models.functions import Least
 from django.utils import timezone
 
+from apps.shared.display_formats import DisplayFormats
 from core.tenant_db import connection
 
 from ..errors import MemberAlreadyCancelled, MemberExitBeforeTransfer
@@ -438,14 +439,11 @@ def _send_cancellation_email(member: Member, *, shares_transferred: bool) -> Non
             "first_name": member.first_name,
             "member_number": member.member_number,
         },
-        # GenG §30 Austrittsdatum is a local calendar day — pre-format
-        # to dd.mm.yyyy here so the template stays substitution-only
-        # and renders identically under the safe Mustache renderer
-        # used for tenant overrides.
-        "cancelled_effective_at": (
-            member.cancelled_effective_at.strftime("%d.%m.%Y")
-            if member.cancelled_effective_at
-            else ""
+        # Pre-formatted, so the template stays substitution-only and renders
+        # identically under the safe Mustache renderer used for tenant
+        # overrides.
+        "cancelled_effective_at": DisplayFormats.current().format_date(
+            member.cancelled_effective_at
         ),
         "shares_transferred": shares_transferred,
     }

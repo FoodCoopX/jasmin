@@ -345,7 +345,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
         description="Wird versendet, wenn das Büro einen Antrag nicht annehmen kann.",
         default_template="accounts/emails/application_rejected",
         default_subject="Zu deinem Antrag bei {{ tenant_name }}",
-        default_subject_en="About your application at {{ tenant_name }}",
+        default_subject_en="About your application to {{ tenant_name }}",
         category="members",
         variables=[
             _TENANT_NAME,
@@ -402,7 +402,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
         label="Vollmitgliedschaft erreicht",
         description=(
             "Wird gesendet, sobald ein Probemitglied seinen ersten "
-            "Geschaeftsanteil erworben hat und damit GenG-Mitglied wird."
+            "Geschäftsanteil erworben hat und damit Mitglied der Genossenschaft wird."
         ),
         default_template="commissioning/emails/trial_converted",
         default_subject="Du bist jetzt Mitglied bei {{ tenant_name }}",
@@ -420,7 +420,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
                 label="Mitgliedsnummer",
                 description=(
                     "Mit der Umwandlung vergebene laufende "
-                    "Mitgliedsnummer (GenG §30)."
+                    "Mitgliedsnummer (§ 30 GenG)."
                 ),
             ),
             EmailVariable(
@@ -428,7 +428,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
                 label="Eintrittsdatum",
                 description=(
                     "Lokales Kalenderdatum des Eintritts in die "
-                    "Genossenschaft (GenG §30 Eintrittsdatum)."
+                    "Genossenschaft (Eintrittsdatum nach § 30 GenG)."
                 ),
             ),
             EmailVariable(
@@ -503,13 +503,13 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
         label="Austritt bestätigt",
         description=(
             "Wird gesendet, nachdem das Büro einen Austritt aus der "
-            "Genossenschaft eingetragen hat (GenG §65 Kündigung). "
+            "Genossenschaft eingetragen hat (Kündigung nach § 65 GenG). "
             "Bestätigt das Austrittsdatum und nennt die Mitglieds"
             "nummer für die Akte."
         ),
         default_template="commissioning/emails/member_cancelled",
-        default_subject="Bestätigung deines Austritts bei {{ tenant_name }}",
-        default_subject_en="Confirmation of your cancellation at {{ tenant_name }}",
+        default_subject="Bestätigung deines Austritts aus {{ tenant_name }}",
+        default_subject_en="Confirmation of your withdrawal from {{ tenant_name }}",
         category="members",
         variables=[
             _TENANT_NAME,
@@ -542,7 +542,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
                 label="Austrittsdatum",
                 description=(
                     "Lokales Kalenderdatum, zu dem die Mitgliedschaft "
-                    "endet (GenG §30 Austrittsdatum, typischerweise "
+                    "endet (Austrittsdatum nach § 30 GenG, typischerweise "
                     "ein Jahresende nach Kündigungsfrist)."
                 ),
             ),
@@ -594,7 +594,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
                 label="Austrittsdatum",
                 description=(
                     "Lokales Kalenderdatum, zu dem die Mitgliedschaft endet "
-                    "(GenG §30 Austrittsdatum)."
+                    "(Austrittsdatum nach § 30 GenG)."
                 ),
             ),
             EmailVariable(
@@ -785,9 +785,9 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
             "reseller": {"name": "Bio Laden Müller"},
             "invoice": {
                 "number": "2026-0042",
-                "period": "Mai 2026",
-                "total": "€ 1.234,56",
-                "due_date": "30. Juni 2026",
+                "period": "05/2026",
+                "total": "1.234,56 €",
+                "due_date": "30.06.2026",
             },
             "tenant": {"bank_details": "DE12 3456 7890 1234 5678 90 — GENODEF1XXX"},
         },
@@ -830,7 +830,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
             "reseller": {"name": "Bio Laden Müller"},
             "delivery_note": {
                 "number": "LS-2026-0042",
-                "date": "12. Juni 2026",
+                "date": "12.06.2026",
                 "order_number": "B-2026-0123",
             },
         },
@@ -880,7 +880,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
         ),
         default_template="gdpr/emails/deletion_approved",
         default_subject="Deine Daten wurden bei {{ tenant_name }} gelöscht",
-        default_subject_en="Your data has been deleted at {{ tenant_name }}",
+        default_subject_en="Your data at {{ tenant_name }} has been deleted",
         category="office",
         variables=[_TENANT_NAME, _USER_FIRST],
         sample={
@@ -897,7 +897,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
             "Anfrage damit in den Status ``PENDING_ADMIN`` übergeht. "
             "Geht an die allgemeine Büro-Mailbox (``Tenant.email``); "
             "ohne diese Mail würde das Büro die Anfrage erst sehen, "
-            "wenn jemand unter Mitglieder die Seite „DSGVO Löschanträge“ "
+            "wenn jemand unter Mitglieder die Seite „DSGVO-Löschanträge“ "
             "öffnet. Die Antwort ist binnen eines Monats fällig "
             "(Art. 12 Abs. 3 DSGVO)."
             "\n\n"
@@ -919,7 +919,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
                 label="Link zur Freigabe-Seite",
                 description=(
                     "Direkter Link auf ``/members/data-protection`` "
-                    "(Mitglieder → DSGVO Löschanträge), wo die wartenden "
+                    "(Mitglieder → DSGVO-Löschanträge), wo die wartenden "
                     "Anfragen aufgelistet sind."
                 ),
             ),
@@ -939,7 +939,7 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
         ),
         default_template="gdpr/emails/deletion_rejected",
         default_subject="Deine Löschanfrage bei {{ tenant_name }} wurde abgelehnt",
-        default_subject_en="Your deletion request at {{ tenant_name }} was declined",
+        default_subject_en="Your deletion request at {{ tenant_name }} was rejected",
         category="office",
         variables=[
             _TENANT_NAME,
@@ -999,16 +999,16 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
             "tenant_name": "Beispiel-Solawi",
             "reseller": {"name": "Bio Laden Müller"},
             "invoices_table": (
-                "<tr><td><strong>2026-0042</strong></td><td>1234.56</td>"
-                "<td>2026-05-01</td><td>2026-05-31</td><td>9 Tage</td></tr>"
-                "<tr><td><strong>2026-0058</strong></td><td>612.30</td>"
-                "<td>2026-05-08</td><td>2026-06-07</td><td>2 Tage</td></tr>"
+                "<tr><td><strong>2026-0042</strong></td><td>1.234,56 €</td>"
+                "<td>01.05.2026</td><td>31.05.2026</td><td>9 Tage</td></tr>"
+                "<tr><td><strong>2026-0058</strong></td><td>612,30 €</td>"
+                "<td>08.05.2026</td><td>07.06.2026</td><td>2 Tage</td></tr>"
             ),
             "invoices_text": (
-                "- 2026-0042 (1234.56), ausgestellt am 2026-05-01, "
-                "fällig am 2026-05-31 (9 Tage überfällig)\n"
-                "- 2026-0058 (612.30), ausgestellt am 2026-05-08, "
-                "fällig am 2026-06-07 (2 Tage überfällig)"
+                "- 2026-0042 (1.234,56 €), ausgestellt am 01.05.2026, "
+                "fällig am 31.05.2026 (9 Tage überfällig)\n"
+                "- 2026-0058 (612,30 €), ausgestellt am 08.05.2026, "
+                "fällig am 07.06.2026 (2 Tage überfällig)"
             ),
             "tenant": {"bank_details": "DE12 3456 7890 1234 5678 90 — GENODEF1XXX"},
         },

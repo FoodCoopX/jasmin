@@ -4,7 +4,7 @@
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1f1f1f; max-width: 560px; margin: 0 auto; padding: 24px;">
     <h1 style="font-size: 22px; font-weight: 600;">Hi {{ user.first_name }},</h1>
     <p>
-      your account{% if tenant_name %} at <strong>{{ tenant_name }}</strong>{% endif %}
+      Your account{% if tenant_name %} at <strong>{{ tenant_name }}</strong>{% endif %}
       is now active.
     </p>
     {% if portal_url %}

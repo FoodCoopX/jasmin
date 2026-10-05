@@ -48,7 +48,6 @@ const PlanningShareContentPage = lazy(
 );
 const Invoices = lazy(() => import("@features/commissioning/pages/Invoices"));
 
-const Labels = lazy(() => import("@features/commissioning/pages/Labels"));
 const ListCrates = lazy(
   () => import("@features/commissioning/pages/ListCrates"),
 );
@@ -358,14 +357,6 @@ export const commissioningRoutes: AppRoute[] = [
     element: (
       <RequireRole flag="isOffice">
         <DeliveryNotes />
-      </RequireRole>
-    ),
-  },
-  {
-    path: "/commissioning/labels",
-    element: (
-      <RequireRole flag="isOffice">
-        <Labels />
       </RequireRole>
     ),
   },

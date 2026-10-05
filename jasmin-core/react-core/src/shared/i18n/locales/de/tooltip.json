@@ -90,5 +90,6 @@
   "bulk_renew_abos": "Verlängert die ausgewählten Abos: erstellt unbestätigte Verlängerungs-Entwürfe für die nächste Laufzeit (gleiche Logik wie die automatische Verlängerung). Nicht verlängerbare Zeilen werden mit Grund übersprungen.",
   "requires_optin": "Wenn aktiv, können Mitglieder, die diesen Anteil grundsätzlich bestellt haben, jede Woche neu entscheiden, ob sie tatsächlich eine Lieferung wollen. Per default ist der Anteil stillgelegt, aber man kann opt-in.",
   "optin_deadline_days_before_delivery": "Wie viele Tage vor der Lieferung der Schalter sperrt. 3 = „bis Mittwoch für die Samstagskiste“.",
-  "peak_occupancy": "Höchste Belegung in einer aktuellen oder zukünftigen Woche (bestätigte Lieferungen + aktive Reservierungen). Die Kapazität kann nicht darunter gesetzt werden."
+  "peak_occupancy": "Höchste Belegung in einer aktuellen oder zukünftigen Woche (bestätigte Lieferungen + aktive Reservierungen). Die Kapazität kann nicht darunter gesetzt werden.",
+  "number_of_tours": "Jede gefahrene Tour zählt, und eine weitere, wenn Mitglieder auch am Hof abholen: Die Abholstation am Hof braucht eine eigene Tour, sonst landen ihre Kisten auf der Tourliste eines Fahrers."
 }

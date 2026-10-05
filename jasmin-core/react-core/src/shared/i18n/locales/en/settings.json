@@ -100,6 +100,8 @@
     "min_shares_desc": "Minimum shares required for membership",
     "max_shares": "Maximum Number of Shares",
     "max_shares_desc": "Maximum shares per member",
+    "info_sentence_about_coop_shares": "Explanation of the cooperative shares",
+    "info_sentence_about_coop_shares_desc": "Shown to applicants in the registration's cooperative-shares step, under the general introduction — for example what the shares are for and when they are paid back.",
     "coop_payback_retention": "Retention period for cancelled members' shares",
     "coop_payback_retention_desc": "Months that cooperative shares stay in the cooperative after a member exits before they become due to be paid back (0 = due immediately).",
     "months_suffix": "months",

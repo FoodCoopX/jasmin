@@ -19,6 +19,8 @@ from django.test import override_settings
     "command, kwargs",
     [
         ("seed_test_users", {}),
+        ("seed_user_status_demo", {"schema": "test_pytest"}),
+        ("seed_dev_tenant", {}),
     ],
 )
 def test_credential_seed_commands_refuse_without_debug(command, kwargs, tenant):

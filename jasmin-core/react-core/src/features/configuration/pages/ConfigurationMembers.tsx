@@ -89,6 +89,17 @@ export default function ConfigurationMembers() {
             visibleIf: (getValue) => Boolean(getValue("has_coop_shares", true)),
           },
           {
+            key: "info_sentence_about_coop_shares",
+            label: t("settings.members.info_sentence_about_coop_shares"),
+            description: t(
+              "settings.members.info_sentence_about_coop_shares_desc",
+            ),
+            type: "textarea",
+            defaultValue: "",
+            rows: 3,
+            visibleIf: (getValue) => Boolean(getValue("has_coop_shares", true)),
+          },
+          {
             key: "retention_period_cancelled_members_coop_shares_in_months",
             label: t("settings.members.coop_payback_retention"),
             description: t("settings.members.coop_payback_retention_desc"),

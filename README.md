@@ -138,7 +138,7 @@ To populate a tenant with real configuration, follow
 - **MailHog** catches every email the app sends (invitations, password resets, …)
   — nothing leaves your machine. Check it to grab links the UI would email.
 - **Super-admin** is optional (tenant management). It needs its own account:
-  `make dev-bash`, then `python manage.py createsuperadmin`.
+  `make dev-superuser EMAIL=you@example.com`, which asks for a password.
 
 ### Handy commands
 

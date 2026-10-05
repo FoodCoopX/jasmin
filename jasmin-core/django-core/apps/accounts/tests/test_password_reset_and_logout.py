@@ -21,12 +21,14 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.accounts.models import JasminUser
+from apps.accounts.services.password_reset_service import _send_password_reset_email
 from apps.commissioning.tests.factories import JasminUserFactory
 from apps.shared.auth_cookies import TENANT_REFRESH_COOKIE
 
@@ -49,6 +51,20 @@ def _login(client, email, password):
 # --------------------------------------------------------------------------- #
 # /password-reset/request/ + /password-reset/confirm/                          #
 # --------------------------------------------------------------------------- #
+
+
+class TestPasswordResetEmail:
+    def test_the_email_says_how_long_the_link_lasts(self, tenant, settings):
+        settings.PASSWORD_RESET_TIMEOUT = 30 * 60
+        user = JasminUserFactory(email="reset-mail@example.com")
+
+        with patch("apps.shared.deferred_email.send_email_best_effort") as send_mock:
+            _send_password_reset_email(user=user, uid="uid", token="token")
+
+        context = send_mock.call_args.kwargs["context"]
+        assert context["expires_minutes"] == 30
+        body = render_to_string("accounts/emails/password_reset.en.txt", context)
+        assert "within 30 minutes" in body
 
 
 class TestPasswordResetFlowHTTP:

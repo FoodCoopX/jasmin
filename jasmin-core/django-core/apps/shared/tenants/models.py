@@ -426,6 +426,10 @@ class TenantSettings(JasminModel):
     value_one_coop_share = models.PositiveIntegerField(default=100)
     min_number_coop_shares = models.PositiveIntegerField(default=3)
     max_number_coop_shares = models.PositiveIntegerField(default=100)
+    # The tenant's own short explanation of its cooperative shares, shown to
+    # applicants under the registration wizard's generic coop-share intro.
+    # Plain text; line breaks are kept.
+    info_sentence_about_coop_shares = models.TextField(blank=True, null=True)
     # After a member is cancelled, their cooperative shares stay in the
     # Genossenschaft for this many months before they are due to be paid back
     # (the share's ``payback_due_date`` is snapshotted at cancellation =

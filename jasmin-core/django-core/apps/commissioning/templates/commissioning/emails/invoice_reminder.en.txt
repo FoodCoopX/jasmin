@@ -2,7 +2,7 @@ Payment reminder
 
 Hi {{ reseller.name }},
 
-Our records show that the following invoices are still open:
+Our records show that the following invoices are still outstanding:
 
 {{ invoices_text }}
 

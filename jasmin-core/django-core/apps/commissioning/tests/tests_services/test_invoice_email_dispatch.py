@@ -36,11 +36,13 @@ from __future__ import annotations
 
 import datetime
 import smtplib
+from decimal import Decimal
 from unittest import mock
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
+from apps.commissioning.models import InvoiceReseller
 from apps.commissioning.services.invoice_service import InvoiceService
 from apps.commissioning.tests.factories import (
     InvoiceResellerFactory,
@@ -113,22 +115,74 @@ def accounting_email_config(tenant):
 # ---------------------------------------------------------------------------
 
 
+def _with_total(amount: str):
+    return mock.patch.object(
+        InvoiceReseller,
+        "sum_brutto",
+        new_callable=mock.PropertyMock,
+        return_value=Decimal(amount),
+    )
+
+
 @pytest.mark.django_db
 class TestInvoiceEmailContextTotal:
-    """The invoice/reminder email total is the formatted
-    ``sum_brutto`` — never blank.
+    """The invoice email's total is ``sum_brutto`` with the currency, written
+    the way the tenant's app writes amounts.
 
     ``sum_brutto`` is a @property: the context formats its value, and calling
     it as ``sum_brutto()`` would raise a ``TypeError``.
     """
 
-    def test_total_is_formatted_sum_brutto_not_blank(
+    def test_total_in_the_tenants_number_format_with_its_currency(
         self, tenant, finalized_invoice_with_pdf
     ):
-        invoice = finalized_invoice_with_pdf
+        with _with_total("1234.5"):
+            ctx = InvoiceService._build_invoice_email_context(
+                finalized_invoice_with_pdf
+            )
+
+        assert ctx["invoice"]["total"] == "1.234,50 €"
+
+    def test_another_number_locale_and_currency(
+        self, tenant, monkeypatch, finalized_invoice_with_pdf
+    ):
+        monkeypatch.setattr(connection.tenant, "number_locale", "en-US")
+        monkeypatch.setattr(connection.tenant, "currency", "USD")
+
+        with _with_total("1234.5"):
+            ctx = InvoiceService._build_invoice_email_context(
+                finalized_invoice_with_pdf
+            )
+
+        assert ctx["invoice"]["total"] == "$1,234.50"
+
+
+@pytest.mark.django_db
+class TestInvoiceEmailContextDueDate:
+    def test_in_the_tenants_date_format(self, tenant, monkeypatch, reseller_with_email):
+        monkeypatch.setattr(connection.tenant, "date_format", "YYYY-MM-DD")
+        issued = datetime.date(2025, 5, 2)
+        invoice = InvoiceResellerFactory(reseller=reseller_with_email, date=issued)
+
         ctx = InvoiceService._build_invoice_email_context(invoice)
-        assert ctx["invoice"]["total"] == f"{invoice.sum_brutto:.2f}"
-        assert ctx["invoice"]["total"] != ""
+
+        terms = datetime.timedelta(days=reseller_with_email.get_payment_terms_days())
+        assert ctx["invoice"]["due_date"] == (issued + terms).isoformat()
+
+    def test_a_cancellation_has_none(self, tenant, reseller_with_email):
+        cancelled = InvoiceResellerFactory(
+            reseller=reseller_with_email, date=datetime.date(2025, 5, 2)
+        )
+        cancellation = InvoiceResellerFactory(
+            reseller=reseller_with_email,
+            date=datetime.date(2025, 5, 9),
+            document_type="storno",
+            cancels_invoice=cancelled,
+        )
+
+        ctx = InvoiceService._build_invoice_email_context(cancellation)
+
+        assert ctx["invoice"]["due_date"] == ""
 
 
 @pytest.mark.django_db

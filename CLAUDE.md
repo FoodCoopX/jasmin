@@ -942,6 +942,7 @@ make dev-bash                    # Shell into backend container
 make dev-shell                   # Django shell in backend container
 make dev-migrate                 # Run shared + tenant migrations
 make dev-makemigrations          # Create new migrations
+make dev-superuser EMAIL=<email> # Super-admin login for marillen.localhost
 ```
 
 **Access points:**
@@ -1108,6 +1109,36 @@ is in the header of `backups/restore.sh`.
 - `gateway`: Public Nginx with TLS, routes to backend/frontend
 - `certbot`: Let's Encrypt renewal (wildcard certs via Linode DNS plugin)
 - `backup`: nightly encrypted DB dump + media archive
+
+### Management commands
+
+The repo's own commands. `check_invoice_hashes`, `reconcile_current_stock` and
+`seed_test_users` work inside one tenant's schema, so they run through
+`python manage.py tenant_command <command> --schema=<schema>`; the others find
+their schemas themselves. In production, run them in the backend container
+(`docker compose exec backend python manage.py …`).
+
+| Command | Where | What it does, and when to run it |
+| ------- | ----- | -------------------------------- |
+| `createsuperadmin` | both | Creates a platform super-admin login in the public schema, asking for the password; `--update-if-exists` resets an existing one. `make dev-superuser EMAIL=…` in dev. |
+| `check_invoice_hashes` | prod | Checks one tenant's finalized invoices against their sealed hashes; exits 1 on drift and logs `invoice.hash_drift` to the security log. Huey's `nightly_invoice_hash_check` checks every tenant at 03:00 and emails the operator, so run this for an on-demand check. |
+| `reconcile_current_stock` | prod | Compares one tenant's stock balances and snapshots with the movement ledger; `--fix` rebuilds the rows that drifted. Run when stock figures look wrong. |
+| `regenerate_charge_schedules` | prod | Re-plans every billable subscription's charges, in all active tenants or in `--tenant <schema>`. A subscription change re-plans its own charges and the office can regenerate its tenant's; run this when every tenant needs it, e.g. after a billing change. |
+| `recompute_donation_joker_shares` | prod, one-shot | Recomputes the shares in weeks with a donation joker, for rows built while donation jokers still counted as production demand. Idempotent; `--tenant <schema>` for one tenant. |
+| `prune_orphan_support_tickets` | prod | Deletes the support tickets of tenants that no longer exist. Huey runs it nightly at 04:45; run it by hand right after a tenant teardown. |
+| `replay_gdpr_deletions` | prod, after a restore | Re-applies the GDPR erasures a backup restore undid, from the deletion ledger kept outside the database (`--ledger`, `--dry-run`). Run it after the restore and before the app serves requests again; the module docstring has the command line. |
+| `rotate_django_secret`, `rotate_db_password` | prod | Generate a new secret and print the steps to apply it; they change nothing themselves. |
+| `rotate_email_creds` | prod | Clears every tenant's stored SMTP password, so each office has to re-enter it before mail goes out again. Preview with `--dry-run`. |
+| `rotate_bunny_token` | prod | Prints the BunnyCDN token rotation steps; there is nothing to rotate in code. |
+| `rotate_field_encryption` | prod | Re-encrypts every encrypted field with the first key in `FIELD_ENCRYPTION_KEY` — step 3 of the key rotation its docstring describes. `--dry-run`, `--schema`. |
+| `run_periodic_tasks_now` | dev, QA | Runs every Huey periodic task once, in-process (`--only`, `--skip`). Nothing stops it in production, where it does at once what the schedule would. |
+| `seed_dev_tenant` | dev | Creates or refreshes the `test` tenant at `test.localhost` with an admin and the persona logins (`make dev-seed`). |
+| `seed_test_users` | dev | Creates or resets the `test-*@example.com` persona logins, password `Test-Test-2026`. |
+| `seed_user_status_demo` | dev | Seeds members and resellers in every account status, for the status-button demos (`--schema`, `--clean`). |
+
+Every `rotate_*` command but `rotate_field_encryption` shares its code with the
+super-admin "Run rotation" buttons. The three seed commands refuse to run with
+`DEBUG=False`.
 
 ## Test fixtures & patterns
 

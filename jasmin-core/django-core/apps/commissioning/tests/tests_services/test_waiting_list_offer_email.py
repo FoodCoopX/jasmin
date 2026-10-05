@@ -23,6 +23,7 @@ from apps.commissioning.tests.factories import (
     SubscriptionFactory,
 )
 from apps.commissioning.views.waiting_list_offer_views import _offer_payload
+from core.tenant_db import connection
 
 
 def _offer(station, **member_kwargs):
@@ -41,6 +42,25 @@ def _scheduled(subscription) -> dict:
     with mock.patch("apps.shared.deferred_email.schedule_deferred_email") as schedule:
         WaitingListOfferService._send_offer_email(subscription)
     return schedule.call_args.kwargs
+
+
+@pytest.mark.django_db
+class TestOfferDates:
+    def test_in_the_tenants_formats_and_the_servers_time_zone(
+        self, tenant, settings, monkeypatch
+    ):
+        settings.TIME_ZONE = "Europe/Berlin"
+        monkeypatch.setattr(connection.tenant, "time_format", "h:mm A")
+        subscription = _offer(DeliveryStationFactory())
+        subscription.valid_from = datetime.date(2025, 1, 6)
+        subscription.notification_expires_at = datetime.datetime(
+            2025, 1, 12, 22, 59, tzinfo=datetime.UTC
+        )
+
+        context = _scheduled(subscription)["context"]
+
+        assert context["valid_from"] == "06.01.2025"
+        assert context["expires_at"] == "12.01.2025, 11:59 PM"
 
 
 @pytest.mark.django_db

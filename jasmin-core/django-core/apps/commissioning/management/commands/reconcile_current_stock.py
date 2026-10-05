@@ -6,8 +6,8 @@ chokepoint that updates the projection, the two diverge silently. This
 command recomputes every balance from the ledger and reports the difference.
 
 Usage:
-    python manage.py reconcile_current_stock --schema=<tenant_schema>
-    python manage.py reconcile_current_stock --schema=<tenant_schema> --fix
+    python manage.py tenant_command reconcile_current_stock --schema=<tenant_schema>
+    python manage.py tenant_command reconcile_current_stock --schema=<tenant_schema> --fix
 """
 
 from __future__ import annotations

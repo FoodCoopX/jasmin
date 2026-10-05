@@ -60,8 +60,11 @@ dev-migrate:
 dev-makemigrations:
 	$(COMPOSE_DEV) exec backend python manage.py makemigrations
 
+# Create a super-admin login for http://marillen.localhost:3000; prompts for
+# the password. Usage: make dev-superuser EMAIL=you@example.com
 dev-superuser:
-	$(COMPOSE_DEV) exec backend python manage.py createsuperuser
+	@test -n "$(EMAIL)" || { echo "Usage: make dev-superuser EMAIL=you@example.com"; exit 1; }
+	$(COMPOSE_DEV) exec backend python manage.py createsuperadmin --email=$(EMAIL)
 
 # Seed (idempotent) a local dev tenant reachable at http://test.localhost:3000
 # with an admin login (admin@test.localhost / Test-Test-2026) + persona logins.
