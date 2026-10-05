@@ -11,10 +11,13 @@ Usage:
 
 from __future__ import annotations
 
+import copy
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import pytest
-from django.db import connection
+from django.db import connection, models
 from django.db.backends.postgresql.operations import (
     DatabaseOperations as PostgresDatabaseOperations,
 )
@@ -120,12 +123,32 @@ def _tenant_schema(django_db_setup, django_db_blocker):
             pass
 
 
+@contextmanager
+def tenant_fields_restored(tenant: Tenant) -> Iterator[None]:
+    """Put back whatever a test sets on the session-wide tenant object — a
+    rate-limit override, a language, a logo. The rollback only undoes what
+    reached the database, and tests run in random order."""
+    saved = {}
+    for field in tenant._meta.concrete_fields:
+        value = getattr(tenant, field.attname)
+        if isinstance(field, models.FileField):
+            saved[field.attname] = value.name
+        else:
+            saved[field.attname] = copy.deepcopy(value)
+    try:
+        yield
+    finally:
+        for attname, value in saved.items():
+            setattr(tenant, attname, value)
+
+
 @pytest.fixture()
 def tenant(_tenant_schema, db):
     """Switch DB connection to the pre-created tenant schema."""
-    connection.set_tenant(_tenant_schema)
-    yield _tenant_schema
-    connection.set_schema_to_public()
+    with tenant_fields_restored(_tenant_schema):
+        connection.set_tenant(_tenant_schema)
+        yield _tenant_schema
+        connection.set_schema_to_public()
 
 
 @pytest.fixture()

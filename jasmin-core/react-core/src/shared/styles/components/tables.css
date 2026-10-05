@@ -262,6 +262,11 @@
   border-radius: 5px;
 }
 
+/* The load, save and delete error banners above an editable table. */
+.editable-table-banner {
+  margin: 8px 0;
+}
+
 /* Small dense table that lives inside a Card (e.g. the per-reseller
    commissioning cards). The global ``.ant-table-container`` /
    ``.ant-table-body`` min-height rules in

@@ -88,7 +88,7 @@ export default function SuperAdminDashboard() {
     },
     onError: (error) => {
       console.error("Operation failed:", error);
-      notify.error(getErrorMessage(error, "Failed to load data"));
+      notify.error(getErrorMessage(error, "Failed to start the backup"));
     },
   });
 
@@ -211,7 +211,12 @@ export default function SuperAdminDashboard() {
                     <td>
                       <span
                         className={`sa-badge ${tenant.is_active !== false ? "sa-badge--active" : "sa-badge--inactive"}`}
-                      ></span>
+                        title={tenant.is_active !== false ? "Active" : "Inactive"}
+                      >
+                        <span className="sr-only">
+                          {tenant.is_active !== false ? "Active" : "Inactive"}
+                        </span>
+                      </span>
                     </td>
                     <td>{tenant.schema_name}</td>
                     <td>{tenant.name}</td>

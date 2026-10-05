@@ -361,11 +361,11 @@ describe("useEditableTable", () => {
     expect(onDeleteSuccess).toHaveBeenCalledWith("r1");
   });
 
-  it("deleteRecord() rethrows when the API rejects so the caller can show feedback", async () => {
+  it("deleteRecord() keeps the row and reports why when the API rejects", async () => {
     const apiFunctions = {
       delete: vi.fn().mockRejectedValue(new Error("boom")),
     };
-    // deleteRecord logs the error before rethrowing — silence noise.
+    // deleteRecord logs the error — silence noise.
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { result } = renderHook(() =>
@@ -376,12 +376,11 @@ describe("useEditableTable", () => {
       result.current.setDataWithTransform([sampleRow]);
     });
 
-    await expect(
-      act(async () => {
-        await result.current.deleteRecord("r1");
-      }),
-    ).rejects.toThrow("boom");
+    await act(async () => {
+      await result.current.deleteRecord("r1");
+    });
 
+    expect(result.current.deleteErrorMessage).toBe("boom");
     // Row stayed in data because the delete failed.
     expect(result.current.data).toEqual([sampleRow]);
     errSpy.mockRestore();

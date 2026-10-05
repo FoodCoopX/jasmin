@@ -22,6 +22,8 @@
     "save_failed_title": "Speichern fehlgeschlagen",
     "save_failed_hint": "Bitte die Daten korrigieren und erneut speichern.",
     "save_failed_generic": "Beim Speichern ist ein Fehler aufgetreten.",
+    "delete_failed_title": "Löschen fehlgeschlagen",
+    "delete_failed_generic": "Beim Löschen ist ein Fehler aufgetreten.",
     "load_failed_title": "Laden fehlgeschlagen",
     "load_failed_hint": "Bitte erneut versuchen.",
     "retry": "Erneut versuchen",

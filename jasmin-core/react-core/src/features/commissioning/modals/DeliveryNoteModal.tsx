@@ -22,6 +22,7 @@ import { useRoles } from "@shared/auth";
 import { useDateFormat, useDefaultTaxRates, useNoteColumn, useNumberFormat, useTenant } from '@hooks/index';
 import { formatAmountForUnit } from "@shared/utils";
 import { makeContentCustomEdit, makeFkCustomSave } from "./resellerContentTableCallbacks";
+import { withUpstreamDiffs } from "./upstreamDiffColumns";
 import { useAmountUnitSizeColumns, useCratesColumns, useShareArticleColumn } from '@features/commissioning/hooks';
 import { FinalizedNotice } from '@features/commissioning/components';
 import { EditableTable, gatedByPermission, wrapApiFunctions } from "@shared/tables";
@@ -30,7 +31,6 @@ import type {
   EditableColumnConfig,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
-import { DiffCell } from "@shared/ui";
 
 type DeliveryNoteContentRecord = DeliveryNoteResellerContent & TableRecord;
 type CrateContentRecord = CrateDeliveryNoteContent & TableRecord;
@@ -229,32 +229,7 @@ export default function DeliveryNoteModal({
         required: false,
         width: "8em",
       },
-      ...amountUnitSizeColumns.map((col) => {
-        // `differField` / `originalField` are runtime-derived keys, so
-        // TS can't statically narrow them — index access still needs a
-        // cast even with a typed record.
-        const differField = `${col.dataIndex}_differs`;
-        const originalField = `original_${col.dataIndex}`;
-
-        return {
-          ...col,
-          render: (value: unknown, record: DeliveryNoteContentRecord) => (
-            <DiffCell
-              value={
-                (col as EditableColumnConfig).render
-                  ? (col as EditableColumnConfig).render!(
-                      value,
-                      record as TableRecord,
-                      0,
-                    )
-                  : (value as string)
-              }
-              differs={record[differField] as boolean | undefined}
-              original={record[originalField]}
-            />
-          ),
-        };
-      }),
+      ...withUpstreamDiffs(amountUnitSizeColumns, format),
 
       noteColumn,
       // ``tax_rate`` is intentionally NOT shown as a column on the
@@ -264,7 +239,7 @@ export default function DeliveryNoteModal({
       // persisted on the row so the OrderableItem NOT NULL
       // constraint is satisfied.
     ],
-    [shareArticleColumn, amountUnitSizeColumns, noteColumn, t],
+    [shareArticleColumn, amountUnitSizeColumns, noteColumn, t, format],
   );
 
   const customSave = useMemo(

@@ -6,7 +6,7 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import ToolTipIcon from "@shared/ui/ToolTipIcon";
-import { pickTierPriceFromAmount } from "@shared/utils/tierPrice";
+import { hasTierPrice, pickTierPriceFromAmount } from "@shared/utils/tierPrice";
 import { useShareArticles } from "../useShareArticles";
 import {
   computeShareArticlePatch,
@@ -154,6 +154,11 @@ export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => 
    * ``finalTiers`` (which are PU-based), and writes ``price_per_unit``
    * so the user sees the live per-unit price as they type the amount.
    *
+   * Only picking an article or a unit puts the tier prices on the form,
+   * so a saved line has none: its price stays as saved instead of
+   * dropping to 0, and so does a price the office typed for an article
+   * without tier prices.
+   *
    * No-op for ``"harvest"`` / ``"purchase"`` contexts (those pages
    * don't have ``price_per_unit`` columns).
    */
@@ -164,14 +169,16 @@ export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => 
       form: FormInstance,
     ) => {
       if (autofillContext !== "reseller") return {};
+      const prices = {
+        price_1: form.getFieldValue("price_1") as number | string | null,
+        price_2: form.getFieldValue("price_2") as number | string | null,
+        price_3: form.getFieldValue("price_3") as number | string | null,
+      };
+      if (!hasTierPrice(prices)) return {};
       const pricePerUnit = pickTierPriceFromAmount(
         newAmount as number | string | null | undefined,
         form.getFieldValue("amount_per_pu") as number | string | null,
-        {
-          price_1: form.getFieldValue("price_1") as number | string | null,
-          price_2: form.getFieldValue("price_2") as number | string | null,
-          price_3: form.getFieldValue("price_3") as number | string | null,
-        },
+        prices,
         finalTiers,
       );
       form.setFieldsValue({ price_per_unit: pricePerUnit });

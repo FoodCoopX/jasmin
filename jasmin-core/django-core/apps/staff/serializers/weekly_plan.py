@@ -36,12 +36,15 @@ class WeeklyPlanCopySerializer(serializers.Serializer):
 
 
 class WeeklyPlanEmployeeSerializer(serializers.Serializer):
-    """Palette entry — the client resolves cell employee ids against this list."""
+    """Palette entry — the client resolves cell employee ids against this list.
+    ``is_active`` is false for a deactivated employee who still holds a shift in
+    the week: listed so the shift shows, but not offered for new ones."""
 
     id = serializers.CharField()
     short_name_for_weekly_plan = serializers.CharField()
     first_name = serializers.CharField(allow_null=True)
     last_name = serializers.CharField(allow_null=True)
+    is_active = serializers.BooleanField()
 
 
 class WeeklyPlanRowSerializer(serializers.Serializer):

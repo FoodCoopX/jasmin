@@ -628,7 +628,7 @@ class TestUpdateBackupFields:
 @pytest.mark.django_db
 class TestGetShareContentAsFrontendData:
     @patch(
-        "apps.commissioning.services.share_content_service.StockService.get_theoretical_current_stock",
+        "apps.commissioning.services.share_content_frontend.StockService.get_theoretical_current_stock",
         return_value={},
     )
     def test_groups_by_article(self, _mock_stock, tenant):
@@ -661,7 +661,7 @@ class TestGetShareContentAsFrontendData:
         assert result[0]["unit"] == "KG"
 
     @patch(
-        "apps.commissioning.services.share_content_service.StockService.get_theoretical_current_stock",
+        "apps.commissioning.services.share_content_frontend.StockService.get_theoretical_current_stock",
         return_value={},
     )
     def test_empty_for_no_data(self, _mock_stock, tenant):
@@ -676,7 +676,7 @@ class TestGetShareContentAsFrontendData:
 @pytest.mark.django_db
 class TestGetShareContentForWeek:
     @patch(
-        "apps.commissioning.services.share_content_service.StockService.get_theoretical_current_stock",
+        "apps.commissioning.services.share_content_frontend.StockService.get_theoretical_current_stock",
         return_value={},
     )
     def test_returns_data_for_week(self, _mock_stock, tenant):
@@ -743,7 +743,7 @@ class TestGetKgPerPieceWithFallback:
 
 
 _STOCK_PATCH = (
-    "apps.commissioning.services.share_content_service."
+    "apps.commissioning.services.share_content_frontend."
     "StockService.get_theoretical_current_stock"
 )
 

@@ -2,12 +2,14 @@ import { Form } from "antd";
 import dayjs from "dayjs";
 import { toApiDate } from "@shared/utils/apiDate";
 import type { Key } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDateFormat } from "@hooks/configuration/useDateFormat";
 import axiosService from "@shared/services/api";
 import { getErrorMessage } from "@shared/utils/apiError";
 import { buildLiveRecord } from "./buildLiveRecord";
+import { columnTitleText } from "./columnTitleText";
+import { duplicateErrors } from "./duplicateErrors";
 import type {
   EditableColumnConfig,
   SelectOption,
@@ -24,6 +26,14 @@ import type {
 const readOptionField = (option: SelectOption, field: string): unknown =>
   (option as SelectOption & Record<string, unknown>)[field];
 
+const sameFields = (a: TableRecord, b: TableRecord): boolean => {
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => Object.is(a[key], b[key]))
+  );
+};
+
 export const useEditableTable = <T extends TableRecord = TableRecord>({
   apiEndpoints = {},
   apiFunctions,
@@ -37,9 +47,11 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
   deleteContext = null,
   uniqueCheck = null,
   uniqueCheckMessage = null,
+  uniqueCheckRows,
   autoHandleDates = true,
   onSaveSuccess = null,
   onDeleteSuccess = null,
+  onRowUpdated,
 }: UseEditableTableOptions<T>): UseEditableTableReturn<T> => {
   const { t } = useTranslation();
   const [form] = Form.useForm();
@@ -57,6 +69,10 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
   // per-cell red border still comes from `formErrors`; this is the "what
   // actually happened" text the user reads to fix the row.
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  // The reason the server gave for refusing a delete, shown as its own banner.
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(
+    null,
+  );
   const [clickedDataIndex, setClickedDataIndex] = useState<string | undefined>(focusIndex);
 
   const { dateFormat } = useDateFormat();
@@ -216,6 +232,18 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
     },
     [columns],
   );
+
+  // Select labels resolve through the columns' options, which can arrive after
+  // the rows. A new column set re-resolves the rows held here instead of
+  // reloading them, so the values saved since they were loaded stay.
+  useEffect(() => {
+    setData((rows) => {
+      const resolved = transformRowsFromApi(rows);
+      return resolved.every((row, index) => sameFields(row, rows[index]))
+        ? rows
+        : resolved;
+    });
+  }, [transformRowsFromApi]);
 
   const isEditing = useCallback(
     (record: T): boolean => {
@@ -421,57 +449,14 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
 
         // Uniqueness validation
         if (uniqueCheck) {
-          const fieldsToCheck = Array.isArray(uniqueCheck) ? uniqueCheck : [uniqueCheck];
-          const errors: Record<string, string> = {};
-
-          // Type-tolerant equality: form inputs hand back strings (an AntD
-          // <Input> for a numeric column emits "2"), while rows loaded from the
-          // API keep numbers (`sort_order: 2`). A strict `===` would miss every
-          // number-vs-string duplicate, so bridge primitives via String() while
-          // keeping null/undefined never-equal to a real value.
-          const sameValue = (a: unknown, b: unknown): boolean =>
-            a === b || (a != null && b != null && String(a) === String(b));
-
-          if (fieldsToCheck.length > 1) {
-            const duplicateExists = data.some((record) => {
-              if (record.key === key || record.key === -1) return false;
-              return fieldsToCheck.every((fieldName) =>
-                sameValue(
-                  (record as Record<string, unknown>)[fieldName],
-                  transformedRow[fieldName],
-                ),
-              );
-            });
-
-            if (duplicateExists) {
-              const fieldNames = fieldsToCheck.join(" + ");
-              const msg =
-                uniqueCheckMessage || `This combination of ${fieldNames} already exists.`;
-              errors[fieldsToCheck[0]] = msg;
-            }
-          } else {
-            const fieldName = fieldsToCheck[0];
-            const valueToCheck = transformedRow[fieldName];
-
-            if (valueToCheck !== undefined && valueToCheck !== null && valueToCheck !== "") {
-              const duplicateExists = data.some(
-                (record) =>
-                  record.key !== key &&
-                  record.key !== -1 &&
-                  sameValue(
-                    (record as Record<string, unknown>)[fieldName],
-                    valueToCheck,
-                  ),
-              );
-
-              if (duplicateExists) {
-                const msg =
-                  uniqueCheckMessage ||
-                  `This ${fieldName} already exists. Please choose a different value.`;
-                errors[fieldName] = msg;
-              }
-            }
-          }
+          const errors = duplicateErrors({
+            uniqueCheck,
+            uniqueCheckMessage,
+            rows: data,
+            extraRows: uniqueCheckRows,
+            key,
+            row: transformedRow,
+          });
 
           if (Object.keys(errors).length > 0) {
             // Both: mark the offending field with a red border via formErrors
@@ -551,6 +536,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
           };
           const newData = data.map((item) => (item.key === key ? updatedRecord : item));
           setData(newData);
+          onRowUpdated?.(updatedRecord);
           if (onDataChange) {
             onDataChange(newData);
           }
@@ -621,7 +607,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
         if (fields.length > 0) {
           const labels = fields.map((name) => {
             const col = columns.find((c) => c.dataIndex === name);
-            return typeof col?.title === "string" ? col.title : name;
+            return (col && columnTitleText(col.title)) || name;
           });
           setSaveErrorMessage(`${labels.join(", ")}: ${baseMessage}`);
         } else {
@@ -643,10 +629,12 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
       data,
       uniqueCheck,
       uniqueCheckMessage,
+      uniqueCheckRows,
       columns,
       onDataChange,
       onSaveSuccess,
       onDeleteSuccess,
+      onRowUpdated,
       apiEndpoints.update,
       apiFunctions,
       t,
@@ -672,6 +660,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
   const deleteRecord = useCallback(
     async (key: Key) => {
       if (!key) return;
+      setDeleteErrorMessage(null);
 
       try {
         const record = data.find((item) => item.key === key);
@@ -734,10 +723,10 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
         }
       } catch (error) {
         console.error("Delete operation failed:", error);
-        throw error;
+        setDeleteErrorMessage(getErrorMessage(error, t("table.delete_failed_generic")));
       }
     },
-    [data, getDeleteUrl, onDataChange, deleteContext, customDelete, onDeleteSuccess, apiFunctions],
+    [data, getDeleteUrl, onDataChange, deleteContext, customDelete, onDeleteSuccess, apiFunctions, t],
   );
 
   const setDataWithTransform = useCallback(
@@ -764,6 +753,8 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
     formErrors,
     saveErrorMessage,
     setSaveErrorMessage,
+    deleteErrorMessage,
+    setDeleteErrorMessage,
     clickedDataIndex,
     setClickedDataIndex,
     isEditing,

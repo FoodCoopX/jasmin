@@ -49,7 +49,7 @@ from apps.commissioning.tests.factories import (
 # ── Helpers ──────────────────────────────────────────
 
 TOTALS_PATCH = (
-    "apps.commissioning.services.share_content_service"
+    "apps.commissioning.services.share_content_stock"
     ".batch_get_physical_variation_totals_for_weeks"
 )
 

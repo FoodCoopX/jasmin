@@ -27,6 +27,7 @@ import {
   editableOnlyOnCreate,
   formatAmountForUnit,
 } from "@shared/utils";
+import { parseDecimalInput } from "@shared/utils/numberFormat";
 import { pickTierPrice } from "@shared/utils/tierPrice";
 import { useAmountUnitSizeColumns } from "./useAmountUnitSizeColumns";
 
@@ -65,11 +66,10 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
         get_price_info: true,
         include_extra: true,
         // Suggest the tier prices active in THIS order's delivery week (not
-        // today's) — mirrors offers (useOffersData). Without price_date the
-        // backend skips the price annotation entirely, so direct article entry
-        // got no suggestion. The office can still overwrite each price; the
-        // entered value is what gets snapshotted on save (the backend stores it
-        // verbatim and never recomputes).
+        // today's, which the backend prices at without price_date) — mirrors
+        // offers (useOffersData). The office can still overwrite each price;
+        // the entered value is what gets snapshotted on save (the backend
+        // stores it verbatim and never recomputes).
         price_date: activeAtDateForWeek(params.year, params.delivery_week),
       },
       autofillContext: "reseller",
@@ -117,7 +117,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
       ) as Record<string, unknown> | undefined;
       if (!offer) return {};
       const price = pickTierPrice(
-        Number(orderedAmountPu) || 0,
+        parseDecimalInput(orderedAmountPu) ?? 0,
         {
           price_1: offer.price_1 as number | null,
           price_2: offer.price_2 as number | null,

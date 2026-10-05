@@ -30,6 +30,7 @@
     "absence_category_year_name_unique": "Diese Kategorie existiert bereits für dieses Jahr.",
     "drop_employee_here": "",
     "remove_employee": "{{employee}} entfernen",
+    "inactive_employee": "{{employee}} (inaktiv)",
     "no_categories": "Keine aktiven Wochenplan-Kategorien. Bitte zuerst Kategorien anlegen.",
     "no_employees": "Keine aktiven MitarbeiterInnen. Bitte zuerst MitarbeiterInnen anlegen.",
     "select_week": "Bitte eine Woche wählen.",

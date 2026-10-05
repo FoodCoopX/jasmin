@@ -213,6 +213,14 @@ jobs:
         # the dependency graph for a gate this size.
         run: poetry run python scripts/import_contracts.py
 
+      - name: Module length (backend, shrink-only)
+        # A backend module has at most 1000 lines, the frontend's max-lines. The
+        # modules already longer are pinned at their length in
+        # jasmin-core/django-core/module-length-baseline.txt, and a pin only goes
+        # down: a module that grows past its pin fails, and so does one that
+        # shrank, until ``scripts/module_length.py freeze`` lowers its pin.
+        run: poetry run python scripts/module_length.py check
+
       - name: Migrations are in sync with models
         # Catches a model field added/changed/removed without the matching
         # migration, i.e. the models and the migration files on disk disagree.

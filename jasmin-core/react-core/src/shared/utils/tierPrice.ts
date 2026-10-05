@@ -19,7 +19,12 @@
  * The ``price_X > 0`` fallback is intentional: tenants on multi-tier
  * who leave a higher tier's price empty (0) silently fall back to the
  * next-lower tier rather than charging 0.
+ *
+ * Amounts and prices may be raw input text, so a decimal comma counts as
+ * the decimal point.
  */
+
+import { parseDecimalInput } from "./numberFormat";
 
 export interface TierPrices {
   price_1?: number | string | null;
@@ -37,9 +42,9 @@ export function pickTierPrice(
   prices: TierPrices,
   finalTiers: number[] = [],
 ): number {
-  const p1 = Number(prices.price_1) || 0;
-  const p2 = Number(prices.price_2) || 0;
-  const p3 = Number(prices.price_3) || 0;
+  const p1 = parseDecimalInput(prices.price_1) ?? 0;
+  const p2 = parseDecimalInput(prices.price_2) ?? 0;
+  const p3 = parseDecimalInput(prices.price_3) ?? 0;
   // ``undefined`` t2 / t3 means the tenant didn't configure that tier
   // — never escalate, even for huge quantities.
   const t2 = finalTiers[1];
@@ -65,8 +70,15 @@ export function pickTierPriceFromAmount(
   prices: TierPrices,
   finalTiers: number[] = [],
 ): number {
-  const numAmount = Number(amount) || 0;
-  const perPu = Number(amountPerPu) || 1;
+  const numAmount = parseDecimalInput(amount) ?? 0;
+  const perPu = parseDecimalInput(amountPerPu) || 1;
   const puCount = perPu > 0 ? numAmount / perPu : numAmount;
   return pickTierPrice(puCount, prices, finalTiers);
+}
+
+/** Whether any tier holds a price — a row without one has nothing to pick. */
+export function hasTierPrice(prices: TierPrices): boolean {
+  return [prices.price_1, prices.price_2, prices.price_3].some(
+    (price) => (parseDecimalInput(price) ?? 0) > 0,
+  );
 }

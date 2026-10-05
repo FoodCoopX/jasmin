@@ -1,5 +1,5 @@
-const SaturdayShifts = () => {
-  return <div>coming soon ...</div>;
-};
+import { ComingSoon } from "@shared/ui";
+
+const SaturdayShifts = () => <ComingSoon />;
 
 export default SaturdayShifts;

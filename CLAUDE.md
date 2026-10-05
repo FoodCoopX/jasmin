@@ -395,7 +395,7 @@ time.
 
 ### Hygiene gates
 
-Three more CI gates hold size, naming and layering still, and all three ratchet
+Four more CI gates hold size, naming and layering still, and all four ratchet
 in BOTH directions like the mypy baseline above: a finding the change introduces
 fails, and so does a register entry that no longer occurs. The register can only
 shrink.
@@ -404,6 +404,7 @@ shrink.
 | ---- | ------- | -------- |
 | ruff hygiene rules (`N`, `C901`, `PLR0913`, `PLR0915`) | `poetry run python scripts/ruff_baseline.py check` / `make ruff` | `jasmin-core/django-core/ruff-baseline.txt` |
 | Backend import layering (commissioning one-way, shared is the bottom layer) | `poetry run python scripts/import_contracts.py` / `make import-contracts` | `EXEMPTIONS` in the script |
+| Backend module length (1000 lines, the frontend's `max-lines`; tests and migrations don't count) | `poetry run python scripts/module_length.py check` / `make module-length` | `jasmin-core/django-core/module-length-baseline.txt` |
 | Frontend size & complexity (`max-lines`, `max-lines-per-function`, `complexity`) | `npm run lint` **and** `npm run lint:pins` / `make lint-pins` | `jasmin-core/react-core/eslint.hygiene-pins.js` |
 
 - **Never hand-edit a baseline.** Re-freeze it: `poetry run python
@@ -412,7 +413,9 @@ shrink.
   number to whatever `npm run lint:pins` reports — or delete the entry once the
   file is under the global threshold. `npm run lint` alone can't see below a
   pin, which is why `lint:pins` re-measures; raising a pin is how a gate quietly
-  stops gating.
+  stops gating. The backend's module-length pins work the same way: split the
+  module, then `poetry run python scripts/module_length.py freeze` (or `make
+  module-length-freeze`), which only ever lowers or drops a pin.
 - **An exemption is a documented extraction blocker, not a permission slip.** A
   new one carries its unwind plan; one that stops matching a real import is an
   error and has to be deleted rather than left standing.
@@ -614,6 +617,21 @@ Fixing copy changes the value; the key never changes.
 ## Testing rules
 
 ### Backend testing
+
+**Tests run in random order** (pytest-randomly), so a test may rely on nothing
+another test leaves behind. Two traps catch it:
+
+- `@pytest.mark.django_db(transaction=True)` commits, and the shared
+  `test_pytest` schema isn't flushed between tests, so those rows outlive the
+  test. Don't assume an empty table — measure from what is there, as
+  `test_member_numbering_concurrency.py` does.
+- Change settings through `override_settings` or through pytest-django's
+  `settings` fixture, never both in one test: the fixture's teardown restores
+  the decorator's layer, whose value then stays for every later test
+  (`apps/shared/tests/test_no_mixed_settings_overrides.py` refuses the mix).
+
+A failing run prints `Using --randomly-seed=N` at its top; replay that order
+with `--randomly-seed=N`, or run in file order with `-p no:randomly`.
 
 **Test both the present AND absent case of an optional/nullable FK** (or any
 presence-guarded branch). A guard like `x.seller.name if x.seller else ""`
@@ -1000,6 +1018,8 @@ POSTGRES_PORT=5433 poetry run pytest -k test_name          # single test by name
 POSTGRES_PORT=5433 poetry run pytest apps/payments/tests/  # one app
 POSTGRES_PORT=5433 poetry run pytest apps/payments/tests/test_models.py::TestBillingProfileValidation
 POSTGRES_PORT=5433 poetry run pytest --maxfail=1 -q        # stop after first failure
+POSTGRES_PORT=5433 poetry run pytest --randomly-seed=1234  # replay one random order
+POSTGRES_PORT=5433 poetry run pytest -p no:randomly        # file order
 POSTGRES_PORT=5433 poetry run pytest --cov=apps --cov-report=html
 ```
 
@@ -1029,7 +1049,7 @@ npm run type-check               # TypeScript check (no emit)
 ### Linting & code quality
 
 `make check` runs the whole CI gate in one shot: black, ruff, import-contracts,
-mypy, pytest, type-check, lint, lint-pins, test-frontend.
+module-length, mypy, pytest, type-check, lint, lint-pins, test-frontend, size.
 
 Much of it also runs on `git commit` through pre-commit (once you have run
 `pre-commit install`): gitleaks secret scanning, `ruff --fix` and `black` over

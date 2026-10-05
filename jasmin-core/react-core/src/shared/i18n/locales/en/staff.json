@@ -30,6 +30,7 @@
   "absence_category_year_name_unique": "This category already exists for this year.",
   "drop_employee_here": "Drop a staff member here",
   "remove_employee": "Remove {{employee}}",
+  "inactive_employee": "{{employee}} (inactive)",
   "no_categories": "No active weekly plan categories. Please create categories first.",
   "no_employees": "No active staff members. Please create staff members first.",
   "select_week": "Please select a week.",

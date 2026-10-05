@@ -205,6 +205,17 @@ ruff-fix:
 import-contracts:
 	$(COMPOSE_DEV) exec backend python scripts/import_contracts.py
 
+# Backend modules over 1000 lines are pinned at their length in
+# jasmin-core/django-core/module-length-baseline.txt, and a pin only goes down:
+# split a module, then `make module-length-freeze`.
+.PHONY: module-length
+module-length:
+	$(COMPOSE_DEV) exec backend python scripts/module_length.py check
+
+.PHONY: module-length-freeze
+module-length-freeze:
+	$(COMPOSE_DEV) exec backend python scripts/module_length.py freeze
+
 # mypy runs against a frozen baseline: only findings that are NOT in
 # jasmin-core/django-core/mypy-baseline.txt fail. Fix findings, then
 # `make mypy-freeze` and commit the smaller baseline.
@@ -270,4 +281,4 @@ tunables:
 
 # --- Run the whole CI gate in one shot ---------------------------------------
 .PHONY: check
-check: black ruff import-contracts mypy pytest type-check lint lint-pins test-frontend size
+check: black ruff import-contracts module-length mypy pytest type-check lint lint-pins test-frontend size

@@ -116,6 +116,7 @@ export function CrudListPage<TRow extends TableRecord>({
         permissions={list.permissions}
         uniqueCheck={uniqueCheck}
         uniqueCheckMessage={uniqueCheckMessage}
+        uniqueCheckRows={list.data}
         focusIndex={focusIndex}
         showSearchBar={showSearchBar}
         pagination={pagination}

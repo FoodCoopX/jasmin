@@ -59,6 +59,35 @@ def test_grid_is_dense(api_client, category, employees):
     }
 
 
+def test_grid_lists_a_deactivated_employee_who_holds_a_shift(
+    api_client, category, employees
+):
+    alice, _ = employees
+    retired = Employee.objects.create(
+        short_name_for_weekly_plan="Cleo", is_active=False
+    )
+    Employee.objects.create(short_name_for_weekly_plan="Dora", is_active=False)
+    WeeklyPlan.objects.create(
+        year=YEAR,
+        week=WEEK,
+        day=1,
+        weekly_plan_category=category,
+        row_index=0,
+        employee=retired,
+    )
+
+    response = api_client.get(reverse("weekly_plan-grid"), {"year": YEAR, "week": WEEK})
+
+    listed = {
+        e["short_name_for_weekly_plan"]: e["is_active"]
+        for e in response.data["employees"]
+    }
+    # Cleo holds a shift this week; Dora, inactive without one, stays out.
+    assert listed == {"Alice": True, "Bob": True, "Cleo": False}
+    assert response.data["categories"][0]["rows"][0]["days"]["1"] == retired.id
+    assert alice.id not in response.data["categories"][0]["rows"][0]["days"].values()
+
+
 def test_grid_requires_year_and_week(api_client):
     assert (
         api_client.get(reverse("weekly_plan-grid"), {"year": YEAR}).status_code

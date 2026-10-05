@@ -22,6 +22,7 @@ import pytest
 from django.db import connection
 from rest_framework.test import APIClient
 
+from apps.commissioning.tests.conftest import tenant_fields_restored
 from apps.shared.tenants.models import Domain, Tenant
 
 # The only hostname that resolves to this package's tenant schema.
@@ -52,9 +53,10 @@ def _tenant_schema(django_db_setup, django_db_blocker):
 
 @pytest.fixture()
 def tenant(_tenant_schema, db):
-    connection.set_tenant(_tenant_schema)
-    yield _tenant_schema
-    connection.set_schema_to_public()
+    with tenant_fields_restored(_tenant_schema):
+        connection.set_tenant(_tenant_schema)
+        yield _tenant_schema
+        connection.set_schema_to_public()
 
 
 @pytest.fixture()

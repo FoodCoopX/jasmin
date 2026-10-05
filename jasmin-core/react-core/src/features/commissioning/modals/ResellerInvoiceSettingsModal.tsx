@@ -1,4 +1,14 @@
-import { Col, Divider, Form, Input, InputNumber, Row, Space, Typography } from "antd";
+import {
+  Col,
+  Divider,
+  Form,
+  Input,
+  InputNumber,
+  Row,
+  Space,
+  Switch,
+  Typography,
+} from "antd";
 
 import { EditFormModal, useModalMutation } from "@shared/modals/shared";
 import type { FC } from "react";
@@ -219,6 +229,15 @@ export const ResellerInvoiceSettingsModal: FC<
 
       {sectionTitle("resellers.invoice_section_delivery")}
       <Row gutter={12} align="middle">
+        <Col span={10}>
+          <Form.Item
+            name="invoice_via_email"
+            label={t("resellers.invoice_via_email")}
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+        </Col>
         <Col span={14}>
           <Form.Item
             name="invoice_email"

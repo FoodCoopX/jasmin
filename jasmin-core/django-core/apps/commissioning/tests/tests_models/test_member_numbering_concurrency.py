@@ -39,8 +39,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
 from django.db import connection, connections
+from django.db.models import Max
 
 from apps.commissioning.models import Member
+
+
+def _highest_member_number() -> int:
+    return Member.objects.aggregate(highest=Max("member_number"))["highest"] or 0
 
 
 def _create_one_member_and_generate_number(schema_name: str, email: str) -> int:
@@ -79,18 +84,24 @@ def _create_one_member_and_generate_number(schema_name: str, email: str) -> int:
 class TestMemberNumberingConcurrency:
     """Spin up N parallel Member creations and verify the sequence.
 
-    The ``test_pytest`` schema is shared across pytest invocations, so
-    each test starts by deleting Members. Cascades drop any
-    Subscription / CoopShare rows attached, which is fine —
-    this test never creates any.
+    Other ``transaction=True`` tests commit members too, some held in place by
+    the subscriptions, billing profiles and charges that protect them, so the
+    table isn't emptied first: the new numbers must continue from the highest
+    one already there, without duplicates or gaps.
     """
 
     @pytest.fixture(autouse=True)
-    def _hermetic_member_table(self, tenant):
-        Member.objects.all().delete()
+    def _own_members_removed_afterwards(self, tenant):
+        # Committed, these members would hold numbers the member factory
+        # counts on to, and a later test's factory member would collide.
+        yield
+        Member.objects.filter(
+            email__regex=r"^(concur|serial)-\d+@example\.com$"
+        ).delete()
 
     def test_no_duplicates_no_gaps_under_concurrent_create(self, tenant):
         schema_name = connection.schema_name
+        start = _highest_member_number()
 
         n_workers = 25
         with ThreadPoolExecutor(max_workers=n_workers) as pool:
@@ -108,15 +119,16 @@ class TestMemberNumberingConcurrency:
         assert (
             len(set(numbers)) == n_workers
         ), f"Duplicate member_numbers under concurrency: {numbers}"
-        # No gaps: the sequence is exactly {1, 2, ..., N}.
+        # No gaps: the sequence continues from the highest number before.
         assert numbers == list(
-            range(1, n_workers + 1)
+            range(start + 1, start + n_workers + 1)
         ), f"Gap in member_number sequence: {numbers}"
 
     def test_serial_baseline_still_works(self, tenant):
         """Sanity check: the same numbering path also works without
         threads. Catches regressions where a concurrency fix accidentally
         broke the single-writer case."""
+        start = _highest_member_number()
         numbers: list[int] = []
         for i in range(5):
             member = Member.objects.create(
@@ -127,4 +139,4 @@ class TestMemberNumberingConcurrency:
             )
             member._generate_member_number()
             numbers.append(member.member_number)
-        assert numbers == [1, 2, 3, 4, 5]
+        assert numbers == [start + 1, start + 2, start + 3, start + 4, start + 5]

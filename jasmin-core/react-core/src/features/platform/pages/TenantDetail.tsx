@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import axiosService from "@shared/services/api";
 import { notify } from "@shared/utils";
-import { getErrorMessage } from "@shared/utils/apiError";
+import { getErrorMessage, getErrorStatus } from "@shared/utils/apiError";
 import { SUPER_ADMIN_ENDPOINTS } from "@features/platform/services/superAdmin";
 import CreateAdminModal from "@features/platform/modals/CreateAdminModal";
 import CreateUserModal from "@features/platform/modals/CreateUserModal";
@@ -129,6 +129,20 @@ export default function TenantDetail() {
     return <div className="sa-section-empty">Loading...</div>;
   }
 
+  if (tenantQuery.isError && getErrorStatus(tenantQuery.error) !== 404) {
+    return (
+      <div className="sa-section-empty" role="alert">
+        {getErrorMessage(tenantQuery.error, "Failed to load the tenant")}{" "}
+        <button
+          onClick={() => void tenantQuery.refetch()}
+          className="sa-btn sa-btn--info"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   if (!tenant) {
     return <div className="sa-section-empty">Tenant not found</div>;
   }
@@ -223,6 +237,13 @@ export default function TenantDetail() {
 
           {usersLoading ? (
             <div className="text-muted">Loading users...</div>
+          ) : usersQuery.isError ? (
+            <div className="text-muted" role="alert">
+              {getErrorMessage(usersQuery.error, "Failed to load the users")}{" "}
+              <button onClick={refetchUsers} className="sa-btn sa-btn--info">
+                Retry
+              </button>
+            </div>
           ) : (
             <>
               <UserTable

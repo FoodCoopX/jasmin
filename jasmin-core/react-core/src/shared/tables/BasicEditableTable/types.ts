@@ -252,6 +252,12 @@ export interface EditableTableProps<T extends TableRecord = TableRecord> {
   forceInlineMode?: boolean;
   uniqueCheck?: string | string[] | null;
   uniqueCheckMessage?: string | null;
+  /**
+   * Rows `uniqueCheck` compares against besides the table's own — the full
+   * list when the page passes only part of it as `initialData` (e.g. with
+   * inactive rows hidden), so a value a hidden row holds still counts as taken.
+   */
+  uniqueCheckRows?: T[];
   onSaveSuccess?: ((record: T, type: "create" | "update") => void) | null;
   onDeleteSuccess?: ((key: Key) => void) | null;
   renderMobileCard?: (record: T, onEdit: (record: T) => void) => ReactNode;
@@ -301,9 +307,12 @@ export interface UseEditableTableOptions<T extends TableRecord = TableRecord> {
   deleteContext?: Record<string, unknown> | string | null;
   uniqueCheck?: string | string[] | null;
   uniqueCheckMessage?: string | null;
+  uniqueCheckRows?: T[];
   autoHandleDates?: boolean;
   onSaveSuccess?: EditableTableProps<T>["onSaveSuccess"];
   onDeleteSuccess?: EditableTableProps<T>["onDeleteSuccess"];
+  /** Called with the row as the table holds it after a successful update. */
+  onRowUpdated?: (row: T) => void;
 }
 
 // ─── useEditableTable Return ────────────────────────────────────────────────
@@ -319,6 +328,9 @@ export interface UseEditableTableReturn<T extends TableRecord = TableRecord> {
    * failed save (unique-check rejection or backend validation error). */
   saveErrorMessage: string | null;
   setSaveErrorMessage: (message: string | null) => void;
+  /** The reason a delete was refused, shown as a banner above the table. */
+  deleteErrorMessage: string | null;
+  setDeleteErrorMessage: (message: string | null) => void;
   clickedDataIndex: string | undefined;
   setClickedDataIndex: (index: string | undefined) => void;
   isEditing: (record: T) => boolean;

@@ -23,6 +23,7 @@ import {
 } from "@shared/utils/lineNetto";
 import { formatAmountForUnit } from "@shared/utils";
 import { makeContentCustomEdit, makeFkCustomSave } from "./resellerContentTableCallbacks";
+import { withUpstreamDiffs } from "./upstreamDiffColumns";
 import { useCurrency, useDateFormat, useDefaultTaxRates, useNumberFormat, useTenant, useUnitOptions } from '@hooks/index';
 import { useAmountUnitSizeColumns, useCratesColumns, useOfferTiers, useShareArticleColumn } from '@features/commissioning/hooks';
 import { FinalizedNotice, InvoiceSendStatus } from '@features/commissioning/components';
@@ -339,32 +340,7 @@ export default function InvoiceModal({
         required: false,
         width: "8em",
       },
-      ...amountUnitSizeColumns.map((col) => {
-        // `differField` / `originalField` are runtime-derived keys, so
-        // TS can't statically narrow them — index access still needs a
-        // cast even with a typed record.
-        const differField = `${col.dataIndex}_differs`;
-        const originalField = `original_${col.dataIndex}`;
-
-        return {
-          ...col,
-          render: (value: unknown, record: InvoiceContentRecord) => (
-            <DiffCell
-              value={
-                (col as EditableColumnConfig).render
-                  ? (col as EditableColumnConfig).render!(
-                      value,
-                      record as TableRecord,
-                      0,
-                    )
-                  : (value as string)
-              }
-              differs={record[differField] as boolean | undefined}
-              original={record[originalField]}
-            />
-          ),
-        };
-      }),
+      ...withUpstreamDiffs(amountUnitSizeColumns, format),
       {
         title: <>{t("commissioning.single_price")}</>,
         dataIndex: "price_per_unit",
@@ -394,6 +370,7 @@ export default function InvoiceModal({
     [
       shareArticleColumn,
       amountUnitSizeColumns,
+      format,
       columnsPrices,
       getUnitLabel,
       t,

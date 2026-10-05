@@ -82,6 +82,21 @@ export function parseLocaleNumber(
 }
 
 /**
+ * What a decimal table input holds, as a number. Those inputs take "." or ","
+ * as the decimal separator, whatever the locale, and no grouping, and their
+ * `onFieldChange` handlers get the raw text — so a comma is read as the
+ * decimal point. Returns `null` for empty or invalid input.
+ */
+export function parseDecimalInput(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n =
+    typeof value === "number"
+      ? value
+      : Number(String(value).trim().replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
  * The decimal and grouping characters this locale uses. Derived from
  * `Intl.NumberFormat.formatToParts` so we don't hard-code per-locale
  * rules — works for any BCP-47 tag the browser knows.

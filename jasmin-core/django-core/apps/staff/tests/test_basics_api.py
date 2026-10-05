@@ -313,3 +313,109 @@ def test_a_stored_non_positive_max_lines_stays_editable(api_client):
     category.refresh_from_db()
     assert category.name == "Legacy renamed"
     assert category.max_lines == 0
+
+
+# --------------------------------------------------------------------------- #
+# Uniqueness — the list pages hide inactive rows, so the server holds the line
+# --------------------------------------------------------------------------- #
+def test_a_weekly_plan_name_an_inactive_employee_holds_is_refused(api_client):
+    Employee.objects.create(short_name_for_weekly_plan="Ada", is_active=False)
+
+    response = api_client.post(
+        reverse("employees-list"), {"short_name_for_weekly_plan": "Ada"}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["code"] == "staff.employee_short_name_taken"
+    assert Employee.objects.filter(short_name_for_weekly_plan="Ada").count() == 1
+
+
+def test_renaming_an_employee_to_a_taken_weekly_plan_name_is_refused(api_client):
+    Employee.objects.create(short_name_for_weekly_plan="Ada")
+    other = Employee.objects.create(short_name_for_weekly_plan="Bea")
+
+    response = api_client.patch(
+        reverse("employees-detail", args=[other.id]),
+        {"short_name_for_weekly_plan": "Ada"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["code"] == "staff.employee_short_name_taken"
+
+
+def test_an_employee_sharing_a_stored_name_stays_editable(api_client):
+    # The list page echoes every column back on save, so a duplicate stored
+    # before the check must not freeze the row.
+    Employee.objects.create(short_name_for_weekly_plan="Ada")
+    twin = Employee.objects.create(short_name_for_weekly_plan="Ada")
+
+    response = api_client.patch(
+        reverse("employees-detail", args=[twin.id]),
+        {"short_name_for_weekly_plan": "Ada", "first_name": "Adelheid"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    twin.refresh_from_db()
+    assert twin.first_name == "Adelheid"
+
+
+def test_a_taken_weekly_plan_category_order_is_refused(api_client):
+    WeeklyPlanCategory.objects.create(
+        name="Harvest", max_lines=2, sort_order=1, is_active=False
+    )
+
+    response = api_client.post(
+        reverse("weekly_plan_categories-list"),
+        {"name": "Packing", "max_lines": 2, "sort_order": 1},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["code"] == "staff.weekly_plan_category_sort_order_taken"
+
+
+def test_weekly_plan_categories_may_share_an_empty_order(api_client):
+    WeeklyPlanCategory.objects.create(name="Harvest", max_lines=2)
+
+    response = api_client.post(
+        reverse("weekly_plan_categories-list"),
+        {"name": "Packing", "max_lines": 2, "sort_order": None},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+def test_an_absence_category_name_is_unique_per_year(api_client):
+    AbsenceCategory.objects.create(year=2026, name="Vacation", is_active=False)
+
+    taken = api_client.post(
+        reverse("absence_categories-list"),
+        {"year": 2026, "name": "Vacation"},
+        format="json",
+    )
+    next_year = api_client.post(
+        reverse("absence_categories-list"),
+        {"year": 2027, "name": "Vacation"},
+        format="json",
+    )
+
+    assert taken.status_code == status.HTTP_400_BAD_REQUEST
+    assert taken.data["code"] == "staff.absence_category_name_taken"
+    assert next_year.status_code == status.HTTP_201_CREATED
+
+
+def test_moving_an_absence_category_into_a_taken_year_is_refused(api_client):
+    AbsenceCategory.objects.create(year=2026, name="Vacation")
+    later = AbsenceCategory.objects.create(year=2027, name="Vacation")
+
+    response = api_client.patch(
+        reverse("absence_categories-detail", args=[later.id]),
+        {"year": 2026},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["code"] == "staff.absence_category_name_taken"

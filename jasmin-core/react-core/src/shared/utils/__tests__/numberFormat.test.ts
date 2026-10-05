@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatNumber,
   getLocaleSeparators,
+  parseDecimalInput,
   parseLocaleNumber,
 } from "../numberFormat";
 
@@ -109,4 +110,23 @@ describe("format / parse round-trip", () => {
       expect(parsedBack).toBe(Number(value.toFixed(decimals)));
     },
   );
+});
+
+describe("parseDecimalInput", () => {
+  it("reads a comma or a point as the decimal separator", () => {
+    expect(parseDecimalInput("2,90")).toBe(2.9);
+    expect(parseDecimalInput("2.90")).toBe(2.9);
+    expect(parseDecimalInput("12,")).toBe(12);
+  });
+
+  it("passes numbers through", () => {
+    expect(parseDecimalInput(1.5)).toBe(1.5);
+  });
+
+  it("returns null for empty or invalid input", () => {
+    expect(parseDecimalInput("")).toBeNull();
+    expect(parseDecimalInput(null)).toBeNull();
+    expect(parseDecimalInput(undefined)).toBeNull();
+    expect(parseDecimalInput("abc")).toBeNull();
+  });
 });

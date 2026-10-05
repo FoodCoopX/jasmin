@@ -42,7 +42,12 @@ import { useTranslation } from "react-i18next";
 import EditableCell from "./EditableCell";
 import EditableModal from "./EditableModal";
 import MobileCardList from "./MobileCardList";
-import { allowsRow, canDeleteRow, canEditRow } from "./rowPermissions";
+import {
+  allowsRow,
+  canDeleteRow,
+  canEditRow,
+  hasRowActions,
+} from "./rowPermissions";
 import type {
   EditableColumnConfig,
   EditableTableProps,
@@ -51,6 +56,12 @@ import type {
   TableRecord,
 } from "./types";
 import { useEditableTable } from "./useEditableTable";
+import { useInitialDataSync, useUpdatedRows } from "./useInitialDataSync";
+
+// The default for `initialData`. The row-sync effect depends on it, so it has to
+// be the same array on every render: a fresh `[]` would re-run the effect, whose
+// new rows render the table again, without end.
+const NO_ROWS: TableRecord[] = [];
 
 // Table.Summary.Cell doesn't expose style prop in its types but it works at runtime
 const StyledSummaryCell = Table.Summary.Cell as unknown as FC<
@@ -172,7 +183,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
   apiEndpoints = {},
   apiFunctions,
   baseParams = {},
-  initialData = [],
+  initialData = NO_ROWS as T[],
   // Destructured (not left to fall into `...tableProps`) so the caller's
   // data-fetch loading is OR-ed with the table's own save/delete loading
   // below, instead of silently overriding it via the prop spread.
@@ -198,6 +209,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
   forceInlineMode = false,
   uniqueCheck = null,
   uniqueCheckMessage = null,
+  uniqueCheckRows,
   onSaveSuccess = null,
   onDeleteSuccess = null,
   renderMobileCard,
@@ -254,20 +266,11 @@ const EditableTable = <T extends TableRecord = TableRecord>({
   // - Explicit `false` from the caller wins: read-only pages stay read-only.
   // - Explicit `true` wins: forces the column on even when permissions are
   //   restrictive (rare; keeps the door open for legacy callers).
-  // - Omitted (the recommended pattern): auto-derive from `permissions`. The
-  //   column appears iff *any* action is reachable — table-level canAdd /
-  //   canEdit / canDelete, or per-row canEditRecord / canDeleteRecord, so
-  //   callers don't need to pass both `permissions={gatedByPermission(...)}`
-  //   AND `showActions={...}` with the same condition.
-  const effectiveShowActions =
-    showActions ??
-    Boolean(
-      permissions.canAdd ||
-      permissions.canEdit ||
-      permissions.canDelete ||
-      permissions.canEditRecord ||
-      permissions.canDeleteRecord,
-    );
+  // - Omitted (the recommended pattern): auto-derive from `permissions`
+  //   (`hasRowActions`), so callers don't need to pass both
+  //   `permissions={gatedByPermission(...)}` AND `showActions={...}` with the
+  //   same condition.
+  const effectiveShowActions = showActions ?? hasRowActions(permissions);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [modalRecord, setModalRecord] = useState<T | null>(null);
@@ -286,6 +289,8 @@ const EditableTable = <T extends TableRecord = TableRecord>({
       }
     : false;
 
+  const { updatedRowsRef, rememberUpdatedRow } = useUpdatedRows(initialData);
+
   const {
     form,
     data,
@@ -296,6 +301,8 @@ const EditableTable = <T extends TableRecord = TableRecord>({
     formErrors,
     saveErrorMessage,
     setSaveErrorMessage,
+    deleteErrorMessage,
+    setDeleteErrorMessage,
     clickedDataIndex,
     setClickedDataIndex,
     isEditing,
@@ -319,9 +326,11 @@ const EditableTable = <T extends TableRecord = TableRecord>({
     deleteContext,
     uniqueCheck,
     uniqueCheckMessage,
+    uniqueCheckRows,
     autoHandleDates: true,
     onSaveSuccess,
     onDeleteSuccess,
+    onRowUpdated: rememberUpdatedRow,
   });
 
   // Spinner on the data grid reflects BOTH the table's own save/delete work
@@ -659,133 +668,14 @@ const EditableTable = <T extends TableRecord = TableRecord>({
     rowSelection,
   ]);
 
-  // Read via ref inside the sync effect so a local ``recentlyAddedIds``
-  // update (fired by ``useEditableTable.save`` right after the optimistic
-  // ``setData``) does NOT retrigger the effect with a stale ``initialData``
-  // — that race would overwrite the just-added row with the pre-refetch
-  // list and the row would only reappear after the parent's query refetched.
-  // The ref still gives us the latest value when ``initialData`` does
-  // legitimately change.
-  const recentlyAddedIdsRef = useRef(recentlyAddedIds);
-  recentlyAddedIdsRef.current = recentlyAddedIds;
-  // Same ref trick for deletions: a row deleted this mount must never be
-  // re-introduced by a stale refetch that still contains it (the delete
-  // flicker). Read via ref so updating it doesn't retrigger the sync effect.
-  const recentlyDeletedIdsRef = useRef(recentlyDeletedIds);
-  recentlyDeletedIdsRef.current = recentlyDeletedIds;
-
-  useEffect(() => {
-    // Preserve any in-flight ``{ key: -1 }`` draft row across an
-    // initialData refetch. Race: user clicks "Add" → ``add()`` inserts
-    // ``{ key: -1 }`` into local state → before the user hits save,
-    // the parent's list query refetches (e.g. a previous modal's
-    // invalidate-on-save settles) → this useEffect fires with new
-    // ``initialData`` → without preservation, the draft is wiped from
-    // ``data`` while ``editingKey`` still points at ``-1``. Symptom:
-    // ``save(-1)`` throws "No record found with key: -1" and the user
-    // sees a save-failed banner that disappears on refresh.
-    const preserveDraft = (mapped: T[], prev: T[]): T[] => {
-      const draft = prev.find((row) => row.key === -1);
-      if (!draft) return mapped;
-      return [draft, ...mapped];
-    };
-
-    if (initialData.length > 0) {
-      // Drop rows deleted on this mount: a refetch that raced ahead of the
-      // backend delete can still include them, which would otherwise undo the
-      // optimistic removal and flicker the row back in. Once the backend
-      // catches up the refetch no longer contains them, so this is a no-op.
-      const deletedSet = new Set(recentlyDeletedIdsRef.current);
-      const mapped = initialData
-        .map((item) => ({ ...item, key: item.id }) as T)
-        .filter(
-          (row) => !(typeof row.id === "string" && deletedSet.has(row.id)),
-        );
-      // Pin freshly-created rows to the top so a just-saved row doesn't
-      // disappear into an alphabetically-distant page after the refetch.
-      // Order within the pinned group: newest first (= insertion order in
-      // recentlyAddedIds).
-      const pinIds = recentlyAddedIdsRef.current;
-      if (pinNewRowsToTop && pinIds.length > 0) {
-        const pinnedSet = new Set(pinIds);
-        // Use the functional form so we can read the PREVIOUS local
-        // state and preserve recently-added rows that aren't in the
-        // refetched list yet. Race: the parent's list query refetches
-        // (staleTime=0 / refetch-on-focus) before the backend's GET
-        // can see the freshly-POSTed row. Without this, the missing
-        // row falls out of ``mapped``, the pin loop has nothing to
-        // pin for that id, and ``setDataWithTransform(mapped)`` wipes
-        // the local optimistic insert — symptom: "row saved but not
-        // shown until I refresh the page".
-        setDataWithTransform((prev) => {
-          const pinned: T[] = [];
-          const rest: T[] = [];
-          const seen = new Set<string>();
-          for (const row of mapped) {
-            if (typeof row.id === "string" && pinnedSet.has(row.id)) {
-              pinned.push(row);
-              seen.add(row.id);
-            } else {
-              rest.push(row);
-            }
-          }
-          // Reach back into previous local state for recently-added
-          // rows that the refetched list doesn't include yet. They
-          // stay pinned at the top until the next refetch catches up.
-          if (prev.length > 0) {
-            const prevById = new Map<string, T>();
-            for (const row of prev) {
-              if (typeof row.id === "string") {
-                prevById.set(row.id, row);
-              }
-            }
-            for (const id of pinIds) {
-              if (!seen.has(id) && prevById.has(id)) {
-                pinned.push(prevById.get(id) as T);
-                seen.add(id);
-              }
-            }
-          }
-          pinned.sort(
-            (a, b) =>
-              pinIds.indexOf(a.id as string) - pinIds.indexOf(b.id as string),
-          );
-          return preserveDraft([...pinned, ...rest], prev);
-        });
-      } else {
-        setDataWithTransform((prev) => preserveDraft(mapped, prev));
-      }
-      return;
-    }
-    // initialData is empty. Preserve two classes of local rows that
-    // legitimately belong here despite the empty refetch:
-    //
-    //   1. The ``{ key: -1 }`` draft (mid-edit, hasn't saved yet).
-    //   2. ``recentlyAddedIds`` rows — freshly saved on this mount.
-    //      Race: a TanStack Query refetch that arrives BEFORE the
-    //      backend has the just-POSTed row (staleTime=0 /
-    //      refetch-on-focus / mutation-triggered invalidate). Without
-    //      this branch, the first row added to an empty table
-    //      disappears on save and only re-appears after a manual
-    //      refresh.
-    //
-    // If neither class applies, fall through to the original
-    // "skip the reset when already empty" optimisation.
-    setDataWithTransform((prev) => {
-      const draft = prev.find((row) => row.key === -1);
-      const pinIds = recentlyAddedIdsRef.current;
-      const pinned =
-        pinIds.length > 0
-          ? prev.filter(
-              (row) => typeof row.id === "string" && pinIds.includes(row.id),
-            )
-          : [];
-      if (draft || pinned.length > 0) {
-        return draft ? [draft, ...pinned] : pinned;
-      }
-      return prev.length === 0 ? prev : [];
-    });
-  }, [initialData, setDataWithTransform, pinNewRowsToTop]);
+  useInitialDataSync({
+    initialData,
+    pinNewRowsToTop,
+    setDataWithTransform,
+    recentlyAddedIds,
+    recentlyDeletedIds,
+    updatedRowsRef,
+  });
 
   const handleModalEdit = useCallback(
     (record: T) => {
@@ -1151,7 +1041,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
             </Button>
           }
           onClose={() => setFetchErrorMessage(null)}
-          style={{ marginTop: 8, marginBottom: 8 }}
+          className="editable-table-banner"
         />
       )}
       {saveErrorMessage && (
@@ -1166,7 +1056,18 @@ const EditableTable = <T extends TableRecord = TableRecord>({
           message={t("table.save_failed_title")}
           description={`${saveErrorMessage} — ${t("table.save_failed_hint")}`}
           onClose={() => setSaveErrorMessage(null)}
-          style={{ marginTop: 8, marginBottom: 8 }}
+          className="editable-table-banner"
+        />
+      )}
+      {deleteErrorMessage && (
+        <Alert
+          type="error"
+          showIcon
+          closable
+          message={t("table.delete_failed_title")}
+          description={deleteErrorMessage}
+          onClose={() => setDeleteErrorMessage(null)}
+          className="editable-table-banner"
         />
       )}
       {isMobile ? (

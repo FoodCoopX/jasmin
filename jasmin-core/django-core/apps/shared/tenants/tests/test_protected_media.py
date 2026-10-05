@@ -148,8 +148,8 @@ class TestProtectedMediaView:
         # the type from the file extension at the internal location.
         assert "Content-Type" not in response.headers
 
-    @override_settings(DEBUG=True)
     def test_debug_streams_the_file_directly(self, tenant, tmp_path, settings):
+        settings.DEBUG = True
         settings.MEDIA_ROOT = tmp_path
         (tmp_path / "test_tenants").mkdir()
         file_path = tmp_path / "test_tenants" / "note.pdf"
@@ -160,8 +160,8 @@ class TestProtectedMediaView:
         assert response.status_code == 200
         assert b"".join(response.streaming_content) == b"%PDF-1.7 test"
 
-    @override_settings(DEBUG=True)
     def test_debug_missing_file_is_404(self, tenant, tmp_path, settings):
+        settings.DEBUG = True
         settings.MEDIA_ROOT = tmp_path
         path = "test_tenants/gone.pdf"
         response = self._get(path, token=sign_media_path(path))

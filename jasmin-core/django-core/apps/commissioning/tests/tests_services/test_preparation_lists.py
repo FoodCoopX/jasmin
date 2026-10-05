@@ -70,7 +70,7 @@ DELIVERY_DAY = 2
 ACTIVITY_DAY = 1  # = default_harvesting_day / washing_day / cleaning_day
 
 TOTALS_PATCH_PATH = (
-    "apps.commissioning.services.share_content_service"
+    "apps.commissioning.services.share_content_stock"
     ".batch_get_physical_variation_totals_for_weeks"
 )
 

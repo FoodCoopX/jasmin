@@ -40975,8 +40975,10 @@ components:
       - year
     WeeklyPlanEmployee:
       type: object
-      description: Palette entry — the client resolves cell employee ids against this
-        list.
+      description: |-
+        Palette entry — the client resolves cell employee ids against this list.
+        ``is_active`` is false for a deactivated employee who still holds a shift in
+        the week: listed so the shift shows, but not offered for new ones.
       properties:
         id:
           type: string
@@ -40988,9 +40990,12 @@ components:
         last_name:
           type: string
           nullable: true
+        is_active:
+          type: boolean
       required:
       - first_name
       - id
+      - is_active
       - last_name
       - short_name_for_weekly_plan
     WeeklyPlanGrid:

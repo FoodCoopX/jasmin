@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosService from "@shared/services/api";
@@ -50,6 +55,9 @@ export default function SuperAdminSupportTickets() {
   const listQuery = useQuery<Paginated<AdminTicketListRow>>({
     queryKey: ["super-admin", "support-tickets", statusFilter],
     enabled: authorized,
+    // Keep the list on screen while another status filter loads, so the page
+    // doesn't swap to its loading screen and take the filter's focus.
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const response = await axiosService.get(
         SUPER_ADMIN_ENDPOINTS.supportTickets,
@@ -123,7 +131,13 @@ export default function SuperAdminSupportTickets() {
               </select>
             </div>
 
-            {rows.length === 0 ? (
+            {listQuery.isError ? (
+              <LoadFailure
+                error={listQuery.error}
+                fallback="Failed to load the support tickets"
+                onRetry={() => void listQuery.refetch()}
+              />
+            ) : rows.length === 0 ? (
               <div className="sa-section-empty">No support tickets.</div>
             ) : (
               groups.map(([tenantName, tenantRows]) => (
@@ -170,6 +184,25 @@ export default function SuperAdminSupportTickets() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function LoadFailure({
+  error,
+  fallback,
+  onRetry,
+}: {
+  error: unknown;
+  fallback: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="sa-section-empty" role="alert">
+      {getErrorMessage(error, fallback)}{" "}
+      <button onClick={onRetry} className="sa-btn sa-btn--info">
+        Retry
+      </button>
     </div>
   );
 }
@@ -233,7 +266,13 @@ function TicketDetailPanel({ id, onBack }: { id: string; onBack: () => void }) {
         </button>
       </div>
 
-      {!ticket ? (
+      {detailQuery.isError ? (
+        <LoadFailure
+          error={detailQuery.error}
+          fallback="Failed to load the ticket"
+          onRetry={() => void detailQuery.refetch()}
+        />
+      ) : !ticket ? (
         <div className="sa-section-empty">Loading ticket...</div>
       ) : (
         <div className="sa-card-compact sa-card--lg">

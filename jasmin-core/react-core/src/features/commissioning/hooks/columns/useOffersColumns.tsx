@@ -6,7 +6,7 @@
  * here.
  */
 
-import { useMemo } from "react";
+import { useMemo, useRef, type Key } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   EditableColumnConfig,
@@ -14,6 +14,7 @@ import type {
 } from "@shared/tables/BasicEditableTable/types";
 import { ToolTipIcon } from "@shared/ui";
 import { editableOnlyOnCreate, renderNumber } from "@shared/utils";
+import { parseDecimalInput } from "@shared/utils/numberFormat";
 import { useCurrency } from "@hooks/configuration/useCurrency";
 import type { useOffersData } from "../useOffersData";
 import { useCrates } from "../useCrates";
@@ -26,6 +27,10 @@ import { useShareArticleColumn } from "./useShareArticleColumn";
 import { useWashingCleaningColumns } from "./useWashingCleaningColumns";
 
 type OffersData = ReturnType<typeof useOffersData>;
+
+/** A tier price: the base less the offer group's discount percent, in cents. */
+const discountedPrice = (base: number, discountPercent: number): number =>
+  Math.round(base * (100 - discountPercent)) / 100;
 
 export function useOffersColumns({
   shareArticleFilters,
@@ -48,6 +53,8 @@ export function useOffersColumns({
   // Tenant-configured price tiers (shared with the orders + offer-group
   // tier columns via useOfferTiers).
   const finalTiers = useOfferTiers();
+  // The tier-1 price each row's lower tiers were last derived from.
+  const tierOneDerivedFromRef = useRef(new Map<Key, number>());
 
   const { shareArticleColumn, handleUnitChange } = useShareArticleColumn({
     filters: shareArticleFilters,
@@ -163,50 +170,50 @@ export function useOffersColumns({
           };
 
           if (index === 0) {
+            // Tiers 2 and 3 follow tier 1 at the offer group's discounts
+            // (rabatt_price_tier_N is a percent off the base: 10 % of 1.00
+            // gives 0.90). This runs on every keystroke, so a tier keeps
+            // following while it is empty or holds what tier 1 gave it —
+            // as last typed, or as saved — and stays once the office types
+            // a price of its own.
             column.onFieldChange = (
               value: unknown,
               record: TableRecord,
               form: {
-                getFieldsValue: () => Record<string, unknown>;
+                getFieldValue: (name: string) => unknown;
                 setFieldValue: (name: string, value: unknown) => void;
               },
             ): Record<string, unknown> | undefined => {
-              if (!selectedOfferGroup || !value) return;
+              if (!selectedOfferGroup) return;
+              const price1 = parseDecimalInput(value);
+              if (price1 === null) return;
 
-              const price1 = parseFloat(String(value));
-              if (isNaN(price1)) return;
-
-              const currentValues = form.getFieldsValue();
-
-              if (currentOfferGroup?.rabatt_price_tier_2) {
-                const shouldSetPrice2 =
-                  !currentValues.price_2 || currentValues.price_2 === 0;
-                if (shouldSetPrice2) {
-                  // rabatt_price_tier_2 is a DISCOUNT percent (0–100) off the
-                  // base price: tier price = price1 * (1 - rabatt/100). A 10%
-                  // rabatt on a base of 1.00 yields 0.90, not 0.10.
-                  const price2 = (
-                    price1 *
-                    (1 -
-                      (currentOfferGroup.rabatt_price_tier_2 as number) / 100)
-                  ).toFixed(2);
-                  form.setFieldValue("price_2", price2);
+              const derivedFrom = [
+                tierOneDerivedFromRef.current.get(record.key),
+                parseDecimalInput(record.price_1),
+              ].filter((base): base is number => base != null);
+              for (const tier of [2, 3] as const) {
+                const discount = Number(
+                  currentOfferGroup?.[`rabatt_price_tier_${tier}`],
+                );
+                if (!discount) continue;
+                const field = `price_${tier}`;
+                const current = parseDecimalInput(form.getFieldValue(field));
+                const followsTierOne =
+                  !current ||
+                  derivedFrom.some(
+                    (base) =>
+                      Math.abs(current - discountedPrice(base, discount)) <
+                      0.005,
+                  );
+                if (followsTierOne) {
+                  form.setFieldValue(
+                    field,
+                    discountedPrice(price1, discount).toFixed(2),
+                  );
                 }
               }
-
-              if (currentOfferGroup?.rabatt_price_tier_3) {
-                const shouldSetPrice3 =
-                  !currentValues.price_3 || currentValues.price_3 === 0;
-                if (shouldSetPrice3) {
-                  // Discount percent off the base — see price_2 above.
-                  const price3 = (
-                    price1 *
-                    (1 -
-                      (currentOfferGroup.rabatt_price_tier_3 as number) / 100)
-                  ).toFixed(2);
-                  form.setFieldValue("price_3", price3);
-                }
-              }
+              tierOneDerivedFromRef.current.set(record.key, price1);
             };
           }
 

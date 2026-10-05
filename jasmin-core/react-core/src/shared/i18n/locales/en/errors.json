@@ -531,7 +531,10 @@
     "absence_category_in_use": "This absence category can't be deleted because absences still reference it. Deactivate it instead.",
     "weekly_plan_category_shrink_blocked": "The number of rows can't be reduced because the rows that would disappear still hold entries. Please clear those entries first.",
     "weekly_plan_copy_source_rows_out_of_range": "The source week holds entries in rows the category no longer has, because its number of rows has since been reduced. Copied over, those entries would travel along invisibly and be deleted the next time the target week is saved. Please raise the category's number of rows again, or clear the affected entries in the source week.",
-    "weekly_plan_copy_source_category_inactive": "The source week holds entries in categories that are deactivated. The weekly plan only shows active categories, so copied over, those entries would travel along invisibly and be deleted the next time the target week is saved. Please reactivate the category, or clear the affected entries in the source week."
+    "weekly_plan_copy_source_category_inactive": "The source week holds entries in categories that are deactivated. The weekly plan only shows active categories, so copied over, those entries would travel along invisibly and be deleted the next time the target week is saved. Please reactivate the category, or clear the affected entries in the source week.",
+    "employee_short_name_taken": "Another staff member already has this weekly-plan name, even if they are deactivated.",
+    "weekly_plan_category_sort_order_taken": "Another weekly plan category already has this order, even if it is deactivated.",
+    "absence_category_name_taken": "Another absence category already has this name in this year, even if it is deactivated."
   },
   "email_config": {
     "test_recipient_missing": "Please enter a recipient address for the test email.",

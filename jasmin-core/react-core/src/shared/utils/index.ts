@@ -43,7 +43,7 @@ export { openStoredPdf } from './openStoredPdf';
 export { zipFilesToBlob } from './zip';
 export type { ZipEntry } from './zip';
 export { activeAtDateForWeek, dateForWeekDayNumber, isoWeekRangeLabel, isWeekInPast, isYearInPast } from './weekRange';
-export { pickTierPrice, pickTierPriceFromAmount } from './tierPrice';
+export { hasTierPrice, pickTierPrice, pickTierPriceFromAmount } from './tierPrice';
 export { isSepaMandateActiveForTerm } from './sepaMandate';
 export { variationAllowsTrial, filterVariationsForTrial } from './trialVariations';
 export type { TrialAllowable } from './trialVariations';

@@ -71,10 +71,15 @@ def build_week_grid(year: int, week: int) -> dict[str, Any]:
             }
         )
 
+    # The active employees make up the palette. An inactive one who still holds
+    # a shift this week comes along, flagged, so the office sees that shift —
+    # every save re-sends it — and can remove it.
     employees = list(
-        Employee.objects.filter(is_active=True)
+        Employee.objects.filter(Q(is_active=True) | Q(id__in=set(placed.values())))
         .order_by("short_name_for_weekly_plan")
-        .values("id", "short_name_for_weekly_plan", "first_name", "last_name")
+        .values(
+            "id", "short_name_for_weekly_plan", "first_name", "last_name", "is_active"
+        )
     )
 
     return {

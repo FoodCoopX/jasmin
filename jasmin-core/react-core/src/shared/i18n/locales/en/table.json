@@ -22,6 +22,8 @@
   "save_failed_title": "Saving failed",
   "save_failed_hint": "please change the data and try saving again.",
   "save_failed_generic": "Something went wrong while saving.",
+  "delete_failed_title": "Deleting failed",
+  "delete_failed_generic": "Something went wrong while deleting.",
   "load_failed_title": "Loading failed",
   "load_failed_hint": "Please try again.",
   "retry": "Try again",

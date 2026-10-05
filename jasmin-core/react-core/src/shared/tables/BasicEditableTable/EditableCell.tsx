@@ -7,6 +7,7 @@ import FormInput from "./FormInput";
 import { useTranslation } from "react-i18next";
 import type { EditableCellProps, EditableColumnConfig, TableRecord, SelectOption } from "./types";
 import { buildLiveRecord } from "./buildLiveRecord";
+import { columnTitleText } from "./columnTitleText";
 import { getEditableFormItemProps } from "./formItemProps";
 import { useNumberFormat } from "@hooks/useNumberFormat";
 
@@ -276,10 +277,8 @@ const EditingCell = <T extends TableRecord = TableRecord>({
 
   // Programmatic accessible name for the inline-edit control: a SR user tabbing
   // into the cell otherwise hears an unlabeled "edit text" with no column
-  // context. `column.title` is a ReactNode, so guard to string and fall back to
-  // dataIndex.
-  const ariaLabel =
-    typeof columnConfig?.title === "string" ? columnConfig.title : dataIndex;
+  // context. Falls back to dataIndex only for a title without any text.
+  const ariaLabel = columnTitleText(columnConfig?.title) || dataIndex;
 
   // Expose validation errors to assistive tech without changing the borderless
   // visual: keep AntD's `help=""` (no visible explain node) and instead point

@@ -71,6 +71,28 @@ class WeeklyPlanCategoryShrinkBlocked(ConflictError):
     code = "staff.weekly_plan_category_shrink_blocked"
 
 
+class EmployeeShortNameTaken(BadRequestError):
+    """Another employee — active or not — already has this weekly-plan name. The
+    weekly plan tells employees apart by it, and a deactivated employee comes
+    back with it on reactivation."""
+
+    code = "staff.employee_short_name_taken"
+
+
+class WeeklyPlanCategorySortOrderTaken(BadRequestError):
+    """Another weekly-plan category — active or not — already has this place in
+    the order."""
+
+    code = "staff.weekly_plan_category_sort_order_taken"
+
+
+class AbsenceCategoryNameTaken(BadRequestError):
+    """Another absence category — active or not — already has this name in this
+    year."""
+
+    code = "staff.absence_category_name_taken"
+
+
 class EmployeeInUse(ConflictError):
     """An employee cannot be deleted while weekly-plan cells, absences or
     employments still reference them — a delete would CASCADE all of those

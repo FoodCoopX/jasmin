@@ -152,6 +152,11 @@ export function getErrorCode(err: unknown): string | undefined {
   return typeof data?.code === "string" ? data.code : undefined;
 }
 
+/** The HTTP status a request failed with, or `undefined` without a response. */
+export function getErrorStatus(err: unknown): number | undefined {
+  return asAxiosError(err)?.response?.status;
+}
+
 /**
  * Return the structured ``details`` object a JasminError carries (e.g.
  * `{ available, requested }` on an insufficient-stock error), for callers

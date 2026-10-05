@@ -2,15 +2,48 @@ from rest_framework import serializers
 
 from apps.commissioning.serializers.serializers_mixin import DeletableMixin
 
-from ..errors import StaffError, WeeklyPlanCategoryShrinkBlocked
+from ..errors import (
+    AbsenceCategoryNameTaken,
+    EmployeeShortNameTaken,
+    StaffError,
+    WeeklyPlanCategoryShrinkBlocked,
+    WeeklyPlanCategorySortOrderTaken,
+)
 from ..models import AbsenceCategory, Employee, WeeklyPlanCategory
 from ..services.weekly_plan import weeks_stranded_by_shrink
+
+
+def _taken_elsewhere(serializer, queryset) -> bool:
+    """Whether a row other than the one being saved matches ``queryset``."""
+    if serializer.instance is not None:
+        queryset = queryset.exclude(pk=serializer.instance.pk)
+    return queryset.exists()
 
 
 class EmployeeSerializer(DeletableMixin, serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = "__all__"
+
+    def validate_short_name_for_weekly_plan(self, value):
+        # Unique across inactive employees too. An unchanged name passes: the
+        # list page echoes every column back on save, so a duplicate stored
+        # before this check would otherwise freeze the whole row.
+        if (
+            self.instance is not None
+            and value == self.instance.short_name_for_weekly_plan
+        ):
+            return value
+        if _taken_elsewhere(
+            self, Employee.objects.filter(short_name_for_weekly_plan=value)
+        ):
+            message = "Another employee already has this weekly-plan name."
+            raise EmployeeShortNameTaken(
+                message,
+                field="short_name_for_weekly_plan",
+                details={"short_name_for_weekly_plan": [message]},
+            )
+        return value
 
     def validate_employee_number(self, value):
         # ``employee_number`` is unique but optional. A blank entry must land as
@@ -23,6 +56,23 @@ class WeeklyPlanCategorySerializer(DeletableMixin, serializers.ModelSerializer):
     class Meta:
         model = WeeklyPlanCategory
         fields = "__all__"
+
+    def validate_sort_order(self, value):
+        # An empty order is allowed for any number of categories; a set one is
+        # unique across inactive categories too. An unchanged value passes, as
+        # for an employee's weekly-plan name.
+        if value is None or (
+            self.instance is not None and value == self.instance.sort_order
+        ):
+            return value
+        if _taken_elsewhere(self, WeeklyPlanCategory.objects.filter(sort_order=value)):
+            message = (
+                "Another weekly-plan category already has this place in the order."
+            )
+            raise WeeklyPlanCategorySortOrderTaken(
+                message, field="sort_order", details={"sort_order": [message]}
+            )
+        return value
 
     def validate_max_lines(self, value):
         # A category needs at least one grid row to be usable — ``max_lines``
@@ -66,3 +116,23 @@ class AbsenceCategorySerializer(DeletableMixin, serializers.ModelSerializer):
     class Meta:
         model = AbsenceCategory
         fields = "__all__"
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = self.instance
+        year = attrs.get("year", instance.year if instance else None)
+        name = attrs.get("name", instance.name if instance else None)
+        # Unique per year across inactive categories too; an unchanged pair
+        # passes, as for an employee's weekly-plan name.
+        unchanged = instance is not None and (year, name) == (
+            instance.year,
+            instance.name,
+        )
+        if not unchanged and _taken_elsewhere(
+            self, AbsenceCategory.objects.filter(year=year, name=name)
+        ):
+            message = "Another absence category already has this name in this year."
+            raise AbsenceCategoryNameTaken(
+                message, field="name", details={"name": [message]}
+            )
+        return attrs

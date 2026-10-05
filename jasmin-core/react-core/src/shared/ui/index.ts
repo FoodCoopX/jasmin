@@ -21,6 +21,7 @@ export { default as MobileStack } from './MobileStack';
 export { default as DiffCell } from './DiffCell';
 export { default as SummaryStatsCard } from './SummaryStatsCard';
 export type { SummaryStat } from './SummaryStatsCard';
+export { default as ComingSoon } from './ComingSoon';
 export { default as EmptyHint } from './EmptyHint';
 export { default as TenantHeaderLogo } from './TenantHeaderLogo';
 export { default as CheckboxMultiSelectList } from './CheckboxMultiSelectList';

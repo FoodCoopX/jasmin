@@ -63,7 +63,7 @@ def _frozen_today():
 
 
 TOTALS_PATCH_PATH = (
-    "apps.commissioning.services.share_content_service"
+    "apps.commissioning.services.share_content_stock"
     ".batch_get_physical_variation_totals_for_weeks"
 )
 

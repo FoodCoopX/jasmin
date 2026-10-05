@@ -33,13 +33,32 @@ class ShareTypeFactory(factory.django.DjangoModelFactory):
     delivery_cycle = "WEEKLY"
 
 
+def _unused_size(variation) -> str:
+    """The first size its share type has no variation in yet.
+
+    One open variation per (share type, size) is a database constraint, and
+    every factory variation without an explicit share type shares the one
+    default share type — so a size counted on from a global sequence would
+    collide or not depending on which tests ran before.
+    """
+    sizes = [size.value for size in ShareTypeVariationSizeOptions]
+    if variation.share_type.pk is None:
+        return sizes[0]
+    taken = set(
+        ShareTypeVariation.objects.filter(
+            share_type_id=variation.share_type.pk
+        ).values_list("size", flat=True)
+    )
+    return next((size for size in sizes if size not in taken), sizes[0])
+
+
 class ShareTypeVariationFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = ShareTypeVariation
 
     share_type = factory.SubFactory(ShareTypeFactory)
     variation_type = "physical"
-    size = factory.Iterator([s.value for s in ShareTypeVariationSizeOptions])
+    size = factory.LazyAttribute(_unused_size)
     valid_from = factory.LazyFunction(lambda: datetime.date(2026, 1, 5))
     sort_order = 0
 

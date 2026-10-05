@@ -11,7 +11,10 @@ import {
   useStaffWeeklyPlanCreate,
   useStaffWeeklyPlanGridRetrieve,
 } from "@shared/api/generated/staff/staff";
-import type { WeeklyPlanEmployee } from "@shared/api/generated/models";
+import type {
+  WeeklyPlanEmployee,
+  WeeklyPlanGrid,
+} from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
 import { WeekSelector } from "@shared/selectors";
 import {
@@ -37,6 +40,22 @@ interface FlatRow {
 
 const cellKey = (categoryId: string, rowIndex: number, day: number) =>
   `${categoryId}|${rowIndex}|${day}`;
+
+/** The filled cells of a week's grid, keyed by `cellKey`. */
+function cellsFromGrid(grid: WeeklyPlanGrid): Record<string, string> {
+  const filled: Record<string, string> = {};
+  grid.categories.forEach((category) =>
+    category.rows.forEach((row) =>
+      Object.entries(row.days).forEach(([day, employeeId]) => {
+        if (employeeId) {
+          filled[cellKey(category.id, row.row_index, Number(day))] =
+            employeeId;
+        }
+      }),
+    ),
+  );
+  return filled;
+}
 
 /** True if any employee appears more than once in the same (category, day) —
  *  the invariant we enforce: a person may work several categories/days, but not
@@ -76,7 +95,11 @@ export default function WeeklyStaffPlan() {
     [selectedYear, selectedWeek],
   );
 
-  const { data: grid, isFetching } = useStaffWeeklyPlanGridRetrieve(
+  const {
+    data: grid,
+    isFetching,
+    refetch: refetchGrid,
+  } = useStaffWeeklyPlanGridRetrieve(
     listParams,
     {
       query: { enabled: selectedWeek != null },
@@ -96,31 +119,25 @@ export default function WeeklyStaffPlan() {
 
   // Seed local state whenever a new week's grid arrives.
   useEffect(() => {
-    if (!grid) return;
-    const seeded: Record<string, string> = {};
-    grid.categories.forEach((category) =>
-      category.rows.forEach((row) =>
-        Object.entries(row.days).forEach(([day, employeeId]) => {
-          if (employeeId) {
-            seeded[cellKey(category.id, row.row_index, Number(day))] =
-              employeeId;
-          }
-        }),
-      ),
-    );
-    setCells(seeded);
+    if (grid) setCells(cellsFromGrid(grid));
   }, [grid]);
 
+  // The grid lists a deactivated employee only while they hold a shift this
+  // week, so the shift shows; the palette offers the active ones alone.
   const employees: WeeklyPlanEmployee[] = useMemo(
     () => grid?.employees ?? [],
     [grid],
+  );
+  const paletteEmployees = useMemo(
+    () => employees.filter((employee) => employee.is_active !== false),
+    [employees],
   );
   const employeeById = useMemo(
     () => new Map(employees.map((e) => [e.id, e])),
     [employees],
   );
   const colorMap = usePastelColorMap(
-    useMemo(() => employees.map((e) => e.id), [employees]),
+    useMemo(() => paletteEmployees.map((e) => e.id), [paletteEmployees]),
   );
 
   // Live tally of how many cells each employee fills in the visible week —
@@ -157,13 +174,12 @@ export default function WeeklyStaffPlan() {
     mutation: {
       onError: (error) => {
         message.error(getErrorMessage(error, t("staff.save_failed")));
-        // Re-sync so the UI can't keep showing an unsaved plan.
-        queryClient.invalidateQueries({
-          queryKey: getStaffWeeklyPlanGridRetrieveQueryKey(listParams),
-        });
       },
     },
   });
+  // Counts the saves started, so a refused one can tell whether a newer save
+  // has started since.
+  const saveCountRef = useRef(0);
 
   // Auto-save the whole week on any real edit (last-write-wins replace-all).
   useEffect(() => {
@@ -179,9 +195,23 @@ export default function WeeklyStaffPlan() {
         employee_id: employeeId,
       };
     });
-    save({
-      data: { year: selectedYear, week: selectedWeek, assignments },
-    });
+    const saveNumber = ++saveCountRef.current;
+    save(
+      { data: { year: selectedYear, week: selectedWeek, assignments } },
+      {
+        // Only the latest save's refusal lands here. Put the week back as the
+        // server stores it, unless a newer save has started meanwhile. The
+        // refetch alone wouldn't: when the server kept the week unchanged, the
+        // refetched grid is the same object, and its seeding effect stays put.
+        onError: () => {
+          void refetchGrid().then(({ data }) => {
+            if (data && saveNumber === saveCountRef.current) {
+              setCells(cellsFromGrid(data));
+            }
+          });
+        },
+      },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cells]);
 
@@ -335,7 +365,7 @@ export default function WeeklyStaffPlan() {
         <div className="weekly-plan-page">
           {selectedWeek == null ? (
             <p className="text-muted">{t("staff.select_week")}</p>
-          ) : !hasCategories ? (
+          ) : !grid ? null : !hasCategories ? (
             <p className="text-muted">{t("staff.no_categories")}</p>
           ) : (
             <div className="weekly-plan-layout">
@@ -347,10 +377,10 @@ export default function WeeklyStaffPlan() {
                   {t("staff.employees")}
                 </h3>
                 <div className="weekly-plan-palette-box">
-                  {employees.length === 0 ? (
+                  {paletteEmployees.length === 0 ? (
                     <p className="text-muted">{t("staff.no_employees")}</p>
                   ) : (
-                    employees.map((employee) => {
+                    paletteEmployees.map((employee) => {
                       const count = planCountByEmployee.get(employee.id) ?? 0;
                       return (
                         <DraggableChip
@@ -419,6 +449,13 @@ export default function WeeklyStaffPlan() {
                               const employee = employeeId
                                 ? employeeById.get(employeeId)
                                 : null;
+                              const occupantLabel =
+                                employee?.is_active === false
+                                  ? t("staff.inactive_employee", {
+                                      employee:
+                                        employee.short_name_for_weekly_plan,
+                                    })
+                                  : employee?.short_name_for_weekly_plan;
                               const flatIndex =
                                 flatIndexByCell.get(
                                   `${category.id}|${rowIndex}`,
@@ -431,8 +468,7 @@ export default function WeeklyStaffPlan() {
                                     day: dayName,
                                     category: category.name,
                                     row: rowIndex + 1,
-                                    employee:
-                                      employee.short_name_for_weekly_plan,
+                                    employee: occupantLabel,
                                   })
                                 : t("staff.cell_empty", {
                                     day: dayName,
@@ -447,9 +483,12 @@ export default function WeeklyStaffPlan() {
                                       employee
                                         ? {
                                             id: employee.id,
-                                            label:
-                                              employee.short_name_for_weekly_plan,
-                                            color: colorMap.get(employee.id),
+                                            label: occupantLabel ?? "",
+                                            // No tint: an inactive employee
+                                            // has no palette colour.
+                                            color: employee.is_active === false
+                                              ? undefined
+                                              : colorMap.get(employee.id),
                                           }
                                         : null
                                     }

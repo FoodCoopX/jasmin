@@ -1,5 +1,5 @@
-const KeyData = () => {
-  return <div>coming soon ...</div>;
-};
+import { ComingSoon } from "@shared/ui";
+
+const KeyData = () => <ComingSoon />;
 
 export default KeyData;

@@ -10,9 +10,34 @@ you with empty dropdowns.
 Paths below are relative to the tenant's own host — locally that's
 `http://test.localhost:3000`, in production the tenant's subdomain.
 
+## 0. The tenant itself
+
+**`/configuration/app`**
+
+The *Operating mode* card at the top decides whether the tenant runs
+subscriptions at all. A tenant whose share demand arrives every week as a CSV
+from another system, rather than from members and subscriptions kept in Jasmin,
+turns on *Upload weekly share amounts*. That hides the Members and Subscriptions
+sections and, under Configuration, the whole *Shares / Members* group — member
+and subscription settings, payments, data protection, consents and the member
+email templates — since they would act on nothing. Decide this first: it
+changes which of the steps below apply.
+
+Then fill in:
+
+- **`/configuration/general`** — the tenant's name, address and contact details,
+  its language and the start of its fiscal year.
+- **`/configuration/email`** — the tenant's mail server (section 7). No
+  invitation, invoice or offer goes out without it, and no login can be created.
+- **`/configuration/commissioning`** — above all the *Packing mode*: crates
+  packed for the stations, members packing their own crates at the stations, or
+  mixed. *Mixed* adds a *Packed in bulk* column to each share type's sizes in
+  step 1, so set it first.
+
 ## 1. Share types and their sizes
 
-**`/configuration/subscriptions`**
+**`/configuration/share-type-variations`** (Configuration → *Share type
+variations*)
 
 Define every share type the CSA offers (e.g. harvest share, bread share) along
 with its size variations (e.g. S / M / L).
@@ -58,6 +83,21 @@ Once these five are in place the operational screens (forecast, harvesting list,
 packing list, station overview) have everything they need, and members can be
 imported or invited. For an onboarding of more than 1000 members, do step 6
 first.
+
+A tenant that uploads its weekly share amounts has no members to import; it maps
+the upstream codes instead.
+
+### Weekly upload: map the upstream codes
+
+**`/commissioning/import-shares`** → *External code mappings* (the link in the
+page's info box)
+
+Each row of the weekly CSV names its delivery station, delivery day and share
+type variation by the other system's codes. Map every one of them to the
+station, delivery day and variation created above before the first upload: a
+single code without a mapping makes the whole file unusable, and the page lists
+each row that failed and why. Only an `office` login can open the import and its
+mappings (section 8).
 
 ## 6. Before a large import: raise the weekly limits
 

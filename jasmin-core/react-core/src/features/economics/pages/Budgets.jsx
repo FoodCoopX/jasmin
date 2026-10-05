@@ -1,5 +1,5 @@
-const Budgets = () => {
-  return <div>coming soon ...</div>;
-};
+import { ComingSoon } from "@shared/ui";
+
+const Budgets = () => <ComingSoon />;
 
 export default Budgets;
