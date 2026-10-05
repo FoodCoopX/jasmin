@@ -173,16 +173,8 @@ export default function ConsentDocumentModal({
               </Text>
             </Text>
             <div
-              style={{
-                marginTop: 8,
-                maxHeight: 480,
-                overflowY: "auto",
-                padding: 12,
-                border: "1px solid var(--ant-color-border, #d9d9d9)",
-                borderRadius: 4,
-                background: "var(--ant-color-bg-container, #fafafa)",
-                fontSize: 13,
-              }}
+              className="consent-document-box"
+              style={{ marginTop: 8, maxHeight: 480, fontSize: 13 }}
               // Body is office-authored HTML (Quill); sanitise on render.
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(document.body),
@@ -214,7 +206,7 @@ export default function ConsentDocumentModal({
             name="kind"
             label={t("consent.admin.col_kind")}
             rules={[{ required: true }]}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Select options={kindOptions} placeholder="privacy / sepa / …" />
           </Form.Item>
@@ -241,7 +233,7 @@ export default function ConsentDocumentModal({
           label={t("consent.admin.col_effective_from")}
           rules={[{ required: true }]}
         >
-          <DatePicker style={{ width: "100%" }} format={dateFormat} />
+          <DatePicker className="w-full" format={dateFormat} />
         </Form.Item>
 
         <Form.Item

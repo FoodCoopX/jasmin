@@ -345,7 +345,7 @@ export default function SepaMandates() {
           onChange={setPaperDate}
           format={dateFormat}
           allowClear
-          style={{ width: "100%" }}
+          className="w-full"
         />
       </Modal>
     </div>

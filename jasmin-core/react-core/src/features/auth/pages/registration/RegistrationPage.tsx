@@ -77,7 +77,7 @@ export default function RegistrationPage() {
         padding: "32px 16px",
       }}
     >
-      <Card style={{ width: 1000, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+      <Card style={{ width: 1000, boxShadow: "0 4px 12px var(--color-shadow)" }}>
         <Title level={3} className="text-center">
           {t(
             isTrial

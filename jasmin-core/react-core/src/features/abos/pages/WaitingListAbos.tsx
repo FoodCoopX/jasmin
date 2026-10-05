@@ -480,7 +480,7 @@ export default function WaitingListAbos() {
                 ? t("abos.availability_station_full")
                 : t("abos.availability_waiting");
             return (
-              <span style={{ color: "var(--color-text-tertiary)" }}>
+              <span className="text-muted">
                 {reason}
               </span>
             );

@@ -44,6 +44,17 @@
 
 /* A card's tagline under its title. It looks like AntD's level-5 title but
    is a paragraph, so the page's headings don't skip from h2 to h5. */
+/* The "what happens next" list under the registration card's title, pulled
+   up to the subtitle. */
+.auth-overview {
+  margin-top: -1.5em;
+}
+
+.auth-overview-list {
+  padding-left: 20px;
+  color: var(--color-text-secondary);
+}
+
 .auth-card-subtitle {
   margin: 1.2em 0 0.5em;
   font-size: 16px;

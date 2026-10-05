@@ -187,7 +187,7 @@ export const CancelMembershipModal: FC<CancelMembershipModalProps> = ({
               value={effectiveAt}
               onChange={setEffectiveAt}
               format={dateFormat}
-              style={{ width: "100%" }}
+              className="w-full"
               aria-label={t("members.cancel_membership_effective_at")}
               aria-required
             />

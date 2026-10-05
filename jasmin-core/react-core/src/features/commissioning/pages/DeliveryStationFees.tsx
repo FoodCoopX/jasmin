@@ -154,7 +154,7 @@ export default function DeliveryStationFees() {
     <div>
       <h1>{t("commissioning.station_fees")}</h1>
 
-      <div style={{ marginBottom: "1em" }}>
+      <div className="mb-1em">
         <WeekSelector
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}

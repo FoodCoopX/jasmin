@@ -64,7 +64,7 @@ export default function StoredOrEditField({
   }
   return (
     <Form.Item label={label}>
-      <Space.Compact style={{ width: "100%" }}>
+      <Space.Compact className="w-full">
         <Form.Item name={name} noStyle rules={rules}>
           <Input
             aria-label={label}

@@ -52,11 +52,7 @@ export default function CustomerOrderHeader({ reseller, logoUrl }: Props) {
 
   return (
     <Card
-      style={{
-        marginBottom: "24px",
-        background: "var(--gradient-primary)",
-        color: "var(--color-bg-base)",
-      }}
+      className="profile-header-card"
       styles={{ body: { padding: "16px" } }}
     >
       <Row align="middle" gutter={24}>
@@ -68,17 +64,15 @@ export default function CustomerOrderHeader({ reseller, logoUrl }: Props) {
           />
         </Col>
         <Col flex="auto">
-          <h1 style={{ color: "var(--color-bg-base)", marginBottom: "8px" }}>
-            {displayName}
-          </h1>
+          <h1 className="profile-header-card__name">{displayName}</h1>
           <Space size="large">
             {displayEmail && (
-              <Text style={{ color: "rgba(255,255,255,0.9)" }}>
+              <Text className="profile-header-card__detail">
                 <MailOutlined /> {displayEmail}
               </Text>
             )}
             {displayPhone && (
-              <Text style={{ color: "rgba(255,255,255,0.9)" }}>
+              <Text className="profile-header-card__detail">
                 <PhoneOutlined /> {displayPhone}
               </Text>
             )}

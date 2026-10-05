@@ -16,8 +16,8 @@ export default function HarvestingCrateSummary({
 }: {
   crateSummary: CrateSummaryEntry[];
   isMobile: boolean;
-  /** Mobile only renders the card once data finished loading and the
-   *  list actually has rows — mirrors the page's previous inline rule. */
+  /** Mobile renders the card only once the data has loaded and the list
+   *  has rows. */
   showMobileCard: boolean;
 }) {
   const { t } = useTranslation();
@@ -28,7 +28,7 @@ export default function HarvestingCrateSummary({
       <Card
         size="small"
         style={{
-          backgroundColor: "#fff9e6",
+          backgroundColor: "var(--color-highlight)",
           marginTop: "1em",
           marginBottom: "1em",
           fontSize: "0.8em",
@@ -50,7 +50,7 @@ export default function HarvestingCrateSummary({
                 display: "flex",
                 justifyContent: "space-between",
                 padding: "2px 0",
-                borderBottom: "1px solid #f0e6c0",
+                borderBottom: "1px solid var(--color-highlight-border)",
               }}
             >
               <span style={{ fontWeight: 500 }}>{item.crate_name}</span>

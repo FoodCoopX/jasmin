@@ -163,14 +163,14 @@ export default function SuperAdminDashboard() {
         <div className="sa-stats-grid">
           <div className="sa-card">
             <h3 className="sa-stat-label">Total Tenants</h3>
-            <p className="sa-stat-value" style={{ color: "#333" }}>
+            <p className="sa-stat-value">
               {tenants.length}
             </p>
           </div>
 
           <div className="sa-card">
             <h3 className="sa-stat-label">Active Tenants</h3>
-            <p className="sa-stat-value" style={{ color: "#4caf50" }}>
+            <p className="sa-stat-value sa-stat-value--success">
               {tenants.filter((t) => t.is_active !== false).length}
             </p>
           </div>

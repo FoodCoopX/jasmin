@@ -115,14 +115,14 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
           <Form.Item
             name="first_name"
             label={t("profile.first_name")}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Input />
           </Form.Item>
           <Form.Item
             name="last_name"
             label={t("profile.last_name")}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Input />
           </Form.Item>
@@ -135,7 +135,7 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
           <Form.Item
             name="zip_code"
             label={t("profile.zip_code")}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Input />
           </Form.Item>

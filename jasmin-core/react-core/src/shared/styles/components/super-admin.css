@@ -184,7 +184,7 @@
 /* ---------- Buttons ---------- */
 .sa-btn {
   padding: 10px 20px;
-  color: var(--color-bg-base);
+  color: var(--color-text-on-solid);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -308,6 +308,11 @@
   font-size: 32px;
   font-weight: 600;
   margin: 0;
+  color: var(--color-text-primary);
+}
+
+.sa-stat-value--success {
+  color: var(--color-success);
 }
 
 /* ---------- Tenant detail page ---------- */
@@ -376,7 +381,7 @@
 .sa-domain-primary {
   padding: 2px 8px;
   background: #2196f3;
-  color: var(--color-bg-base);
+  color: var(--color-text-on-solid);
   border-radius: 4px;
   font-size: 12px;
 }
@@ -440,7 +445,7 @@
 
 .sa-role-chip--selected {
   background: #667eea;
-  color: var(--color-bg-base);
+  color: var(--color-text-on-solid);
 }
 
 .sa-role-empty {
@@ -454,7 +459,7 @@
   border-radius: 4px;
   font-size: 12px;
   cursor: pointer;
-  color: var(--color-bg-base);
+  color: var(--color-text-on-solid);
 }
 
 .sa-icon-btn--save {

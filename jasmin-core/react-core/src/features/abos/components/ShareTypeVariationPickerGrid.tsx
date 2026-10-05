@@ -147,16 +147,7 @@ export default function ShareTypeVariationPickerGrid({
                           )}
                           {variation.description && (
                             <div
-                              style={{
-                                fontSize: 12,
-                                marginTop: 4,
-                                color: "rgba(0, 0, 0, 0.45)",
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden",
-                                overflowWrap: "break-word",
-                              }}
+                              className="variation-picker-description"
                               dangerouslySetInnerHTML={{
                                 __html: cleanDescriptionHtml(
                                   variation.description,

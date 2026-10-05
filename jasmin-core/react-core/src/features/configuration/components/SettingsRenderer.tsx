@@ -184,7 +184,7 @@ export const SettingsRenderer = {
           <div>
             <Text strong>
               {setting.label}
-              {setting.required && <span style={{ color: "var(--color-error)" }}> *</span>}
+              {setting.required && <span className="text-error"> *</span>}
             </Text>
             <Input
               value={value as string}
@@ -200,7 +200,7 @@ export const SettingsRenderer = {
               <div
                 style={{
                   fontSize: "0.85em",
-                  color: "var(--color-error, #c0392b)",
+                  color: "var(--color-error)",
                   marginTop: 2,
                 }}
               >

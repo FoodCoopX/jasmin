@@ -41,6 +41,15 @@
   color: var(--color-primary);
 }
 
+/* A document's number after a download button's label (the customer's
+   documents card). It takes the button's own text colour, so it reads on the
+   primary fill and on a disabled button alike. */
+.document-number-suffix {
+  margin-left: 4px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
 /* Finalized (locked) notice banner shown at the top of the DeliveryNote and
    Invoice modals when the document has been finalized. */
 .finalized-notice {

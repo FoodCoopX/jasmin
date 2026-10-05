@@ -1,0 +1,32 @@
+/* ExplainerText (@shared/ui): a soft panel that explains a page or a section.
+   Callers set its width and top margin. */
+.explainer-text {
+  padding: 1.25em;
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 8px;
+}
+
+.explainer-text__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.explainer-text__icon {
+  color: var(--color-text-secondary);
+  font-size: 1em;
+}
+
+.explainer-text__title.ant-typography {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--color-text-secondary);
+}
+
+.explainer-text__body.ant-typography {
+  margin: 0;
+  font-size: 0.9em;
+  line-height: 1.6;
+}

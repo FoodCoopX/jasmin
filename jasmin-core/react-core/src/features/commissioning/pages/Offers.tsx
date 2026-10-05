@@ -6,7 +6,7 @@
  * under ``./components/``.
  */
 
-import { ExclamationCircleOutlined, SendOutlined } from "@ant-design/icons";
+import { SendOutlined } from "@ant-design/icons";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { Button, Checkbox, Flex } from "antd";
 import dayjs from "dayjs";
@@ -247,25 +247,12 @@ export default function Offers() {
     return (
       <div>
         <h1>{t("commissioning.offers")}</h1>
-        <div
-          className="past-warning-message"
-          style={{ width: "60em", paddingLeft: "1em" }}
-        >
-          {" "}
-          <ExclamationCircleOutlined style={{ color: "#ffa800" }} />
-          <p>
-            {t("commissioning.no_offer_groups_message")}{" "}
-            <Link
-              to="/commissioning/list-offer-groups"
-              style={{
-                color: "#0066cc",
-                textDecoration: "underline",
-              }}
-            >
-              {t("commissioning.manage_offer_groups")}
-            </Link>
-          </p>
-        </div>
+        <PastWarningMessage width="60em">
+          {t("commissioning.no_offer_groups_message")}{" "}
+          <Link to="/commissioning/list-offer-groups">
+            {t("commissioning.manage_offer_groups")}
+          </Link>
+        </PastWarningMessage>
       </div>
     );
   }

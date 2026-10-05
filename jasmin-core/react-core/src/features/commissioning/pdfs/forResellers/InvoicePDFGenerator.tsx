@@ -107,7 +107,7 @@ export default function InvoicePDFGenerator({
 
   if (error) {
     return (
-      <div style={{ color: "var(--color-error)" }}>
+      <div className="text-error">
         {t("common.error")}: {error}
       </div>
     );

@@ -14,7 +14,13 @@
 }
 
 .past-warning-message__icon {
-  color: #ffa800;
+  color: var(--color-warning);
+}
+
+/* A link inside the warning is underlined, so it stands out from the warning's
+   own text. */
+.past-warning-message a {
+  text-decoration: underline;
 }
 
 /* Inline mode header (e.g. "Packing list mode") */

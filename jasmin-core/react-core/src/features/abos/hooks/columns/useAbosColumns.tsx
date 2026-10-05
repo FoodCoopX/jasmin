@@ -763,7 +763,7 @@ export function useAbosColumns({
           if (!aboIsConfirmed(record)) {
             return (
               <div className="text-center">
-                <span style={{ color: "var(--color-text-tertiary)" }}>—</span>
+                <span className="text-muted">—</span>
               </div>
             );
           }

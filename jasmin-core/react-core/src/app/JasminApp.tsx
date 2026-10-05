@@ -122,8 +122,7 @@ export default function JasminApp() {
 
   // Derived from the canonical list rather than spelled out, so a role added
   // there is recognised here and a name that is not a role cannot be tested
-  // for. The literal list this replaces checked pack_team, harvest_team and
-  // superuser, none of which are roles.
+  // for.
   const validRoles: string[] = Object.values(ROLES);
   const hasAnyValidRole = (user?.roles ?? []).some((role) =>
     validRoles.includes(role),

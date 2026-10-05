@@ -463,7 +463,7 @@ export default function InvoiceModal({
     >
       {invoiceData && (
         <div>
-          <div style={{ marginBottom: "1em" }}>
+          <div className="mb-1em">
             <p>
               <strong>{t("resellers.reseller")}</strong>{" "}
               {invoiceData.reseller_name}

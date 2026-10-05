@@ -1,11 +1,11 @@
 :root {
-  color: #213547;
+  color: var(--color-text-primary);
   background-color: var(--color-bg-base);
 }
 
 :root.dark {
-  color: var(--color-border-soft);
-  background-color: #141414;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-base);
 }
 
 :root.dark a {

@@ -164,9 +164,13 @@ export function HarvestingMobileCard({
                 height: 48,
                 backgroundColor: isConfirmed
                   ? "var(--color-success-bg)"
-                  : "#fce4ec",
-                borderColor: isConfirmed ? "#81c784" : "#ef9a9a",
-                color: isConfirmed ? "var(--color-share-content)" : "#c62828",
+                  : "var(--color-error-bg)",
+                borderColor: isConfirmed
+                  ? "var(--color-success-border)"
+                  : "var(--color-error-border)",
+                color: isConfirmed
+                  ? "var(--color-share-content)"
+                  : "var(--color-error-text)",
                 fontSize: 20,
               }}
               icon={<CheckOutlined />}

@@ -162,7 +162,7 @@ export default function DebitsAbos() {
             pain.008 XML
           </a>
         ) : (
-          <span style={{ color: "#aaa" }}>pain.008 XML</span>
+          <span className="text-muted">pain.008 XML</span>
         ),
     },
     {

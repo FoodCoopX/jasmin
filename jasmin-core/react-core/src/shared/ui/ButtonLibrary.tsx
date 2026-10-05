@@ -105,9 +105,11 @@ const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
     ),
     className: "small-squared-button",
     labelKey: "button_library.admin_confirmed",
+    // The themed primary lightens in dark mode, so the label takes the base
+    // colour like the icon does: light on dark green, dark on light green.
     style: {
       backgroundColor: "var(--color-primary)",
-      color: "white",
+      color: "var(--color-bg-base)",
     },
   },
   adminPending: {
@@ -121,13 +123,13 @@ const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
   adminRejected: {
     type: "text",
     icon: (
-      <CloseCircleOutlined className="lib-status-icon lib-status-icon--base" />
+      <CloseCircleOutlined className="lib-status-icon lib-status-icon--on-solid" />
     ),
     className: "small-squared-button",
     labelKey: "button_library.admin_rejected",
     style: {
       backgroundColor: "var(--color-error)",
-      color: "white",
+      color: "var(--color-text-on-solid)",
     },
   },
   userActive: {

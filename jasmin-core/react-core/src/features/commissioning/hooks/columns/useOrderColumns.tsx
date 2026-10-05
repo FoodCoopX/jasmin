@@ -239,7 +239,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
       render: (value: unknown, record: Record<string, unknown>) => {
         const hasAmount = record.amount && (record.amount as number) > 0;
         return hasAmount ? (
-          <span style={{ fontWeight: "bold", color: "#18817aff" }}>
+          <span className="ordered-offer">
             {value as ReactNode}
           </span>
         ) : (

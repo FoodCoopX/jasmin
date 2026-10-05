@@ -201,7 +201,7 @@ export const CancelSubscriptionModal: FC<CancelSubscriptionModalProps> = ({
               value={effectiveAt}
               onChange={setEffectiveAt}
               format={dateFormat}
-              style={{ width: "100%" }}
+              className="w-full"
               aria-label={t("members.cancel_abo_effective_at")}
               aria-required
               disabledDate={(d) => {

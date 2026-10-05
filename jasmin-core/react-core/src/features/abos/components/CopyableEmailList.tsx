@@ -56,7 +56,7 @@ export default function CopyableEmailList({
   };
 
   return (
-    <div style={{ width: "100%" }}>
+    <div className="w-full">
       <Flex align="center" gap="small" style={{ marginBottom: 8 }}>
         <Text strong>
           {t("abos.emails_recipients", { count: emails.length })}

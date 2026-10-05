@@ -215,16 +215,8 @@ export default function ConsentBlock({
     >
       <div
         lang={documentLanguage}
-        style={{
-          maxHeight: 200,
-          overflowY: "auto",
-          padding: 12,
-          border: "1px solid var(--ant-color-border, #d9d9d9)",
-          borderRadius: 4,
-          background: "var(--ant-color-bg-container, #fafafa)",
-          marginBottom: 12,
-          fontSize: 12,
-        }}
+        className="consent-document-box"
+        style={{ maxHeight: 200, marginBottom: 12, fontSize: 12 }}
         // Body is office-authored HTML (Quill); sanitise before rendering.
         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(document.body) }}
       />

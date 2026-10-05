@@ -132,6 +132,18 @@ h5 {
   color: var(--color-info);
 }
 
+/* An offer that has been ordered, in the orders table. */
+.ordered-offer {
+  font-weight: bold;
+  color: var(--color-primary);
+}
+
+/* The line of explanation under a modal's title. */
+.modal-subtitle {
+  margin-top: 0;
+  color: var(--color-text-secondary);
+}
+
 /* Generic muted helpers (used as plain inline color, no font-size override). */
 .text-muted {
   color: var(--color-text-tertiary);

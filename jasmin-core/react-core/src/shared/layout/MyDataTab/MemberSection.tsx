@@ -170,14 +170,14 @@ export default function MemberSection({ onSaved }: { onSaved: () => void }) {
           <Form.Item
             name="zip_code"
             label={t("profile.zip_code")}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Input />
           </Form.Item>
           <Form.Item
             name="city"
             label={t("profile.city")}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Input />
           </Form.Item>
@@ -189,7 +189,7 @@ export default function MemberSection({ onSaved }: { onSaved: () => void }) {
           name="birth_date"
           label={t("profile.birth_date")}
         >
-          <DatePicker style={{ width: "100%" }} format={dateFormat} />
+          <DatePicker className="w-full" format={dateFormat} />
         </Form.Item>
 
         <StoredOrEditField

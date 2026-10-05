@@ -169,6 +169,9 @@
 .lib-status-icon--base {
   color: var(--color-bg-base);
 }
+.lib-status-icon--on-solid {
+  color: var(--color-text-on-solid);
+}
 .has-certificate {
   color: var(--color-primary);
   border-color: var(--color-primary);

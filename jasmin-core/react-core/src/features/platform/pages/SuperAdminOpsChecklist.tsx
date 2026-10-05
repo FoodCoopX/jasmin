@@ -381,7 +381,7 @@ export default function SuperAdminOpsChecklist() {
                         marginTop: 8,
                         padding: 12,
                         background: "var(--color-bg-subtle)",
-                        border: "1px solid #d9d9d9",
+                        border: "1px solid var(--color-border)",
                         borderRadius: 4,
                         fontFamily: "monospace",
                         fontSize: 13,
@@ -418,7 +418,7 @@ export default function SuperAdminOpsChecklist() {
                 fontSize: 12,
                 padding: 12,
                 background: "var(--color-bg-elevated)",
-                border: "1px solid #f0f0f0",
+                border: "1px solid var(--color-border-light)",
                 borderRadius: 4,
               }}
             >

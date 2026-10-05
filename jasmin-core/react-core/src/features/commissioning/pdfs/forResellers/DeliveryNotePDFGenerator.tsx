@@ -75,7 +75,7 @@ export default function DeliveryNotePDFGenerator({
 
   if (error) {
     return (
-      <div style={{ color: "var(--color-error)" }}>
+      <div className="text-error">
         {t("common.error")}: {error}
       </div>
     );

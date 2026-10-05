@@ -63,17 +63,10 @@ export default function CustomerDocumentsCard({ orderContents }: Props) {
             >
               <DownloadOutlined /> {t("customer.delivery_note")}
               {deliveryNoteId && (
-                <Text
-                  type="secondary"
-                  style={{
-                    color: "var(--color-bg-base)",
-                    marginLeft: 4,
-                    fontSize: 12,
-                  }}
-                >
+                <span className="document-number-suffix">
                   #{String(deliveryNoteRef?.delivery_note_prefix ?? "")}
                   {String(deliveryNoteRef?.delivery_note_number ?? "")}
-                </Text>
+                </span>
               )}
             </Button>
             <Button
@@ -88,17 +81,10 @@ export default function CustomerDocumentsCard({ orderContents }: Props) {
             >
               <DownloadOutlined /> {t("customer.invoice")}
               {invoiceId && (
-                <Text
-                  type="secondary"
-                  style={{
-                    color: "var(--color-bg-base)",
-                    marginLeft: 4,
-                    fontSize: 12,
-                  }}
-                >
+                <span className="document-number-suffix">
                   #{String(invoiceRef?.invoice_prefix ?? "")}
                   {String(invoiceRef?.invoice_number ?? "")}
-                </Text>
+                </span>
               )}
             </Button>
             {invoiceIsCancelled && (

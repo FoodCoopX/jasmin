@@ -201,7 +201,7 @@ export default function UserProfileModal({
       <Modal
         title={
           <span className="icon-title-row">
-            <ExclamationCircleOutlined style={{ color: "var(--color-error)" }} />
+            <ExclamationCircleOutlined className="text-error" />
             {t("gdpr.confirm_deletion_title")}
           </span>
         }

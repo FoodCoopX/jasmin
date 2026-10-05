@@ -239,7 +239,7 @@ export default function ExternalCodeMappingsModal({
       destroyOnHidden
       title={t("import_shares.mappings.title")}
     >
-      <p style={{ color: "rgba(0,0,0,0.65)", marginTop: 0 }}>
+      <p className="modal-subtitle">
         {t("import_shares.mappings.subtitle")}
       </p>
 

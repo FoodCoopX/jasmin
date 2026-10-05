@@ -22,7 +22,7 @@ export default function MainContent() {
         overflow: "auto",
         width: "100%",
         border: "3px",
-        borderLeft: "solid 1px rgb(32, 95, 82)",
+        borderLeft: "solid 1px var(--color-brand)",
       }}
     >
       {/* Per-route safety net: a page render-throw shows the fallback here,

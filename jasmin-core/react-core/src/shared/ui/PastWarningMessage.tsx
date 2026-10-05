@@ -25,7 +25,7 @@ const PastWarningMessage = ({
       }}
       {...props}
     >
-      <ExclamationCircleOutlined style={{ color: "var(--color-warning)" }} />
+      <ExclamationCircleOutlined className="past-warning-message__icon" />
       <span>{children}</span>
     </div>
   );

@@ -134,7 +134,7 @@ export function OrderInfoPanel({
                 }
               }}
             >
-              {orderNote || <span style={{ color: "var(--color-text-tertiary)" }}>—</span>}
+              {orderNote || <span className="text-muted">—</span>}
               <EditOutlined
                 style={{
                   fontSize: "0.85em",

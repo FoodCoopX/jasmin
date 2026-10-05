@@ -41,9 +41,15 @@
   --color-text-tertiary: #767676;
   --color-text-muted: #717171;
   --color-text-disabled: rgba(0, 0, 0, 0.25);
+  /* Text on a fill that keeps its colour in both themes — the brand gradient,
+     a fixed-colour button or chip. Not themed, unlike --color-bg-base, which
+     only reads as "white text" on a fill that darkens with the theme. */
+  --color-text-on-solid: #ffffff;
+  --color-text-on-solid-secondary: rgba(255, 255, 255, 0.9);
   --color-shadow: rgba(0, 0, 0, 0.1);
   --color-shadow-strong: rgba(0, 0, 0, 0.15);
   --color-highlight: #fff7e6;
+  --color-highlight-border: #f0e6c0;
 
   /* Surface variants */
   --color-page-bg: #f0f2f5;
@@ -52,8 +58,19 @@
      confirmed/finalized surfaces (finalized-notice, success explainer). */
   --color-success-border: #b7eb8f;
   --color-success-text: #389e0d;
+  /* The same set for something that failed or is still open. */
+  --color-error-bg: #fff1f0;
+  --color-error-border: #ffccc7;
+  --color-error-text: #c62828;
   --color-info-bg: #f0f9ff;
   --color-border-soft: #e0e0e0;
+
+  /* The app shell's brand line: the header and content borders and the
+     navigation menu's hover and selected states. */
+  --color-brand: rgb(32, 95, 82);
+  --color-brand-hover-bg: rgba(32, 95, 82, 0.06);
+  --color-brand-selected-bg: rgba(32, 95, 82, 0.1);
+  --color-brand-faint: rgba(32, 95, 82, 0.2);
 
   /* Brand gradients */
   --gradient-primary: linear-gradient(135deg, #226c47 0%, #764ba2 100%);
@@ -100,14 +117,25 @@
   --color-shadow: rgba(0, 0, 0, 0.3);
   --color-shadow-strong: rgba(0, 0, 0, 0.45);
   --color-highlight: #2b2111;
+  --color-highlight-border: #5a4020;
 
   /* Surface variants (dark) */
   --color-page-bg: #1a1a1a;
   --color-success-bg: #162312;
   --color-success-border: #274916;
   --color-success-text: #95de64;
+  --color-error-bg: #2a1215;
+  --color-error-border: #5c2223;
+  --color-error-text: #ff7875;
   --color-info-bg: #111d2c;
   --color-border-soft: #424242;
+
+  /* Brand line (dark): the light-mode green is too dark to read on the dark
+     base, so it follows the dark primary. */
+  --color-brand: rgb(76, 175, 120);
+  --color-brand-hover-bg: rgba(76, 175, 120, 0.08);
+  --color-brand-selected-bg: rgba(76, 175, 120, 0.15);
+  --color-brand-faint: rgba(76, 175, 120, 0.25);
 
   /* Commissioning (dark) */
   --color-share-content: #66bb6a;

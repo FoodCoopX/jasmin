@@ -401,7 +401,7 @@ export default function ConfigurationDeliveryDays() {
     <div>
       <h1>{t("configuration.time_management_title")}</h1>
       <h4>{t("configuration.time_management_for_shares")}</h4>
-      <div style={{ marginBottom: "1em" }}>
+      <div className="mb-1em">
         <LabeledSwitch
           value={!showAll}
           onChange={(checked: boolean) => setShowAll(!checked)}

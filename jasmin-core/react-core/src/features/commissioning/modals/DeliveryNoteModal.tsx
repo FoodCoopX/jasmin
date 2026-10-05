@@ -341,7 +341,7 @@ export default function DeliveryNoteModal({
     >
       {deliveryNoteData && (
         <div>
-          <div style={{ marginBottom: "1em" }}>
+          <div className="mb-1em">
             <p>
               <strong>{t("resellers.reseller")}</strong>{" "}
               {deliveryNoteData.reseller_name}

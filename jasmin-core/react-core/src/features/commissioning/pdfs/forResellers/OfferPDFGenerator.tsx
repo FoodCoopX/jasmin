@@ -81,7 +81,7 @@ export default function OfferPDFGenerator({
 
   if (error) {
     return (
-      <div style={{ color: "var(--color-error)" }}>
+      <div className="text-error">
         {t("common.error")}: {error}
       </div>
     );

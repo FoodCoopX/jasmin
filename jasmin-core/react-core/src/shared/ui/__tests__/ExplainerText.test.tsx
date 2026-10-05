@@ -20,26 +20,18 @@ describe("ExplainerText", () => {
     expect(screen.getByText("Body text")).toBeInTheDocument();
   });
 
-  it("uses the warning preset's background colour when type='warning'", () => {
+  it("lets the caller set the panel's width and spacing", () => {
     const { container } = render(
-      <ExplainerText type="warning">heads up</ExplainerText>,
-    );
-    const panel = container.firstChild as HTMLElement;
-    expect(styleOf(panel).backgroundColor).toBe("var(--color-highlight)");
-  });
-
-  it("falls back to the supplied background/border when no type is given", () => {
-    const { container } = render(
-      <ExplainerText backgroundColor="rgb(1, 2, 3)" borderColor="rgb(4, 5, 6)">
+      <ExplainerText maxWidth="20em" style={{ marginTop: 0 }}>
         plain
       </ExplainerText>,
     );
     const panel = container.firstChild as HTMLElement;
-    expect(styleOf(panel).backgroundColor).toBe("rgb(1, 2, 3)");
-    expect(styleOf(panel).border).toContain("rgb(4, 5, 6)");
+    expect(styleOf(panel).maxWidth).toBe("20em");
+    expect(styleOf(panel).marginTop).toBe("0px");
   });
 
-  it("renders the default 💡 emoji icon when no type and no icon is given", () => {
+  it("renders the 💡 emoji icon", () => {
     render(<ExplainerText>tip</ExplainerText>);
     expect(screen.getByText("💡")).toBeInTheDocument();
   });

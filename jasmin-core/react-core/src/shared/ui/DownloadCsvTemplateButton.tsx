@@ -279,7 +279,7 @@ export default function DownloadCsvTemplateButton({
 
   return (
     <>
-      <div style={{ marginBottom: "1em" }}>
+      <div className="mb-1em">
         <Button
           className="csv-template-button"
           icon={<DownloadOutlined />}
@@ -289,7 +289,7 @@ export default function DownloadCsvTemplateButton({
         </Button>
         <ToolTipIcon title={t("tooltip.explainer_csv_template")} />
       </div>
-      <div style={{ marginBottom: "1em" }}>
+      <div className="mb-1em">
         {allowDryRun && modelName && (
           <span>
             <Upload

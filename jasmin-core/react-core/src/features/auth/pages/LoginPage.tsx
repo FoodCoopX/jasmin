@@ -370,8 +370,8 @@ const LoginPage = () => {
                     {t("auth.registration.card_sub_title")}
                   </p>
                 </div>
-                <div style={{ marginTop: "-1.5em" }}>
-                  <ul style={{ paddingLeft: 20, color: "rgba(0,0,0,0.65)" }}>
+                <div className="auth-overview">
+                  <ul className="auth-overview-list">
                     <li>{t("auth.registration.overview.tell_us")}</li>
                     <li>{t("auth.registration.overview.verify_email")}</li>
                     <li>{t("auth.registration.overview.choose_shares")}</li>
@@ -408,13 +408,8 @@ const LoginPage = () => {
                     </p>
                   )}
                 </div>
-                <div style={{ marginTop: "-1.5em" }}>
-                  <ul
-                    style={{
-                      paddingLeft: 20,
-                      color: "rgba(0,0,0,0.65)",
-                    }}
-                  >
+                <div className="auth-overview">
+                  <ul className="auth-overview-list">
                     <li>{t("auth.registration.overview.tell_us_trial")}</li>
                     <li>{t("auth.registration.overview.verify_email")}</li>
                     <li>

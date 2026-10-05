@@ -481,7 +481,7 @@ export default function LoggingStorage() {
       <h1>{t("commissioning.internal_workflow")}</h1>
       <h5>{t("commissioning.workflow_explanation")}</h5>
 
-      <div style={{ marginBottom: "1em" }}>
+      <div className="mb-1em">
         <YearSelector
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
@@ -495,7 +495,7 @@ export default function LoggingStorage() {
         />
       </div>
 
-      <div style={{ marginBottom: "1em" }}>
+      <div className="mb-1em">
         {sourceOptions.map((option) => (
           <Tag
             key={option.value}

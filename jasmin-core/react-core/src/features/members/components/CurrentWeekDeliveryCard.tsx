@@ -304,14 +304,7 @@ const CurrentWeekDeliveryCard = ({
           {currentWeekByVariation.map((group) => (
             <div
               key={group.orderedVariation}
-              style={{
-                border: "2px solid #2b620fff",
-                borderRadius: "8px",
-                padding: "8px 12px",
-                background:
-                  "linear-gradient(135deg, var(--color-success-bg) 0%, #ffffff 100%)",
-                boxShadow: "0 2px 8px rgba(82, 196, 26, 0.1)",
-              }}
+              className="current-week-variation"
             >
               <div
                 style={{

@@ -24,10 +24,12 @@
 @import './components/buttons.css';
 @import './components/card-headers.css';
 @import './components/checkbox.css';
+@import './components/consent.css';
 @import './components/delivery-tours.css';
 @import './components/dnd-grid.css';
 @import './components/diff-cell.css';
 @import './components/email-templates.css';
+@import './components/explainer-text.css';
 @import './components/info-card.css';
 @import './components/invoices.css';
 @import './components/member-cards.css';

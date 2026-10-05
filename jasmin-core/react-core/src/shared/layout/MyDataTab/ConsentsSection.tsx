@@ -228,16 +228,8 @@ function ConsentDocumentModal({
       ) : (
         <>
           <div
-            style={{
-              maxHeight: 360,
-              overflowY: "auto",
-              padding: 12,
-              border: "1px solid var(--ant-color-border, #d9d9d9)",
-              borderRadius: 4,
-              background: "var(--ant-color-bg-container, #fafafa)",
-              whiteSpace: "pre-wrap",
-              fontSize: 13,
-            }}
+            className="consent-document-box"
+            style={{ maxHeight: 360, whiteSpace: "pre-wrap", fontSize: 13 }}
           >
             {data.body}
           </div>

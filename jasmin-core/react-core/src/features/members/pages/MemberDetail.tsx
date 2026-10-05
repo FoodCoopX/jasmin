@@ -355,11 +355,7 @@ const MemberDetail = () => {
     <div style={{ padding: "24px", maxWidth: "1400px", margin: "0 auto" }}>
       {/* Header Section */}
       <Card
-        style={{
-          marginBottom: "24px",
-          background: "var(--gradient-primary)",
-          color: "var(--color-bg-base)",
-        }}
+        className="profile-header-card"
         styles={{ body: { padding: "16px" } }}
       >
         <Row align="middle" gutter={24}>
@@ -371,11 +367,11 @@ const MemberDetail = () => {
             />
           </Col>
           <Col flex="auto">
-            <h1 style={{ color: "var(--color-bg-base)", marginBottom: "8px" }}>
+            <h1 className="profile-header-card__name">
               {member.first_name} {member.last_name}
             </h1>
             <Space size="large">
-              <Text style={{ color: "rgba(255,255,255,0.9)" }}>
+              <Text className="profile-header-card__detail">
                 <MailOutlined /> {member.email}
               </Text>
             </Space>

@@ -86,7 +86,9 @@ export function useDeliveryDayColumns({
       return (
         <div
           style={{
-            backgroundColor: shouldHighlight ? "#fff3cd" : "transparent",
+            backgroundColor: shouldHighlight
+              ? "var(--color-highlight)"
+              : "transparent",
             padding: "4px",
             borderRadius: "2px",
             minHeight: "20px",

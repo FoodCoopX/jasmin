@@ -474,7 +474,7 @@ export default function DeliveryNotes() {
           include_null_option={true}
         />
       </div>
-      <div style={{ marginBottom: "1em" }}>
+      <div className="mb-1em">
         <ResellerSelector
           selectedReseller={selectedReseller}
           setSelectedReseller={setSelectedReseller}

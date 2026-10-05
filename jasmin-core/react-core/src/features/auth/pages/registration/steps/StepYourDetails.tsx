@@ -54,7 +54,7 @@ export default function StepYourDetails({ data, update, next, back }: StepProps)
                 message: t("auth.registration.details.first_name_required"),
               },
             ]}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Input autoComplete="given-name" />
           </Form.Item>
@@ -67,7 +67,7 @@ export default function StepYourDetails({ data, update, next, back }: StepProps)
                 message: t("auth.registration.details.last_name_required"),
               },
             ]}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Input autoComplete="family-name" />
           </Form.Item>
@@ -108,7 +108,7 @@ export default function StepYourDetails({ data, update, next, back }: StepProps)
           <Form.Item
             name="city"
             label={t("auth.registration.details.city")}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             <Input autoComplete="address-level2" />
           </Form.Item>

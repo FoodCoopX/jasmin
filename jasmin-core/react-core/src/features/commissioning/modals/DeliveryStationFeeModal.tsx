@@ -116,7 +116,7 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
           min={0}
           step={0.01}
           suffix={currencySymbol}
-          style={{ width: "100%" }}
+          className="w-full"
         />
       </Form.Item>
       {/* <Form.Item
@@ -127,7 +127,7 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
           min={0}
           step={0.01}
           suffix={currencySymbol}
-          style={{ width: "100%" }}
+          className="w-full"
         />
       </Form.Item>
       <Form.Item
@@ -138,7 +138,7 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
           min={0}
           step={0.01}
           suffix={currencySymbol}
-          style={{ width: "100%" }}
+          className="w-full"
         />
       </Form.Item>
       <Form.Item

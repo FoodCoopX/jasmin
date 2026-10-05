@@ -84,7 +84,7 @@ export default function MobileSidebar() {
           padding: "4px",
           backgroundColor: "var(--color-bg-base)",
           borderRadius: "4px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          boxShadow: "0 2px 8px var(--color-shadow)",
         }}
         onClick={() => setVisible(true)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVisible(true); } }}

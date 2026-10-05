@@ -34,8 +34,8 @@ function PrimaryNavigation() {
         paddingRight: isMobile ? "12px" : "24px",
         paddingTop: isMobile ? "0px" : "10px",
         paddingBottom: "0px",
-        borderTop: "solid 1px rgb(32, 95, 82)",
-        borderBottom: "solid 1px rgb(32, 95, 82)",
+        borderTop: "solid 1px var(--color-brand)",
+        borderBottom: "solid 1px var(--color-brand)",
         position: "relative",
       }}
     >
@@ -210,7 +210,7 @@ function SecondaryNavigation() {
       style={{
         padding: "0 24px",
         background: "var(--color-bg-base)",
-        borderBottom: "solid 1px rgb(32, 95, 82)",
+        borderBottom: "solid 1px var(--color-brand)",
         overflow: "visible",
       }}
     >

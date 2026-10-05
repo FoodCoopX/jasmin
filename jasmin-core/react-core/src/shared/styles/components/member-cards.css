@@ -116,6 +116,37 @@
   margin-bottom: 12px;
 }
 
+/* The member and customer page headers: the brand gradient, with text that
+   stays light in both themes. */
+.profile-header-card {
+  margin-bottom: 24px;
+  background: var(--gradient-primary);
+  color: var(--color-text-on-solid);
+}
+
+.profile-header-card__name {
+  margin-bottom: 8px;
+  color: var(--color-text-on-solid);
+}
+
+.profile-header-card__detail.ant-typography {
+  color: var(--color-text-on-solid-secondary);
+}
+
+/* One ordered variation in "this week's delivery": a green frame, fading from
+   the success tint into the card's own background. */
+.current-week-variation {
+  padding: 8px 12px;
+  border: 2px solid var(--color-share-content);
+  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    var(--color-success-bg) 0%,
+    var(--color-bg-base) 100%
+  );
+  box-shadow: 0 2px 8px rgba(82, 196, 26, 0.1);
+}
+
 /* The withdrawn-consent warning at the top of a member's page. */
 .member-consent-review-alert {
   margin-bottom: 24px;

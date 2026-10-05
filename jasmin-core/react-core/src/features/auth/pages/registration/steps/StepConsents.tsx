@@ -62,7 +62,7 @@ export default function StepConsents({ data, update, next, back }: StepProps) {
   return (
     <>
       <Paragraph>{t("auth.registration.consents.intro")}</Paragraph>
-      <Space direction="vertical" style={{ width: "100%" }} size="middle">
+      <Space direction="vertical" className="w-full" size="middle">
         {privacy.doc && (
           <ConsentDocumentField
             doc={privacy.doc}

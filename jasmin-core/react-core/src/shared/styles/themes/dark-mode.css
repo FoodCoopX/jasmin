@@ -306,6 +306,11 @@
   color: #e0e0e0;
 }
 
+/* --- Reseller chip dark --- */
+:root.dark .reseller-card-header {
+  background-color: #3a1f39;
+}
+
 /* --- Green checkbox dark --- */
 :root.dark .green-checkbox .ant-checkbox-checked .ant-checkbox-inner {
   background-color: #2a5a1a !important;

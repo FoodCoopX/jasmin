@@ -14,8 +14,8 @@
 
 /* Sidebar toggle hover effect */
 .sidebar-toggle:hover {
-  background-color: rgba(32, 95, 82, 0.08) !important;
-  border-color: rgba(32, 95, 82, 0.2) !important;
+  background-color: var(--color-brand-hover-bg) !important;
+  border-color: var(--color-brand-faint) !important;
 }
 
 /* Modern menu styling */
@@ -37,13 +37,13 @@
 }
 
 .modern-nav-menu .ant-menu-item:hover {
-  background-color: rgba(32, 95, 82, 0.06);
-  color: rgb(32, 95, 82);
+  background-color: var(--color-brand-hover-bg);
+  color: var(--color-brand);
 }
 
 .modern-nav-menu .ant-menu-item-selected {
-  background-color: rgba(32, 95, 82, 0.1) !important;
-  color: rgb(32, 95, 82) !important;
+  background-color: var(--color-brand-selected-bg) !important;
+  color: var(--color-brand) !important;
   font-weight: 600;
 }
 
@@ -68,7 +68,7 @@
 
 /* Custom divider styling */
 .ant-divider-vertical {
-  border-color: rgba(32, 95, 82, 0.15);
+  border-color: var(--color-brand-faint);
   height: 24px;
 }
 
