@@ -3,24 +3,34 @@ import { useMemo } from "react";
 import { ROLES } from "./roles";
 import { useRoleOptions } from "./useRoleOptions";
 
-// Pastel colour per role for the role tags. Keep contrast readable on white.
+interface RoleTagColors {
+  bg: string;
+  border: string;
+  text: string;
+}
+
+// The ``--color-role-<role>-*`` tokens: a tinted chip per role, with a dark
+// variant each.
+const roleTagColors = (role: string): RoleTagColors => ({
+  bg: `var(--color-role-${role}-bg)`,
+  border: `var(--color-role-${role}-border)`,
+  text: `var(--color-role-${role}-text)`,
+});
+
 // Single source of truth — do not re-declare per page.
-const ROLE_TAG_COLORS: Record<
-  string,
-  { bg: string; border: string; text: string }
-> = {
-  [ROLES.ADMIN]: { bg: "#ffe0e0", border: "#ffb3b3", text: "#a8071a" },
-  [ROLES.MANAGEMENT]: { bg: "#ffe7d1", border: "#ffc999", text: "#ad4e00" },
-  [ROLES.OFFICE]: { bg: "#fff5cc", border: "#ffe680", text: "#876800" },
-  [ROLES.STAFF]: { bg: "#dff5d4", border: "#b3e3a0", text: "#1f6313" },
-  [ROLES.GARDENER]: { bg: "#d4f0e0", border: "#9bd9b8", text: "#0f5132" },
-  [ROLES.MEMBER]: { bg: "#dceeff", border: "#a9d1ff", text: "#003a8c" },
-  [ROLES.CUSTOMER]: { bg: "#ecdcff", border: "#c9a9ff", text: "#391085" },
+const ROLE_TAG_COLORS: Record<string, RoleTagColors> = {
+  [ROLES.ADMIN]: roleTagColors("admin"),
+  [ROLES.MANAGEMENT]: roleTagColors("management"),
+  [ROLES.OFFICE]: roleTagColors("office"),
+  [ROLES.STAFF]: roleTagColors("staff"),
+  [ROLES.GARDENER]: roleTagColors("gardener"),
+  [ROLES.MEMBER]: roleTagColors("member"),
+  [ROLES.CUSTOMER]: roleTagColors("customer"),
 };
-const DEFAULT_ROLE_COLOR = {
+const DEFAULT_ROLE_COLOR: RoleTagColors = {
   bg: "var(--color-bg-hover)",
   border: "var(--color-border)",
-  text: "#595959",
+  text: "var(--color-text-secondary)",
 };
 
 interface RoleTagsProps {

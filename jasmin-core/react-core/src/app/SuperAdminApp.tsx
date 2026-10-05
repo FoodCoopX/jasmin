@@ -1,3 +1,4 @@
+import { ConfigProvider, theme } from "antd";
 import { Navigate, Route, Routes } from "react-router-dom";
 import SuperAdminDashboard from "@features/platform/pages/SuperAdminDashboard";
 import SuperAdminLoginPage from "@features/platform/pages/SuperAdminLoginPage";
@@ -5,8 +6,22 @@ import SuperAdminOpsChecklist from "@features/platform/pages/SuperAdminOpsCheckl
 import SuperAdminSupportTickets from "@features/platform/pages/SuperAdminSupportTickets";
 import TenantDetail from "@features/platform/pages/TenantDetail";
 import { useAuth } from "@shared/contexts/AuthContext";
+import { useIsDarkTheme } from "@shared/contexts/LocaleContext";
 
 export default function SuperAdminApp() {
+  const isDark = useIsDarkTheme();
+  return (
+    <ConfigProvider
+      theme={{
+        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+      }}
+    >
+      <SuperAdminRoutes />
+    </ConfigProvider>
+  );
+}
+
+function SuperAdminRoutes() {
   // AuthContext performs a silent /refresh on boot. While that's in flight we
   // show a loading splash; once it settles we route on the real auth state.
   // Gate on ``bootstrapping`` (initial boot only), NOT the per-action

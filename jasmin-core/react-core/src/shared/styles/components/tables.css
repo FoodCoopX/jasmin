@@ -324,9 +324,10 @@
   color: var(--color-text-tertiary) !important;
 }
 
-.charges-subtotal-row,
-.charges-subtotal-row td {
-  background: #daefc8 !important;
+/* As specific as the zebra stripes, which colour every body row's cells, and
+   later, so it wins; dark-mode.css repeats it after the dark stripes. */
+.custom-jasmin-table .ant-table-tbody > tr.ant-table-row.charges-subtotal-row > td {
+  background-color: var(--color-subtotal-bg) !important;
   font-weight: 500;
 }
 

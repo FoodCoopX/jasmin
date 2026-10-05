@@ -242,13 +242,13 @@
 }
 
 .sa-badge--active {
-  background: #95df9b;
-  color: #2e7d32;
+  background: var(--color-success-bg);
+  color: var(--color-share-content);
 }
 
 .sa-badge--inactive {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
 }
 
 /* ---------- Loading / error fullscreen states ---------- */

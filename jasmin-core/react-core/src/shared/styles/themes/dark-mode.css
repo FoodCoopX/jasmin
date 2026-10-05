@@ -21,6 +21,9 @@
 :root.dark .custom-jasmin-table .ant-table-tbody > tr.ant-table-row:hover > td {
   background-color: #1a3535 !important;
 }
+:root.dark .custom-jasmin-table .ant-table-tbody > tr.ant-table-row.charges-subtotal-row > td {
+  background-color: var(--color-subtotal-bg) !important;
+}
 
 /* Staff table */
 :root.dark .custom-staff-table .ant-table {
@@ -98,6 +101,12 @@
 
 /* The .order-info panel's surface/border/accent come from design tokens
    (info-card.css), which adapt to dark mode on their own — no override here. */
+
+/* --- Harvest cards --- */
+:root.dark .harvest-plot-header {
+  background-color: var(--color-success-bg);
+  color: var(--color-share-content);
+}
 
 /* --- Card headers --- */
 :root.dark .tenant-card-header .ant-card-head {

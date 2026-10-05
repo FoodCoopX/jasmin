@@ -16,13 +16,13 @@
   top: 4px;
   right: 8px;
   font-size: 0.75em;
-  color: #888;
+  color: var(--color-text-tertiary);
   font-weight: 500;
 }
 
 /* Per-PU hint line under the article title. */
 .harvest-per-pu-hint {
-  color: #999;
+  color: var(--color-text-tertiary);
   font-size: 0.8em;
 }
 
@@ -38,7 +38,7 @@
 }
 
 .harvest-amounts-table tr.has-border-top {
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border-soft);
 }
 
 .harvest-amounts-table td {

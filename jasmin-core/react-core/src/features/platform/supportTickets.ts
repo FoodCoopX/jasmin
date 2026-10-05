@@ -54,12 +54,17 @@ export const TICKET_STATUSES = [
 // on a sa-badge-style pill), so the platform page needs no new CSS class.
 export const SUPPORT_STATUS_COLORS: Record<string, { bg: string; color: string }> =
   {
-    open: { bg: "#e3f2fd", color: "#1565c0" },
-    // Darkened from #e65100 → #b34700 to clear WCAG AA (4.5:1) on the pale bg.
-    in_progress: { bg: "#fff3e0", color: "#b34700" },
+    open: { bg: "var(--color-info-bg)", color: "var(--color-info-text)" },
+    in_progress: {
+      bg: "var(--color-warning-bg)",
+      color: "var(--color-warning-text)",
+    },
     resolved: {
       bg: "var(--color-success-bg)",
       color: "var(--color-share-content)",
     },
-    closed: { bg: "#eeeeee", color: "#555" },
+    closed: {
+      bg: "var(--color-bg-hover)",
+      color: "var(--color-text-secondary)",
+    },
   };

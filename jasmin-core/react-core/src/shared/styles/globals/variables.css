@@ -62,8 +62,14 @@
   --color-error-bg: #fff1f0;
   --color-error-border: #ffccc7;
   --color-error-text: #c62828;
+  /* And for something waiting on someone, and for plain information. */
+  --color-warning-bg: #fff3e0;
+  --color-warning-text: #b34700;
   --color-info-bg: #f0f9ff;
+  --color-info-text: #1565c0;
   --color-border-soft: #e0e0e0;
+  /* A table row that sums up the rows above it. */
+  --color-subtotal-bg: #daefc8;
 
   /* The app shell's brand line: the header and content borders and the
      navigation menu's hover and selected states. */
@@ -71,6 +77,37 @@
   --color-brand-hover-bg: rgba(32, 95, 82, 0.06);
   --color-brand-selected-bg: rgba(32, 95, 82, 0.1);
   --color-brand-faint: rgba(32, 95, 82, 0.2);
+
+  /* Role tags: a tinted chip per role. */
+  --color-role-admin-bg: #ffe0e0;
+  --color-role-admin-border: #ffb3b3;
+  --color-role-admin-text: #a8071a;
+  --color-role-management-bg: #ffe7d1;
+  --color-role-management-border: #ffc999;
+  --color-role-management-text: #ad4e00;
+  --color-role-office-bg: #fff5cc;
+  --color-role-office-border: #ffe680;
+  --color-role-office-text: #876800;
+  --color-role-staff-bg: #dff5d4;
+  --color-role-staff-border: #b3e3a0;
+  --color-role-staff-text: #1f6313;
+  --color-role-gardener-bg: #d4f0e0;
+  --color-role-gardener-border: #9bd9b8;
+  --color-role-gardener-text: #0f5132;
+  --color-role-member-bg: #dceeff;
+  --color-role-member-border: #a9d1ff;
+  --color-role-member-text: #003a8c;
+  --color-role-customer-bg: #ecdcff;
+  --color-role-customer-border: #c9a9ff;
+  --color-role-customer-text: #391085;
+
+  /* The bullets before the articles in a member's delivery card, in turn. */
+  --color-article-dot-1: #52c41a;
+  --color-article-dot-2: #142d06;
+  --color-article-dot-3: #cbf0ba;
+  --color-article-dot-4: #95de64;
+  --color-article-dot-5: #237804;
+  --color-article-dot-6: #a0d911;
 
   /* Brand gradients */
   --gradient-primary: linear-gradient(135deg, #226c47 0%, #764ba2 100%);
@@ -93,6 +130,9 @@
 
 /* Dark theme overrides */
 :root.dark {
+  /* Native controls — inputs, selects, scrollbars — draw themselves dark. */
+  color-scheme: dark;
+
   --color-primary: rgb(76, 175, 120);
   --color-primary-hover: rgb(96, 195, 140);
   --color-primary-active: rgb(56, 155, 100);
@@ -127,8 +167,12 @@
   --color-error-bg: #2a1215;
   --color-error-border: #5c2223;
   --color-error-text: #ff7875;
+  --color-warning-bg: #2b1d11;
+  --color-warning-text: #f3b765;
   --color-info-bg: #111d2c;
+  --color-info-text: #65a9f3;
   --color-border-soft: #424242;
+  --color-subtotal-bg: #203d18;
 
   /* Brand line (dark): the light-mode green is too dark to read on the dark
      base, so it follows the dark primary. */
@@ -140,4 +184,33 @@
   /* Commissioning (dark) */
   --color-share-content: #66bb6a;
   --color-order-content: #a5d6a7;
+
+  /* Role tags (dark): AntD's dark palette for each hue — its first step for the
+     background, the third for the border and the eighth for the text. */
+  --color-role-admin-bg: #2a1215;
+  --color-role-admin-border: #58181c;
+  --color-role-admin-text: #f37370;
+  --color-role-management-bg: #2b1d11;
+  --color-role-management-border: #593815;
+  --color-role-management-text: #f3b765;
+  --color-role-office-bg: #2b2111;
+  --color-role-office-border: #594214;
+  --color-role-office-text: #f3cc62;
+  --color-role-staff-bg: #162312;
+  --color-role-staff-border: #274916;
+  --color-role-staff-text: #8fd460;
+  --color-role-gardener-bg: #112123;
+  --color-role-gardener-border: #144848;
+  --color-role-gardener-text: #58d1c9;
+  --color-role-member-bg: #111a2c;
+  --color-role-member-border: #15325b;
+  --color-role-member-text: #65a9f3;
+  --color-role-customer-bg: #1a1325;
+  --color-role-customer-border: #301c4d;
+  --color-role-customer-text: #ab7ae0;
+
+  /* Article bullets (dark): the shades too dark to show on a dark card. */
+  --color-article-dot-2: #b7eb8f;
+  --color-article-dot-3: #389e0d;
+  --color-article-dot-5: #73d13d;
 }

@@ -14,6 +14,7 @@ import {
   useSubscriptionVariationStats,
 } from "@features/abos/hooks/useSubscriptionVariationStats";
 import { buildMonthlyIncomeSeries } from "@features/abos/utils/incomeSeries";
+import { useIsDarkTheme } from "@shared/contexts/LocaleContext";
 import {
   useCurrency,
   useDateFormat,
@@ -27,8 +28,9 @@ const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
 // A finance-green, distinct from the categorical VARIATION_PALETTE (income is a
-// single, non-per-variation series).
+// single, non-per-variation series), and a lighter one for the dark theme.
 const INCOME_COLOR = "#3f8600";
+const INCOME_COLOR_DARK = "#73d13d";
 
 interface PriceRow {
   key: string;
@@ -45,6 +47,7 @@ export default function DashboardAbos() {
   const presets = useDateRangePresets();
   const { getSetting } = useTenant();
   const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
+  const isDark = useIsDarkTheme();
 
   // The average-vs-reference price comparison is only meaningful when members
   // can pay different amounts for the same variation — i.e. solidarity pricing.
@@ -95,9 +98,9 @@ export default function DashboardAbos() {
     return buildMonthlyIncomeSeries(points, range, {
       id: "income",
       label: t("statistics.income"),
-      color: INCOME_COLOR,
+      color: isDark ? INCOME_COLOR_DARK : INCOME_COLOR,
     });
-  }, [incomeData, range, t]);
+  }, [incomeData, range, t, isDark]);
   // Solidarity: prices actually paid per variation for subs STARTED in range.
   const paidPricesByVariation = useMemo(() => {
     const rows = subscriptions ?? [];

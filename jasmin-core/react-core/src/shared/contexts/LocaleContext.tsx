@@ -94,6 +94,17 @@ export function useLocale() {
   return context;
 }
 
+/**
+ * Whether the dark theme is on, for code that picks a colour in JS rather than
+ * through a CSS variable — a chart writes its series colours into SVG
+ * attributes. Light outside a LocaleProvider.
+ */
+/* eslint-disable-next-line react-refresh/only-export-components --
+   like useLocale, a way into the private context above */
+export function useIsDarkTheme(): boolean {
+  return useContext(LocaleContext)?.theme === "dark";
+}
+
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   // Direct ``useContext`` instead of ``useTenant()`` because LocaleProvider

@@ -17,12 +17,12 @@ import { removePurchasedSuffix } from "@shared/utils";
 const { Text } = Typography;
 
 const GREEN_SHADES = [
-  "var(--color-success)",
-  "#142d06ff",
-  "#cbf0baff",
-  "#95de64",
-  "#237804",
-  "#a0d911",
+  "var(--color-article-dot-1)",
+  "var(--color-article-dot-2)",
+  "var(--color-article-dot-3)",
+  "var(--color-article-dot-4)",
+  "var(--color-article-dot-5)",
+  "var(--color-article-dot-6)",
 ];
 
 interface ArticleItem {

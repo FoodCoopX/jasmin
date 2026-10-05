@@ -22,7 +22,7 @@ const STATUS_RANK: Record<string, number> = Object.fromEntries(
 );
 
 function StatusPill({ status }: { status: string }) {
-  const c = SUPPORT_STATUS_COLORS[status] ?? { bg: "#eee", color: "#555" };
+  const c = SUPPORT_STATUS_COLORS[status] ?? SUPPORT_STATUS_COLORS.closed;
   return (
     <span
       className="sa-status-pill"

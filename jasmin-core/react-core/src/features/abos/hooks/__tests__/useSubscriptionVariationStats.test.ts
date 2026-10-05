@@ -1,13 +1,17 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-// The hook's only cross-module dependency is the size-label helper; stub it so
-// the test needs neither i18n nor a tenant. No JSX / react-i18next required —
-// the hook doesn't call useTranslation.
+// The hook's cross-module dependencies are the size-label helper and the theme;
+// stub both so the test needs neither i18n, a tenant nor a provider. No JSX /
+// react-i18next required — the hook doesn't call useTranslation.
 vi.mock("@hooks/index", () => ({
   useShareTypeVariationSizeOptions: () => ({
     getShareTypeVariationSizeLabel: (size: string) => size || "",
   }),
+}));
+const theme = { isDark: false };
+vi.mock("@shared/contexts/LocaleContext", () => ({
+  useIsDarkTheme: () => theme.isDark,
 }));
 
 import {
@@ -70,5 +74,24 @@ describe("useSubscriptionVariationStats", () => {
     expect(forward.get("1")?.color).toBe(VARIATION_PALETTE[0]);
     expect(forward.get("2")?.color).toBe(VARIATION_PALETTE[1]);
     expect(forward.get("10")?.color).toBe(VARIATION_PALETTE[2]);
+  });
+
+  it("draws the eighth variation white instead of black in the dark theme", () => {
+    const eight = Array.from({ length: 8 }, (_, index) => ({
+      id: String(index + 1),
+      share_type_name: "Veg",
+      size: "FULL",
+    }));
+    const lastColour = () =>
+      renderHook(() => useSubscriptionVariationStats([], eight)).result.current
+        .variationLegendById.get("8")?.color;
+
+    expect(lastColour()).toBe("#000000");
+    theme.isDark = true;
+    try {
+      expect(lastColour()).toBe("#FFFFFF");
+    } finally {
+      theme.isDark = false;
+    }
   });
 });

@@ -25,7 +25,7 @@
   gap: 8px;
   padding: 6px 10px;
   border-radius: 6px;
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: var(--color-bg-subtle);
 }
 
 /* Members list header row: summary stats on the left, the CSV export button

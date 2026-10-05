@@ -201,7 +201,7 @@ export default function ChargesAbos() {
         render: (_v: unknown, r: DisplayRow) => {
           if (r.type === "subtotal") {
             return (
-              <span style={{ color: "var(--color-text-muted)" }}>
+              <span style={{ color: "var(--color-text-secondary)" }}>
                 {t("abos.charges_subtotal_label", {
                   count: r.rowCount,
                 })}
