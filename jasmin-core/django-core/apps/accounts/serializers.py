@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.accounts.models import ThemeChoices
 from apps.shared.languages import LanguageChoices
 
 # Column widths the request payloads are written into: ``JasminUser.first_name``
@@ -32,6 +33,7 @@ class UserProfileUpdateRequestSerializer(serializers.Serializer):
     user_language = serializers.ChoiceField(
         choices=LanguageChoices.choices, required=False
     )
+    theme = serializers.ChoiceField(choices=ThemeChoices.choices, required=False)
 
 
 class UserProfileResponseSerializer(serializers.Serializer):
@@ -43,6 +45,7 @@ class UserProfileResponseSerializer(serializers.Serializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()
     user_language = serializers.CharField()
+    theme = serializers.ChoiceField(choices=ThemeChoices.choices)
 
 
 # --------------------------------------------------------------------------- #
@@ -76,6 +79,7 @@ class LoginUserSerializer(serializers.Serializer):
     first_name = serializers.CharField(allow_blank=True)
     last_name = serializers.CharField(allow_blank=True)
     user_language = serializers.CharField()
+    theme = serializers.ChoiceField(choices=ThemeChoices.choices)
     roles = serializers.ListField(child=serializers.CharField())
     member_id = serializers.CharField(allow_null=True, required=False)
     reseller_id = serializers.CharField(allow_null=True, required=False)

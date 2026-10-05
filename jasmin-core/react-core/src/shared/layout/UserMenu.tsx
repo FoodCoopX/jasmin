@@ -1,10 +1,14 @@
 import {
+  BgColorsOutlined,
+  DesktopOutlined,
   DownOutlined,
   GlobalOutlined,
   IdcardOutlined,
   LockOutlined,
   LogoutOutlined,
+  MoonOutlined,
   SafetyOutlined,
+  SunOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import { Avatar, Button, Dropdown, Space } from "antd";
@@ -13,6 +17,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useCommissioningMembersRetrieve } from "@shared/api/generated/commissioning/commissioning";
+import { ThemeEnum } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth/useRoles";
 import { useAuth } from "@shared/contexts/AuthContext";
 import { useLocale } from "@shared/contexts/LocaleContext";
@@ -23,7 +28,8 @@ import UserProfileModal, { type UserProfileTab } from "./UserProfileModal";
 export default function UserMenu() {
   const { t } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
-  const { language, saveLanguage } = useLocale();
+  const { language, saveLanguage, themePreference, saveThemePreference } =
+    useLocale();
   const { hasMemberRole, isStaff, isMemberOnly } = useRoles();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -128,6 +134,44 @@ export default function UserMenu() {
             ),
             onClick: () => {
               void saveLanguage(lang.code);
+            },
+          })),
+        },
+        {
+          key: "theme",
+          icon: <BgColorsOutlined />,
+          label: t("profile.menu_theme"),
+          children: [
+            {
+              preference: ThemeEnum.system,
+              icon: <DesktopOutlined />,
+              label: t("profile.theme_system"),
+            },
+            {
+              preference: ThemeEnum.light,
+              icon: <SunOutlined />,
+              label: t("profile.theme_light"),
+            },
+            {
+              preference: ThemeEnum.dark,
+              icon: <MoonOutlined />,
+              label: t("profile.theme_dark"),
+            },
+          ].map(({ preference, icon, label }) => ({
+            key: `theme-${preference}`,
+            icon,
+            label: (
+              <Space>
+                <span>{label}</span>
+                {themePreference === preference && (
+                  <span aria-hidden style={{ marginLeft: "auto" }}>
+                    ✓
+                  </span>
+                )}
+              </Space>
+            ),
+            onClick: () => {
+              void saveThemePreference(preference);
             },
           })),
         },

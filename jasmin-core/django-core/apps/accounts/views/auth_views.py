@@ -196,6 +196,7 @@ def _login_payload(*, result, tenant) -> dict:
             "first_name": user.first_name,
             "last_name": user.last_name,
             "user_language": user.user_language,
+            "theme": user.theme,
             "roles": user.roles or ["member"],
             "member_id": result.member_id,
             "reseller_id": result.reseller_id,
@@ -337,6 +338,7 @@ def user_profile_update_view(request, user_id):
             "first_name": user.first_name,
             "last_name": user.last_name,
             "user_language": user.user_language,
+            "theme": user.theme,
         },
         status=status.HTTP_200_OK,
     )

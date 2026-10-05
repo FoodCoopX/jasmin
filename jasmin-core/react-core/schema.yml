@@ -31948,6 +31948,8 @@ components:
           type: string
         user_language:
           type: string
+        theme:
+          $ref: '#/components/schemas/ThemeEnum'
         roles:
           type: array
           items:
@@ -31964,6 +31966,7 @@ components:
       - id
       - last_name
       - roles
+      - theme
       - user_language
     Member:
       type: object
@@ -40042,6 +40045,16 @@ components:
         recipient:
           type: string
           format: email
+    ThemeEnum:
+      enum:
+      - system
+      - light
+      - dark
+      type: string
+      description: |-
+        * `system` - System
+        * `light` - Light
+        * `dark` - Dark
     TheoreticalCleanAmount:
       type: object
       description: Mixin to automatically add related name fields.
@@ -40487,11 +40500,14 @@ components:
           type: string
         user_language:
           type: string
+        theme:
+          $ref: '#/components/schemas/ThemeEnum'
       required:
       - email
       - first_name
       - id
       - last_name
+      - theme
       - user_language
     UserProfileUpdateRequest:
       type: object
@@ -40505,6 +40521,8 @@ components:
           maxLength: 255
         user_language:
           $ref: '#/components/schemas/UserLanguageEnum'
+        theme:
+          $ref: '#/components/schemas/ThemeEnum'
     VariationTypeEnum:
       enum:
       - physical

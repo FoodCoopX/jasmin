@@ -5,6 +5,7 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
+import type { ThemeEnum } from './themeEnum';
 
 export interface LoginUser {
   id: string;
@@ -12,6 +13,7 @@ export interface LoginUser {
   first_name: string;
   last_name: string;
   user_language: string;
+  theme: ThemeEnum;
   roles: string[];
   /** @nullable */
   member_id?: string | null;

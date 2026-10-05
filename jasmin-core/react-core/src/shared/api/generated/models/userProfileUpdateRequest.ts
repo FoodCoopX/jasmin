@@ -6,6 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { UserLanguageEnum } from './userLanguageEnum';
+import type { ThemeEnum } from './themeEnum';
 
 /**
  * Request body for ``PATCH /api/auth/<user_id>/``.
@@ -16,4 +17,5 @@ export interface UserProfileUpdateRequest {
   /** @maxLength 255 */
   last_name?: string;
   user_language?: UserLanguageEnum;
+  theme?: ThemeEnum;
 }

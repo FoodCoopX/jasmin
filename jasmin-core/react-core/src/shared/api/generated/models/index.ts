@@ -591,6 +591,7 @@ export * from './tenantWebsite';
 export * from './testEmailRequest';
 export * from './testEmailResponse';
 export * from './testSend';
+export * from './themeEnum';
 export * from './theoreticalCleanAmount';
 export * from './theoreticalCleanAmountDayNumber';
 export * from './theoreticalHarvest';

@@ -5,6 +5,7 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
+import type { ThemeEnum } from './themeEnum';
 
 /**
  * Response body for ``PATCH /api/auth/<user_id>/``.
@@ -15,4 +16,5 @@ export interface UserProfileResponse {
   first_name: string;
   last_name: string;
   user_language: string;
+  theme: ThemeEnum;
 }

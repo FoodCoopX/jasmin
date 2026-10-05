@@ -137,6 +137,14 @@ ACCOUNT_STATUS_CHOICES = [
 ]
 
 
+class ThemeChoices(models.TextChoices):
+    # Follow the device's light or dark setting — the default, until the user
+    # picks one of the other two.
+    SYSTEM = "system", "System"
+    LIGHT = "light", "Light"
+    DARK = "dark", "Dark"
+
+
 class JasminUserManager(BaseUserManager):
     def create_user(self, first_name, last_name, email, password=None, **kwargs):
         if first_name is None:
@@ -198,8 +206,8 @@ class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
     sidebar_collapsed = models.BooleanField(default=False)
     theme = models.CharField(
         max_length=10,
-        choices=[("light", "Light"), ("dark", "Dark")],
-        default="light",
+        choices=ThemeChoices.choices,
+        default=ThemeChoices.SYSTEM,
     )
     edit_mode = models.CharField(
         max_length=10,

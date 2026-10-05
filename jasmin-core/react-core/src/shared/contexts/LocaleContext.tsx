@@ -11,7 +11,10 @@ import dayjs from "dayjs";
 import { useAuth } from "./AuthContext";
 import { TenantContext } from "./TenantContext";
 import { authPartialUpdate } from "@shared/api/generated/auth/auth";
-import type { UserProfileUpdateRequest } from "@shared/api/generated/models";
+import {
+  ThemeEnum,
+  type UserProfileUpdateRequest,
+} from "@shared/api/generated/models";
 import { isSupportedLanguageCode } from "@shared/i18n/languages";
 
 /**
@@ -61,28 +64,50 @@ function applyDayjsLocale(language: string): void {
 
 interface UserPreferences {
   language?: string;
-  theme?: string;
+  theme?: ThemeEnum;
   sidebar_collapsed?: boolean;
 }
 
 interface LocaleContextValue {
   language: string;
-  theme: string;
+  /** The theme in effect: the user's choice, or the device's under ``system``. */
+  theme: "light" | "dark";
+  /** What the user chose: light, dark, or ``system`` to follow the device. */
+  themePreference: ThemeEnum;
   sidebarCollapsed: boolean;
   loading: boolean;
   error: string | null;
   saveLanguage: (newLanguage: string) => Promise<void>;
-  saveTheme: (newTheme: string) => Promise<void>;
+  saveThemePreference: (preference: ThemeEnum) => Promise<void>;
   saveSidebarCollapsed: (newSidebarCollapsed: boolean) => Promise<void>;
   savePreferences: (newPreferences: UserPreferences) => Promise<void>;
   setLanguage: (newLanguage: string) => void;
-  setTheme: (newTheme: string) => void;
   setSidebarCollapsed: (newSidebarCollapsed: boolean) => void;
   toggleSidebar: () => void;
   getBrowserLanguage: () => string;
 }
 
 const LocaleContext = createContext<LocaleContextValue | undefined>(undefined);
+
+const DEVICE_PREFERS_DARK = "(prefers-color-scheme: dark)";
+
+function isThemePreference(value: unknown): value is ThemeEnum {
+  return Object.values(ThemeEnum).includes(value as ThemeEnum);
+}
+
+/** Whether the device is set to dark, following it when that changes. */
+function useDeviceIsDark(): boolean {
+  const [isDark, setIsDark] = useState(
+    () => window.matchMedia(DEVICE_PREFERS_DARK).matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia(DEVICE_PREFERS_DARK);
+    const follow = (event: MediaQueryListEvent) => setIsDark(event.matches);
+    media.addEventListener("change", follow);
+    return () => media.removeEventListener("change", follow);
+  }, []);
+  return isDark;
+}
 
 /* eslint-disable-next-line react-refresh/only-export-components --
    the hook is the only way into the private context above */
@@ -113,7 +138,16 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const tenantCtx = useContext(TenantContext);
   const tenantLanguage = tenantCtx?.tenant?.tenant_language ?? null;
   const [language, setLanguage] = useState("en");
-  const [theme, setTheme] = useState("light");
+  const [themePreference, setThemePreference] = useState<ThemeEnum>(
+    ThemeEnum.system,
+  );
+  const deviceIsDark = useDeviceIsDark();
+  const theme =
+    themePreference === ThemeEnum.system
+      ? deviceIsDark
+        ? "dark"
+        : "light"
+      : themePreference;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,12 +158,6 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       navigator.language ||
       (navigator as unknown as { userLanguage?: string }).userLanguage;
     return browserLang?.split("-")[0] || "en"; // Get just the language code (e.g., 'en' from 'en-US')
-  }, []);
-
-  const getSystemTheme = useCallback(() => {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
   }, []);
 
   // Initialize language from user, tenant, or browser.
@@ -145,7 +173,6 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   //      mounted) before the super-admin signs in.
   useEffect(() => {
     let initialLanguage = "en"; // Default fallback
-    let initialTheme = "light"; // Default fallback
     let initialSidebarCollapsed = false;
 
     if (user?.user_language) {
@@ -157,12 +184,15 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       initialLanguage = getBrowserLanguage();
     }
 
-    if (user?.theme) {
-      initialTheme = user.theme;
-    } else {
-      // Check localStorage first, then system preference
-      const savedTheme = localStorage.getItem("theme");
-      initialTheme = savedTheme || getSystemTheme();
+    // The signed-in user's saved choice; signed out, the last one made in this
+    // browser; and with neither, the device decides.
+    const userThemePreference = user?.theme;
+    const storedThemePreference = localStorage.getItem("theme");
+    let initialThemePreference: ThemeEnum = ThemeEnum.system;
+    if (isThemePreference(userThemePreference)) {
+      initialThemePreference = userThemePreference;
+    } else if (isThemePreference(storedThemePreference)) {
+      initialThemePreference = storedThemePreference;
     }
 
     if (user?.sidebar_collapsed !== undefined) {
@@ -174,23 +204,26 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     }
 
     setLanguage(initialLanguage);
-    setTheme(initialTheme);
+    setThemePreference(initialThemePreference);
     setSidebarCollapsed(initialSidebarCollapsed);
     applyDayjsLocale(initialLanguage);
     // ``tenantLanguage`` arrives asynchronously after the pre-login
     // tenant bootstrap fetch — re-running this effect when it
     // resolves is what makes the LoginPage flip from browser-default
     // to the tenant's configured language.
-  }, [user, tenantLanguage, getBrowserLanguage, getSystemTheme]);
+  }, [user, tenantLanguage, getBrowserLanguage]);
 
   // Update dayjs locale when language changes
   useEffect(() => {
     applyDayjsLocale(language);
   }, [language]);
 
-  // Update localStorage when theme changes
+  // Kept in this browser for the signed-out pages.
   useEffect(() => {
-    localStorage.setItem("theme", theme);
+    localStorage.setItem("theme", themePreference);
+  }, [themePreference]);
+
+  useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
@@ -208,7 +241,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
           applyDayjsLocale(newPreferences.language);
         }
         if (newPreferences.theme) {
-          setTheme(newPreferences.theme);
+          setThemePreference(newPreferences.theme);
         }
         if (newPreferences.sidebar_collapsed !== undefined) {
           setSidebarCollapsed(newPreferences.sidebar_collapsed);
@@ -220,14 +253,17 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         setError(null);
 
-        // Only fields the server persists for a profile PATCH; theme &
-        // sidebar_collapsed are local-only preferences.
+        // Only fields the server persists for a profile PATCH;
+        // sidebar_collapsed is a local-only preference.
         const profilePayload: UserProfileUpdateRequest = {};
         // A language from browser/tenant detection can be anything — switch
         // the UI to it locally below, but never send an unsupported code to
         // the server, whose choice field would 400.
         if (isSupportedLanguageCode(newPreferences.language)) {
           profilePayload.user_language = newPreferences.language;
+        }
+        if (newPreferences.theme) {
+          profilePayload.theme = newPreferences.theme;
         }
         if (Object.keys(profilePayload).length > 0) {
           await authPartialUpdate(String(user.id), profilePayload);
@@ -239,7 +275,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
           applyDayjsLocale(newPreferences.language);
         }
         if (newPreferences.theme) {
-          setTheme(newPreferences.theme);
+          setThemePreference(newPreferences.theme);
         }
         if (newPreferences.sidebar_collapsed !== undefined) {
           setSidebarCollapsed(newPreferences.sidebar_collapsed);
@@ -286,14 +322,14 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [language, savePreferences],
   );
 
-  const saveTheme = useCallback(
-    async (newTheme: string) => {
-      if (!newTheme || newTheme === theme) {
+  const saveThemePreference = useCallback(
+    async (preference: ThemeEnum) => {
+      if (preference === themePreference) {
         return;
       }
-      await savePreferences({ theme: newTheme });
+      await savePreferences({ theme: preference });
     },
-    [theme, savePreferences],
+    [themePreference, savePreferences],
   );
 
   const saveSidebarCollapsed = useCallback(
@@ -310,10 +346,6 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const setLanguageLocal = useCallback((newLanguage: string) => {
     setLanguage(newLanguage);
     applyDayjsLocale(newLanguage);
-  }, []);
-
-  const setThemeLocal = useCallback((newTheme: string) => {
-    setTheme(newTheme);
   }, []);
 
   const setSidebarCollapsedLocal = useCallback(
@@ -336,15 +368,15 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     () => ({
       language,
       theme,
+      themePreference,
       sidebarCollapsed,
       loading,
       error,
       saveLanguage,
-      saveTheme,
+      saveThemePreference,
       saveSidebarCollapsed,
       savePreferences,
       setLanguage: setLanguageLocal,
-      setTheme: setThemeLocal,
       setSidebarCollapsed: setSidebarCollapsedLocal,
       toggleSidebar,
       getBrowserLanguage,
@@ -352,15 +384,15 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [
       language,
       theme,
+      themePreference,
       sidebarCollapsed,
       loading,
       error,
       saveLanguage,
-      saveTheme,
+      saveThemePreference,
       saveSidebarCollapsed,
       savePreferences,
       setLanguageLocal,
-      setThemeLocal,
       setSidebarCollapsedLocal,
       toggleSidebar,
       getBrowserLanguage,

@@ -307,7 +307,7 @@ def revoke_all_sessions(user: JasminUser) -> None:
 # --------------------------------------------------------------------------- #
 
 
-_PROFILE_FIELDS = {"user_language", "first_name", "last_name"}
+_PROFILE_FIELDS = {"user_language", "first_name", "last_name", "theme"}
 
 
 def update_user_profile(*, user: JasminUser, data: dict[str, Any]) -> list[str]:
