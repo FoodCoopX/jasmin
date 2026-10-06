@@ -17,7 +17,10 @@ function changedFields<T extends TableRecord>(before: T, after: T): Partial<T> {
  * it re-derives its rows (re-filtering its list, say), and the saved row must
  * win over it. A new object for the id brings only the fields that differ from
  * the replaced one: a page that patches its cached row (after a login change,
- * say) builds on its copy from before the save.
+ * say) builds on its copy from before the save. An id must therefore name the
+ * same record for as long as the table is mounted; a page whose ids repeat
+ * across the views it switches between (a week's weekdays) gives each view its
+ * own table through `key`.
  */
 export function useUpdatedRows<T extends TableRecord>(initialData: T[]) {
   const initialDataRef = useRef(initialData);

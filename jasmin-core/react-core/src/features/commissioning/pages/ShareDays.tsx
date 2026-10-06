@@ -314,7 +314,11 @@ export default function ShareDays() {
       {isPast && (
         <PastWarningMessage>{t("table.past_week_readonly")}</PastWarningMessage>
       )}
+      {/* A row's id is its weekday, the same in every week, while the table
+          remembers saved rows by id for as long as it is mounted: a new week
+          gets a new table. */}
       <EditableTable
+        key={`${selectedYear}-${selectedWeek}`}
         columns={columns}
         apiFunctions={apiFunctions}
         focusIndex="delivery_day"
