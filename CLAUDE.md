@@ -81,9 +81,9 @@ the matching section of Part 1.
   statement of that reason. This applies to docstrings and test docstrings too.
 - **Write skill files whenever useful.**
 - **Don't proactively start new feature work in the cultivation / economics /
-  staff domains** unless asked. Their frontend pages are, however, **no longer
-  excluded** from the type-check / lint / build gates — treat them like any
-  other feature and keep type-check + lint + build green when you touch them.
+  staff domains** unless asked. Their code is, however, held to **every gate**
+  like any other feature's — the frontend type-check / lint / build and the
+  backend guards alike — so keep those green when you touch it.
 
 ## Universal conventions
 

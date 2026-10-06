@@ -186,6 +186,8 @@ class CoopShareService:
         # No re-validation needed — equity was bounds-checked at member confirm.
         with transaction.atomic():
             CoopShare.objects.filter(pk__in=[share.pk for share in pending]).update(
+                # state-field-update-allowed: CoopShare has no _post_confirm, and
+                # the trial conversion below runs once for the whole set.
                 admin_confirmed=True,
                 admin_confirmed_by=admin_user,
                 admin_confirmed_at=(

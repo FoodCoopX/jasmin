@@ -20,38 +20,35 @@ that get silently skipped when callers use ``.update(...)`` instead:
   via ``.update(admin_confirmed=True)`` would leave a "confirmed"
   row with none of the downstream rows.
 
-This guard keeps the bypass from being introduced silently — the
-bypass shape is exactly the literal pattern, so a regex catches the
-realistic risk.
+This guard keeps the bypass from being introduced silently.
 
 How it works
 ------------
 
 1. Walk every ``.py`` file under ``apps/`` (skipping ``tests/`` and
-   ``migrations/``).
-2. Tokenise and mask comments + string literals (so docstring text
-   that mentions ``.update(account_status=...)`` doesn't match).
-3. Regex for ``.update(`` / ``.bulk_update(`` followed, within ~250
-   chars on the same line, by a protected field name as a keyword
-   argument (``field=``). A chain broken across lines is caught when
-   its ``.update(field=…`` part shares a line; a call whose keywords
-   start on the next line, or a ``bulk_update`` whose field list names
-   the field as a string, is not.
-4. For each match, check the *raw* source line for an opt-out
-   marker — see "Opt-out" below — and skip if present.
-5. Assert no remaining offenders, with file:line for each.
+   ``migrations/``) and parse it.
+2. Visit every call of a method named ``update`` or ``bulk_update``. An
+   ``update`` writes the fields named by its keywords, including those of a
+   ``**{...}`` literal; a ``bulk_update`` writes the string constants in its
+   field list (the second argument, or ``fields=``). Working on the syntax
+   tree, a call matches however black lays it out, and the name in a comment,
+   a docstring or a ``filter(...)`` doesn't.
+3. Skip a call that carries the opt-out marker — see "Opt-out" below.
+4. Assert no remaining offenders, with file:line for each.
+
+A field list held in a variable isn't resolved.
 
 Opt-out
 -------
 
 A legitimate batch update of one of these fields (e.g. a one-off
 data migration; a deliberate ``last_login_ip`` bulk stamp on a
-list of users) can opt out by adding a trailing-comment marker on
-the same line as the ``.update(...)`` call::
+list of users) can opt out with a trailing-comment marker on any line of
+the call, from the method name to the closing parenthesis::
 
     JasminUser.objects.filter(
         account_status="pending_invitation"
-    ).update(account_status="inactive")  # state-field-update-allowed: prod cleanup 2026-05-24
+    ).update(account_status="inactive")  # state-field-update-allowed: prod cleanup
 
 The marker is a deliberate, greppable acknowledgement that the
 caller knows the invariant is being skipped on purpose. The text
@@ -61,9 +58,8 @@ to know.
 
 from __future__ import annotations
 
-import io
-import re
-import tokenize
+import ast
+from collections.abc import Iterable
 from pathlib import Path
 
 # Locate the django-core root (this test lives at
@@ -79,67 +75,61 @@ _SELF_PATH = Path(__file__).resolve()
 # ``is_active`` / ``activated_at`` / ``inactivated_at`` on JasminUser;
 # ``admin_confirmed`` drives ``_post_confirm`` side-effects on
 # AdminConfirmableMixin consumers (Member, Subscription, ...).
-_PROTECTED_FIELDS: tuple[str, ...] = ("account_status", "admin_confirmed")
+_PROTECTED_FIELDS: frozenset[str] = frozenset({"account_status", "admin_confirmed"})
 
-# ``.update(`` or ``.bulk_update(`` (but NOT ``.update_or_create(`` —
-# the trailing ``_or_create`` makes the regex's literal ``(`` fail to
-# match), followed within 250 chars by ``<protected_field>=``. Window
-# capped to keep multi-line method chains from spanning unrelated calls.
-_PATTERN = re.compile(
-    r"\.(?:bulk_update|update)\s*\((?:[^\n]{0,250}?)\b("
-    + "|".join(_PROTECTED_FIELDS)
-    + r")\s*=",
-    re.DOTALL,
-)
-
-# Per-line opt-out marker. Searched in the raw (unmasked) source so a
-# comment counts as a deliberate acknowledgement. The trailing text
-# after the colon explains the rationale; the test enforces the prefix
-# but doesn't parse the rationale.
 _OPT_OUT_MARKER = "state-field-update-allowed"
 
 
-def _mask_comments_and_strings(source: str) -> str:
-    """Return ``source`` with comment and string-literal tokens replaced
-    by spaces of the same dimensions. Preserves line/column positions
-    so regex hits still report accurate line numbers.
+def _string_constants(nodes: Iterable[ast.expr | None]) -> set[str]:
+    return {
+        node.value
+        for node in nodes
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
 
-    Falls back to raw source if the file fails to tokenise (syntax
-    error mid-edit). Any real syntax error fails the rest of the test
-    suite anyway.
-    """
-    lines = source.splitlines(keepends=True)
-    mutable: list[list[str]] = [list(line) for line in lines]
 
-    try:
-        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
-    except (tokenize.TokenizeError, IndentationError, SyntaxError):
-        return source
+def _fields_written(call: ast.Call, method: str) -> set[str]:
+    """The fields an ``update(...)`` or ``bulk_update(...)`` call writes, as
+    far as its source names them."""
+    if method == "update":
+        fields = {keyword.arg for keyword in call.keywords if keyword.arg}
+        for keyword in call.keywords:
+            # ``update(**{"field": value})``
+            if keyword.arg is None and isinstance(keyword.value, ast.Dict):
+                fields |= _string_constants(keyword.value.keys)
+        return fields
+    field_list = call.args[1] if len(call.args) > 1 else None
+    for keyword in call.keywords:
+        if keyword.arg == "fields":
+            field_list = keyword.value
+    if isinstance(field_list, ast.List | ast.Tuple | ast.Set):
+        return _string_constants(field_list.elts)
+    return set()
 
-    def _blank_chars_on_line(row: int, start_col: int, end_col: int) -> None:
-        line = mutable[row]
-        for col in range(start_col, min(end_col, len(line))):
-            if line[col] != "\n":
-                line[col] = " "
 
-    for tok in tokens:
-        if tok.type not in (tokenize.COMMENT, tokenize.STRING):
+def _unmarked_writes(source: str) -> list[tuple[int, list[str]]]:
+    """``(line, fields)`` for each ``update`` or ``bulk_update`` call in
+    ``source`` that writes a protected field and carries no opt-out marker.
+    The line is the method name's, where a reader looks for the call."""
+    lines = source.splitlines()
+    writes = []
+    for node in ast.walk(ast.parse(source)):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in ("update", "bulk_update")
+        ):
             continue
-        start_row = tok.start[0] - 1
-        start_col = tok.start[1]
-        end_row = tok.end[0] - 1
-        end_col = tok.end[1]
-
-        if start_row == end_row:
-            _blank_chars_on_line(start_row, start_col, end_col)
+        protected = _fields_written(node, node.func.attr) & _PROTECTED_FIELDS
+        if not protected:
             continue
-
-        _blank_chars_on_line(start_row, start_col, len(mutable[start_row]))
-        for row in range(start_row + 1, end_row):
-            _blank_chars_on_line(row, 0, len(mutable[row]))
-        _blank_chars_on_line(end_row, 0, end_col)
-
-    return "".join("".join(line) for line in mutable)
+        line_no = node.func.end_lineno or node.lineno
+        if any(
+            _OPT_OUT_MARKER in line for line in lines[line_no - 1 : node.end_lineno]
+        ):
+            continue
+        writes.append((line_no, sorted(protected)))
+    return writes
 
 
 def _iter_python_files() -> list[Path]:
@@ -153,17 +143,6 @@ def _iter_python_files() -> list[Path]:
     return out
 
 
-def _line_at(text: str, position: int) -> tuple[int, str]:
-    """Return (1-indexed line number, raw line text) for a byte offset."""
-    line_no = text.count("\n", 0, position) + 1
-    # Walk back to the start of the line.
-    line_start = text.rfind("\n", 0, position) + 1
-    line_end = text.find("\n", position)
-    if line_end == -1:
-        line_end = len(text)
-    return line_no, text[line_start:line_end]
-
-
 def test_no_state_field_update_bypass() -> None:
     """Protected state-machine fields (``account_status``,
     ``admin_confirmed``) must not be modified via ``QuerySet.update(...)``
@@ -174,29 +153,70 @@ def test_no_state_field_update_bypass() -> None:
 
     Use ``instance.save()`` per row, or add the
     ``state-field-update-allowed: <reason>`` marker as a trailing
-    comment on the offending line if the bypass is deliberate.
+    comment on the call if the bypass is deliberate.
     """
-    offenders: list[str] = []
+    offenders = []
     for path in _iter_python_files():
-        raw = path.read_text(encoding="utf-8")
+        source = path.read_text(encoding="utf-8")
         # Cheap reject: most files don't touch these names at all.
-        if not any(f in raw for f in _PROTECTED_FIELDS):
+        if not any(field in source for field in _PROTECTED_FIELDS):
             continue
-        masked = _mask_comments_and_strings(raw)
-        for match in _PATTERN.finditer(masked):
-            line_no, raw_line = _line_at(raw, match.start())
-            if _OPT_OUT_MARKER in raw_line:
-                continue
-            rel = path.relative_to(_DJANGO_CORE_ROOT)
-            field = match.group(1)
-            offenders.append(f"{rel}:{line_no}  (field: {field})")
+        rel = path.relative_to(_DJANGO_CORE_ROOT)
+        offenders += [
+            f"{rel}:{line_no}  (field: {', '.join(fields)})"
+            for line_no, fields in _unmarked_writes(source)
+        ]
 
     assert not offenders, (
         "Found bulk-update calls that bypass save()-enforced invariants on "
-        "state-machine fields (comments and string literals are masked out "
-        "before matching, so each hit is a real call). Use instance.save() "
-        "per row, or add a trailing 'state-field-update-allowed: <reason>' "
-        f"comment on the line if the bypass is deliberate. {len(offenders)} "
-        "hit(s):"
+        "state-machine fields. Use instance.save() per row, or add a trailing "
+        "'state-field-update-allowed: <reason>' comment on the call if the "
+        f"bypass is deliberate. {len(offenders)} hit(s):"
         "\n  - " + "\n  - ".join(sorted(offenders))
     )
+
+
+class TestCallShapes:
+    """Which calls count as writing a protected field."""
+
+    def test_keywords_on_the_lines_after_the_call(self) -> None:
+        source = "rows.update(\n    admin_confirmed=True,\n)\n"
+
+        assert _unmarked_writes(source) == [(1, ["admin_confirmed"])]
+
+    def test_a_chained_call_is_reported_on_its_update_line(self) -> None:
+        source = "User.objects.filter(\n    pk=1\n).update(account_status='active')\n"
+
+        assert _unmarked_writes(source) == [(3, ["account_status"])]
+
+    def test_a_bulk_update_field_list(self) -> None:
+        positional = 'Member.objects.bulk_update(rows, ["note", "admin_confirmed"])\n'
+        keyword = 'User.objects.bulk_update(rows, fields=("account_status",))\n'
+
+        assert _unmarked_writes(positional) == [(1, ["admin_confirmed"])]
+        assert _unmarked_writes(keyword) == [(1, ["account_status"])]
+
+    def test_a_dict_unpacked_into_update(self) -> None:
+        source = 'rows.update(**{"account_status": "active"})\n'
+
+        assert _unmarked_writes(source) == [(1, ["account_status"])]
+
+    def test_the_marker_on_any_line_of_the_call(self) -> None:
+        source = (
+            "rows.update(\n"
+            "    admin_confirmed=True,  # state-field-update-allowed: no side effects\n"
+            ")\n"
+        )
+
+        assert _unmarked_writes(source) == []
+
+    def test_reads_names_in_text_and_other_calls_do_not_count(self) -> None:
+        source = (
+            "rows.filter(admin_confirmed=False)\n"
+            '"""rows.update(admin_confirmed=True)"""\n'
+            '# rows.update(account_status="active")\n'
+            'User.objects.update_or_create(account_status="active")\n'
+            'rows.update(note="admin_confirmed")\n'
+        )
+
+        assert _unmarked_writes(source) == []

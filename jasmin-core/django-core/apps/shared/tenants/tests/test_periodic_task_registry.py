@@ -20,8 +20,6 @@ from apps.shared.tenants.management.commands.run_periodic_tasks_now import (
 
 DJANGO_CORE = Path(__file__).resolve().parents[4]
 APPS = DJANGO_CORE / "apps"
-# Standing instruction: cultivation / economics / staff are out of scope.
-IGNORED_APPS = frozenset({"cultivation", "economics", "staff"})
 _PERIODIC_DECORATORS = frozenset({"db_periodic_task", "periodic_task"})
 
 
@@ -41,7 +39,7 @@ def _discover_periodic_tasks() -> set[tuple[str, str]]:
     found: set[tuple[str, str]] = set()
     for path in sorted(APPS.rglob("*.py")):
         parts = path.relative_to(APPS).parts
-        if parts[0] in IGNORED_APPS or "tests" in parts or "migrations" in parts:
+        if "tests" in parts or "migrations" in parts:
             continue
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):

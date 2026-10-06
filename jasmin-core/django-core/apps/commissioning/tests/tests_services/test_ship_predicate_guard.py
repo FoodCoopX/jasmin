@@ -18,7 +18,6 @@ from pathlib import Path
 
 DJANGO_CORE = Path(__file__).resolve().parents[4]
 APPS = DJANGO_CORE / "apps"
-IGNORED_APPS = frozenset({"cultivation", "economics", "staff"})
 
 _PREDICATE_TOKENS = ("shippable(", "delivery_counts_q(", "opted_out_q(")
 
@@ -42,7 +41,7 @@ def test_share_delivery_quantity_aggregations_use_ship_predicate() -> None:
     scanned = 0
     for path in sorted(APPS.rglob("*.py")):
         parts = path.relative_to(APPS).parts
-        if parts[0] in IGNORED_APPS or "tests" in parts or "migrations" in parts:
+        if "tests" in parts or "migrations" in parts:
             continue
         source = path.read_text()
         if "subscription__quantity" not in source:

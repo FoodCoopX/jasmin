@@ -85,10 +85,6 @@ COVERED_ERRORS_FILES = [
 I18N_LOCALES_DIR = REACT_CORE / "src" / "shared" / "i18n" / "locales"
 REQUIRED_LANGS = ("de", "en")
 
-# Apps excluded from the app codebase by standing instruction — their code is
-# not held to the current conventions and their error codes aren't backfilled.
-IGNORED_APPS = frozenset({"cultivation", "economics", "staff"})
-
 # Helper functions that FORWARD a ``code=`` kwarg into a JasminError (so an
 # inline ``code=`` on a call to one of these reaches the wire as the envelope
 # code, exactly like constructing the error directly). Kept as a small explicit
@@ -155,11 +151,11 @@ def _jasmin_error_callees() -> set[str]:
 
 
 def _app_modules() -> list[Path]:
-    """Every non-test, non-migration app module, excluding the ignored apps."""
+    """Every non-test, non-migration app module."""
     modules: list[Path] = []
     for py in sorted((DJANGO_CORE / "apps").rglob("*.py")):
         parts = py.relative_to(DJANGO_CORE / "apps").parts
-        if parts[0] in IGNORED_APPS or "tests" in parts or "migrations" in parts:
+        if "tests" in parts or "migrations" in parts:
             continue
         modules.append(py)
     return modules
