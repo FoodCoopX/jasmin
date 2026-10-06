@@ -384,6 +384,8 @@ const rowButton = (text: string, name: string) =>
 const statusButton = (company: string) =>
   within(cellOf(rowOf(company), "members.user_status")).getByRole("button");
 const addButton = () => screen.queryByRole("button", { name: /table\.add_plus_icon/ });
+// AntD's Spin turns itself off in an effect, a render after the rows arrive,
+// so a test waits for it to go.
 const spinner = () => document.querySelector(".ant-spin-spinning");
 const pageTitle = () => screen.getByRole("heading", { level: 1, name: "resellers.list_resellers" });
 
@@ -435,7 +437,7 @@ describe("ListResellers loading and layout", () => {
     deliver([HOFLADEN]);
 
     expect(await screen.findByText("Hofladen Gruber")).toBeInTheDocument();
-    expect(spinner()).not.toBeInTheDocument();
+    await waitFor(() => expect(spinner()).not.toBeInTheDocument());
   });
 
   it("shows the title, the columns in order and the explainer", async () => {

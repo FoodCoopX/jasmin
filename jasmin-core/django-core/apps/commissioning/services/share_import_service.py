@@ -47,11 +47,13 @@ import itertools
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
+from datetime import date
 from typing import Any
 
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
+from isoweek import Week
 
 from ..errors import (
     CommissioningError,
@@ -64,7 +66,10 @@ from ..models import (
     ExternalShareDemand,
     Share,
     ShareImportBatch,
+    ShareTypeVariation,
 )
+from ..models.managers import active_on_date_q
+from ..models.mixin import TimeBoundMixin
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +144,20 @@ class DiffReport:
                 "removed": len(self.removed),
             },
         }
+
+
+@dataclass(frozen=True)
+class _WeekLookups:
+    """What a batch's rows resolve against, loaded once per parse."""
+
+    # {kind: {external_code: internal_id}}
+    mappings: dict[str, dict[str, str]]
+    # {kind: {internal_id: valid in the batch's week}}, for the ids that exist
+    targets: dict[str, dict[str, bool]]
+    # {(station_id, day_id): station_day_id}, for the station days valid then
+    station_day_by_pair: dict[tuple[str, str], str]
+    # "week 15 of 2026", for the row errors
+    week_label: str
 
 
 # --- service ---------------------------------------------------------------
@@ -246,25 +265,7 @@ class ShareImportService:
             cls._persist_validation(batch, outcome, ok=False)
             return outcome
 
-        # Pre-load all mappings into memory once, and which of the objects
-        # they point at exist: a mapping whose object is gone (or whose id
-        # was mistyped before the mapping API checked it) fails its rows
-        # naming the mapping, not as a missing station-day link.
-        mappings = cls._load_mappings()
-        existing_targets = cls._existing_mapping_targets(mappings)
-
-        # Pre-load every DeliveryStationDay once, keyed by the
-        # (station_id, day_id) pair. Without this the per-row lookup below
-        # fired one query per CSV line — 800 queries for an 800-row file,
-        # and parse runs at upload, preview AND apply. There are only
-        # stations × delivery-days of these rows, so loading them all is
-        # cheap and turns the N+1 into a single query.
-        station_day_by_pair: dict[tuple[str, str], str] = {
-            (station_id, day_id): share_delivery_id
-            for share_delivery_id, station_id, day_id in DeliveryStationDay.objects.values_list(
-                "id", "delivery_station_id", "delivery_day_id"
-            )
-        }
+        lookups = cls._week_lookups(batch)
 
         for line_no, raw in enumerate(raw_rows, start=1):
             extra_cells = raw.pop(_EXTRA_CELLS_KEY, None)
@@ -315,7 +316,7 @@ class ShareImportService:
                 ("day", "delivery_day_code"),
             ):
                 resolved[kind], error = cls._resolve_code(
-                    kind, column, data[column], mappings, existing_targets
+                    kind, column, data[column], lookups
                 )
                 if error:
                     row_errors.append(error)
@@ -325,10 +326,11 @@ class ShareImportService:
 
             station_day_id: str | None = None
             if station_id and day_id:
-                station_day_id = station_day_by_pair.get((station_id, day_id))
+                station_day_id = lookups.station_day_by_pair.get((station_id, day_id))
                 if station_day_id is None:
                     row_errors.append(
-                        "no DeliveryStationDay links the given station and day"
+                        "no DeliveryStationDay links the given station and day "
+                        f"in {lookups.week_label}"
                     )
 
             if row_errors:
@@ -572,9 +574,37 @@ class ShareImportService:
             )
             return
 
+        # Only the versions still running next week: copying a variation or
+        # station-day replaced from next week on would put the estimate on the
+        # closed version. Next week's real upload brings those rows on the new.
+        next_monday = Week(next_year, next_week).monday()
+        running_variations = set(
+            ShareTypeVariation.objects.filter(
+                active_on_date_q(next_monday),
+                pk__in={row.variation_id for row in rows},
+            ).values_list("pk", flat=True)
+        )
+        running_station_days = set(
+            DeliveryStationDay.objects.filter(
+                active_on_date_q(next_monday),
+                pk__in={row.delivery_station_day_id for row in rows},
+            ).values_list("pk", flat=True)
+        )
         next_rows = [
-            replace(row, year=next_year, delivery_week=next_week) for row in rows
+            replace(row, year=next_year, delivery_week=next_week)
+            for row in rows
+            if row.variation_id in running_variations
+            and row.delivery_station_day_id in running_station_days
         ]
+        if len(next_rows) < len(rows):
+            logger.info(
+                "share_import.seed.left_out batch=%s next_year=%s next_week=%s "
+                "rows=%s reason=version_ends",
+                batch.pk,
+                next_year,
+                next_week,
+                len(rows) - len(next_rows),
+            )
         cls._replace_week_demand(
             batch=batch,
             year=next_year,
@@ -606,39 +636,81 @@ class ShareImportService:
             )
             yield from reader
 
+    @classmethod
+    def _week_lookups(cls, batch: ShareImportBatch) -> _WeekLookups:
+        """The mappings and station days, as they stand in the batch's week.
+
+        The week is read by its Monday: validity windows are whole ISO weeks,
+        so a variation, day or station day valid on the Monday is the version
+        that runs all week. A mapping whose object is gone (or whose id was
+        mistyped before the mapping API checked it), or still points at a
+        variation or day replaced before this week, fails its rows naming the
+        mapping, not as a missing station-day link. The station days come in
+        one query rather than one per CSV line — parse runs at upload, preview
+        AND apply — and a week has at most one per station and day, as
+        Postgres keeps their periods from overlapping."""
+        week_monday = Week(batch.year, batch.delivery_week).monday()
+        mappings = cls._load_mappings()
+        station_days = DeliveryStationDay.objects.filter(
+            active_on_date_q(week_monday)
+        ).values_list("id", "delivery_station_id", "delivery_day_id")
+        return _WeekLookups(
+            mappings=mappings,
+            targets=cls._mapping_targets(mappings, week_monday),
+            station_day_by_pair={
+                (station_id, day_id): station_day_id
+                for station_day_id, station_id, day_id in station_days
+            },
+            week_label=f"week {batch.delivery_week} of {batch.year}",
+        )
+
     @staticmethod
-    def _existing_mapping_targets(
-        mappings: dict[str, dict[str, str]],
-    ) -> dict[str, set[str]]:
-        """Of the ids the mappings point at, those that exist — per kind, in
-        one query each."""
-        return {
-            kind: {
-                str(pk)
-                for pk in ExternalCodeMapping.target_model(kind)
-                ._default_manager.filter(pk__in=set(internal_ids.values()))
-                .values_list("pk", flat=True)
-            }
-            for kind, internal_ids in mappings.items()
-        }
+    def _mapping_targets(
+        mappings: dict[str, dict[str, str]], on_date: date
+    ) -> dict[str, dict[str, bool]]:
+        """Of the ids the mappings point at, those that exist — per kind —
+        each with whether it is valid on ``on_date``. A kind without validity
+        dates (stations) is valid whenever it exists."""
+        targets: dict[str, dict[str, bool]] = {}
+        for kind, internal_ids in mappings.items():
+            model = ExternalCodeMapping.target_model(kind)
+            pointed_at = model._default_manager.filter(
+                pk__in=set(internal_ids.values())
+            )
+            existing = {str(pk) for pk in pointed_at.values_list("pk", flat=True)}
+            valid = (
+                {
+                    str(pk)
+                    for pk in pointed_at.filter(active_on_date_q(on_date)).values_list(
+                        "pk", flat=True
+                    )
+                }
+                if issubclass(model, TimeBoundMixin)
+                else existing
+            )
+            targets[kind] = {pk: pk in valid for pk in existing}
+        return targets
 
     @staticmethod
     def _resolve_code(
-        kind: str,
-        column: str,
-        code: str,
-        mappings: dict[str, dict[str, str]],
-        existing_targets: dict[str, set[str]],
+        kind: str, column: str, code: str, lookups: _WeekLookups
     ) -> tuple[str | None, str | None]:
         """``(internal_id, None)`` for a code the ``kind`` mappings resolve to
-        an existing object, else ``(None, why)``."""
-        internal_id = mappings[kind].get(code)
+        an object valid in the batch's week, else ``(None, why)``."""
+        internal_id = lookups.mappings[kind].get(code)
         if internal_id is None:
             return None, f"unknown {column}: {code!r}"
-        if internal_id not in existing_targets[kind]:
+        valid = lookups.targets[kind].get(internal_id)
+        if valid is None:
             return None, (
                 f"{column} {code!r} is mapped to {internal_id!r}, but no "
                 f"{kind} has that id — correct the mapping"
+            )
+        if not valid:
+            return None, (
+                f"{column} {code!r} is mapped to {internal_id!r}, which isn't "
+                f"valid in {lookups.week_label} — point the mapping at the "
+                f"{kind} valid then"
             )
         return internal_id, None
 

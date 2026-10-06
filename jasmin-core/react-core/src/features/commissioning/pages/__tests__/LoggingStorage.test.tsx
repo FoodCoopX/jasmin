@@ -295,7 +295,8 @@ function rowsOf(table: HTMLElement): string[][] {
 const ledgerRows = () => rowsOf(ledgerTable());
 const workflowRows = () => rowsOf(workflowTable());
 
-/** Whether the table's loading spinner is showing. */
+/** Whether the table's loading spinner is showing. AntD's Spin turns itself
+ *  off in an effect, a render after the rows arrive, so wait for it to go. */
 const isLoading = (table: HTMLElement) =>
   Boolean(table.closest(".ant-table-wrapper")?.querySelector(".ant-spin-spinning"));
 
@@ -493,7 +494,7 @@ describe("LoggingStorage storage ledger", () => {
     ledger.resolve(answerLedger({ storage: CELLAR.id! }));
 
     await cellarLedgerShown();
-    expect(isLoading(ledgerTable())).toBe(false);
+    await waitFor(() => expect(isLoading(ledgerTable())).toBe(false));
   });
 
   it("lists each movement newest first with its date, kind, article, change, balance and unit", async () => {
@@ -751,7 +752,7 @@ describe("LoggingStorage internal workflow", () => {
     harvests.resolve(HARVESTS.filter((row) => row.year === 2026));
 
     await harvestsShown();
-    expect(isLoading(workflowTable())).toBe(false);
+    await waitFor(() => expect(isLoading(workflowTable())).toBe(false));
   });
 
   it.each([

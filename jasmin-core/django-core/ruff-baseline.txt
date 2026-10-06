@@ -104,7 +104,7 @@ apps/commissioning/services/share_demand_service.py: PLR0913 Too many arguments 
 apps/commissioning/services/share_demand_service.py: PLR0913 Too many arguments in function definition (11 > 5)
 apps/commissioning/services/share_demand_service.py: PLR0913 Too many arguments in function definition (11 > 5)
 apps/commissioning/services/share_import_service.py: C901 `parse_and_validate` is too complex (15 > 10)
-apps/commissioning/services/share_import_service.py: PLR0915 Too many statements (57 > 50)
+apps/commissioning/services/share_import_service.py: PLR0915 Too many statements (55 > 50)
 apps/commissioning/services/shares_day_change_service.py: C901 `apply` is too complex (16 > 10)
 apps/commissioning/services/shares_delivery_day_service.py: C901 `update_share_deliveries_for_delivery_day` is too complex (12 > 10)
 apps/commissioning/services/snapshot_service.py: PLR0913 Too many arguments in function definition (6 > 5)

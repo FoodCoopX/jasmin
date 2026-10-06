@@ -6,6 +6,8 @@ external-code-mapping plumbing they depend on.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from apps.commissioning.errors import ShareImportBatchInTerminalStatus
@@ -814,6 +816,42 @@ class TestForwardSeedNextWeek:
         assert row.is_estimate is False  # untouched
         assert row.quantity == 20  # not overwritten by week 15's 9
 
+    def test_seed_leaves_out_a_variation_that_ends_this_week(self, import_world):
+        # Replaced from week 16 on: an estimate on the old variation would put
+        # week 16's Share on a closed version while the new one showed none.
+        old = import_world["variation"]
+        ShareTypeVariationFactory(
+            share_type=old.share_type, size=old.size, valid_from=date(2026, 4, 13)
+        )
+
+        self._apply(year=2026, week=15, quantity=9, filename="w15.csv")
+
+        assert (
+            ExternalShareDemand.objects.get(year=2026, delivery_week=15).quantity == 9
+        )
+        assert not ExternalShareDemand.objects.filter(
+            year=2026, delivery_week=16
+        ).exists()
+        assert not Share.objects.filter(
+            year=2026, delivery_week=16, share_type_variation_id=old.pk
+        ).exists()
+
+    def test_seed_leaves_out_a_station_day_that_ends_this_week(self, import_world):
+        DeliveryStationDayFactory(
+            delivery_station=import_world["station"],
+            delivery_day=import_world["day"],
+            valid_from=date(2026, 4, 13),
+        )
+
+        self._apply(year=2026, week=15, quantity=9, filename="w15.csv")
+
+        assert (
+            ExternalShareDemand.objects.get(year=2026, delivery_week=15).quantity == 9
+        )
+        assert not ExternalShareDemand.objects.filter(
+            year=2026, delivery_week=16
+        ).exists()
+
 
 # ---------------------------------------------------------------------------
 # End-to-end propagation: import → recompute → theoreticals reflect new demand
@@ -1109,6 +1147,105 @@ class TestMappingToAMissingObject:
             "variation_code 'VEG-M' is mapped to 'missing00000', but no variation "
             "has that id — correct the mapping"
         ]
+
+
+@pytest.mark.django_db
+class TestTheVersionsValidInTheBatchWeek:
+    """Variations, days and station days are versioned in whole ISO weeks; an
+    import's rows resolve to the versions valid in its own week."""
+
+    @staticmethod
+    def _batch(week: int) -> ShareImportBatch:
+        return ShareImportService.ingest_upload(
+            file_bytes=_csv_bytes(
+                [
+                    {
+                        "year": 2026,
+                        "delivery_week": week,
+                        "delivery_station_code": "STN-1",
+                        "delivery_day_code": "WED",
+                        "variation_code": "VEG-M",
+                        "quantity": 2,
+                    }
+                ]
+            ),
+            original_filename=f"w{week}.csv",
+            year=2026,
+            delivery_week=week,
+            uploaded_by=JasminUserFactory(roles=["office"]),
+        )
+
+    def _validate(self, week: int):
+        return ShareImportService.parse_and_validate(self._batch(week))
+
+    def test_the_station_day_running_that_week_takes_the_row(self, import_world):
+        # The station day from January is followed by one from week 14 and one
+        # from week 23, each closing the one before.
+        station, day = import_world["station"], import_world["day"]
+        spring = DeliveryStationDayFactory(
+            delivery_station=station, delivery_day=day, valid_from=date(2026, 3, 30)
+        )
+        summer = DeliveryStationDayFactory(
+            delivery_station=station, delivery_day=day, valid_from=date(2026, 6, 1)
+        )
+
+        assert self._validate(10).rows[0].delivery_station_day_id == (
+            import_world["station_day"].pk
+        )
+        assert self._validate(15).rows[0].delivery_station_day_id == spring.pk
+        assert self._validate(25).rows[0].delivery_station_day_id == summer.pk
+
+    def test_a_station_day_closed_before_the_week_fails_its_rows(self, import_world):
+        station_day = import_world["station_day"]
+        station_day.valid_until = date(2026, 3, 29)
+        station_day.save()
+
+        assert self._validate(15).errors["1"] == [
+            "no DeliveryStationDay links the given station and day in week 15 of 2026"
+        ]
+
+    def test_a_variation_replaced_before_the_week_fails_its_rows(self, import_world):
+        old = import_world["variation"]
+        new = ShareTypeVariationFactory(
+            share_type=old.share_type, size=old.size, valid_from=date(2026, 3, 30)
+        )
+        batch = self._batch(15)
+
+        outcome = ShareImportService.parse_and_validate(batch)
+
+        assert outcome.errors["1"] == [
+            f"variation_code 'VEG-M' is mapped to {old.pk!r}, which isn't valid in "
+            "week 15 of 2026 — point the mapping at the variation valid then"
+        ]
+        # Pointed at the version running then, the same file goes through.
+        ExternalCodeMapping.objects.filter(external_code="VEG-M").update(
+            internal_id=new.pk
+        )
+        outcome = ShareImportService.parse_and_validate(batch)
+        assert outcome.errors == {}
+        assert outcome.rows[0].variation_id == new.pk
+
+    def test_a_day_replaced_before_the_week_fails_its_rows(self, import_world):
+        old = import_world["day"]
+        SharesDeliveryDayFactory(
+            day_number=old.day_number, valid_from=date(2026, 3, 30)
+        )
+
+        assert self._validate(15).errors["1"] == [
+            f"delivery_day_code 'WED' is mapped to {old.pk!r}, which isn't valid in "
+            "week 15 of 2026 — point the mapping at the day valid then"
+        ]
+
+    def test_a_week_before_the_replacement_still_resolves(self, import_world):
+        old = import_world["variation"]
+        ShareTypeVariationFactory(
+            share_type=old.share_type, size=old.size, valid_from=date(2026, 3, 30)
+        )
+
+        outcome = self._validate(13)
+
+        assert outcome.errors == {}
+        assert outcome.rows[0].variation_id == old.pk
 
 
 @pytest.mark.django_db

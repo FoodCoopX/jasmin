@@ -184,7 +184,10 @@ describe("ListEmployees", () => {
     deliver([ANNA, BEN]);
 
     expect(await screen.findByText("Anna")).toBeInTheDocument();
-    expect(document.querySelector(".ant-spin-spinning")).not.toBeInTheDocument();
+    // AntD's Spin turns itself off in an effect, a render after the rows.
+    await waitFor(() =>
+      expect(document.querySelector(".ant-spin-spinning")).not.toBeInTheDocument(),
+    );
   });
 
   it("shows the title, the column headings and the explainer", async () => {

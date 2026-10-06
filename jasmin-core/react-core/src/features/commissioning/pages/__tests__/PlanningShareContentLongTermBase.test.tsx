@@ -324,6 +324,8 @@ const timelineBlocks = (row: HTMLElement) =>
   );
 
 const field = (label: string) => within(editingRow()).getByLabelText(label);
+// AntD's Spin turns itself off in an effect, a render after the rows arrive,
+// so a test waits for it to go.
 const isSpinning = () => document.querySelector(".ant-table-wrapper .ant-spin-spinning") !== null;
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
 
@@ -523,7 +525,7 @@ describe("PlanningShareContentLongTermBase plan", () => {
     answer([CARROTS]);
 
     await within(tableBody()).findByText("Carrots");
-    expect(isSpinning()).toBe(false);
+    await waitFor(() => expect(isSpinning()).toBe(false));
   });
 
   it("says so when the year has no plan yet", async () => {
