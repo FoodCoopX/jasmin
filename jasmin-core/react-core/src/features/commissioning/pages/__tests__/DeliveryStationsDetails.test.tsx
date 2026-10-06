@@ -506,9 +506,7 @@ describe("DeliveryStationsDetails loading", () => {
   it("opens on the week's first delivery day and that day's first station, and lists its pickups", async () => {
     renderPage();
 
-    // The file's first render also warms up the page's modules, which can
-    // take longer than the default second.
-    expect(await screen.findByText("Ana Example", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText("Ana Example")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", {
         name: "commissioning.delivery_notes_delivery_stations_details_title",

@@ -11,7 +11,7 @@ import "@testing-library/jest-dom/vitest";
 import type { AxeMatchers } from "vitest-axe/matchers";
 import * as axeMatchers from "vitest-axe/matchers";
 import { afterAll, afterEach, beforeAll, expect, vi } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 
 declare module "vitest" {
   interface Assertion<T = any> {
@@ -20,6 +20,12 @@ declare module "vitest" {
 }
 
 expect.extend(axeMatchers);
+
+// How long `findBy…` and `waitFor` wait. CI runners are slower than a laptop,
+// and a file's first render also loads its page's modules, so the library's
+// one-second default fails healthy tests there; vitest's own test timeout
+// (30 s) stays the outer bound.
+configure({ asyncUtilTimeout: 5000 });
 
 import { server } from "./msw/server";
 

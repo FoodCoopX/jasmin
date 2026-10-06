@@ -166,6 +166,36 @@ describe("EditableTable rows after a save", () => {
     expect(await screen.findByText("Turnips")).toBeInTheDocument();
     expect(screen.queryByText("Parsnips")).not.toBeInTheDocument();
   });
+
+  it("takes a field the page patches into its copy and keeps the saved values for the rest", async () => {
+    // A login change patched into the page's cached row, which still holds the
+    // values from before the save.
+    const api = savingApi();
+    const columns: EditableColumnConfig<Row>[] = [
+      NAME_COLUMN,
+      { title: "Login", dataIndex: "login", inputType: "text", disabled: true },
+    ];
+    const renderRows = (rows: Row[]) => (
+      <EditableTable<Row>
+        columns={columns}
+        initialData={rows}
+        permissions={PERMISSIONS}
+        apiFunctions={api}
+      />
+    );
+    const { rerender } = render(renderRows(ROWS));
+
+    await renameCarrotsTo("Parsnips");
+    rerender(renderRows([{ ...CARROTS, login: "inactive" }, LEEKS]));
+
+    expect(await screen.findByText("inactive")).toBeInTheDocument();
+    expect(screen.getByText("Parsnips")).toBeInTheDocument();
+    expect(screen.queryByText("Carrots")).not.toBeInTheDocument();
+    await userEvent.click(
+      (await screen.findAllByRole("button", { name: "table.edit" }))[0],
+    );
+    expect(await screen.findByDisplayValue("Parsnips")).toBeInTheDocument();
+  });
 });
 
 describe("EditableTable rows", () => {

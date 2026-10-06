@@ -4,11 +4,20 @@ import type { TableRecord } from "./types";
 
 type UpdatedRows<T> = Map<Key, { replaced: T; row: T }>;
 
+/** The fields of `after` whose values differ from `before`'s. */
+function changedFields<T extends TableRecord>(before: T, after: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(after).filter(([field, value]) => !Object.is(value, before[field])),
+  ) as Partial<T>;
+}
+
 /**
  * Rows updated on this mount, each with the `initialData` row it replaced. A
  * page that doesn't refetch after an update hands that very object back when
  * it re-derives its rows (re-filtering its list, say), and the saved row must
- * win over it; a new object for the id is fresher data and takes over.
+ * win over it. A new object for the id brings only the fields that differ from
+ * the replaced one: a page that patches its cached row (after a login change,
+ * say) builds on its copy from before the save.
  */
 export function useUpdatedRows<T extends TableRecord>(initialData: T[]) {
   const initialDataRef = useRef(initialData);
@@ -71,9 +80,18 @@ export function useInitialDataSync<T extends TableRecord>({
     const toRow = (item: T): T => {
       const key = item.id as Key;
       const updated = updatedRows.get(key);
-      if (updated?.replaced === item) return updated.row;
-      if (updated) updatedRows.delete(key);
-      return { ...item, key: item.id } as T;
+      if (!updated) return { ...item, key: item.id } as T;
+      if (updated.replaced === item) return updated.row;
+      // A new object for a row saved on this mount: the page patched it (a
+      // login's status, say) or refetched it. A patch builds on the page's
+      // copy from before the save, so only what changed since that copy is
+      // news; the saved values stay for the rest.
+      const row = {
+        ...updated.row,
+        ...changedFields(updated.replaced, item),
+      } as T;
+      updatedRows.set(key, { replaced: item, row });
+      return row;
     };
 
     // Preserve any in-flight ``{ key: -1 }`` draft row across an
