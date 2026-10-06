@@ -4,11 +4,11 @@
 #     poetry run python scripts/module_length.py freeze
 # 22 module(s).
 
-apps/commissioning/errors.py: 2328
+apps/commissioning/errors.py: 2323
 apps/commissioning/models/members.py: 1129
-apps/commissioning/models/mixin.py: 1414
+apps/commissioning/models/mixin.py: 1413
 apps/commissioning/models/resellers.py: 1332
-apps/commissioning/models/shares.py: 1162
+apps/commissioning/models/shares.py: 1158
 apps/commissioning/serializers/members_serializer.py: 1122
 apps/commissioning/serializers/resellers_serializer.py: 1313
 apps/commissioning/serializers/shares_serializer.py: 1067

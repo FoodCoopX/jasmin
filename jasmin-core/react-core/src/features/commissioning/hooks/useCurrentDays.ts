@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useCommissioningSharesList } from '@shared/api/generated/commissioning/commissioning';
 import type { Share } from '@shared/api/generated/models';
-import dayjs from 'dayjs';
+import { mondayOfIsoWeek } from '@shared/utils';
 
 type ShareWithExtras = Share & {
   [key: string]: unknown;
@@ -50,7 +50,7 @@ export const useCurrentDays = (delivery_week?: number, year?: number) => {
   // Calculate next week and year
   const { nextWeek, nextYear } = useMemo(() => {
     if (!delivery_week || !year) return { nextWeek: 0, nextYear: 0 };
-    const nextWeekDate = dayjs().year(year).isoWeek(delivery_week).add(1, 'week');
+    const nextWeekDate = mondayOfIsoWeek(year, delivery_week).add(1, 'week');
     // ``isoWeekYear()`` so the pair stays one ISO coordinate: stepping out of
     // week 52 lands on a January date whose calendar year is already the next
     // one while its ISO week still belongs to the old year.

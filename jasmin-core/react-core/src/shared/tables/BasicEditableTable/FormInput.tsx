@@ -15,6 +15,7 @@ import dayjs from "dayjs";
 import { toApiDate } from "@shared/utils/apiDate";
 import { useDateFormat, useTimeFormat } from "@hooks/index";
 import { toValidDayjs } from "@shared/utils/dayjsParse";
+import { nodeText } from "./nodeText";
 import { withClearOption } from "./selectOptions";
 import type { FormInputProps, SelectOption } from "./types";
 
@@ -356,7 +357,7 @@ const FormInput = forwardRef<InputRef, FormInputProps>(
             options={selectOptions}
             optionFilterProp="children"
             filterOption={(input: string, option?: SelectOption) =>
-              (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              nodeText(option?.label).toLowerCase().includes(input.toLowerCase())
             }
             onChange={handleSelectChange}
             onKeyDown={(e: KeyboardEvent) => {

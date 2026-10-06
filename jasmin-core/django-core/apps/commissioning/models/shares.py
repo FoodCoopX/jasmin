@@ -311,30 +311,26 @@ class ShareTypeVariation(JasminModel, TimeBoundMixin):
     def clean(self) -> None:
         super().clean()
 
+        # The variation's validity lies within its share type's: it starts on
+        # or after the share type, and when the share type is CLOSED it may
+        # neither end after it nor stay OPEN (valid_until=None runs forever).
+        # The same coded error as the serializer's check, for every save path.
         if self.valid_from:
-            if self.valid_from < self.share_type.valid_from:
-                raise ValidationError(
-                    {
-                        "valid_from": f"Variation start date must be on or after the share type's start date ({self.share_type.valid_from})."
-                    }
+            share_type = self.share_type
+            starts_before = self.valid_from < share_type.valid_from
+            outlives = share_type.valid_until is not None and (
+                self.valid_until is None or self.valid_until > share_type.valid_until
+            )
+            if starts_before or outlives:
+                from apps.commissioning.errors import (
+                    ShareTypeVariationOutsideShareTypeRange,
                 )
 
-            # When the parent share type is CLOSED, the variation must not
-            # outlive it: it may neither end after the parent nor stay OPEN
-            # (valid_until=None runs forever), so the check must not require
-            # ``self.valid_until`` to be truthy.
-            if self.share_type.valid_until and (
-                self.valid_until is None
-                or self.valid_until > self.share_type.valid_until
-            ):
-                raise ValidationError(
-                    {
-                        "valid_until": (
-                            "Variation must end on or before the share type's "
-                            f"end date ({self.share_type.valid_until}); an "
-                            "open-ended variation cannot have a closed parent."
-                        )
-                    }
+                raise ShareTypeVariationOutsideShareTypeRange(
+                    variation_from=self.valid_from,
+                    variation_until=self.valid_until,
+                    share_type_from=share_type.valid_from,
+                    share_type_until=share_type.valid_until,
                 )
 
         # The components M2M check requires a saved row. Skip only that part

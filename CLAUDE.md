@@ -521,6 +521,14 @@ loading; do NOT rely on prop-spread). Pick the source flag by page type:
 - `isPending` for mutations (TanStack Query v5 renamed mutation `isLoading` →
   `isPending`).
 
+**Time-bound tables — declare the overlap group.** Every `useTimeBoundColumns`
+call names the model's `overlap_unique_fields` as `overlapGroup` (`null` only
+where rows may overlap, as subscriptions do). The table then refuses a period
+the backend would refuse — an overlap within the group, or a new row starting
+before the group's open row — in the backend's own words (`errors.time_bound.*`),
+and lets a later row succeed the open one. Don't hand-roll period checks with
+`uniqueCheck` combinations or in `customSave`.
+
 ### Structure & imports
 
 **Domain-first.** There is no single global modals folder. A modal that is

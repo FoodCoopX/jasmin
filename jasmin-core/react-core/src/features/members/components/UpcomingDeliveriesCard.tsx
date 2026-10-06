@@ -6,7 +6,7 @@ import {
   UpOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Space, Switch, Tag, Timeline, Typography } from "antd";
-import dayjs from "dayjs";
+import { mondayOfIsoWeek } from "@shared/utils";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -63,13 +63,7 @@ const UpcomingDeliveriesCard = ({
   const getDeliveryDate = useCallback(
     (year: number, week: number, dayNumber: number) => {
       return (
-        formatDate(
-          dayjs()
-            .year(year)
-            .isoWeek(week)
-            .startOf("isoWeek")
-            .add(dayNumber, "day"),
-        ) ?? ""
+        formatDate(mondayOfIsoWeek(year, week).add(dayNumber, "day")) ?? ""
       );
     },
     [formatDate],

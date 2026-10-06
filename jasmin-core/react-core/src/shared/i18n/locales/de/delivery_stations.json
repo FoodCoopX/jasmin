@@ -52,5 +52,9 @@
     "fees_billing_period": "Abrechnungszeitraum",
     "fees_billing_period_placeholder": "Zeitraum wählen",
     "fee_saved": "Gebühren gespeichert",
-    "fee_save_error": "Gebühren konnten nicht gespeichert werden"
+    "fee_save_error": "Gebühren konnten nicht gespeichert werden",
+    "takeover_title": "Laufenden Liefertag ablösen?",
+    "takeover_text": "Ab dem {{from}} löst der neue Eintrag den {{weekday}} ab, der seit dem {{since}} gilt. Der bisherige endet am {{until}}; seine Lieferungen und Reservierungen ab dem {{from}} wandern zum neuen Eintrag.",
+    "takeover_confirm": "Ablösen",
+    "takeover_not_saved": "Nicht gespeichert – der laufende Liefertag bleibt, wie er ist."
   }

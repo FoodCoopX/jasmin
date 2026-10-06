@@ -265,6 +265,8 @@ class TimeBoundMixin(models.Model):
         WARNING: this is a TOCTOU check. For a hard guarantee, add a
         Postgres ExclusionConstraint (requires btree_gist) on the subclass.
         """
+        from apps.commissioning.errors import TimeBoundOverlap
+
         _sentinel = datetime.date(9999, 12, 31)
 
         filter_kwargs = {
@@ -277,10 +279,7 @@ class TimeBoundMixin(models.Model):
         for existing in siblings:
             existing_until = existing.valid_until or _sentinel
             if self.valid_from <= existing_until and self_until >= existing.valid_from:
-                raise ValidationError(
-                    f"Overlapping period detected with existing record "
-                    f"({existing.valid_from} to {existing.valid_until})"
-                )
+                raise TimeBoundOverlap(existing)
 
     @classmethod
     @transaction.atomic

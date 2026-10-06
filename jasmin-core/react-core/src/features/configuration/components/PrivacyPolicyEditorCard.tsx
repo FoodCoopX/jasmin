@@ -46,7 +46,7 @@ export default function PrivacyPolicyEditorCard() {
   // ``useState(value || "")`` initialises with the value just passed in.
   const [modalNonce, setModalNonce] = useState(0);
 
-  const { mutate, isPending } = useTenantsTenantsPartialUpdate({
+  const { mutate, mutateAsync, isPending } = useTenantsTenantsPartialUpdate({
     mutation: {
       onSuccess: async () => {
         notify.success(
@@ -65,14 +65,16 @@ export default function PrivacyPolicyEditorCard() {
     },
   });
 
-  const handleSave = (content: string) => {
+  const handleSave = async (content: string) => {
     if (!tenantId) return;
     // Quill normalises an empty editor to ``<p><br></p>``; store that
     // as a true empty string so the public page falls back to the
     // i18n template rather than rendering an empty paragraph.
     const normalised =
       content.trim() === "" || content === "<p><br></p>" ? "" : content;
-    mutate({
+    // Awaited, so the editor stays open with the text when the save fails
+    // (``onError`` above reports it).
+    await mutateAsync({
       id: tenantId,
       data: { privacy_policy_html: normalised } as unknown as Tenant,
     });

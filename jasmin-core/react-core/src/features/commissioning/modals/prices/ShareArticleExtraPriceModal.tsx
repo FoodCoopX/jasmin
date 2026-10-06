@@ -47,6 +47,7 @@ export default function ShareArticleExtraPriceModal({
     defaultSortOrder: "descend",
   });
   const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    overlapGroup: ["share_article"],
     width: "9em",
   });
 

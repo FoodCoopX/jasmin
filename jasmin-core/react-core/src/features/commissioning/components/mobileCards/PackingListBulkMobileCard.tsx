@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { useVegetableSizeOptions, useUnitOptions } from "@hooks/index";
+import { useNumberFormat, useVegetableSizeOptions, useUnitOptions } from "@hooks/index";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
+import { formatAmountForUnit } from "@shared/utils";
 import {
   MOBILE_CARD_PLACEHOLDER,
   MobileCard,
@@ -22,11 +23,16 @@ export function PackingListBulkMobileCard({
   const { t } = useTranslation();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { getUnitLabel } = useUnitOptions();
+  const { format } = useNumberFormat();
 
   const articleName = (record.share_article_name as string) || "";
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
   const unitLabel = getUnitLabel(record.unit as string);
   const totalAmount = record.total_amount as number | string | null | undefined;
+  const totalAmountText =
+    totalAmount == null || totalAmount === ""
+      ? MOBILE_CARD_PLACEHOLDER
+      : formatAmountForUnit(Number(totalAmount), record.unit as string, format);
   const noteText = (record.note as string) || "";
 
   return (
@@ -36,7 +42,7 @@ export function PackingListBulkMobileCard({
         <MobileCardMetricsRow>
           <MobileCardMetric
             label={t("commissioning.total_amount")}
-            value={totalAmount ?? MOBILE_CARD_PLACEHOLDER}
+            value={totalAmountText}
             unit={unitLabel}
           />
         </MobileCardMetricsRow>

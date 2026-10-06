@@ -461,6 +461,43 @@ class TestShareTypeVariationViewSet:
         predecessor.refresh_from_db()
         assert predecessor.valid_until == datetime.date(2026, 6, 28)
 
+    def test_extending_into_the_successor_is_refused_with_a_coded_error(
+        self, api_client, tenant
+    ):
+        # Two variations of one size follow each other; stretching the first
+        # into the second's period is refused with a code the frontend
+        # translates, together with the period it collides with.
+        st = ShareTypeFactory(
+            share_option="HONEY_SHARE",
+            valid_from=datetime.date(2026, 1, 5),
+            valid_until=None,
+        )
+        first = ShareTypeVariationFactory(
+            share_type=st,
+            size="M",
+            valid_from=datetime.date(2026, 1, 5),
+            valid_until=datetime.date(2026, 6, 28),
+        )
+        ShareTypeVariationFactory(
+            share_type=st,
+            size="M",
+            valid_from=datetime.date(2026, 6, 29),
+            valid_until=None,
+        )
+        with time_machine.travel(datetime.datetime(2026, 5, 4, 12, 0), tick=False):
+            resp = api_client.patch(
+                reverse("share_type_variation-detail", kwargs={"pk": first.pk}),
+                {"valid_until": "2026-07-26"},
+                format="json",
+            )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "time_bound.overlap"
+        assert resp.data["details"] == {
+            "existing_valid_from": "2026-06-29",
+            "existing_valid_until": None,
+            "context": "open",
+        }
+
     def test_shorten_blocked_by_active_subscriptions(self, api_client, tenant):
         # Directly shortening a variation's window (PATCH valid_until earlier) is
         # refused (409) when it would strand a subscription.

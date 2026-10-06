@@ -79,3 +79,57 @@ describe("EditableTable", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("EditableTable select search", () => {
+  // Options may carry formatted labels — a weekday with a status dot and its
+  // dates, say; the search reads their text.
+  const dayColumns: EditableColumnConfig<TableRecord>[] = [
+    {
+      title: "Day",
+      dataIndex: "day",
+      inputType: "select",
+      editable: true,
+      options: [
+        {
+          value: "tue",
+          label: (
+            <span>
+              <span className="status-dot" />
+              Tuesday <span>from 05.01.2026</span>
+            </span>
+          ) as unknown as string,
+        },
+        { value: "thu", label: "Thursday" },
+      ],
+    },
+  ];
+
+  it("filters options with formatted labels by their text", async () => {
+    render(
+      <EditableTable<TableRecord>
+        columns={dayColumns}
+        initialData={[{ key: "1", id: "1", day: "thu" }]}
+        permissions={{ canAdd: true, canEdit: true, canDelete: true }}
+        apiFunctions={{ create: vi.fn(), update: vi.fn(), delete: vi.fn() }}
+      />,
+    );
+    await userEvent.click(
+      (await screen.findAllByRole("button", { name: "table.edit" }))[0],
+    );
+
+    await userEvent.type(screen.getByRole("combobox", { name: "Day" }), "tues");
+
+    const offered = await waitFor(() => {
+      const options = Array.from(
+        document.querySelectorAll(
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option",
+        ),
+      );
+      if (options.length === 0) throw new Error("No options are offered");
+      return options;
+    });
+    expect(offered.map((option) => option.textContent)).toEqual([
+      "Tuesday from 05.01.2026",
+    ]);
+  });
+});

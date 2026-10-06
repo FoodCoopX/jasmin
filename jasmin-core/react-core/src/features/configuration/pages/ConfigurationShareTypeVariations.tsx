@@ -233,6 +233,7 @@ export default function ConfigurationShareTypeVariations() {
   );
 
   const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    overlapGroup: ["share_option"],
     // A share type can't end before its latest variation, and can't be closed
     // at all while a variation is open-ended (backend stranding guard).
     validUntilFloor: (record) => ({

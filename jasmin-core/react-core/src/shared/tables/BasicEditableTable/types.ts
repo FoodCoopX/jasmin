@@ -95,6 +95,13 @@ export interface EditableColumnConfig<T extends Record<string, unknown> = Record
   ) => Record<string, unknown> | undefined;
   render?: (value: unknown, record: T, index: number) => ReactNode;
   rules?: Array<Record<string, unknown>>;
+  /**
+   * On the `valid_from` column of a time-bound table (`useTimeBoundColumns`
+   * sets it): the fields whose values form a row's overlap group, the
+   * backend's `overlap_unique_fields`. The table refuses a save whose period
+   * the backend would refuse, in its words (`periodErrors`).
+   */
+  overlapGroup?: readonly string[] | null;
   style?: CSSProperties;
   showSorterTooltip?: boolean;
   /**
@@ -253,9 +260,10 @@ export interface EditableTableProps<T extends TableRecord = TableRecord> {
   uniqueCheck?: string | string[] | null;
   uniqueCheckMessage?: string | null;
   /**
-   * Rows `uniqueCheck` compares against besides the table's own — the full
-   * list when the page passes only part of it as `initialData` (e.g. with
-   * inactive rows hidden), so a value a hidden row holds still counts as taken.
+   * Rows `uniqueCheck` and a column's `overlapGroup` compare against besides
+   * the table's own — the full list when the page passes only part of it as
+   * `initialData` (e.g. with inactive rows hidden), so a value or a period a
+   * hidden row holds still counts.
    */
   uniqueCheckRows?: T[];
   onSaveSuccess?: ((record: T, type: "create" | "update") => void) | null;

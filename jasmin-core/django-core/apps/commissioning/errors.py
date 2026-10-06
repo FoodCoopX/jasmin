@@ -145,10 +145,6 @@ class PictureInvalid(BadRequestError):
     code = "commissioning.picture_invalid"
 
 
-class DeliveryStationError(BadRequestError):
-    code = "delivery_station.invalid"
-
-
 class DeliveryStationNotFound(BadRequestError):
     """A referenced ``delivery_station_id`` does not exist — raised by the
     tour-update input serializer so a bogus id is a field-level 400 instead of
@@ -169,13 +165,6 @@ class SharedStationIdentityLocked(ForbiddenError):
     fields on the same row stay editable."""
 
     code = "my_data.shared_station_identity_locked"
-
-
-class DeliveryDayRequired(BadRequestError):
-    """The ``delivery_day`` parameter is missing on an endpoint that
-    needs it to resolve the SharesDeliveryDay."""
-
-    code = "delivery_day.required"
 
 
 class DeliveryDayValidFromInPast(BadRequestError):
@@ -442,10 +431,6 @@ class ResellerNotFound(NotFoundError):
     code = "reseller.not_found"
 
 
-class ResellerError(BadRequestError):
-    code = "reseller.invalid"
-
-
 class ResellerEmailMissing(BadRequestError):
     """A document could not be sent because the reseller has no
     ``invoice_email`` configured."""
@@ -519,20 +504,12 @@ class OrderableItemReferenceInvalid(BadRequestError):
     code = "orderable_item.reference_invalid"
 
 
-class DeliveryNoteNotFound(NotFoundError):
-    code = "delivery_note.not_found"
-
-
 class InvoiceNotFound(NotFoundError):
     code = "invoice.not_found"
 
 
 class OfferGroupNotFound(NotFoundError):
     code = "offer_group.not_found"
-
-
-class OfferNotFound(NotFoundError):
-    code = "offer.not_found"
 
 
 class StorageNotFound(NotFoundError):
@@ -1813,6 +1790,28 @@ class TimeBoundInvalidRange(BadRequestError):
     code = "time_bound.invalid_range"
 
 
+class TimeBoundOverlap(BadRequestError):
+    """A time-bound record's validity shares a day with another record of its
+    overlap group (``overlap_unique_fields``). ``details.context`` is ``open``
+    when that record has no end date, so the message can say so."""
+
+    code = "time_bound.overlap"
+
+    def __init__(self, existing) -> None:
+        until = existing.valid_until
+        details = {
+            "existing_valid_from": str(existing.valid_from),
+            "existing_valid_until": str(until) if until else None,
+        }
+        if until is None:
+            details["context"] = "open"
+        super().__init__(
+            "Overlapping period detected with existing record "
+            f"({existing.valid_from} to {until})",
+            details=details,
+        )
+
+
 class SuccessionStartBeforePredecessor(ConflictError):
     """A new time-bound record can't start *before* the open record it would
     succeed. ``TimeBoundMixin.handle_succession`` closes the predecessor at
@@ -2199,27 +2198,22 @@ __all__ = [
     "DeliveryStationInUse",
     "DeliveryStationDayInUse",
     "SharesDeliveryDayInUse",
-    "DeliveryStationError",
     "DeliveryStationNotFound",
-    "DeliveryDayRequired",
     "DeliveryExceptionInvalidRange",
     "DeliveryExceptionOverlap",
     "DeliveryExceptionPeriodLocked",
     "DeliveryStationOverCapacity",
     "DeliveryStationCapacityBelowOccupancy",
     "ResellerNotFound",
-    "ResellerError",
     "ResellerEmailMissing",
     "ResellerInvoiceEmailDisabled",
     "AccountingEmailMissing",
     "DocumentPdfMissing",
     "OrderNotFound",
     "OrderContentNotFound",
-    "DeliveryNoteNotFound",
     "InvoiceNotFound",
     "DeliveryNoteFinalizeFailed",
     "OfferGroupNotFound",
-    "OfferNotFound",
     "StorageNotFound",
     "CrateNotFound",
     "CrateNetPriceInUse",
@@ -2323,6 +2317,7 @@ __all__ = [
     "TimeBoundValidFromNotMonday",
     "TimeBoundValidUntilNotSunday",
     "TimeBoundInvalidRange",
+    "TimeBoundOverlap",
     "SharedStationIdentityLocked",
     "MemberEmailHeldByNonMemberLogin",
 ]

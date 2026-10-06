@@ -41,32 +41,32 @@ export const complexityPins = {
   "src/shared/tables/BasicEditableTable/EditableCell.tsx": 34,
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 50,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 35,
-  "src/shared/tables/BasicEditableTable/useEditableTable.ts": 48,
+  "src/shared/tables/BasicEditableTable/useEditableTable.ts": 47,
   "src/shared/ui/JobProgressDrawer.tsx": 34,
 };
 
 // Longest function per file, blank lines and comments excluded.
 export const functionLengthPins = {
-  "src/features/abos/hooks/columns/useAbosColumns.tsx": 590,
+  "src/features/abos/hooks/columns/useAbosColumns.tsx": 589,
   "src/features/abos/modals/NewSubscriptionModal.tsx": 893,
   "src/features/abos/pages/WaitingListAbos.tsx": 470,
   "src/features/commissioning/hooks/columns/useHarvestingListColumns.tsx": 484,
   "src/features/commissioning/hooks/columns/useOrderColumns.tsx": 433,
   "src/features/commissioning/hooks/columns/useShareArticleListColumns.tsx": 490,
   "src/features/commissioning/hooks/useOrdersData.ts": 634,
-  "src/features/commissioning/modals/DeliveryStationDetailModal.tsx": 451,
+  "src/features/commissioning/modals/DeliveryStationDetailModal.tsx": 448,
   "src/features/commissioning/modals/InvoiceModal.tsx": 458,
-  "src/features/commissioning/modals/ShareTypeVariationModal.tsx": 608,
+  "src/features/commissioning/modals/ShareTypeVariationModal.tsx": 601,
   "src/features/commissioning/pages/DeliveryNotes.tsx": 479,
-  "src/features/commissioning/pages/DeliveryStationsDetails.tsx": 430,
+  "src/features/commissioning/pages/DeliveryStationsDetails.tsx": 415,
   "src/features/commissioning/pages/Forecast.tsx": 439,
   "src/features/commissioning/pages/Invoices.tsx": 758,
   "src/features/commissioning/pages/ListResellers.tsx": 408,
   "src/features/commissioning/pages/LoggingStorage.tsx": 464,
   "src/features/commissioning/pages/Orders.tsx": 477,
-  "src/features/commissioning/pages/PackingListBulk.tsx": 409,
-  "src/features/commissioning/pages/PlanningShareContentBase.tsx": 847,
-  "src/features/commissioning/pages/PlanningShareContentLongTermBase.tsx": 561,
+  "src/features/commissioning/pages/PackingListBulk.tsx": 407,
+  "src/features/commissioning/pages/PlanningShareContentBase.tsx": 844,
+  "src/features/commissioning/pages/PlanningShareContentLongTermBase.tsx": 559,
   "src/features/commissioning/pages/PurchaseList.tsx": 528,
   "src/features/configuration/pages/ConfigurationGeneral.tsx": 452,
   "src/features/members/modals/CoopSharesModal.tsx": 467,
@@ -74,14 +74,14 @@ export const functionLengthPins = {
   "src/shared/layout/sidebars/CommissioningSidebar.tsx": 601,
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 850,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 472,
-  "src/shared/tables/BasicEditableTable/useEditableTable.ts": 579,
+  "src/shared/tables/BasicEditableTable/useEditableTable.ts": 578,
 };
 
 // Total file length, blank lines and comments INCLUDED — a file you have to
 // scroll is a file you have to scroll.
 export const fileLengthPins = {
   "src/features/abos/modals/NewSubscriptionModal.tsx": 1273,
-  "src/features/commissioning/pages/PlanningShareContentBase.tsx": 1234,
+  "src/features/commissioning/pages/PlanningShareContentBase.tsx": 1231,
   "src/features/members/pages/Members.tsx": 1018,
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 1160,
 };

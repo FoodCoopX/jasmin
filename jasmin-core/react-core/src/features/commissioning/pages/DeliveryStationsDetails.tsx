@@ -32,6 +32,7 @@ import {
 import {
   useBoxCombinationColumns,
   useDeliveryStations,
+  useDeliveryStationsPerDay,
   useShareDeliveryDays,
 } from "@features/commissioning/hooks";
 import {
@@ -41,6 +42,37 @@ import {
   generatePdfFilename,
   getDayName,
 } from "@shared/utils";
+
+/**
+ * The week's delivery days, each paired with the stations IT serves — every
+ * day has its own, so the week's pages pair a day only with its stations.
+ * Empty until every day's stations have loaded.
+ */
+function useWeekStationSlots(
+  dayNumbers: number[],
+  shareDeliveryDays: { id?: unknown; day_number?: unknown }[],
+) {
+  const weekDeliveryDays = useMemo(
+    () =>
+      dayNumbers.flatMap((dayNum) => {
+        const id = shareDeliveryDays.find((day) => day.day_number === dayNum)?.id;
+        return id ? [{ dayNum, id: String(id) }] : [];
+      }),
+    [dayNumbers, shareDeliveryDays],
+  );
+  const { stationsPerDay, loading } = useDeliveryStationsPerDay(
+    weekDeliveryDays.map((day) => day.id),
+  );
+  return useMemo(
+    () =>
+      loading
+        ? []
+        : weekDeliveryDays.flatMap(({ dayNum }, index) =>
+            (stationsPerDay[index] ?? []).map((station) => ({ dayNum, station })),
+          ),
+    [weekDeliveryDays, stationsPerDay, loading],
+  );
+}
 
 export default function DeliveryStationsDetails() {
   const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
@@ -205,42 +237,36 @@ export default function DeliveryStationsDetails() {
         : [],
   });
 
-  // Bulk fetch: the combination matrix for every station across every day of
-  // the week.
+  const weekSlots = useWeekStationSlots(dayNumbers, shareDeliveryDays);
+
+  // Bulk fetch: the combination matrix for every station on every day of the
+  // week it serves.
   const allStationsWeekQueries = useQueries({
     queries:
-      matrixRows.length > 0 &&
-      dayNumbers.length > 0 &&
-      deliveryStations.length > 0
-        ? dayNumbers.flatMap((dayNum) =>
-            deliveryStations.map((station) =>
-              getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
-                year: selectedYear,
-                delivery_week: selectedWeek!,
-                day_number: dayNum,
-                delivery_station: station.value,
-              }),
-            ),
+      matrixRows.length > 0
+        ? weekSlots.map(({ dayNum, station }) =>
+            getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
+              year: selectedYear,
+              delivery_week: selectedWeek!,
+              day_number: dayNum,
+              delivery_station: station.value,
+            }),
           )
         : [],
   });
 
-  // Parallel member-amounts per station × day — mirrors allStationsWeekQueries.
+  // Parallel member-amounts per station and day — mirrors allStationsWeekQueries.
   const allStationsWeekMemberQueries = useQueries({
     queries:
-      matrixRows.length > 0 &&
-      dayNumbers.length > 0 &&
-      deliveryStations.length > 0
-        ? dayNumbers.flatMap((dayNum) =>
-            deliveryStations.map((station) =>
-              getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
-                year: selectedYear,
-                delivery_week: selectedWeek!,
-                day_number: dayNum,
-                delivery_station: station.value,
-                is_packed_bulk: true,
-              }),
-            ),
+      matrixRows.length > 0
+        ? weekSlots.map(({ dayNum, station }) =>
+            getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
+              year: selectedYear,
+              delivery_week: selectedWeek!,
+              day_number: dayNum,
+              delivery_station: station.value,
+              is_packed_bulk: true,
+            }),
           )
         : [],
   });
@@ -307,41 +333,33 @@ export default function DeliveryStationsDetails() {
     if (
       allStationsWeekQueries.some((q) => q.isLoading) ||
       allStationsWeekMemberQueries.some((q) => q.isLoading) ||
-      deliveryStations.length === 0 ||
-      dayNumbers.length === 0
+      weekSlots.length === 0
     )
       return null;
-    const pages: StationPageData[] = [];
-    let queryIdx = 0;
-    for (const dayNum of dayNumbers) {
-      const dayLabel = getDayName(dayNum, t);
-      for (const station of deliveryStations) {
-        const stationMatrix = allStationsWeekQueries[queryIdx]?.data as
-          | StationMemberMatrix
-          | undefined;
-        const rows = (stationMatrix?.rows ??
-          []) as unknown as StationPageData["rows"];
-        if (rows.length > 0) {
-          pages.push({
-            stationName: `${station.label} — ${dayLabel}`,
-            columns: stationMatrix?.columns ?? [],
-            rows,
-            ...buildMemberMatrix(
-              allStationsWeekMemberQueries[queryIdx]?.data as
-                | PackingBoxesMatrix
-                | undefined,
-            ),
-          });
-        }
-        queryIdx++;
-      }
-    }
+    const pages = weekSlots.flatMap(({ dayNum, station }, index) => {
+      const stationMatrix = allStationsWeekQueries[index]?.data as
+        | StationMemberMatrix
+        | undefined;
+      const rows = (stationMatrix?.rows ?? []) as unknown as StationPageData["rows"];
+      if (rows.length === 0) return [];
+      return [
+        {
+          stationName: `${station.label} — ${getDayName(dayNum, t)}`,
+          columns: stationMatrix?.columns ?? [],
+          rows,
+          ...buildMemberMatrix(
+            allStationsWeekMemberQueries[index]?.data as
+              | PackingBoxesMatrix
+              | undefined,
+          ),
+        },
+      ];
+    });
     return pages.length > 0 ? pages : null;
   }, [
     allStationsWeekQueries,
     allStationsWeekMemberQueries,
-    deliveryStations,
-    dayNumbers,
+    weekSlots,
     t,
     buildMemberMatrix,
   ]);

@@ -54,12 +54,16 @@ import {
   PastWarningMessage,
   ToolTipIcon,
 } from "@shared/ui";
-import { activeAtDateForWeek, isWeekInPast, notify } from "@shared/utils";
+import {
+  activeAtDateForWeek,
+  isWeekInPast,
+  mondayOfIsoWeek,
+  notify,
+} from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import { Button, Popconfirm } from "antd";
-import dayjs from "dayjs";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -427,13 +431,13 @@ export default function Forecast() {
   });
 
   const nextWeekInfo = useMemo(() => {
-    const currentDate = dayjs()
-      .year(selectedYear)
-      .isoWeek(selectedWeek ?? currentWeek);
-    const nextWeekDate = currentDate.add(1, "week");
+    const nextWeekDate = mondayOfIsoWeek(
+      selectedYear,
+      selectedWeek ?? currentWeek,
+    ).add(1, "week");
     return {
       week: nextWeekDate.isoWeek(),
-      year: nextWeekDate.year(),
+      year: nextWeekDate.isoWeekYear(),
     };
   }, [selectedYear, selectedWeek]);
 

@@ -17,7 +17,7 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText } from "@shared/ui";
-import { buildCsvString, toApiDate } from "@shared/utils";
+import { buildCsvString, mondayOfIsoWeek, toApiDate } from "@shared/utils";
 import { useCurrency } from "@hooks/index";
 
 type FeeRow = DeliveryStationFees & TableRecord;
@@ -57,10 +57,7 @@ export default function DeliveryStationFees() {
         end_date: toApiDate(base.endOf("year"))!,
       };
     }
-    const monday = dayjs()
-      .year(selectedYear)
-      .isoWeek(selectedWeek)
-      .startOf("isoWeek");
+    const monday = mondayOfIsoWeek(selectedYear, selectedWeek);
     return {
       start_date: toApiDate(monday)!,
       end_date: toApiDate(monday.endOf("isoWeek"))!,

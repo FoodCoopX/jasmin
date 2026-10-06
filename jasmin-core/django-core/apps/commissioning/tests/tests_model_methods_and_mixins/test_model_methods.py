@@ -10,6 +10,7 @@ import time_machine
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from apps.commissioning.errors import ShareTypeVariationOutsideShareTypeRange
 from apps.commissioning.tests.factories import (
     ContactEntityFactory,
     DeliveryStationDayFactory,
@@ -172,8 +173,9 @@ class TestShareTypeVariationClean:
             share_type=st,
             valid_from=datetime.date(2026, 1, 5),
         )
-        with pytest.raises(ValidationError, match="start date"):
+        with pytest.raises(ShareTypeVariationOutsideShareTypeRange) as exc_info:
             stv.clean()
+        assert exc_info.value.code == "share_type_variation.outside_share_type_range"
 
     def test_valid_until_after_parent_raises(self, tenant):
         st = ShareTypeFactory(
@@ -185,8 +187,9 @@ class TestShareTypeVariationClean:
             valid_from=datetime.date(2026, 1, 5),
             valid_until=datetime.date(2026, 12, 27),
         )
-        with pytest.raises(ValidationError, match="end date"):
+        with pytest.raises(ShareTypeVariationOutsideShareTypeRange) as exc_info:
             stv.clean()
+        assert exc_info.value.details["share_type_valid_until"] == "2026-06-28"
 
     def test_valid_range_within_parent_passes(self, tenant):
         st = ShareTypeFactory(

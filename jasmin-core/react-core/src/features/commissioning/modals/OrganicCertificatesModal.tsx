@@ -32,7 +32,9 @@ export default function OrganicCertificatesModal({
   reseller_name,
 }: OrganicCertificatesModalProps) {
   const { t } = useTranslation();
-  const { validFromColumn, validUntilColumn } = useTimeBoundColumns();
+  const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    overlapGroup: ["reseller"],
+  });
 
   const columns = useMemo<EditableColumnConfig[]>(
     () =>

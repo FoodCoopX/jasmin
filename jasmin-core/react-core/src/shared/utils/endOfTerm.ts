@@ -1,21 +1,5 @@
 import dayjs, { type Dayjs } from "dayjs";
-
-/**
- * Monday of ISO ``week`` in ISO ``year``, computed DETERMINISTICALLY (no
- * ``dayjs()`` wall-clock seed — the isoWeek SETTER is a relative move, so a
- * ``dayjs().year(y).isoWeek(w)`` construction leaks today's month/day into the
- * anchor and breaks at year boundaries). Jan 4 is always in ISO week 1, so its
- * Monday is week 1's Monday; adding ``week - 1`` weeks lands on the target week
- * — and a week past the year's last (53 in a 52-week year) rolls forward
- * exactly like the backend ``isoweek`` library. Mirrors
- * ``subscription_term._sunday_before_iso_week`` so create (frontend) and
- * renewal (backend) agree on every date, at every wall-clock.
- */
-function mondayOfIsoWeek(isoYear: number, week: number): Dayjs {
-  return dayjs(`${isoYear}-01-04`)
-    .isoWeekday(1)
-    .add(week - 1, "week");
-}
+import { mondayOfIsoWeek } from "./weekRange";
 
 /**
  * Map ``ShareType.delivery_cycle`` (canonical backend values) to the

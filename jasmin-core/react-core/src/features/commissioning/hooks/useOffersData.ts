@@ -10,8 +10,7 @@
  */
 
 import { useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
-import { toApiDate } from "@shared/utils";
+import { mondayOfIsoWeek, toApiDate } from "@shared/utils";
 import { useCallback, useMemo } from "react";
 import {
   getCommissioningOfferSendingStatusListQueryKey,
@@ -42,9 +41,7 @@ export function useOffersData({
   const queryClient = useQueryClient();
 
   const mondayOfSelectedWeek = useMemo(() => {
-    return toApiDate(
-      dayjs().year(selectedYear).isoWeek(selectedWeek).startOf("isoWeek"),
-    )!;
+    return toApiDate(mondayOfIsoWeek(selectedYear, selectedWeek))!;
   }, [selectedYear, selectedWeek]);
 
   const shareArticleFilters = useMemo(

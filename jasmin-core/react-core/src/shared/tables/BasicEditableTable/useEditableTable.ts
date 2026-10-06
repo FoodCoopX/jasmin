@@ -8,8 +8,10 @@ import { useDateFormat } from "@hooks/configuration/useDateFormat";
 import axiosService from "@shared/services/api";
 import { getErrorMessage } from "@shared/utils/apiError";
 import { buildLiveRecord } from "./buildLiveRecord";
-import { columnTitleText } from "./columnTitleText";
+import { nodeText } from "./nodeText";
 import { duplicateErrors } from "./duplicateErrors";
+import { periodErrors } from "./periodErrors";
+import { RowSaveRefused } from "./RowSaveRefused";
 import type {
   EditableColumnConfig,
   SelectOption,
@@ -33,6 +35,38 @@ const sameFields = (a: TableRecord, b: TableRecord): boolean => {
     keys.every((key) => Object.is(a[key], b[key]))
   );
 };
+
+/**
+ * Shows a row `customSave` refused: the message above the table and, for a
+ * `RowSaveRefused`, a mark on each field it names.
+ */
+const showRefusal = (
+  error: unknown,
+  setFormErrors: (errors: Record<string, string>) => void,
+  setSaveErrorMessage: (message: string) => void,
+): void => {
+  if (error instanceof RowSaveRefused) setFormErrors(error.fieldErrors);
+  setSaveErrorMessage((error as Error).message);
+};
+
+/**
+ * The field errors of a row about to be saved: a repeat of another row's
+ * `uniqueCheck` values, then a period the backend would refuse in the
+ * `overlapGroup` a column names.
+ */
+const ruleErrors = <T extends TableRecord>({
+  uniqueCheck,
+  uniqueCheckMessage,
+  ...check
+}: Parameters<typeof periodErrors<T>>[0] & {
+  uniqueCheck: string | string[] | null;
+  uniqueCheckMessage: string | null;
+}): Record<string, string> => ({
+  ...(uniqueCheck
+    ? duplicateErrors({ uniqueCheck, uniqueCheckMessage, ...check })
+    : {}),
+  ...periodErrors(check),
+});
 
 export const useEditableTable = <T extends TableRecord = TableRecord>({
   apiEndpoints = {},
@@ -442,30 +476,28 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
             }
             transformedRow = result;
           } catch (customSaveError) {
-            setSaveErrorMessage((customSaveError as Error).message);
+            showRefusal(customSaveError, setFormErrors, setSaveErrorMessage);
             return;
           }
         }
 
-        // Uniqueness validation
-        if (uniqueCheck) {
-          const errors = duplicateErrors({
-            uniqueCheck,
-            uniqueCheckMessage,
-            rows: data,
-            extraRows: uniqueCheckRows,
-            key,
-            row: transformedRow,
-          });
-
-          if (Object.keys(errors).length > 0) {
-            // Both: mark the offending field with a red border via formErrors
-            // AND surface the message in the banner above the table (no
-            // toast) — the banner stays until the user fixes the row.
-            setFormErrors(errors);
-            setSaveErrorMessage(Object.values(errors)[0]);
-            return;
-          }
+        // Uniqueness and validity-period rules
+        const errors = ruleErrors({
+          columns,
+          uniqueCheck,
+          uniqueCheckMessage,
+          rows: data,
+          extraRows: uniqueCheckRows,
+          key,
+          row: transformedRow,
+        });
+        if (Object.keys(errors).length > 0) {
+          // Both: mark the offending field with a red border via formErrors
+          // AND surface the message in the banner above the table (no
+          // toast) — the banner stays until the user fixes the row.
+          setFormErrors(errors);
+          setSaveErrorMessage(Object.values(errors)[0]);
+          return;
         }
 
         // API call
@@ -607,7 +639,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
         if (fields.length > 0) {
           const labels = fields.map((name) => {
             const col = columns.find((c) => c.dataIndex === name);
-            return (col && columnTitleText(col.title)) || name;
+            return (col && nodeText(col.title)) || name;
           });
           setSaveErrorMessage(`${labels.join(", ")}: ${baseMessage}`);
         } else {

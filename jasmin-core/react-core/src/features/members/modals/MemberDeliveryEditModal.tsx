@@ -1,6 +1,5 @@
 import { Button, Checkbox, Form, Modal, Select, Space } from "antd";
-import dayjs from "dayjs";
-import { toApiDate } from "@shared/utils";
+import { mondayOfIsoWeek, toApiDate } from "@shared/utils";
 import { FC, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -42,11 +41,10 @@ const MemberDeliveryEditModal: FC<MemberDeliveryEditModalProps> = ({
   // active delivery station days
   const deliveryDate = useMemo(() => {
     if (!delivery?.year || !delivery.delivery_week) return undefined;
-    const d = dayjs()
-      .year(delivery.year)
-      .isoWeek(delivery.delivery_week)
-      .startOf("isoWeek")
-      .add(delivery.delivery_day_number ?? 0, "day");
+    const d = mondayOfIsoWeek(delivery.year, delivery.delivery_week).add(
+      delivery.delivery_day_number ?? 0,
+      "day",
+    );
     return toApiDate(d)!;
   }, [delivery?.year, delivery?.delivery_week, delivery?.delivery_day_number]);
 

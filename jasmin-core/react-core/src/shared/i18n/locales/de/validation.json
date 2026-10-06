@@ -3,7 +3,6 @@
       "abos": "Die Kombination existiert bereits.",
       "share_article_unit_size_must_be_unique": "Kombination aus Artikel/Einheit/Größe muss einzigartig sein.",
       "crate_type": "Kistentyp muss einzigartig sein.",
-      "delivery_day_tour_number_valid_from": "Kombination aus Liefertag, Tour-Nummer und gültig-ab muss einzigartig sein.",
       "delivery_note_modal_crate": "Kiste im Lieferschein muss einzigartig sein.",
       "documentation_purchase": "Eintrag in der Einkaufsdokumentation muss einzigartig sein.",
       "invoice_modal_crate": "Kiste in der Rechnung muss einzigartig sein.",
@@ -12,10 +11,8 @@
       "members_member_number_must_be_unique": "Mitgliedsnummer muss einzigartig sein.",
       "name": "Name muss einzigartig sein.",
       "number": "Nummer muss einzigartig sein.",
-      "size": "Größe muss innerhalb dieser Anteilsvariante einzigartig sein.",
-      "time_management": "Zeit-Konfiguration muss einzigartig sein.",
       "time_management_order_days": "Bestelltage müssen einzigartig sein.",
-      "sort_order": "Diese Reihenfolge ist bereits einer anderen Variante zugewiesen."
+      "sort_order": "Diese Reihenfolge ist im selben Zeitraum bereits einer anderen Variante zugewiesen."
     },
     "at_least_one_storage_required": "Bitte ein Lager auswählen/anhaken.",
     "iban_invalid": "Bitte eine gültige IBAN eingeben. Ländercode, Länge (DE = 22 Zeichen, AT = 20, CH = 21) und Prüfziffern kontrollieren.",

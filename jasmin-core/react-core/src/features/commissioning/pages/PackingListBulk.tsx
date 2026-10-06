@@ -20,6 +20,7 @@ import {
   useIsMobile,
   currentWeek,
   useNoteColumn,
+  useNumberFormat,
   useVegetableSizeOptions,
   useTenant,
   useUnitOptions,
@@ -51,6 +52,7 @@ import { ExplainerText, MobileStack, PastWarningMessage } from "@shared/ui";
 import {
   activeAtDateForWeek,
   dateForWeekDayNumber,
+  formatAmountForUnit,
   formatDayLabel,
   formatWeekLabel,
   generatePdfFilename,
@@ -73,6 +75,17 @@ const widthTotalAmount = "10%";
 
 const currentDay = dayjs().isoWeekday();
 
+/** A row's total in the tenant's number format, at its unit's precision —
+ *  the text the table, the phone card and the printed list all show. */
+const totalAmountText = (
+  amount: unknown,
+  unit: unknown,
+  format: (value: number, decimals: number) => string,
+): string =>
+  amount == null || amount === "" || !Number.isFinite(Number(amount))
+    ? ""
+    : formatAmountForUnit(Number(amount), unit as string | null, format);
+
 // Bulk endpoint accepts ``delivery_station`` and ``is_packed_bulk`` (MIXED-mode
 // split); ``share_type`` is optional — omitting it sums every share_type.
 type BulkParams = CommissioningPackingListBulkListParams & {
@@ -90,6 +103,7 @@ export default function PackingListBulk() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const { format } = useNumberFormat();
   const { dateFormat, mobileDateFormat } = useDateFormat();
   const deliveryDayLabel = useDeliveryDayLabel();
   const { getUnitLabel } = useUnitOptions();
@@ -298,12 +312,8 @@ export default function PackingListBulk() {
       align: "center",
       width: "10em",
       disabled: true,
-      render: (value: unknown) => {
-        if (value === null || value === undefined || value === "") return "";
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return String(value);
-        return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2);
-      },
+      render: (value: unknown, record: TableRecord) =>
+        totalAmountText(value, record.unit, format),
     };
 
     const endColumns: EditableColumnConfig<TableRecord>[] = [
@@ -322,7 +332,7 @@ export default function PackingListBulk() {
     ];
 
     return [...baseColumns, totalAmountColumn, ...endColumns];
-  }, [t, widthNote, shareArticleColumn, amountUnitSizeColumns, noteColumn]);
+  }, [t, widthNote, shareArticleColumn, amountUnitSizeColumns, noteColumn, format]);
 
   const apiFunctions = useMemo<ApiFunctions>(() => wrapApiFunctions({}), []);
 
@@ -366,10 +376,11 @@ export default function PackingListBulk() {
     () =>
       data.map((item) => ({
         ...item,
+        total_amount_text: totalAmountText(item.total_amount, item.unit, format),
         unit_label: item.unit ? getUnitLabel(item.unit as string) : "",
         size_label: item.size ? getVegetableSizeLabel(item.size as string) : "",
       })),
-    [data, getUnitLabel, getVegetableSizeLabel],
+    [data, format, getUnitLabel, getVegetableSizeLabel],
   );
 
   const stationName = useMemo(

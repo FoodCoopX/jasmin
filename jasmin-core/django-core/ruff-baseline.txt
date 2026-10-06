@@ -2,7 +2,7 @@
 # Managed by scripts/ruff_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/ruff_baseline.py freeze
-# 193 finding(s).
+# 192 finding(s).
 
 apps/accounts/backends.py: N806 Variable `UserModel` in function should be lowercase
 apps/accounts/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
@@ -26,7 +26,6 @@ apps/commissioning/models/basics.py: N815 Variable `pieces_per_kg_M` in class sc
 apps/commissioning/models/basics.py: N815 Variable `pieces_per_kg_S` in class scope should not be mixedCase
 apps/commissioning/models/days.py: PLR0913 Too many arguments in function definition (8 > 5)
 apps/commissioning/models/mixin.py: C901 `save` is too complex (11 > 10)
-apps/commissioning/models/shares.py: C901 `clean` is too complex (11 > 10)
 apps/commissioning/serializers/documentation_serializer.py: N815 Variable `selectedData` in class scope should not be mixedCase
 apps/commissioning/serializers/documentation_serializer.py: N815 Variable `selectedData` in class scope should not be mixedCase
 apps/commissioning/serializers/shares_serializer.py: N815 Variable `kg_per_bunch_L` in class scope should not be mixedCase

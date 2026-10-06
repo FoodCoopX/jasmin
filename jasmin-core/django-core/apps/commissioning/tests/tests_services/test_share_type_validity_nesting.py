@@ -8,9 +8,11 @@ from __future__ import annotations
 import datetime
 
 import pytest
-from django.core.exceptions import ValidationError
 
-from apps.commissioning.errors import ShareTypeShorteningStrandsVariation
+from apps.commissioning.errors import (
+    ShareTypeShorteningStrandsVariation,
+    ShareTypeVariationOutsideShareTypeRange,
+)
 from apps.commissioning.tests.factories import (
     ShareTypeFactory,
     ShareTypeVariationFactory,
@@ -51,8 +53,9 @@ class TestShareTypeValidityNesting:
         share_type.valid_until = _SUNDAY
         share_type.save()  # close it — no children yet, so allowed
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ShareTypeVariationOutsideShareTypeRange) as exc_info:
             ShareTypeVariationFactory(share_type=share_type, valid_until=None)
+        assert exc_info.value.code == "share_type_variation.outside_share_type_range"
 
     def test_shortening_parent_still_covering_variation_allowed(self, tenant):
         # Sanity: shortening to a date that still covers a closed child is fine.

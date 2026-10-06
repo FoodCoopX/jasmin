@@ -110,7 +110,9 @@ export default function ShareTypeVariationPriceModal({
   const activeStatusColumn = useActiveStatusColumn({
     defaultSortOrder: "descend",
   });
-  const { validFromColumn, validUntilColumn } = useTimeBoundColumns();
+  const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    overlapGroup: ["share_type_variation"],
+  });
 
   const columns = useMemo<EditableColumnConfig[]>(
     () =>

@@ -153,8 +153,8 @@ export const useContactColumns = (options: ContactColumnOptions = {}) => {
       }),
       phone2: applyOverrides("phone2", {
         title: <>{t(`${translationPrefix}.phone2`)}</>,
-        dataIndex: "phone2",
-        key: "phone2",
+        dataIndex: "phone_2",
+        key: "phone_2",
         inputType: "text",
         required: false,
         width: "14em",

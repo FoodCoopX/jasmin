@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "antd";
-import dayjs from "dayjs";
-import { toApiDate } from "@shared/utils";
+import { mondayOfIsoWeek, toApiDate } from "@shared/utils";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -56,9 +55,7 @@ export default function ShareWeights() {
 
   const activeAtDate = useMemo(() => {
     if (!selectedWeek) return undefined;
-    return toApiDate(
-      dayjs().year(selectedYear).isoWeek(selectedWeek).startOf("isoWeek"),
-    )!;
+    return toApiDate(mondayOfIsoWeek(selectedYear, selectedWeek))!;
   }, [selectedYear, selectedWeek]);
 
   const listParams = useMemo<CommissioningSharesListParams>(

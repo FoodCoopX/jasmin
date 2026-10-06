@@ -38,6 +38,13 @@ import { useSharedAboColumns } from "./useSharedAboColumns";
 type AbosData = ReturnType<typeof useAbosData>;
 type AdminConfirmation = ReturnType<typeof useAdminConfirmationModalAbos>;
 
+// Subscriptions run side by side, so their periods may overlap.
+const SUBSCRIPTION_PERIOD_OPTIONS = {
+  overlapGroup: null,
+  width: "9em",
+  validUntilRequired: true,
+};
+
 // Parse a price-ish value to a number, tolerant of BOTH the canonical
 // dot-decimal (backend strings like "14.00", or a raw number) AND a
 // locale-formatted string the AntD input may hold (German "14,00", or
@@ -169,10 +176,9 @@ export function useAbosColumns({
     onShowDetails: (status, record) =>
       onShowSepaDetails(status, record as AboRecord),
   });
-  const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
-    width: "9em",
-    validUntilRequired: true,
-  });
+  const { validFromColumn, validUntilColumn } = useTimeBoundColumns(
+    SUBSCRIPTION_PERIOD_OPTIONS,
+  );
 
   // Lock the subscription's editable columns once the office has
   // admin-confirmed it. From that moment on, the only way to alter the

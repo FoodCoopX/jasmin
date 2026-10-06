@@ -2,6 +2,9 @@ export { default as EditableTable } from './BasicEditableTable';
 export { adminConfirmationColumn } from './adminConfirmationColumn';
 export type { AdminStatusVariant } from './adminConfirmationColumn';
 export { wrapApiFunctions } from './BasicEditableTable/wrapApiFunctions';
+export { RowSaveRefused } from './BasicEditableTable/RowSaveRefused';
+export { sameCellValue } from './BasicEditableTable/duplicateErrors';
+export { periodsOverlap } from './BasicEditableTable/periodErrors';
 export type { RawApiFunctions } from './BasicEditableTable/wrapApiFunctions';
 export {
   READ_ONLY_PERMISSION,

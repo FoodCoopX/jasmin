@@ -37,7 +37,7 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable";
 import { ExplainerText } from "@shared/ui";
-import { activeAtDateForWeek, isYearInPast } from "@shared/utils";
+import { activeAtDateForWeek, editableOnlyOnCreate, isYearInPast } from "@shared/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, Space } from "antd";
 import type { FormInstance } from "antd";
@@ -115,8 +115,11 @@ export default function PlanningShareContentLongTermBase({
 
   const { amountUnitSizeColumns } = useAmountUnitSizeColumns({
     showAmount: false,
+    // A saved row's unit and size belong to its slot, as its article does: the
+    // backend reads them from the slot id, so another unit is another row.
     overrides: {
-      unit: { onFieldChange: handleUnitChange },
+      unit: { onFieldChange: handleUnitChange, disabled: editableOnlyOnCreate },
+      size: { disabled: editableOnlyOnCreate },
     },
   });
 
@@ -323,10 +326,7 @@ export default function PlanningShareContentLongTermBase({
 
   const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
     () => [
-      {
-        ...shareArticleColumn,
-        disabled: (record: TableRecord) => record.key != -1,
-      },
+      { ...shareArticleColumn, disabled: editableOnlyOnCreate },
       ...amountUnitSizeColumns,
 
       ...(effectiveMode === "total"

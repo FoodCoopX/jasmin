@@ -61,6 +61,7 @@ export default function ConfigurationDeliveryExceptions() {
 
   const activeStatusColumn = useActiveStatusColumn();
   const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    overlapGroup: ["share_type_variation"],
     validFromRequired: true,
     validUntilRequired: true,
     // A delivery pause can only be scheduled going forward — the backend

@@ -5,10 +5,10 @@ from __future__ import annotations
 import datetime
 
 import pytest
-from django.core.exceptions import ValidationError
 
 from apps.commissioning.errors import (
     TimeBoundInvalidRange,
+    TimeBoundOverlap,
     TimeBoundValidFromNotMonday,
     TimeBoundValidUntilNotSunday,
 )
@@ -143,8 +143,13 @@ class TestValidateNoOverlap:
             day_number=2,
             valid_from=datetime.date(2026, 3, 30),
         )
-        with pytest.raises(ValidationError, match="Overlapping"):
+        with pytest.raises(TimeBoundOverlap) as exc_info:
             new._validate_no_overlap()
+        assert exc_info.value.code == "time_bound.overlap"
+        assert exc_info.value.details == {
+            "existing_valid_from": "2026-01-05",
+            "existing_valid_until": "2026-06-28",
+        }
 
     def test_open_ended_overlap_detected(self, tenant):
         SharesDeliveryDayFactory(
@@ -156,8 +161,14 @@ class TestValidateNoOverlap:
             day_number=2,
             valid_from=datetime.date(2026, 6, 1),
         )
-        with pytest.raises(ValidationError, match="Overlapping"):
+        with pytest.raises(TimeBoundOverlap) as exc_info:
             new._validate_no_overlap()
+        # The message names the open end, so the context says there is one.
+        assert exc_info.value.details == {
+            "existing_valid_from": "2026-01-05",
+            "existing_valid_until": None,
+            "context": "open",
+        }
 
     def test_different_group_allowed(self, tenant):
         SharesDeliveryDayFactory(

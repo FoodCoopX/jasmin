@@ -34,6 +34,7 @@ export default function CratePriceModal({
     defaultSortOrder: "descend",
   });
   const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    overlapGroup: ["crate"],
     width: "9em",
   });
 

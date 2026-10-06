@@ -137,7 +137,9 @@
     "succession_start_before_predecessor": "Es kann kein neuer Eintrag vor dem bestehenden offenen Eintrag begonnen werden, den er ablösen würde. Wähle ein Startdatum am oder nach dem des bestehenden Eintrags, oder schließe den bestehenden Eintrag zuerst.",
     "valid_from_not_monday": "Das Startdatum muss ein Montag sein.",
     "valid_until_not_sunday": "Das Enddatum muss ein Sonntag sein.",
-    "invalid_range": "Das Enddatum darf nicht vor dem Startdatum liegen."
+    "invalid_range": "Das Enddatum darf nicht vor dem Startdatum liegen.",
+    "overlap": "Der Zeitraum überschneidet sich mit einem bestehenden Eintrag vom {{existing_valid_from}} bis {{existing_valid_until}}. Wähle Daten, die sich mit keinem anderen Eintrag überschneiden.",
+    "overlap_open": "Der Zeitraum überschneidet sich mit einem bestehenden Eintrag, der ab dem {{existing_valid_from}} ohne Enddatum gilt. Wähle Daten, die sich mit keinem anderen Eintrag überschneiden."
   },
   "share_type_variation": {
     "not_found": "Anteilsvariation nicht gefunden.",

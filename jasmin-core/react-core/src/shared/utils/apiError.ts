@@ -133,9 +133,20 @@ function translateByCode(err: unknown): string | undefined {
   if (!code) return undefined;
   // DRF/Django generic codes pass through to the already-translated message.
   if (code === "validation_error" || code === "not_authenticated") return undefined;
+  return messageForErrorCode(code, getErrorDetails(err));
+}
+
+/**
+ * The message an API error with this code and these details shows, or
+ * `undefined` when the code has no entry. Lets the frontend refuse a change
+ * in the very words the backend's refusal of it would be shown in.
+ */
+export function messageForErrorCode(
+  code: string,
+  details?: Record<string, unknown>,
+): string | undefined {
   const key = `errors.${code}`;
-  const details = withDisplayDates(getErrorDetails(err));
-  const translated = i18n.t(key, details);
+  const translated = i18n.t(key, withDisplayDates(details));
   return translated && translated !== key ? translated : undefined;
 }
 

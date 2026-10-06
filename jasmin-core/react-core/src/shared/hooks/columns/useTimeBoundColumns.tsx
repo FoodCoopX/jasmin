@@ -21,6 +21,14 @@ export interface EarlierStartWindow {
  * column definitions for any EditableTable backed by a TimeBoundMixin model.
  */
 interface TimeBoundColumnOptions {
+  /**
+   * The fields whose values form a row's overlap group — the model's
+   * `overlap_unique_fields`. The rows of a group may not share a day, and a
+   * new row closes the group's open row the day before it starts; the table
+   * refuses a save that breaks this, in the backend's words. `null` for rows
+   * that may overlap (subscriptions).
+   */
+  overlapGroup: readonly string[] | null;
   validFromRequired?: boolean;
   validUntilRequired?: boolean;
   width?: string;
@@ -63,8 +71,9 @@ interface TimeBoundColumnOptions {
   };
 }
 
-export const useTimeBoundColumns = (options: TimeBoundColumnOptions = {}) => {
+export const useTimeBoundColumns = (options: TimeBoundColumnOptions) => {
   const {
+    overlapGroup,
     validFromRequired = true,
     validUntilRequired = false,
     width = "10em",
@@ -76,6 +85,9 @@ export const useTimeBoundColumns = (options: TimeBoundColumnOptions = {}) => {
 
   const { t } = useTranslation();
   const { dateFormat } = useDateFormat();
+  // Keyed as a string, so a caller's inline array doesn't renew the column —
+  // and make the table re-read its rows — on every render.
+  const overlapGroupKey = overlapGroup ? overlapGroup.join(",") : null;
 
   // The first Monday on or after today (equal to today when today is a Monday,
   // otherwise next Monday) — the earliest a future-only ``valid_from`` may be.
@@ -165,9 +177,11 @@ export const useTimeBoundColumns = (options: TimeBoundColumnOptions = {}) => {
       align: "center",
       disabledDate: disabledDateValidFrom,
       disabled: validFromDisabled,
+      overlapGroup:
+        overlapGroupKey === null ? null : overlapGroupKey.split(",").filter(Boolean),
       render: (value: unknown) => (value ? dayjs(value as string).format(dateFormat) : (value as string)),
     }),
-    [t, dateFormat, validFromRequired, width, disabledDateValidFrom, validFromDisabled],
+    [t, dateFormat, validFromRequired, width, disabledDateValidFrom, validFromDisabled, overlapGroupKey],
   );
 
   const validUntilColumn = useMemo<EditableColumnConfig<TableRecord>>(

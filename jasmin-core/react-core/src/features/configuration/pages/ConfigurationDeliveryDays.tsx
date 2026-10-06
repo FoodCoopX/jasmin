@@ -93,6 +93,7 @@ export default function ConfigurationDeliveryDays() {
     laterAllowed: notInUse,
   });
   const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    overlapGroup: ["day_number"],
     // A new delivery day can only be scheduled going forward — the backend
     // rejects a past valid_from; this aligns the picker with that rule.
     validFromFutureOnly: true,
@@ -423,8 +424,6 @@ export default function ConfigurationDeliveryDays() {
         focusIndex="day_number"
         initialData={data}
         loading={sharesLoading}
-        uniqueCheck={["day_number", "valid_from"]}
-        uniqueCheckMessage={t("validation.unique.time_management")}
         onSaveSuccess={onSharesSaveSuccess}
         onDeleteSuccess={onSharesDeleteSuccess}
         permissions={permissions}

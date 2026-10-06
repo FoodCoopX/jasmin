@@ -28,7 +28,10 @@ import ModalCloseFooter from "@shared/modals/ModalCloseFooter";
 import RichTextEditorModal from "@shared/modals/RichTextEditorModal";
 import {
   EditableTable,
+  RowSaveRefused,
   gatedByPermission,
+  periodsOverlap,
+  sameCellValue,
   wrapApiFunctions,
 } from "@shared/tables";
 import type {
@@ -70,6 +73,29 @@ interface ShareTypeVariationModalProps {
   share_type: string | null;
   share_type_name: string;
   onSave?: () => void;
+}
+
+/**
+ * Whether a variation of another size, valid on a day `variation` covers, has
+ * its sort order: the backend's variation lists order by it first, so a tie
+ * would leave the order to the id. Variations of one size never run at the
+ * same time — the table refuses overlapping periods — so a successor may keep
+ * its predecessor's sort order.
+ */
+function sortOrderTaken(
+  variations: ShareTypeVariationRecord[],
+  variation: Record<string, unknown>,
+  record: TableRecord,
+): boolean {
+  const sortOrder = variation.sort_order;
+  if (sortOrder == null || sortOrder === "") return false;
+  return variations.some(
+    (other) =>
+      other.id !== record.id &&
+      !sameCellValue(other.size, variation.size) &&
+      sameCellValue(other.sort_order, sortOrder) &&
+      periodsOverlap(other, variation),
+  );
 }
 
 export default function ShareTypeVariationModal({
@@ -148,6 +174,8 @@ export default function ShareTypeVariationModal({
     defaultSortOrder: "descend",
   });
   const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    // One variation per share type and size at a time.
+    overlapGroup: ["share_type", "size"],
     width: "8em",
     // A variation can't end before its latest subscription, and can't be closed
     // at all while a subscription is open-ended (backend stranding guard).
@@ -247,6 +275,8 @@ export default function ShareTypeVariationModal({
         invalidateData();
       } catch (error) {
         notify.error(getErrorMessage(error, t("common.error_saving")));
+        // Keeps the editor open with the text.
+        throw error;
       }
     },
     [selectedDescriptionRecord, t, invalidateData],
@@ -602,33 +632,16 @@ export default function ShareTypeVariationModal({
   );
 
   const customSave = useCallback(
-    (transformedData: Record<string, unknown>) => {
-      // Sort-order uniqueness — the table's built-in ``uniqueCheck``
-      // prop only supports one rule (currently ``size``). Enforce
-      // sort-order uniqueness here so the office can't ship two rows
-      // with the same "3". The backend's variation querysets order by
-      // ``sort_order`` first (see
-      // ``ShareDeliveryService.get_weekly_variation_count_matrix`` +
-      // ``ShareTypeVariationViewSet.get_queryset``); duplicates would leave
-      // tiebreakers up to ``id`` and confuse the office.
-      const sortOrder = transformedData.sort_order;
-      const editingId = transformedData.id;
-      if (sortOrder != null && sortOrder !== "") {
-        const duplicate = (data as Array<Record<string, unknown>>).some(
-          (row) => row.id !== editingId && row.sort_order === sortOrder,
-        );
-        if (duplicate) {
-          const msg = t("validation.unique.sort_order");
-          notify.error(msg);
-          // Throwing aborts the save; ``EditableTable`` keeps the row
-          // in edit mode so the office can pick a different value.
-          throw new Error(msg);
-        }
-      }
-      return {
+    (transformedData: Record<string, unknown>, record: TableRecord) => {
+      const variation: Record<string, unknown> = {
         ...transformedData,
         share_type,
       };
+      if (sortOrderTaken(data, variation, record)) {
+        const message = t("validation.unique.sort_order");
+        throw new RowSaveRefused(message, { sort_order: message });
+      }
+      return variation;
     },
     [share_type, data, t],
   );
@@ -680,8 +693,6 @@ export default function ShareTypeVariationModal({
               onSaveSuccess={handleSaveSuccess}
               onDeleteSuccess={handleDeleteSuccess}
               permissions={permissions}
-              uniqueCheck={["size"]}
-              uniqueCheckMessage={t("validation.unique.size")}
               customSave={customSave}
               forceInlineMode={true}
             />

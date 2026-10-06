@@ -4,10 +4,15 @@ import type { Dayjs } from "dayjs";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+// One `t` for every render, as react-i18next keeps it: the columns depend on
+// it, so a new `t` per render would renew them.
+const i18nMock = vi.hoisted(() => ({
+  t: (key: string, fallback?: unknown) =>
+    typeof fallback === "string" ? fallback : key,
+}));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: unknown) =>
-      typeof fallback === "string" ? fallback : key,
+    t: i18nMock.t,
     i18n: { language: "de", changeLanguage: () => Promise.resolve() },
   }),
   Trans: ({ children }: { children?: ReactNode }) => <>{children}</>,
@@ -33,7 +38,7 @@ import { useTimeBoundColumns } from "../useTimeBoundColumns";
  */
 describe("useTimeBoundColumns disabledDate — plugin-independent weekday gating", () => {
   const getPredicates = () => {
-    const { result } = renderHook(() => useTimeBoundColumns());
+    const { result } = renderHook(() => useTimeBoundColumns({ overlapGroup: null }));
     // The declared type is (current: Dayjs) => boolean — what AntD passes —
     // but the runtime contract this suite pins includes tolerating EMPTY
     // cells (null/undefined) without throwing. Widen locally so the
@@ -90,6 +95,7 @@ describe("useTimeBoundColumns validUntilFloor — per-row lower bound", () => {
   ) => {
     const { result } = renderHook(() =>
       useTimeBoundColumns({
+        overlapGroup: null,
         validUntilFloor: floor as never,
       }),
     );
@@ -126,7 +132,7 @@ describe("useTimeBoundColumns validUntilFloor — per-row lower bound", () => {
 
 describe("useTimeBoundColumns — cross-field valid_until > valid_from", () => {
   it("disables Sundays on or before the live valid_from, allows later ones", () => {
-    const { result } = renderHook(() => useTimeBoundColumns());
+    const { result } = renderHook(() => useTimeBoundColumns({ overlapGroup: null }));
     const validUntil = result.current.validUntilColumn.disabledDate! as (
       current: Dayjs,
       record?: Record<string, unknown>,
@@ -139,7 +145,7 @@ describe("useTimeBoundColumns — cross-field valid_until > valid_from", () => {
   });
 
   it("no valid_from selected yet → only the Sunday rule applies", () => {
-    const { result } = renderHook(() => useTimeBoundColumns());
+    const { result } = renderHook(() => useTimeBoundColumns({ overlapGroup: null }));
     const validUntil = result.current.validUntilColumn.disabledDate! as (
       current: Dayjs,
       record?: Record<string, unknown>,
@@ -151,7 +157,7 @@ describe("useTimeBoundColumns — cross-field valid_until > valid_from", () => {
 describe("useTimeBoundColumns — validFromFutureOnly", () => {
   it("disables past Mondays and allows the first upcoming Monday and later", () => {
     const { result } = renderHook(() =>
-      useTimeBoundColumns({ validFromFutureOnly: true }),
+      useTimeBoundColumns({ overlapGroup: null, validFromFutureOnly: true }),
     );
     const validFrom = result.current.validFromColumn.disabledDate! as (
       current: Dayjs,
@@ -168,7 +174,7 @@ describe("useTimeBoundColumns — validFromFutureOnly", () => {
   });
 
   it("without the flag, past Mondays are still allowed (default)", () => {
-    const { result } = renderHook(() => useTimeBoundColumns());
+    const { result } = renderHook(() => useTimeBoundColumns({ overlapGroup: null }));
     const validFrom = result.current.validFromColumn.disabledDate! as (
       current: Dayjs,
     ) => boolean;
@@ -190,6 +196,7 @@ describe("useTimeBoundColumns — validFromEarlierMove", () => {
   const columns = (laterAllowed: boolean, lockedOnSave = false) => {
     const { result } = renderHook(() =>
       useTimeBoundColumns({
+        overlapGroup: null,
         validFromFutureOnly: true,
         validFromLockedOnSave: lockedOnSave,
         validFromEarlierMove: (record) =>
@@ -239,6 +246,7 @@ describe("useTimeBoundColumns — validFromEarlierMove", () => {
   it("locks a start without a window as before", () => {
     const { result } = renderHook(() =>
       useTimeBoundColumns({
+        overlapGroup: null,
         validFromLockedOnSave: true,
         validFromEarlierMove: () => null,
       }),
@@ -250,3 +258,37 @@ describe("useTimeBoundColumns — validFromEarlierMove", () => {
   });
 });
 
+
+describe("useTimeBoundColumns — overlapGroup", () => {
+  it("puts the overlap group on the valid_from column for the table to check", () => {
+    const { result } = renderHook(() =>
+      useTimeBoundColumns({ overlapGroup: ["share_type", "size"] }),
+    );
+
+    expect(result.current.validFromColumn.overlapGroup).toEqual([
+      "share_type",
+      "size",
+    ]);
+    expect(result.current.validUntilColumn.overlapGroup).toBeUndefined();
+  });
+
+  it("keeps the column for a group passed as a new array each render", () => {
+    // A new column object makes the table re-read its rows.
+    const { result, rerender } = renderHook(() =>
+      useTimeBoundColumns({ overlapGroup: ["crate"] }),
+    );
+    const first = result.current.validFromColumn;
+
+    rerender();
+
+    expect(result.current.validFromColumn).toBe(first);
+  });
+
+  it("names no group for rows that may overlap", () => {
+    const { result } = renderHook(() =>
+      useTimeBoundColumns({ overlapGroup: null }),
+    );
+
+    expect(result.current.validFromColumn.overlapGroup).toBeNull();
+  });
+});

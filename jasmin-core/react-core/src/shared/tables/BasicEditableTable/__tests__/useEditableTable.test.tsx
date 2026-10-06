@@ -45,6 +45,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { useEditableTable } from "../useEditableTable";
+import { RowSaveRefused } from "../RowSaveRefused";
 import type { EditableColumnConfig, TableRecord } from "../types";
 
 interface Row extends TableRecord {
@@ -210,6 +211,103 @@ describe("useEditableTable", () => {
 
     expect(customSave).toHaveBeenCalled();
     expect(apiFunctions.update).not.toHaveBeenCalled();
+  });
+
+  it("a RowSaveRefused from customSave keeps the row open, shows its message and marks the fields it names", async () => {
+    const apiFunctions = { update: vi.fn() };
+    const customSave = vi.fn(() => {
+      throw new RowSaveRefused("Amount is taken", { amount: "Amount is taken" });
+    });
+
+    const { result } = renderHook(() =>
+      useEditableTable<Row>({ columns: baseColumns, apiFunctions, customSave }),
+    );
+    act(() => {
+      result.current.setDataWithTransform([sampleRow]);
+    });
+    await act(async () => {
+      await result.current.edit(sampleRow);
+    });
+
+    await act(async () => {
+      await result.current.save("r1", { name: "Carrots", amount: 7 });
+    });
+
+    expect(apiFunctions.update).not.toHaveBeenCalled();
+    expect(result.current.saveErrorMessage).toBe("Amount is taken");
+    expect(result.current.formErrors).toEqual({ amount: "Amount is taken" });
+    expect(result.current.editingKey).toBe("r1");
+  });
+
+  it("a plain Error from customSave shows its message without marking a field", async () => {
+    const apiFunctions = { update: vi.fn() };
+    const customSave = vi.fn(() => {
+      throw new Error("Not now");
+    });
+
+    const { result } = renderHook(() =>
+      useEditableTable<Row>({ columns: baseColumns, apiFunctions, customSave }),
+    );
+    act(() => {
+      result.current.setDataWithTransform([sampleRow]);
+    });
+
+    await act(async () => {
+      await result.current.save("r1", { name: "Carrots", amount: 7 });
+    });
+
+    expect(apiFunctions.update).not.toHaveBeenCalled();
+    expect(result.current.saveErrorMessage).toBe("Not now");
+    expect(result.current.formErrors).toEqual({});
+  });
+
+  it("refuses a period that overlaps another row of the column's overlap group", async () => {
+    const apiFunctions = { update: vi.fn() };
+    const periodColumns: EditableColumnConfig<Row>[] = [
+      ...baseColumns,
+      {
+        title: "Valid from",
+        dataIndex: "valid_from",
+        inputType: "text",
+        overlapGroup: ["name"],
+      },
+      { title: "Valid until", dataIndex: "valid_until", inputType: "text" },
+    ];
+    const { result } = renderHook(() =>
+      useEditableTable<Row>({
+        columns: periodColumns,
+        apiFunctions,
+        autoHandleDates: false,
+      }),
+    );
+    act(() => {
+      result.current.setDataWithTransform([
+        { ...sampleRow, valid_from: "2026-01-05", valid_until: "2026-06-28" },
+        {
+          id: "r2",
+          key: "r2",
+          name: "Carrots",
+          amount: 2,
+          valid_from: "2026-06-29",
+          valid_until: null,
+        },
+      ]);
+    });
+
+    await act(async () => {
+      await result.current.save("r1", {
+        name: "Carrots",
+        amount: 5,
+        valid_from: "2026-01-05",
+        valid_until: "2026-07-26",
+      });
+    });
+
+    expect(apiFunctions.update).not.toHaveBeenCalled();
+    expect(Object.keys(result.current.formErrors)).toEqual(["valid_until"]);
+    expect(result.current.saveErrorMessage).toBe(
+      result.current.formErrors.valid_until,
+    );
   });
 
   it("customSave returning the __deleteOnSave sentinel deletes the row instead of updating", async () => {

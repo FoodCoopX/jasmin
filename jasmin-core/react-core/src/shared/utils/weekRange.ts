@@ -1,5 +1,22 @@
-import dayjs from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import { toApiDate } from "./apiDate";
+
+/**
+ * Monday of ISO ``week`` in ISO ``year``, computed DETERMINISTICALLY (no
+ * ``dayjs()`` wall-clock seed — the isoWeek SETTER is a relative move, so a
+ * ``dayjs().year(y).isoWeek(w)`` construction leaks today's month/day into the
+ * anchor and breaks at year boundaries). Jan 4 is always in ISO week 1, so its
+ * Monday is week 1's Monday; adding ``week - 1`` weeks lands on the target week
+ * — and a week past the year's last (53 in a 52-week year) rolls forward
+ * exactly like the backend ``isoweek`` library. Mirrors
+ * ``subscription_term._sunday_before_iso_week`` so the frontend and the backend
+ * agree on every date, at every wall-clock.
+ */
+export function mondayOfIsoWeek(isoYear: number, week: number): Dayjs {
+  return dayjs(`${isoYear}-01-04`)
+    .isoWeekday(1)
+    .add(week - 1, "week");
+}
 
 /**
  * Is the selected ISO week more than one week in the past (i.e. read-only)?
@@ -13,8 +30,7 @@ export function isWeekInPast(
   selectedWeek: number | null | undefined,
 ): boolean {
   if (!selectedYear || !selectedWeek) return false;
-  const selectedDate = dayjs().year(selectedYear).isoWeek(selectedWeek);
-  return dayjs().diff(selectedDate, "weeks") > 1;
+  return dayjs().diff(mondayOfIsoWeek(selectedYear, selectedWeek), "weeks") > 1;
 }
 
 /**
@@ -68,28 +84,19 @@ export function isoWeekRangeLabel(
  * ISO week.
  */
 export function activeAtDateForWeek(year: number, week: number | null): string {
-  return toApiDate(
-    dayjs()
-      .year(year)
-      .isoWeek(week ?? dayjs().isoWeek())
-      .isoWeekday(6),
-  )!;
+  return toApiDate(mondayOfIsoWeek(year, week ?? dayjs().isoWeek()).add(5, "day"))!;
 }
 
 /**
  * The calendar date of a delivery day within a given ISO week. ``dayNumber`` is
- * the backend ``day_number`` (0 = Monday … 6 = Sunday); ``isoWeekday`` is
- * 1-based, hence the ``+ 1`` offset (this offset tracks the backend contract and
- * must not diverge). Returns a Dayjs so callers can either format it (labels) or
- * compare ``.valueOf()`` (sort comparators).
+ * the backend ``day_number`` (0 = Monday … 6 = Sunday), so it counts the days
+ * after the week's Monday. Returns a Dayjs so callers can either format it
+ * (labels) or compare ``.valueOf()`` (sort comparators).
  */
 export function dateForWeekDayNumber(
   year: number,
   week: number,
   dayNumber: number,
-): dayjs.Dayjs {
-  return dayjs()
-    .year(year)
-    .isoWeek(week)
-    .isoWeekday(Number(dayNumber) + 1);
+): Dayjs {
+  return mondayOfIsoWeek(year, week).add(Number(dayNumber), "day");
 }

@@ -1,8 +1,19 @@
-import { useCommissioningDeliveryStationsList } from "@shared/api/generated/commissioning/commissioning";
-import type { DeliveryStation, CommissioningDeliveryStationsListParams } from "@shared/api/generated/models";
+import { useQueries, type UseQueryResult } from "@tanstack/react-query";
+import {
+  getCommissioningDeliveryStationsListQueryOptions,
+  useCommissioningDeliveryStationsList,
+} from "@shared/api/generated/commissioning/commissioning";
+import type {
+  CommissioningDeliveryStationsListParams,
+  DeliveryStation,
+  ErrorResponse,
+} from "@shared/api/generated/models";
 import { toOptions, type Option } from "@hooks/internal/toOptions";
 
 export type DeliveryStationOption = Option<DeliveryStation>;
+
+const deliveryStationLabel = (station: DeliveryStation) =>
+  station.short_name || station.company_name || "";
 
 export const useDeliveryStations = (
   params: CommissioningDeliveryStationsListParams = {},
@@ -17,10 +28,7 @@ export const useDeliveryStations = (
     query: { enabled: enabled ?? params.delivery_day != null },
   });
 
-  const deliveryStations: DeliveryStationOption[] = toOptions(
-    data,
-    (ds) => ds.short_name || ds.company_name || "",
-  );
+  const deliveryStations: DeliveryStationOption[] = toOptions(data, deliveryStationLabel);
 
   return {
     deliveryStations,
@@ -28,3 +36,28 @@ export const useDeliveryStations = (
     error,
   };
 };
+
+// Module-level, so TanStack re-runs it only when a query result changes and
+// the lists keep their identity between renders.
+const combineStationsPerDay = (
+  results: UseQueryResult<DeliveryStation[], ErrorResponse>[],
+) => ({
+  stationsPerDay: results.map((result) => toOptions(result.data, deliveryStationLabel)),
+  loading: results.some((result) => result.isLoading),
+});
+
+/**
+ * The active stations of each delivery day, in the order of `deliveryDayIds` —
+ * for views spanning several days, since every day serves its own stations.
+ * Shares its requests with `useDeliveryStations` for the same day.
+ */
+export const useDeliveryStationsPerDay = (deliveryDayIds: string[]) =>
+  useQueries({
+    queries: deliveryDayIds.map((deliveryDay) =>
+      getCommissioningDeliveryStationsListQueryOptions({
+        is_active: true,
+        delivery_day: deliveryDay,
+      }),
+    ),
+    combine: combineStationsPerDay,
+  });

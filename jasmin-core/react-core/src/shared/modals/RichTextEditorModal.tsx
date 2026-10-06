@@ -65,7 +65,9 @@ interface RichTextEditorModalProps {
   visible: boolean;
   onClose: () => void;
   value?: string;
-  onSave: (content: string) => void;
+  /** The editor closes once this resolves and stays open with the text when
+   *  it rejects; the caller reports the failure. */
+  onSave: (content: string) => void | Promise<void>;
   title?: string;
   /** Pin above a parent modal when opened from inside one (sibling modals
    *  don't get AntD's nesting auto-lift). Pass 1100 from a modal call site. */
@@ -100,6 +102,7 @@ export default function RichTextEditorModal({
   // with the value just passed in. No need for any session-tracking
   // inside the modal — the parent's key bump handles the mount story.
   const [content, setContent] = useState(value || "");
+  const [saving, setSaving] = useState(false);
   const [validation, setValidation] = useState<ValidationState>({
     lines: 0,
     chars: 0,
@@ -195,9 +198,16 @@ export default function RichTextEditorModal({
     validateContent(newContent);
   };
 
-  const handleSave = () => {
-    onSave(content);
-    onClose();
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(content);
+      onClose();
+    } catch {
+      // The caller has reported the failure; the text stays for another try.
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -213,6 +223,7 @@ export default function RichTextEditorModal({
           <Button
             type="primary"
             onClick={handleSave}
+            loading={saving}
             disabled={!validation.valid}
           >
             {t("common.save")}

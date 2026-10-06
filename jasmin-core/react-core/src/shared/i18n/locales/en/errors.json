@@ -137,7 +137,9 @@
     "succession_start_before_predecessor": "Can't start a new record before the existing open record it would succeed. Choose a start date on or after the existing record's, or close the existing record first.",
     "valid_from_not_monday": "The start date must be a Monday.",
     "valid_until_not_sunday": "The end date must be a Sunday.",
-    "invalid_range": "The end date must not be before the start date."
+    "invalid_range": "The end date must not be before the start date.",
+    "overlap": "The period overlaps an existing record that runs from {{existing_valid_from}} to {{existing_valid_until}}. Choose dates that don't overlap any other record.",
+    "overlap_open": "The period overlaps an existing record that runs from {{existing_valid_from}} with no end date. Choose dates that don't overlap any other record."
   },
   "share_type_variation": {
     "not_found": "Share type variation not found.",

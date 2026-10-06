@@ -27,7 +27,10 @@ import {
   stationDayTermCapacity,
 } from "@features/abos/utils/stationCapacity";
 import type { CapacityWeekEntry } from "@features/abos/utils/stationCapacity";
-import { useShareDeliveryDays } from "@features/commissioning/hooks";
+import {
+  useShareDeliveryDays,
+  useStationDayTakeover,
+} from "@features/commissioning/hooks";
 import { useStationDayEarlierStart } from "@features/commissioning/hooks/useStationDayEarlierStart";
 import type { ShareDeliveryDayOption } from "@features/commissioning/hooks/useShareDeliveryDays";
 import { getStatusColor, notify } from "@shared/utils";
@@ -128,6 +131,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
 
   const validFromEarlierMove = useStationDayEarlierStart(data, shareDeliveryDays);
   const { validFromColumn, validUntilColumn } = useTimeBoundColumns({
+    overlapGroup: ["delivery_station", "delivery_day"],
     width: "7em",
     // A station's opening day can only be scheduled going forward — the backend
     // rejects a past valid_from; this aligns the picker with that rule. A saved
@@ -234,20 +238,13 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
     defaultSortOrder: "descend",
   });
 
-  // Delivery days already taken by an active row in this station's table.
-  // We exclude these from the "add new row" select so the user cannot pick a
-  // delivery_day that would violate the unique constraint
-  // ``deliverystationday_unique_active_per_station_day``.
-  const availableDeliveryDayOptions = useMemo(() => {
-    const usedActiveDayIds = new Set<string>(
-      data
-        .filter((row) => !row.valid_until)
-        .map((row) => row.delivery_day as string),
-    );
-    return deliveryDayOptions.filter(
-      (opt) => !usedActiveDayIds.has(opt.value as string),
-    );
-  }, [data, deliveryDayOptions]);
+  // Every delivery day is offered, also one this station already serves: a
+  // new station day starting later takes the open one over, once the office
+  // agrees; the table refuses one that would overlap it.
+  const { confirmTakeover, confirmHolder } = useStationDayTakeover(
+    data,
+    shareDeliveryDays,
+  );
 
   const [descriptionModalVisible, setDescriptionModalVisible] = useState(false);
   const [selectedDescriptionRecord, setSelectedDescriptionRecord] =
@@ -334,8 +331,9 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
         notify.success(t("common.saved_successfully"));
         invalidateData();
       } catch (error) {
-        console.error("Failed to save description:", error);
         notify.error(getErrorMessage(error, t("common.error_saving")));
+        // Keeps the editor open with the text.
+        throw error;
       }
     },
     [selectedDescriptionRecord, t, invalidateData],
@@ -378,7 +376,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
           align: "center",
           width: "12em",
           disabled: (record: StationDayRecord) => record.key !== -1,
-          options: availableDeliveryDayOptions,
+          options: deliveryDayOptions,
           render: renderWeekday,
         },
         validFromColumn,
@@ -483,7 +481,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
       navigate,
       validFromColumn,
       validUntilColumn,
-      availableDeliveryDayOptions,
+      deliveryDayOptions,
       handleOpenDescriptionModal,
       renderWeekday,
       peakByStationDayId,
@@ -521,12 +519,17 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
   const apiFunctions = useMemo<ApiFunctions>(
     () =>
       wrapApiFunctions<DeliveryStationDay & TableRecord>({
-        create: (data) => commissioningDeliveryStationsDaysCreate(data),
+        create: async (newDay) => {
+          if (!(await confirmTakeover(newDay))) {
+            throw new Error(t("delivery_stations.takeover_not_saved"));
+          }
+          return commissioningDeliveryStationsDaysCreate(newDay);
+        },
         update: (id, data) =>
           commissioningDeliveryStationsDaysPartialUpdate(id, data),
         delete: (id) => commissioningDeliveryStationsDaysDestroy(id),
       }),
-    [],
+    [confirmTakeover, t],
   );
 
   const permissions = useMemo(
@@ -536,6 +539,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
 
   return (
     <>
+      {confirmHolder}
       <Modal
         title={`${t("delivery.station_delivery_days_details")} ${
           deliveryStation?.short_name || deliveryStation?.contact?.name || ""
@@ -563,10 +567,6 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
               onSaveSuccess={invalidateData}
               onDeleteSuccess={invalidateData}
               permissions={permissions}
-              uniqueCheck={["delivery_day", "tour_number", "valid_from"]}
-              uniqueCheckMessage={t(
-                "validation.unique.delivery_day_tour_number_valid_from",
-              )}
               customSave={customSave}
               forceInlineMode={true}
             />

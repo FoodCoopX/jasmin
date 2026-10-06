@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Checkbox, Tooltip } from "antd";
 import dayjs from "dayjs";
+import { mondayOfIsoWeek } from "@shared/utils";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -278,7 +279,7 @@ export default function ShareDeliveries() {
           const week = record.delivery_week;
           const year = selectedYear;
           if (!week) return deliveryStationDays;
-          const weekStart = dayjs().year(year).isoWeek(week).startOf("isoWeek");
+          const weekStart = mondayOfIsoWeek(year, week);
           const weekEnd = weekStart.endOf("isoWeek");
           const weekKey = `${year}-${week}`;
           return deliveryStationDays

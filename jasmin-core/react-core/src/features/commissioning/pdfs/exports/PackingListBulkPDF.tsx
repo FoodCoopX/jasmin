@@ -35,6 +35,8 @@ export interface PackingListBulkItem {
   unit_label?: string;
   size_label?: string;
   total_amount?: number;
+  /** The total as the page shows it, in the tenant's number format. */
+  total_amount_text?: string;
   note?: string;
 }
 
@@ -111,8 +113,8 @@ const PackingListBulkPDF = ({
               )}
               <View style={[listStyles.cell, localStyles.colAmount, listStyles.cellCenter]}>
                 <Text>
-                  {item.total_amount != null
-                    ? `${item.total_amount} ${item.unit_label ?? ""}`.trim()
+                  {item.total_amount_text
+                    ? `${item.total_amount_text} ${item.unit_label ?? ""}`.trim()
                     : ""}
                 </Text>
               </View>

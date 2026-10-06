@@ -65,7 +65,7 @@ import {
   LabeledSwitch,
   PastWarningMessage,
 } from "@shared/ui";
-import { hasPurchasedSuffix, isWeekInPast, toApiDate } from "@shared/utils";
+import { hasPurchasedSuffix, isWeekInPast, mondayOfIsoWeek, toApiDate } from "@shared/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import { Button, Space } from "antd";
@@ -239,10 +239,7 @@ export default function PlanningShareContentBase({
       share_option: shareOption,
       get_price_info: true,
       price_date: toApiDate(
-        dayjs()
-          .year(selectedYear)
-          .isoWeek(selectedWeek ?? nextWeek)
-          .isoWeekday(2),
+        mondayOfIsoWeek(selectedYear, selectedWeek ?? nextWeek).add(1, "day"),
       )!,
     }),
     [shareArticleFilters, shareOption, selectedYear, selectedWeek],
