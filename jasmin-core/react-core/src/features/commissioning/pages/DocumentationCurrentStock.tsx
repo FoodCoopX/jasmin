@@ -441,7 +441,7 @@ export default function DocumentationCurrentStock() {
         keyboardAddShortcut={true}
         renderMobileCard={(
           record: TableRecord,
-          onEdit: (r: TableRecord) => void,
+          onEdit: ((r: TableRecord) => void) | undefined,
         ) => (
           <DocumentationCurrentStockMobileCard
             key={String(record.key)}

@@ -9,12 +9,14 @@ import {
   MobileCardNote,
   MobileCardTitle,
 } from "./primitives";
+import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
 import "./HarvestingMobileCard.css";
 
 interface HarvestingMobileCardProps {
   record: TableRecord;
-  onEdit: (record: TableRecord) => void;
+  /** Opens the row's edit dialog; absent where the row can't be edited. */
+  onEdit?: (record: TableRecord) => void;
   onConfirmHarvest: (record: TableRecord) => void;
   /** Whether to show the plot-name header above this card (computed by the
    *  parent: true when this row starts a new plot group). */
@@ -70,21 +72,25 @@ export function HarvestingMobileCard({
   const { t } = useTranslation();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
 
-  const articleName = (record.share_article_name as string) || "";
+  const articleName = recordText(record, "share_article_name");
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
-  const perPuText = (record.computed_amount_per_pu_text as string) || "";
-  const noteText = (record.computed_note_line as string) || "";
-  const plotName = (record.forecast_plot_name as string) || "";
+  const perPuText = recordText(record, "computed_amount_per_pu_text");
+  const noteText = recordText(record, "computed_note_line");
+  const plotName = recordText(record, "forecast_plot_name");
   const bedNumber = record.forecast_bed_number as number | null | undefined;
 
-  const shareUnit =
-    (record.computed_total_amount_text_share_content as string) || "";
-  const sharePu = (record.computed_amount_pu_text_share_content as string) || "";
-  const orderUnit =
-    (record.computed_total_amount_text_order_content as string) || "";
-  const orderPu = (record.computed_amount_pu_text_order_content as string) || "";
-  const totalUnit = (record.computed_total_amount_text as string) || "";
-  const totalPu = (record.computed_amount_pu_text as string) || "";
+  const shareUnit = recordText(
+    record,
+    "computed_total_amount_text_share_content",
+  );
+  const sharePu = recordText(record, "computed_amount_pu_text_share_content");
+  const orderUnit = recordText(
+    record,
+    "computed_total_amount_text_order_content",
+  );
+  const orderPu = recordText(record, "computed_amount_pu_text_order_content");
+  const totalUnit = recordText(record, "computed_total_amount_text");
+  const totalPu = recordText(record, "computed_amount_pu_text");
 
   const hasShare = !!(shareUnit || sharePu);
   const hasOrder = !!(orderUnit || orderPu);
@@ -96,7 +102,7 @@ export function HarvestingMobileCard({
       {showPlotHeader && plotName && (
         <div className="harvest-plot-header">{plotName}</div>
       )}
-      <MobileCard onClick={() => onEdit(record)}>
+      <MobileCard onClick={onEdit && (() => onEdit(record))}>
         {bedNumber != null && (
           <div className="harvest-bed-number">
             {t("commissioning.bed_number")}: {bedNumber}

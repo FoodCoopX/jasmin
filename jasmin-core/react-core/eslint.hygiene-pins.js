@@ -19,7 +19,6 @@ export const complexityPins = {
   "src/features/abos/modals/AdminConfirmationModalAbos.tsx": 27,
   "src/features/abos/modals/NewSubscriptionModal.tsx": 91,
   "src/features/auth/pages/LoginPage.tsx": 31,
-  "src/features/commissioning/components/mobileCards/HarvestingMobileCard.tsx": 28,
   "src/features/commissioning/components/OrderInfoPanel.tsx": 32,
   "src/features/commissioning/hooks/columns/useOrderColumns.tsx": 31,
   "src/features/commissioning/modals/ShareTypeVariationModal.tsx": 32,
@@ -41,7 +40,7 @@ export const complexityPins = {
   "src/shared/tables/BasicEditableTable/EditableCell.tsx": 34,
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 50,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 35,
-  "src/shared/tables/BasicEditableTable/useEditableTable.ts": 47,
+  "src/shared/tables/BasicEditableTable/useEditableTable.ts": 41,
   "src/shared/ui/JobProgressDrawer.tsx": 34,
 };
 
@@ -72,9 +71,9 @@ export const functionLengthPins = {
   "src/features/members/modals/CoopSharesModal.tsx": 467,
   "src/features/members/pages/Members.tsx": 768,
   "src/shared/layout/sidebars/CommissioningSidebar.tsx": 601,
-  "src/shared/tables/BasicEditableTable/EditableTable.tsx": 850,
+  "src/shared/tables/BasicEditableTable/EditableTable.tsx": 836,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 472,
-  "src/shared/tables/BasicEditableTable/useEditableTable.ts": 578,
+  "src/shared/tables/BasicEditableTable/useEditableTable.ts": 539,
 };
 
 // Total file length, blank lines and comments INCLUDED — a file you have to
@@ -83,5 +82,5 @@ export const fileLengthPins = {
   "src/features/abos/modals/NewSubscriptionModal.tsx": 1273,
   "src/features/commissioning/pages/PlanningShareContentBase.tsx": 1231,
   "src/features/members/pages/Members.tsx": 1018,
-  "src/shared/tables/BasicEditableTable/EditableTable.tsx": 1160,
+  "src/shared/tables/BasicEditableTable/EditableTable.tsx": 1146,
 };

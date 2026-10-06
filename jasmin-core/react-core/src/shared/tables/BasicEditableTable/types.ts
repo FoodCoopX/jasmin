@@ -268,7 +268,15 @@ export interface EditableTableProps<T extends TableRecord = TableRecord> {
   uniqueCheckRows?: T[];
   onSaveSuccess?: ((record: T, type: "create" | "update") => void) | null;
   onDeleteSuccess?: ((key: Key) => void) | null;
-  renderMobileCard?: (record: T, onEdit: (record: T) => void) => ReactNode;
+  /**
+   * A page's own phone card for a row. `onEdit` opens the row's edit dialog;
+   * it is undefined where the table's permissions refuse editing the row, and
+   * the card then must not offer it.
+   */
+  renderMobileCard?: (
+    record: T,
+    onEdit: ((record: T) => void) | undefined,
+  ) => ReactNode;
   /**
    * If true, pressing "+" on the keyboard triggers the same logic as the add button.
    * Ignored while focus is inside an input, textarea, contenteditable element, or while a modal is open.
@@ -344,7 +352,9 @@ export interface UseEditableTableReturn<T extends TableRecord = TableRecord> {
   isEditing: (record: T) => boolean;
   edit: (record: T) => void;
   cancel: () => void;
-  save: (key: Key, formValues?: Record<string, unknown>) => Promise<void>;
+  /** Resolves to false when the row stays unsaved — refused, aborted by
+   *  `customSave` or failed — and to true otherwise. */
+  save: (key: Key, formValues?: Record<string, unknown>) => Promise<boolean>;
   add: () => Promise<T | undefined>;
   deleteRecord: (key: Key) => Promise<void>;
   /** IDs created during this mount, newest first. The table pins these to the
@@ -367,6 +377,8 @@ export interface EditableModalProps<T extends TableRecord = TableRecord> {
   record: T | null;
   columns: EditableColumnConfig<T>[];
   loading: boolean;
+  /** Why the last save was refused, shown in the dialog, which stays open. */
+  errorMessage?: string | null;
   customEdit?: EditableTableProps<T>["customEdit"];
   focusIndex?: string;
   uniqueCheck?: string | string[] | null;

@@ -1,13 +1,14 @@
-import { useEffect } from "react";
-import type { KeyboardEvent, ReactElement, ReactNode } from "react";
+import { useEffect, useRef } from "react";
+import type { Key, KeyboardEvent, ReactElement, ReactNode } from "react";
 import type { Dayjs } from "dayjs";
-import { Modal, Form } from "antd";
+import { Alert, Modal, Form } from "antd";
 import FormInput from "./FormInput";
 import { useTranslation } from "react-i18next";
 import { useNumberFormat } from "@hooks/useNumberFormat";
 import type { EditableModalProps, EditableColumnConfig, TableRecord } from "./types";
 import { buildLiveRecord } from "./buildLiveRecord";
 import { getEditableFormItemProps } from "./formItemProps";
+import { nodeText } from "./nodeText";
 
 interface ProcessedColumn<T extends TableRecord = TableRecord>
   extends EditableColumnConfig<T> {
@@ -22,6 +23,7 @@ const EditableModal = <T extends TableRecord = TableRecord>({
   record,
   columns,
   loading,
+  errorMessage,
   customEdit,
 }: EditableModalProps<T>) => {
   const [form] = Form.useForm();
@@ -29,74 +31,78 @@ const EditableModal = <T extends TableRecord = TableRecord>({
   const { separators } = useNumberFormat();
   const formValues = Form.useWatch([], form);
 
+  // Filled and focused once per opened row. Pages build new columns on every
+  // render, and refetch their rows when the window regains focus; filling the
+  // form again then would put back what the user has typed over.
+  const filledForKeyRef = useRef<Key | null>(null);
   useEffect(() => {
-    if (visible && record) {
-      form.resetFields();
+    if (!visible || !record) {
+      filledForKeyRef.current = null;
+      return;
+    }
+    if (filledForKeyRef.current === record.key) return;
+    filledForKeyRef.current = record.key;
+    form.resetFields();
 
-      let values: Record<string, unknown> = { ...record };
+    let values: Record<string, unknown> = { ...record };
 
-      columns.forEach((column) => {
-        const value = record[column.dataIndex as keyof T];
+    columns.forEach((column) => {
+      const value = record[column.dataIndex as keyof T];
 
-        if (column.foreignKey) {
-          const { valueField } = column.foreignKey;
-          const idValue =
-            (record as Record<string, unknown>)[`${column.dataIndex}_id`] ??
-            (record as Record<string, unknown>)[valueField];
-          if (idValue !== undefined) {
-            values[column.dataIndex] = idValue;
-          }
+      if (column.foreignKey) {
+        const { valueField } = column.foreignKey;
+        const idValue =
+          (record as Record<string, unknown>)[`${column.dataIndex}_id`] ??
+          (record as Record<string, unknown>)[valueField];
+        if (idValue !== undefined) {
+          values[column.dataIndex] = idValue;
         }
-
-        if (column.inputType === "date" && value && column.render) {
-          const renderedValue = column.render(value, record as T, 0);
-
-          if (
-            renderedValue &&
-            typeof renderedValue === "object" &&
-            (renderedValue as ReactElement).props
-          ) {
-            values[column.dataIndex] = (renderedValue as ReactElement<{children?: ReactNode}>).props.children;
-          } else if (renderedValue && typeof renderedValue === "string") {
-            values[column.dataIndex] = renderedValue;
-          }
-        }
-      });
-
-      if (customEdit) {
-        values = customEdit(values as T, form) as Record<string, unknown>;
       }
 
-      form.setFieldsValue(values);
+      if (column.inputType === "date" && value && column.render) {
+        const renderedValue = column.render(value, record as T, 0);
+
+        if (
+          renderedValue &&
+          typeof renderedValue === "object" &&
+          (renderedValue as ReactElement).props
+        ) {
+          values[column.dataIndex] = (renderedValue as ReactElement<{children?: ReactNode}>).props.children;
+        } else if (renderedValue && typeof renderedValue === "string") {
+          values[column.dataIndex] = renderedValue;
+        }
+      }
+    });
+
+    if (customEdit) {
+      values = customEdit(values as T, form) as Record<string, unknown>;
+    }
+
+    form.setFieldsValue(values);
+
+    const firstEditableColumn = columns.find(
+      (col) =>
+        col.inputType &&
+        !col.hideInModal &&
+        !col.readOnly &&
+        col.dataIndex !== "actions",
+    );
+    if (firstEditableColumn) {
+      setTimeout(() => {
+        form.getFieldInstance(firstEditableColumn.dataIndex)?.focus?.();
+      }, 100);
     }
   }, [visible, record, columns, customEdit, form]);
 
-  useEffect(() => {
-    if (visible) {
-      const firstEditableColumn = columns.find(
-        (col) =>
-          col.inputType &&
-          !col.hideInModal &&
-          !col.readOnly &&
-          col.dataIndex !== "actions",
-      );
-
-      if (firstEditableColumn) {
-        setTimeout(() => {
-          const focusElement = form.getFieldInstance(
-            firstEditableColumn.dataIndex,
-          );
-          if (focusElement?.focus) {
-            focusElement.focus();
-          }
-        }, 100);
-      }
-    }
-  }, [visible, columns, form]);
-
   const handleSave = async () => {
     try {
-      const values = await form.validateFields();
+      // The store as well as the validated fields: it also holds the row's
+      // fields the dialog doesn't show and those filled in for the user (an
+      // article's default crate), which a save must not drop.
+      const values = {
+        ...form.getFieldsValue(true),
+        ...(await form.validateFields()),
+      };
 
       const disabledFields: Record<string, unknown> = {};
       const mergedRecord = buildLiveRecord(record, values, columns) as T;
@@ -167,6 +173,7 @@ const EditableModal = <T extends TableRecord = TableRecord>({
             : column.options
         }
         title={column.title}
+        aria-label={nodeText(column.title) || column.dataIndex}
         suffix={column.suffix}
         isModal={true}
         onFieldChange={wrappedOnFieldChange}
@@ -256,6 +263,14 @@ const EditableModal = <T extends TableRecord = TableRecord>({
       cancelText={t("table.cancel")}
       confirmLoading={loading}
     >
+      {errorMessage && (
+        <Alert
+          type="error"
+          showIcon
+          message={errorMessage}
+          className="editable-table-banner"
+        />
+      )}
       <Form form={form} layout="vertical" onKeyDown={handleKeyDown}>
         {processColumns(columns)
           .filter((column) => {

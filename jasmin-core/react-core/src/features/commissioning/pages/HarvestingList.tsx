@@ -283,7 +283,7 @@ export default function HarvestingList() {
         keyboardAddShortcut={true}
         renderMobileCard={(
           record: TableRecord,
-          onEdit: (r: TableRecord) => void,
+          onEdit: ((r: TableRecord) => void) | undefined,
         ) => (
           <HarvestingMobileCard
             key={String(record.key)}

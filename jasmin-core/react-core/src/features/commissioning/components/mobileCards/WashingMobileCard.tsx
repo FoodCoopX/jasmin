@@ -6,11 +6,13 @@ import {
   MobileCardNote,
   MobileCardTitle,
 } from "./primitives";
+import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 interface WashingMobileCardProps {
   record: TableRecord;
-  onEdit: (record: TableRecord) => void;
+  /** Opens the row's edit dialog; absent where the row can't be edited. */
+  onEdit?: (record: TableRecord) => void;
 }
 
 export function WashingMobileCard({
@@ -18,14 +20,13 @@ export function WashingMobileCard({
   onEdit,
 }: WashingMobileCardProps) {
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
-  const articleName = (record.share_article_name as string) || "";
+  const articleName = recordText(record, "share_article_name");
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
-  const washAmountText =
-    (record.computed_total_wash_amount_text as string) || "";
-  const noteText = (record.note as string) || "";
+  const washAmountText = recordText(record, "computed_total_wash_amount_text");
+  const noteText = recordText(record, "note");
 
   return (
-    <MobileCard onClick={() => onEdit(record)}>
+    <MobileCard onClick={onEdit && (() => onEdit(record))}>
       <MobileCardContent>
         <MobileCardTitle name={articleName} sizeLabel={sizeLabel} />
         {washAmountText && (

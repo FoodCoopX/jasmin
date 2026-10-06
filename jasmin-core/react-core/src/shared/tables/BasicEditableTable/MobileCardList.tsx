@@ -11,6 +11,7 @@ import "./MobileCardList.css";
 import { canDeleteRow, canEditRow } from "./rowPermissions";
 import type {
   EditableColumnConfig,
+  EditableTableProps,
   SelectOption,
   TablePermissions,
   TableRecord,
@@ -120,7 +121,7 @@ interface MobileCardListProps<T extends TableRecord> {
   /** Columns whose dataIndex appears here are shown in the card summary. */
   primaryFields?: string[];
   /** Override default card rendering per record. */
-  renderMobileCard?: (record: T, onEdit: (record: T) => void) => ReactNode;
+  renderMobileCard?: EditableTableProps<T>["renderMobileCard"];
 }
 
 // Cards rendered at first and added per "show more": a phone scrolls a long
@@ -212,7 +213,10 @@ function MobileCardList<T extends TableRecord>({
           if (renderMobileCard) {
             return (
               <Fragment key={String(record.key)}>
-                {renderMobileCard(record, onEdit)}
+                {renderMobileCard(
+                  record,
+                  canEditRow(permissions, record) ? onEdit : undefined,
+                )}
               </Fragment>
             );
           }

@@ -406,7 +406,7 @@ export default function DocumentationHarvest() {
         )}
         renderMobileCard={(
           record: TableRecord,
-          onEdit: (r: TableRecord) => void,
+          onEdit: ((r: TableRecord) => void) | undefined,
         ) => (
           <DocumentationHarvestMobileCard
             key={String(record.key)}

@@ -8,10 +8,10 @@ import { useDateFormat } from "@hooks/configuration/useDateFormat";
 import axiosService from "@shared/services/api";
 import { getErrorMessage } from "@shared/utils/apiError";
 import { buildLiveRecord } from "./buildLiveRecord";
-import { nodeText } from "./nodeText";
 import { duplicateErrors } from "./duplicateErrors";
 import { periodErrors } from "./periodErrors";
 import { RowSaveRefused } from "./RowSaveRefused";
+import { describeSaveFailure } from "./saveFailure";
 import type {
   EditableColumnConfig,
   SelectOption,
@@ -362,8 +362,8 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
   }, []);
 
   const save = useCallback(
-    async (key: Key, formValues?: Record<string, unknown>) => {
-      if (!key) return;
+    async (key: Key, formValues?: Record<string, unknown>): Promise<boolean> => {
+      if (!key) return true;
 
       try {
         // ``validateFields()`` only returns REGISTERED fields (those with a
@@ -451,7 +451,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
         if (customSave) {
           try {
             const result = customSave(transformedRow, currentRecord);
-            if (result === null) return;
+            if (result === null) return false;
             // ``customSave`` may signal that the row should be DELETED rather
             // than saved — e.g. clearing an order's amount removes the
             // OrderContent entirely (offers with no order are placeholder
@@ -472,12 +472,12 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
                 setEditingKey("");
                 setFormErrors({});
               }
-              return;
+              return true;
             }
             transformedRow = result;
           } catch (customSaveError) {
             showRefusal(customSaveError, setFormErrors, setSaveErrorMessage);
-            return;
+            return false;
           }
         }
 
@@ -497,7 +497,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
           // toast) — the banner stays until the user fixes the row.
           setFormErrors(errors);
           setSaveErrorMessage(Object.values(errors)[0]);
-          return;
+          return false;
         }
 
         // API call
@@ -576,75 +576,17 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
             onSaveSuccess(savedRecord as T, "update");
           }
         }
+        return true;
       } catch (error) {
         console.error("Save operation failed:", error);
-
-        // Per-field red borders: extract field → message from any of the
-        // shapes the backend speaks. DRF defaults emit top-level
-        // `{field: ["msg"]}`; the canonical Jasmin handler emits
-        // `{message, details: {field: ["msg"]}}` (the top-level `message`
-        // is just the first one and lacks the field name).
-        const axiosError = error as {
-          response?: { data?: Record<string, unknown> };
-        };
-        const data = axiosError.response?.data;
-        const fieldErrors: Record<string, string> = {};
-
-        const collectFieldMessages = (
-          source: Record<string, unknown>,
-          skip: Set<string>,
-          arraysOnly = false,
-        ) => {
-          for (const [k, v] of Object.entries(source)) {
-            if (skip.has(k)) continue;
-            if (Array.isArray(v) && typeof v[0] === "string") {
-              fieldErrors[k] = v[0];
-            } else if (!arraysOnly && typeof v === "string") {
-              fieldErrors[k] = v;
-            }
-          }
-        };
-
-        if (data && typeof data === "object") {
-          // DRF top-level field shape
-          collectFieldMessages(
-            data,
-            new Set(["code", "message", "details", "request_id", "field"]),
-          );
-          // Canonical Jasmin `details` map. Only ARRAY values are per-field
-          // error lists (the `{field: ["msg"]}` shape). Scalar entries are
-          // interpolation context for the coded message (e.g. over_capacity's
-          // `station_day_id`, `year`, `week`) — collecting those would wrongly
-          // tag a real form field and prepend its name to the banner.
-          const details = data.details;
-          if (details && typeof details === "object") {
-            collectFieldMessages(
-              details as Record<string, unknown>,
-              new Set(),
-              true,
-            );
-          }
-        }
-        setFormErrors(fieldErrors);
-
-        // Banner: prepend the offending field names so the user can see
-        // *which* fields are broken, not just the (often generic) message.
-        // Field names use the matching column title when available, falling
-        // back to the raw schema name.
-        const baseMessage = getErrorMessage(
+        const failure = describeSaveFailure(
           error,
+          columns,
           t("table.save_failed_generic"),
         );
-        const fields = Object.keys(fieldErrors);
-        if (fields.length > 0) {
-          const labels = fields.map((name) => {
-            const col = columns.find((c) => c.dataIndex === name);
-            return (col && nodeText(col.title)) || name;
-          });
-          setSaveErrorMessage(`${labels.join(", ")}: ${baseMessage}`);
-        } else {
-          setSaveErrorMessage(baseMessage);
-        }
+        setFormErrors(failure.fieldErrors);
+        setSaveErrorMessage(failure.message);
+        return false;
       }
     },
     [

@@ -8,11 +8,13 @@ import {
   MobileCardNote,
   MobileCardTitle,
 } from "./primitives";
+import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 interface DocumentationHarvestMobileCardProps {
   record: TableRecord;
-  onEdit: (record: TableRecord) => void;
+  /** Opens the row's edit dialog; absent where the row can't be edited. */
+  onEdit?: (record: TableRecord) => void;
   isLongTermStorage: boolean;
 }
 
@@ -25,11 +27,11 @@ export function DocumentationHarvestMobileCard({
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { getUnitLabel } = useUnitOptions();
 
-  const articleName = (record.share_article_name as string) || "";
+  const articleName = recordText(record, "share_article_name");
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
   const unitLabel = getUnitLabel(record.unit as string);
   const actualAmount = record.harvest_amount as number | null | undefined;
-  const noteText = (record.note as string) || "";
+  const noteText = recordText(record, "note");
   const isFinalized = !!record.is_finalized;
 
   const theoreticalAmount = !isLongTermStorage
@@ -40,7 +42,7 @@ export function DocumentationHarvestMobileCard({
   const showActualUnit = !(!isLongTermStorage && theoreticalAmount > 0);
 
   return (
-    <MobileCard onClick={() => onEdit(record)} finalized={isFinalized}>
+    <MobileCard onClick={onEdit && (() => onEdit(record))} finalized={isFinalized}>
       <MobileCardContent>
         <MobileCardTitle
           name={articleName}

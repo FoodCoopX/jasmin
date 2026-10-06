@@ -58,6 +58,7 @@ import type {
 } from "./types";
 import { useEditableTable } from "./useEditableTable";
 import { useInitialDataSync, useUpdatedRows } from "./useInitialDataSync";
+import { useRowSelectionState } from "./useRowSelectionState";
 
 // The default for `initialData`. The row-sync effect depends on it, so it has to
 // be the same array on every render: a fresh `[]` would re-run the effect, whose
@@ -200,7 +201,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
   focusIndex,
   rowSelection = null,
   onSelectedRowsChange = null,
-  selectedRowKeys = [],
+  selectedRowKeys,
   summaryRows = [],
   summaryLabelColumnIndex = 0,
   summaryPosition = "top",
@@ -680,11 +681,12 @@ const EditableTable = <T extends TableRecord = TableRecord>({
 
   const handleModalEdit = useCallback(
     (record: T) => {
+      if (!canEditRow(permissions, record)) return;
       setModalRecord(record);
       setIsModalVisible(true);
       edit(record);
     },
-    [edit],
+    [edit, permissions],
   );
 
   const handleModalAdd = useCallback(async () => {
@@ -697,14 +699,9 @@ const EditableTable = <T extends TableRecord = TableRecord>({
 
   const handleModalSave = useCallback(
     async (formValues: Record<string, unknown>) => {
-      try {
-        await save(modalRecord!.key, formValues);
-        setIsModalVisible(false);
-        setModalRecord(null);
-      } catch (error) {
-        console.error("Modal save failed:", error);
-        throw error;
-      }
+      if (!(await save(modalRecord!.key, formValues))) return;
+      setIsModalVisible(false);
+      setModalRecord(null);
     },
     [save, modalRecord],
   );
@@ -982,29 +979,17 @@ const EditableTable = <T extends TableRecord = TableRecord>({
     ],
   );
 
-  const [internalSelectedRowKeys, setInternalSelectedRowKeys] = useState<Key[]>(
-    [],
-  );
-  const currentSelectedRowKeys =
-    selectedRowKeys.length > 0 ? selectedRowKeys : internalSelectedRowKeys;
-
-  const handleSelectionChange = useCallback(
-    (selectedKeys: Key[], selectedRows: T[]) => {
-      if (selectedRowKeys.length === 0) {
-        setInternalSelectedRowKeys(selectedKeys);
-      }
-      if (onSelectedRowsChange) {
-        onSelectedRowsChange(selectedKeys, selectedRows);
-      }
-    },
-    [selectedRowKeys, onSelectedRowsChange],
-  );
+  const { selectedKeys, changeSelection } = useRowSelectionState({
+    rows: data,
+    selectedRowKeys,
+    onSelectedRowsChange,
+  });
 
   const tableRowSelection = rowSelection
     ? {
         type: (rowSelection.type || "checkbox") as "checkbox" | "radio",
-        selectedRowKeys: currentSelectedRowKeys,
-        onChange: handleSelectionChange,
+        selectedRowKeys: selectedKeys,
+        onChange: changeSelection,
         onSelect: rowSelection.onSelect,
         onSelectAll: rowSelection.onSelectAll,
         getCheckboxProps:
@@ -1147,6 +1132,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
         record={modalRecord}
         columns={columns}
         loading={loading}
+        errorMessage={saveErrorMessage}
         customEdit={customEdit}
         focusIndex={focusIndex}
         uniqueCheck={uniqueCheck}

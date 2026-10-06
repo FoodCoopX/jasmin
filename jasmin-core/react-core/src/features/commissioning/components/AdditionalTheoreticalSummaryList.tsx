@@ -104,7 +104,7 @@ export interface AdditionalTheoreticalSummaryListConfig {
   /** Optional mobile card (washing has one; cleaning doesn't). */
   renderMobileCard?: (
     record: TableRecord,
-    onEdit: (r: TableRecord) => void,
+    onEdit: ((r: TableRecord) => void) | undefined,
   ) => ReactNode;
 }
 

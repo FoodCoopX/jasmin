@@ -11,6 +11,7 @@ import {
   MobileCardContent,
   MobileCardNote,
 } from "./primitives";
+import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 export interface ShareTypeVariationOption {
@@ -31,10 +32,10 @@ export function PackingListBoxesMobileCard({
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { getUnitLabel } = useUnitOptions();
 
-  const articleName = (record.share_article_name as string) || "";
+  const articleName = recordText(record, "share_article_name");
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
   const unitLabel = getUnitLabel(record.unit as string);
-  const noteText = (record.note as string) || "";
+  const noteText = recordText(record, "note");
 
   const variations = shareTypeVariations
     .map((v) => ({

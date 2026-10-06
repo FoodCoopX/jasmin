@@ -11,6 +11,7 @@ import {
   MobileCardNote,
   MobileCardTitle,
 } from "./primitives";
+import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
 
 interface PackingListBulkMobileCardProps {
@@ -25,7 +26,7 @@ export function PackingListBulkMobileCard({
   const { getUnitLabel } = useUnitOptions();
   const { format } = useNumberFormat();
 
-  const articleName = (record.share_article_name as string) || "";
+  const articleName = recordText(record, "share_article_name");
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
   const unitLabel = getUnitLabel(record.unit as string);
   const totalAmount = record.total_amount as number | string | null | undefined;
@@ -33,7 +34,7 @@ export function PackingListBulkMobileCard({
     totalAmount == null || totalAmount === ""
       ? MOBILE_CARD_PLACEHOLDER
       : formatAmountForUnit(Number(totalAmount), record.unit as string, format);
-  const noteText = (record.note as string) || "";
+  const noteText = recordText(record, "note");
 
   return (
     <MobileCard>

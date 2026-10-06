@@ -548,7 +548,7 @@ export default function Forecast() {
         keyboardAddShortcut={true}
         renderMobileCard={(
           record: TableRecord,
-          onEdit: (r: TableRecord) => void,
+          onEdit: ((r: TableRecord) => void) | undefined,
         ) => (
           <ForecastMobileCard
             key={String(record.key)}
