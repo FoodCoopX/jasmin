@@ -641,9 +641,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # django-auditlog: captures the acting user on each request so model
-    # changes are attributed to a real user, not "system".
-    "auditlog.middleware.AuditlogMiddleware",
+    # django-auditlog: attributes each change to its user, looked up when the
+    # entry is written so the JWT user DRF authenticates counts too.
+    "apps.shared.audit_log_middleware.JasminAuditlogMiddleware",
     # django-axes must be LAST so it sees the resolved request.user.
     "axes.middleware.AxesMiddleware",
 ]

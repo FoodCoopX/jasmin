@@ -28,6 +28,9 @@ vi.mock("react-i18next", () => ({
 const modalState = vi.hoisted(() => ({
   onboardingMode: false,
   tableProps: null as Record<string, unknown> | null,
+  rows: [] as Record<string, unknown>[],
+  minShares: undefined as number | undefined,
+  maxShares: undefined as number | undefined,
 }));
 
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
@@ -40,7 +43,10 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
     mutate: vi.fn(),
     isPending: false,
   }),
-  useCommissioningCoopSharesList: () => ({ data: [], isFetching: false }),
+  useCommissioningCoopSharesList: () => ({
+    data: modalState.rows,
+    isFetching: false,
+  }),
   useCommissioningCoopSharesReverseTransferCreate: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -93,6 +99,8 @@ vi.mock("@hooks/index", () => {
       getSetting: (key: string, defaultValue?: unknown) => {
         if (key === "onboarding_mode") return modalState.onboardingMode;
         if (key === "value_one_coop_share") return 100;
+        if (key === "min_number_coop_shares") return modalState.minShares;
+        if (key === "max_number_coop_shares") return modalState.maxShares;
         return defaultValue;
       },
     }),
@@ -112,7 +120,9 @@ type CustomSave = (
   currentRecord: Record<string, unknown>,
 ) => Record<string, unknown>;
 
-function renderModal() {
+function renderModal({
+  memberCancelledEffectiveAt = null,
+}: { memberCancelledEffectiveAt?: string | null } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -124,6 +134,7 @@ function renderModal() {
         memberId="member-1"
         memberName="Ada Lovelace"
         adminConfirmed
+        memberCancelledEffectiveAt={memberCancelledEffectiveAt}
       />
     </QueryClientProvider>,
   );
@@ -143,6 +154,9 @@ function paidAtColumn(): ColumnConfig {
 beforeEach(() => {
   modalState.onboardingMode = false;
   modalState.tableProps = null;
+  modalState.rows = [];
+  modalState.minShares = undefined;
+  modalState.maxShares = undefined;
 });
 
 describe("CoopSharesModal paid_at", () => {
@@ -230,3 +244,52 @@ describe("CoopSharesModal share value", () => {
 function renderStandalone(node: React.ReactNode) {
   return render(<div data-testid="value-cell">{node}</div>);
 }
+
+describe("CoopSharesModal coop-share bounds", () => {
+  const cancelledShare = {
+    key: "share-9",
+    id: "share-9",
+    amount_of_coop_shares: 2,
+    cancelled_at: "2025-12-31T10:00:00Z",
+  };
+
+  it("refuses a total below the minimum for a current member", () => {
+    modalState.minShares = 3;
+    renderModal();
+
+    const customSave = modalState.tableProps?.customSave as CustomSave;
+    expect(() => customSave({ amount_of_coop_shares: 1 }, { key: -1 })).toThrow(
+      "members.below_min_shares",
+    );
+  });
+
+  it("lets the office record the payback on a departed member's share", () => {
+    // Every share of a departed member is cancelled, so their total is 0.
+    modalState.minShares = 3;
+    modalState.rows = [cancelledShare];
+    renderModal({ memberCancelledEffectiveAt: "2025-12-31" });
+
+    const customSave = modalState.tableProps?.customSave as CustomSave;
+    expect(
+      customSave(
+        { amount_of_coop_shares: 2, paid_back_date: "2026-07-15" },
+        cancelledShare,
+      ),
+    ).toMatchObject({ paid_back_date: "2026-07-15" });
+  });
+
+  it("counts an edited cancelled share as 0, like the server", () => {
+    modalState.maxShares = 3;
+    modalState.rows = [
+      { key: "share-1", id: "share-1", amount_of_coop_shares: 3 },
+      cancelledShare,
+    ];
+    renderModal();
+
+    const customSave = modalState.tableProps?.customSave as CustomSave;
+    expect(
+      customSave({ amount_of_coop_shares: 2, note: "Paid back." }, cancelledShare),
+    ).toMatchObject({ note: "Paid back." });
+  });
+});
+

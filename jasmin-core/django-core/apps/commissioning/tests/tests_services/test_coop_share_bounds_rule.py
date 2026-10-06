@@ -77,6 +77,17 @@ class TestAssertWithinMinMaxScope:
                 member=member, new_amount=Decimal(11)
             )
 
+    def test_departed_member_is_exempt(self, tenant):
+        # Their shares are cancelled, so the live total is 0 — below any
+        # minimum — and the office still has to record the payback.
+        _settings(tenant, min_number_coop_shares=3, max_number_coop_shares=10)
+        member = MemberFactory(
+            is_trial=False, admin_confirmed=True, cancelled_at=timezone.now()
+        )
+        CoopShareService.assert_within_min_max(
+            member=member, new_amount=Decimal(0)
+        )  # no raise
+
     def test_confirmed_non_trial_within_range_is_ok(self, tenant):
         _settings(tenant, min_number_coop_shares=3, max_number_coop_shares=10)
         member = MemberFactory(is_trial=False, admin_confirmed=True)

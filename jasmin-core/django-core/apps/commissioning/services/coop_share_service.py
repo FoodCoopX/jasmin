@@ -214,12 +214,18 @@ class CoopShareService:
         rejected applicants (not yet in the Mitgliederliste) are
         exempt — the office must be able to build up their coop-share
         position incrementally without each interim save tripping a
-        bound.
+        bound. So is a member who has left (``cancelled_at`` set): their
+        shares are cancelled and count 0, and the office must still be
+        able to record the payback on them.
 
         Mirror this check on every entry-point that calls
         ``assert_within_min_max``.
         """
-        return member.admin_confirmed and not member.is_trial
+        return (
+            member.admin_confirmed
+            and not member.is_trial
+            and member.cancelled_at is None
+        )
 
     @staticmethod
     def assert_within_min_max(

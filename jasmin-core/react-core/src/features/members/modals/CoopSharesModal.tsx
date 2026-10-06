@@ -72,6 +72,34 @@ interface CoopSharesModalProps {
   memberEntryDate?: string | null;
 }
 
+/**
+ * Mirrors ``CoopShareService._bounds_apply_to``: the [min, max] window only
+ * constrains admitted, non-trial members who haven't left. Trial and pending
+ * members are exempt so the office can build up their position bit by bit,
+ * and a departed member so the payback on their cancelled shares can still be
+ * recorded.
+ */
+const boundsApplyTo = (member: {
+  adminConfirmed: boolean;
+  isTrial: boolean;
+  departed: boolean;
+}): boolean => member.adminConfirmed && !member.isTrial && !member.departed;
+
+/**
+ * The member's live total once ``amount`` is saved on ``row``. Cancelled
+ * shares count 0 — this row too — as in the backend's check.
+ */
+function liveTotalAfterSave(
+  rows: CoopShareRecord[],
+  row: CoopShareRecord,
+  amount: unknown,
+): number {
+  const others = rows
+    .filter((other) => other.id !== row.id && !other.cancelled_at)
+    .reduce((sum, other) => sum + (Number(other.amount_of_coop_shares) || 0), 0);
+  return others + (row.cancelled_at ? 0 : Number(amount) || 0);
+}
+
 export default function CoopSharesModal({
   isOpen,
   onClose,
@@ -132,11 +160,11 @@ export default function CoopSharesModal({
     onMemberReinstated: onClose,
   });
 
-  // Mirror backend rule (CoopShareService._bounds_apply_to): the
-  // [min, max] window only constrains non-trial admin-confirmed
-  // Mitglieder. Trial / pending members are exempt so the office can
-  // build up their position incrementally.
-  const boundsApply = adminConfirmed && !isTrial;
+  const boundsApply = boundsApplyTo({
+    adminConfirmed,
+    isTrial,
+    departed: memberCancelled,
+  });
   const minShares = boundsApply
     ? (getSetting("min_number_coop_shares") ?? null)
     : null;
@@ -396,17 +424,11 @@ export default function CoopSharesModal({
       currentRecord: CoopShareRecord,
     ) => {
       if (boundsApply && (minShares != null || maxShares != null)) {
-        const newAmount =
-          Number(transformedData.amount_of_coop_shares as string | number) || 0;
-        const otherTotal = data
-          // Live equity only — cancelled (divested) shares count as 0, matching
-          // the enforced backend bounds invariant.
-          .filter((row) => row.id !== currentRecord.id && !row.cancelled_at)
-          .reduce(
-            (sum, row) => sum + (Number(row.amount_of_coop_shares) || 0),
-            0,
-          );
-        const newTotal = otherTotal + newAmount;
+        const newTotal = liveTotalAfterSave(
+          data,
+          currentRecord,
+          transformedData.amount_of_coop_shares,
+        );
 
         if (minShares != null && newTotal < minShares) {
           throw new Error(

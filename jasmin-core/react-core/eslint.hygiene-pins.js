@@ -31,7 +31,7 @@ export const complexityPins = {
   "src/features/members/components/CurrentWeekDeliveryCard.tsx": 26,
   "src/features/members/components/UpcomingDeliveriesCard.tsx": 37,
   "src/features/members/modals/AdminConfirmationModalMembers.tsx": 26,
-  "src/features/members/modals/CoopSharesModal.tsx": 35,
+  "src/features/members/modals/CoopSharesModal.tsx": 34,
   "src/features/members/modals/DeliveryStationMemberModal.tsx": 42,
   "src/features/members/pages/MemberDetail.tsx": 26,
   "src/features/members/pages/Members.tsx": 42,

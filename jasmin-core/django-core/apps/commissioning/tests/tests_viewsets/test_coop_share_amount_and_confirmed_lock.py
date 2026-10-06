@@ -19,11 +19,13 @@ from unittest import mock
 
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 
 from apps.commissioning.models import CoopShare
 from apps.commissioning.tests.factories import CoopShareFactory, MemberFactory
 from apps.commissioning.viewsets.members_viewsets import CoopShareViewSet
+from apps.shared.tenants.models import TenantSettings
 
 LIST_URL = reverse("coop_shares-list")
 DUE_DATE = datetime.date(2026, 3, 2)
@@ -262,3 +264,55 @@ class TestCoopShareUpdateBoundsLock:
             for member_id in sorted([str(share.member_id), str(other_member.id)])
         ]
         assert lock.call_args_list == expected
+
+
+@pytest.mark.django_db
+class TestDepartedMemberShares:
+    """A member who has left holds only cancelled shares, so their live total is
+    0 — below any minimum. The office still records the payback on those
+    shares, and a note, through the same grid."""
+
+    @pytest.fixture()
+    def departed_share(self, tenant):
+        TenantSettings.objects.create(
+            tenant=tenant,
+            valid_from=timezone.now() - datetime.timedelta(seconds=1),
+            min_number_coop_shares=3,
+            max_number_coop_shares=10,
+        )
+        exit_date = datetime.date(2025, 12, 31)
+        member = MemberFactory(
+            admin_confirmed=True,
+            is_trial=False,
+            entry_date=datetime.date(2024, 1, 1),
+            cancelled_at=timezone.now(),
+            cancelled_effective_at=exit_date,
+        )
+        return CoopShareFactory(
+            member=member,
+            admin_confirmed=True,
+            amount_of_coop_shares=3,
+            cancelled_at=timezone.now(),
+            cancelled_effective_at=exit_date,
+            payback_due_date=datetime.date(2026, 6, 30),
+        )
+
+    def test_the_payback_can_be_recorded(self, api_client, departed_share):
+        resp = api_client.patch(
+            _detail_url(departed_share),
+            {"paid_back_date": "2026-07-15"},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        departed_share.refresh_from_db()
+        assert departed_share.paid_back_date == datetime.date(2026, 7, 15)
+
+    def test_a_note_can_be_saved(self, api_client, departed_share):
+        resp = api_client.patch(
+            _detail_url(departed_share), {"note": "Paid back in cash."}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        departed_share.refresh_from_db()
+        assert departed_share.note == "Paid back in cash."
