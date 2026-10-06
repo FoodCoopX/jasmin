@@ -72,7 +72,7 @@ export const functionLengthPins = {
   "src/features/members/modals/CoopSharesModal.tsx": 467,
   "src/features/members/pages/Members.tsx": 768,
   "src/shared/layout/sidebars/CommissioningSidebar.tsx": 601,
-  "src/shared/tables/BasicEditableTable/EditableTable.tsx": 857,
+  "src/shared/tables/BasicEditableTable/EditableTable.tsx": 850,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 472,
   "src/shared/tables/BasicEditableTable/useEditableTable.ts": 579,
 };
@@ -83,5 +83,5 @@ export const fileLengthPins = {
   "src/features/abos/modals/NewSubscriptionModal.tsx": 1273,
   "src/features/commissioning/pages/PlanningShareContentBase.tsx": 1234,
   "src/features/members/pages/Members.tsx": 1018,
-  "src/shared/tables/BasicEditableTable/EditableTable.tsx": 1166,
+  "src/shared/tables/BasicEditableTable/EditableTable.tsx": 1160,
 };

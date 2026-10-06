@@ -42,6 +42,7 @@ import { useTranslation } from "react-i18next";
 import EditableCell from "./EditableCell";
 import EditableModal from "./EditableModal";
 import MobileCardList from "./MobileCardList";
+import TableSearchInput from "./TableSearchInput";
 import {
   allowsRow,
   canDeleteRow,
@@ -1072,8 +1073,11 @@ const EditableTable = <T extends TableRecord = TableRecord>({
       )}
       {isMobile ? (
         <>
+          {showSearchBar && (
+            <TableSearchInput value={searchText} onChange={handleSearch} mobile />
+          )}
           <MobileCardList
-            data={data}
+            data={filteredData}
             columns={columns}
             loading={tableLoading}
             permissions={permissions}
@@ -1106,17 +1110,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
             </div>
             <div>
               {showSearchBar && (
-                <Input
-                  placeholder={t("table.search_placeholder")}
-                  aria-label={t("table.search_placeholder")}
-                  type="search"
-                  value={searchText}
-                  allowClear
-                  onChange={handleSearch}
-                  prefix={<SearchOutlined />}
-                  size="small"
-                  style={{ width: "16em" }}
-                />
+                <TableSearchInput value={searchText} onChange={handleSearch} />
               )}
             </div>
           </div>

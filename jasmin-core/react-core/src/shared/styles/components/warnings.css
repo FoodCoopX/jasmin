@@ -1,6 +1,7 @@
 /* Inline warnings, error messages, mode banners. */
 
-/* Warning shown when viewing past data (read-only weeks). */
+/* Warning shown when viewing past data (read-only weeks). 40em wide, or the
+   width a page asks for, but never wider than the screen. */
 .past-warning-message {
   margin-top: 2.5em;
   padding: 5px;
@@ -8,6 +9,8 @@
   border: 1px solid #ffd591;
   border-radius: 6px;
   width: 40em;
+  max-width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;

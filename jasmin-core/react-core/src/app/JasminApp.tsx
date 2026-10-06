@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { activateLanguage } from "@shared/i18n";
 import { ROLES } from "@shared/auth/roles";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useMatch } from "react-router-dom";
 import DynamicSidebar from "@shared/layout/DynamicSidebar";
 import Footer from "@shared/layout/Footer";
 import MainContent from "@shared/layout/MainContent";
@@ -21,6 +21,7 @@ import RegistrationPage from "@features/auth/pages/registration/RegistrationPage
 import SetPasswordPage from "@features/auth/pages/SetPasswordPage";
 import ForgotPasswordPage from "@features/auth/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@features/auth/pages/ResetPasswordPage";
+import DeletionConfirmPage from "@features/public/pages/DeletionConfirmPage";
 import PrivacyPolicyPage from "@features/public/pages/PrivacyPolicyPage";
 import PublicLegalNoticePage from "@features/public/pages/PublicLegalNoticePage";
 import WaitingListOfferPage from "@features/public/pages/WaitingListOfferPage";
@@ -43,6 +44,12 @@ export default function JasminApp() {
   const { user, isAuthenticated, bootstrapping } = useAuth();
   const { i18n } = useTranslation();
   useErrorDateFormat();
+  // Pages a link in an email opens. The token in the URL is the credential, so
+  // they open whatever the visitor's session: the layouts for signed-in users
+  // would send a member or an office user to their own start page instead,
+  // and the link would be lost.
+  const deletionConfirmation = useMatch("/gdpr/confirm-deletion/:token");
+  const waitingListOffer = useMatch("/waiting-list-offer/:token");
 
   const { defaultAlgorithm, darkAlgorithm } = theme;
 
@@ -74,6 +81,23 @@ export default function JasminApp() {
     if (language) void activateLanguage(language);
   }, [language]);
 
+  if (deletionConfirmation || waitingListOffer) {
+    return (
+      <ConfigProvider theme={antdTheme} locale={antdLocale}>
+        <Routes>
+          <Route
+            path="/gdpr/confirm-deletion/:token"
+            element={<DeletionConfirmPage />}
+          />
+          <Route
+            path="/waiting-list-offer/:token"
+            element={<WaitingListOfferPage />}
+          />
+        </Routes>
+      </ConfigProvider>
+    );
+  }
+
   // Show the full-screen loader ONLY during the initial auth boot. Gating on
   // the per-action ``loading`` would unmount the login page on every submit and
   // drop the 2FA step (the credentials form would reappear instead of the code
@@ -103,10 +127,6 @@ export default function JasminApp() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegistrationPage />} />
           <Route path="/set-password/:token" element={<SetPasswordPage />} />
-          <Route
-            path="/waiting-list-offer/:token"
-            element={<WaitingListOfferPage />}
-          />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route
             path="/reset-password/:uid/:token"

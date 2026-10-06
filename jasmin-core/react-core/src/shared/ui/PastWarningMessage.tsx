@@ -13,7 +13,7 @@ const PastWarningMessage = ({
   children,
   style = {},
   className = "",
-  width = "40em",
+  width,
   ...props
 }: PastWarningMessageProps) => {
   return (

@@ -59,6 +59,7 @@
   "charges_stat_count": "Rows shown",
   "charges_stat_total": "Sum",
   "charges_subtotal_label": "Subtotal ({{count}} charges)",
+  "charges_members_total": "Members: {{count}}",
   "charges_regenerate": "Regenerate planned charges",
   "charges_regenerate_confirm": "Re-run the schedule generator for every active subscription? Idempotent — only PLANNED rows are affected.",
   "charges_regenerated": "Regeneration done. {{subscriptions}} subscription(s), {{rows}} new PLANNED rows.",

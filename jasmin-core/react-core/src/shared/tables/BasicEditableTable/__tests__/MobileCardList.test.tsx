@@ -6,6 +6,7 @@
  * for a formatted amount, an ISO date, a bare id for a relation.
  */
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import MobileCardList from "../MobileCardList";
@@ -76,3 +77,28 @@ describe("MobileCardList", () => {
     expect(screen.getByText("0.000")).toBeInTheDocument();
   });
 });
+
+describe("MobileCardList paging", () => {
+  const many: Row[] = Array.from({ length: 45 }, (_, index) => ({
+    key: `r${index}`,
+    name: `Article ${index + 1}`,
+    amount: null,
+  }));
+
+  it("shows 20 cards at first and 20 more per request", async () => {
+    renderList(columns(), many);
+
+    expect(screen.getByText("Article 20")).toBeInTheDocument();
+    expect(screen.queryByText("Article 21")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "table.show_more" }));
+    expect(screen.getByText("Article 40")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "table.show_more" }));
+    expect(screen.getByText("Article 45")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "table.show_more" }),
+    ).not.toBeInTheDocument();
+  });
+});
+

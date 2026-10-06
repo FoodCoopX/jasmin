@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { captureMessage } = vi.hoisted(() => ({ captureMessage: vi.fn() }));
+vi.mock("@sentry/react", () => ({ captureMessage }));
+
 import { isDynamicImportError, reloadOnceForChunkError } from "../chunkReload";
 
 describe("isDynamicImportError", () => {
@@ -39,6 +42,7 @@ describe("reloadOnceForChunkError", () => {
       value: { ...window.location, reload: reloadMock },
     });
     reloadMock.mockClear();
+    captureMessage.mockClear();
   });
 
   it("reloads once, then the loop-guard blocks a storm", () => {
@@ -47,5 +51,19 @@ describe("reloadOnceForChunkError", () => {
     // A second failure right away (chunk genuinely broken) must NOT reload again.
     expect(reloadOnceForChunkError()).toBe(false);
     expect(reloadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the reload it makes, with the failed import", () => {
+    reloadOnceForChunkError(new Error("Failed to fetch dynamically imported module"));
+    reloadOnceForChunkError(new Error("still failing"));
+
+    expect(captureMessage).toHaveBeenCalledTimes(1);
+    expect(captureMessage).toHaveBeenCalledWith(
+      "Reloaded after a failed chunk import",
+      {
+        level: "warning",
+        extra: { error: "Failed to fetch dynamically imported module" },
+      },
+    );
   });
 });

@@ -1,10 +1,8 @@
-import type { ReactNode } from "react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Button,
-  Card,
   Descriptions,
   Result,
   Space,
@@ -23,43 +21,11 @@ import {
   useShareTypeVariationSizeOptions,
   useTenant,
 } from "@hooks/index";
+import PublicCard from "../components/PublicCard";
 
 const { Title, Paragraph } = Typography;
 
 type Outcome = "pending" | "accepted" | "declined" | "expired" | "error";
-
-function Shell({
-  logoUrl,
-  children,
-}: {
-  logoUrl?: string | null;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-      }}
-    >
-      <Card style={{ maxWidth: 480, width: "100%" }}>
-        {logoUrl ? (
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <img
-              src={logoUrl}
-              alt=""
-              style={{ maxHeight: 64, maxWidth: "60%", objectFit: "contain" }}
-            />
-          </div>
-        ) : null}
-        {children}
-      </Card>
-    </div>
-  );
-}
 
 /**
  * Public (no-login) magic-link page: a waiting-list member accepts or declines
@@ -108,68 +74,68 @@ export default function WaitingListOfferPage() {
 
   if (isLoading) {
     return (
-      <Shell logoUrl={logoUrl}>
+      <PublicCard logoUrl={logoUrl}>
         <div style={{ textAlign: "center", padding: 24 }}>
           <Spin />
         </div>
-      </Shell>
+      </PublicCard>
     );
   }
 
   if (isError || !data) {
     return (
-      <Shell logoUrl={logoUrl}>
+      <PublicCard logoUrl={logoUrl}>
         <Result
           status="warning"
           title={t("abos.offer_page.invalid_title")}
           subTitle={t("abos.offer_page.invalid_text")}
         />
-      </Shell>
+      </PublicCard>
     );
   }
 
   if (outcome === "accepted") {
     return (
-      <Shell logoUrl={logoUrl}>
+      <PublicCard logoUrl={logoUrl}>
         <Result
           status="success"
           title={t("abos.offer_page.accepted_title")}
           subTitle={t("abos.offer_page.accepted_text")}
         />
-      </Shell>
+      </PublicCard>
     );
   }
   if (outcome === "declined") {
     return (
-      <Shell logoUrl={logoUrl}>
+      <PublicCard logoUrl={logoUrl}>
         <Result
           status="info"
           title={t("abos.offer_page.declined_title")}
           subTitle={t("abos.offer_page.declined_text")}
         />
-      </Shell>
+      </PublicCard>
     );
   }
   if (outcome === "expired" || data.expired) {
     return (
-      <Shell logoUrl={logoUrl}>
+      <PublicCard logoUrl={logoUrl}>
         <Result
           status="warning"
           title={t("abos.offer_page.expired_title")}
           subTitle={t("abos.offer_page.expired_text")}
         />
-      </Shell>
+      </PublicCard>
     );
   }
   if (outcome === "error") {
     return (
-      <Shell logoUrl={logoUrl}>
+      <PublicCard logoUrl={logoUrl}>
         <Result
           status="error"
           title={t("abos.offer_page.error_title")}
           subTitle={t("abos.offer_page.error_text")}
         />
-      </Shell>
+      </PublicCard>
     );
   }
 
@@ -189,7 +155,7 @@ export default function WaitingListOfferPage() {
     : "";
 
   return (
-    <Shell logoUrl={logoUrl}>
+    <PublicCard logoUrl={logoUrl}>
       <Title level={4}>
         {t("abos.offer_page.title", { name: data.member_first_name })}
       </Title>
@@ -247,6 +213,6 @@ export default function WaitingListOfferPage() {
           {t("abos.offer_page.accept")}
         </Button>
       </Space>
-    </Shell>
+    </PublicCard>
   );
 }

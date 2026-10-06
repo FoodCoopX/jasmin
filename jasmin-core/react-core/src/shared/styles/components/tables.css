@@ -262,6 +262,16 @@
   border-radius: 5px;
 }
 
+/* The search box above an editable table; full width on a phone. */
+.table-search-input {
+  width: 16em;
+}
+
+.table-search-input--mobile {
+  width: 100%;
+  margin: 8px 0;
+}
+
 /* The load, save and delete error banners above an editable table. */
 .editable-table-banner {
   margin: 8px 0;

@@ -1,3 +1,4 @@
+import { captureReactException } from "@sentry/react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button, Card, Result, Typography } from "antd";
 import {
@@ -54,10 +55,13 @@ export default class ErrorBoundary extends Component<Props, State> {
     // reload once to pick up the current module URLs instead of dead-ending on
     // the error card. If the loop-guard blocks the reload (the chunk is
     // genuinely broken), fall through and show the recovery UI.
-    if (isDynamicImportError(error) && reloadOnceForChunkError()) {
+    if (isDynamicImportError(error) && reloadOnceForChunkError(error)) {
       return;
     }
     console.error("[ErrorBoundary] Uncaught render error:", error, info);
+    // The production build strips the console line; this reaches GlitchTip
+    // (a no-op without a DSN), with the component stack attached.
+    captureReactException(error, info);
   }
 
   componentDidUpdate(prevProps: Props): void {

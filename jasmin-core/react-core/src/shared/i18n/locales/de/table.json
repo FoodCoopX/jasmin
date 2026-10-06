@@ -15,6 +15,7 @@
     "edit_record": "Eintrag bearbeiten",
     "items_per_page": "/ Seite",
     "search_placeholder": "Suchen...",
+    "show_more": "{{count}} weitere anzeigen",
     "packing_for_days": "alle Tage werden gleich gepackt",
     "packing_for_tours": "Es wird nach Touren gepackt.",
     "packing_for_stations": "Es wird nach Verteilstationen gepackt.", 

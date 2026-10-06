@@ -5,7 +5,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Popconfirm, Space, Spin, Tag } from "antd";
 import type { Key, ReactNode } from "react";
-import { Fragment, isValidElement, useMemo } from "react";
+import { Fragment, isValidElement, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./MobileCardList.css";
 import { canDeleteRow, canEditRow } from "./rowPermissions";
@@ -123,6 +123,10 @@ interface MobileCardListProps<T extends TableRecord> {
   renderMobileCard?: (record: T, onEdit: (record: T) => void) => ReactNode;
 }
 
+// Cards rendered at first and added per "show more": a phone scrolls a long
+// list fine, but rendering hundreds of cards at once is slow on one.
+const CARDS_PER_STEP = 20;
+
 function MobileCardList<T extends TableRecord>({
   data,
   columns,
@@ -136,6 +140,7 @@ function MobileCardList<T extends TableRecord>({
 }: MobileCardListProps<T>) {
   const { t } = useTranslation();
   const flat = useMemo(() => flattenColumns(columns), [columns]);
+  const [visibleCount, setVisibleCount] = useState(CARDS_PER_STEP);
 
   // Determine which columns are "primary" (shown in card body)
   // and which are "tags" (boolean flags shown as small tags).
@@ -202,7 +207,8 @@ function MobileCardList<T extends TableRecord>({
           {t("table.no_data")}
         </div>
       ) : (
-        activeData.map((record, index) => {
+        <>
+        {activeData.slice(0, visibleCount).map((record, index) => {
           if (renderMobileCard) {
             return (
               <Fragment key={String(record.key)}>
@@ -334,7 +340,19 @@ function MobileCardList<T extends TableRecord>({
               </div>
             </div>
           );
-        })
+        })}
+        {activeData.length > visibleCount && (
+          <Button
+            block
+            className="mobile-card-more-btn"
+            onClick={() => setVisibleCount((count) => count + CARDS_PER_STEP)}
+          >
+            {t("table.show_more", {
+              count: Math.min(CARDS_PER_STEP, activeData.length - visibleCount),
+            })}
+          </Button>
+        )}
+        </>
       )}
     </div>
   );

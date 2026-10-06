@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Button, Space, Tag } from "antd";
+import { Button, Pagination, Space, Tag } from "antd";
 import { ReadOnlyReportTable } from "@shared/tables";
 import dayjs from "dayjs";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getPaymentsChargeSchedulesListQueryKey,
@@ -61,6 +61,13 @@ export default function ChargesAbos() {
   );
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  // Paged by member, not by row, so a page never cuts a member's charges off
+  // from their name cell and subtotal.
+  const [page, setPage] = useState(1);
+  const [membersPerPage, setMembersPerPage] = useState(50);
+  useEffect(() => {
+    setPage(1);
+  }, [selectedYear, selectedMonth, selectedMember, selectedStatus]);
 
   // Status is filtered CLIENT-side (see ``filteredRows``) — NOT sent to the API —
   // so a single load carries every status and the per-status totals below stay
@@ -131,12 +138,19 @@ export default function ChargesAbos() {
     );
   }, [filteredRows]);
 
-  // Flatten groups → list of charge rows + a subtotal row per group.
+  const pageCount = Math.max(1, Math.ceil(grouped.length / membersPerPage));
+  const currentPage = Math.min(page, pageCount);
+
+  // Flatten the page's groups → list of charge rows + a subtotal row per group.
   // The first charge of each block carries memberRowSpan so AntD merges
-  // the member-name cell visually.
+  // the member-name cell visually, over the subtotal row too.
   const displayRows: DisplayRow[] = useMemo(() => {
     const out: DisplayRow[] = [];
-    for (const g of grouped) {
+    const pageGroups = grouped.slice(
+      (currentPage - 1) * membersPerPage,
+      currentPage * membersPerPage,
+    );
+    for (const g of pageGroups) {
       g.rows.forEach((charge, idx) => {
         out.push({
           key: charge.id ?? `${g.memberId}-${idx}`,
@@ -150,12 +164,13 @@ export default function ChargesAbos() {
         key: `subtotal-${g.memberId}`,
         type: "subtotal",
         memberLabel: g.memberLabel,
+        memberRowSpan: 0, // covered by the first charge's member cell
         subtotal: g.total,
         rowCount: g.rows.length,
       });
     }
     return out;
-  }, [grouped]);
+  }, [grouped, currentPage, membersPerPage]);
 
   const handleRegenerate = useCallback(async () => {
     setRegenerating(true);
@@ -201,7 +216,7 @@ export default function ChargesAbos() {
         render: (_v: unknown, r: DisplayRow) => {
           if (r.type === "subtotal") {
             return (
-              <span style={{ color: "var(--color-text-secondary)" }}>
+              <span className="charges-subtotal-label">
                 {t("abos.charges_subtotal_label", {
                   count: r.rowCount,
                 })}
@@ -248,7 +263,7 @@ export default function ChargesAbos() {
               role="button"
               tabIndex={0}
               aria-pressed={selectedStatus === r.charge.status}
-              style={{ cursor: "pointer" }}
+              className="charges-status-filter"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedStatus((s) =>
@@ -304,7 +319,7 @@ export default function ChargesAbos() {
         setSelectedMember={setSelectedMember}
         include_null_option
       />
-      <div style={{ marginBottom: "2em", marginTop: "2em" }}>
+      <div className="charges-regenerate">
         <Button
           type="primary"
           loading={regenerating}
@@ -315,8 +330,8 @@ export default function ChargesAbos() {
       </div>
 
       {statusTotals.length > 0 && (
-        <div style={{ marginBottom: "1.5em" }}>
-          <span style={{ color: "var(--color-text-muted)", marginRight: 8 }}>
+        <div className="charges-status-totals">
+          <span className="charges-status-totals-label">
             {t("abos.charges_status_totals")}
           </span>
           <Space wrap>
@@ -329,10 +344,11 @@ export default function ChargesAbos() {
                 role="button"
                 tabIndex={0}
                 aria-pressed={selectedStatus === st}
-                style={{
-                  cursor: "pointer",
-                  fontWeight: selectedStatus === st ? 700 : 400,
-                }}
+                className={
+                  selectedStatus === st
+                    ? "charges-status-filter charges-status-filter--active"
+                    : "charges-status-filter"
+                }
                 onClick={() => setSelectedStatus((s) => (s === st ? null : st))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -354,10 +370,24 @@ export default function ChargesAbos() {
         loading={isFetching}
         dataSource={displayRows}
         columns={columns}
-        pagination={{ pageSize: 100, showSizeChanger: true }}
+        pagination={false}
         rowClassName={(r) =>
           r.type === "subtotal" ? "charges-subtotal-row" : ""
         }
+      />
+      <Pagination
+        className="charges-pager"
+        current={currentPage}
+        pageSize={membersPerPage}
+        total={grouped.length}
+        showSizeChanger
+        pageSizeOptions={[25, 50, 100, 200]}
+        hideOnSinglePage
+        showTotal={(total) => t("abos.charges_members_total", { count: total })}
+        onChange={(nextPage, nextSize) => {
+          setPage(nextSize === membersPerPage ? nextPage : 1);
+          setMembersPerPage(nextSize);
+        }}
       />
 
       <ExplainerText title={t("common.info")}>

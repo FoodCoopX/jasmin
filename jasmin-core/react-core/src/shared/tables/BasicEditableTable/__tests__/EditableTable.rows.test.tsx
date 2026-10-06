@@ -18,6 +18,13 @@ vi.mock("@shared/contexts/ModalContext", () => ({
   useModal: () => ({ isModalMode: false }),
 }));
 
+// Switched per test: the phone layout renders cards instead of the table.
+const viewport = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@hooks/index", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@hooks/index")>()),
+  useIsMobile: () => viewport.mobile,
+}));
+
 vi.mock("@hooks/configuration/useTenant", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
   const tenant = makeUseTenantMock();
@@ -315,3 +322,32 @@ describe("EditableTable rows", () => {
     ).toHaveValue("Carrots");
   });
 });
+
+describe("EditableTable on a phone", () => {
+  it("searches the cards", async () => {
+    viewport.mobile = true;
+    try {
+      render(
+        <EditableTable<Row>
+          columns={[NAME_COLUMN]}
+          initialData={ROWS}
+          showSearchBar
+          permissions={PERMISSIONS}
+          apiFunctions={savingApi()}
+        />,
+      );
+      expect(await screen.findByText("Leeks")).toBeInTheDocument();
+
+      await userEvent.type(
+        screen.getByRole("searchbox", { name: "table.search_placeholder" }),
+        "carr",
+      );
+
+      expect(screen.getByText("Carrots")).toBeInTheDocument();
+      expect(screen.queryByText("Leeks")).not.toBeInTheDocument();
+    } finally {
+      viewport.mobile = false;
+    }
+  });
+});
+

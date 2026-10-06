@@ -15,6 +15,7 @@
   "edit_record": "Edit entry",
   "items_per_page": "/ page",
   "search_placeholder": "Search...",
+  "show_more": "Show {{count}} more",
   "packing_for_days": "all days are packed the same",
   "packing_for_tours": "Packing is organized by tours.",
   "packing_for_stations": "Packing is organized by delivery stations.",

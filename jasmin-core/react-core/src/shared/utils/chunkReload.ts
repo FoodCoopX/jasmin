@@ -16,6 +16,8 @@
  * so they share ONE loop-guard.
  */
 
+import * as Sentry from "@sentry/react";
+
 const RELOAD_AT_KEY = "chunk-reload-at";
 const RELOAD_WINDOW_MS = 10_000;
 
@@ -42,7 +44,7 @@ export function isDynamicImportError(error: unknown): boolean {
  * extension, a real 404) — don't reload-storm; let the caller surface the
  * error instead.
  */
-export function reloadOnceForChunkError(): boolean {
+export function reloadOnceForChunkError(error?: unknown): boolean {
   let last = 0;
   try {
     last = Number(window.sessionStorage.getItem(RELOAD_AT_KEY) ?? 0);
@@ -55,6 +57,13 @@ export function reloadOnceForChunkError(): boolean {
   } catch {
     // ignore — the reload is more important than the guard bookkeeping.
   }
+  // An event, not a breadcrumb: breadcrumbs live in the page's memory and die
+  // with the reload, while the event leaves on a keepalive request. A no-op
+  // without a DSN.
+  Sentry.captureMessage("Reloaded after a failed chunk import", {
+    level: "warning",
+    extra: { error: error instanceof Error ? error.message : String(error ?? "") },
+  });
   window.location.reload();
   return true;
 }

@@ -1125,7 +1125,9 @@ is in the header of `backups/restore.sh`.
 - `redis`: Redis 7 for cache and Huey broker
 - `backend`: Django + Gunicorn
 - `huey`: Background task worker (async jobs, notifications)
-- `frontend`: React + Nginx (built SPA)
+- `frontend`: React + Nginx (built SPA); keeps the hashed assets of the last
+  three releases on the `frontend_assets` volume, so a tab still running an
+  older release can lazy-load its chunks after a deploy
 - `gateway`: Public Nginx with TLS, routes to backend/frontend
 - `certbot`: Let's Encrypt renewal (wildcard certs via Linode DNS plugin)
 - `backup`: nightly encrypted DB dump + media archive

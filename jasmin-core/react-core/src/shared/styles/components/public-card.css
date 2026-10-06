@@ -1,0 +1,24 @@
+/* A page opened from a link in an email (PublicCard). */
+.public-card-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.public-card {
+  max-width: 480px;
+  width: 100%;
+}
+
+.public-card-logo {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.public-card-logo img {
+  max-height: 64px;
+  max-width: 60%;
+  object-fit: contain;
+}

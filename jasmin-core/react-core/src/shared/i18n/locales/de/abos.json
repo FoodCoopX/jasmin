@@ -62,6 +62,7 @@
   "charges_stat_count": "Angezeigte Zeilen",
   "charges_stat_total": "Summe",
   "charges_subtotal_label": "Zwischensumme ({{count}})",
+  "charges_members_total": "Mitglieder: {{count}}",
   "charges_regenerate": "Geplante Zahlungen neu berechnen",
   "charges_regenerate_confirm": "Generator für alle aktiven Abos neu laufen lassen? Idempotent — nur PLANNED-Zeilen werden berührt.",
   "charges_regenerated": "Neu erzeugt. {{subscriptions}} Abo(s), {{rows}} neue PLANNED-Zeilen.",

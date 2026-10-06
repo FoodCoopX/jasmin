@@ -330,6 +330,10 @@ services:
     mem_limit: 128m
     pids_limit: 64
     networks: [jasmin-net]
+    volumes:
+      # The hashed assets of the last three releases, kept across deploys so a
+      # tab still running an older release can lazy-load its chunks.
+      - frontend_assets:/srv/jasmin-frontend
 
   gateway:
     image: nginx:1.31-alpine
@@ -537,6 +541,7 @@ volumes:
   uptime_kuma_data:
   certbot_conf:
   certbot_www:
+  frontend_assets:
 
 networks:
   jasmin-net:

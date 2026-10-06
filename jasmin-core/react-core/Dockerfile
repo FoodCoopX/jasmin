@@ -5,7 +5,8 @@
 #     deps    - npm ci against package*.json only (cached layer)
 #     dev     - vite dev server with HMR
 #     builder - produces /app/dist
-#     nginx   - production: serves /app/dist via nginx
+#     nginx   - production: serves /app/dist via nginx, keeping the hashed
+#               assets of the last releases on a volume
 # =============================================================================
 
 # The node stages name their base image literally, not through an ARG:
@@ -84,8 +85,13 @@ FROM nginx:1.31-alpine AS nginx
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Built SPA
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Built SPA. The entry files (index.html, build.json, the icons) are served
+# from the image; the hashed assets go onto the volume that keeps the last
+# releases' too, which keep-release-assets.sh fills before nginx starts.
+COPY --from=builder /app/dist /opt/jasmin/dist
+RUN cp -R /opt/jasmin/dist/. /usr/share/nginx/html/ \
+    && rm -rf /usr/share/nginx/html/assets
+COPY --chmod=755 docker/keep-release-assets.sh /docker-entrypoint.d/40-keep-release-assets.sh
 
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

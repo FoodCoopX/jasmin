@@ -1,0 +1,32 @@
+/* The charges overview (abos → charges). */
+.charges-regenerate {
+  margin: 2em 0;
+}
+
+.charges-status-totals {
+  margin-bottom: 1.5em;
+}
+
+.charges-status-totals-label {
+  color: var(--color-text-muted);
+  margin-right: 8px;
+}
+
+/* A status tag doubles as the filter toggle. */
+.charges-status-filter {
+  cursor: pointer;
+}
+
+.charges-status-filter--active {
+  font-weight: 700;
+}
+
+.charges-subtotal-label {
+  color: var(--color-text-secondary);
+}
+
+.charges-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}

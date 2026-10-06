@@ -131,7 +131,8 @@ function bootstrap(): void {
 // by the global ErrorBoundary; both go through ``reloadOnceForChunkError`` so
 // they share ONE loop-guard against reload-storming a genuinely broken chunk.
 window.addEventListener("vite:preloadError", (event: Event) => {
-  if (reloadOnceForChunkError()) event.preventDefault();
+  const { payload } = event as Event & { payload?: unknown };
+  if (reloadOnceForChunkError(payload)) event.preventDefault();
 });
 
 try {

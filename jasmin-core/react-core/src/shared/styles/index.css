@@ -23,6 +23,7 @@
 @import './components/auth.css';
 @import './components/buttons.css';
 @import './components/card-headers.css';
+@import './components/charges.css';
 @import './components/checkbox.css';
 @import './components/consent.css';
 @import './components/delivery-tours.css';
@@ -40,6 +41,7 @@
 @import './components/packing-list.css';
 @import './components/packing-list-boxes-matrix.css';
 @import './components/popconfirm.css';
+@import './components/public-card.css';
 @import './components/selectors.css';
 @import './components/summary-stats-card.css';
 @import './components/super-admin.css';

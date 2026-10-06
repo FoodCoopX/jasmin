@@ -22,6 +22,10 @@
   margin-bottom: 8px;
 }
 
+.mobile-card-more-btn {
+  margin-top: 4px;
+}
+
 /* ─── Card item ──────────────────────────────────────────────────────────── */
 
 .mobile-card-item {
