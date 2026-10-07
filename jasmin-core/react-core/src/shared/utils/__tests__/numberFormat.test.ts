@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  blockNonNumericKeys,
   formatNumber,
   getLocaleSeparators,
+  normalizeNumberInputText,
   parseDecimalInput,
   parseLocaleNumber,
 } from "../numberFormat";
@@ -128,5 +130,104 @@ describe("parseDecimalInput", () => {
     expect(parseDecimalInput(null)).toBeNull();
     expect(parseDecimalInput(undefined)).toBeNull();
     expect(parseDecimalInput("abc")).toBeNull();
+  });
+});
+
+describe("normalizeNumberInputText", () => {
+  it.each([
+    ["2,50", "2.50"],
+    ["2.50", "2.50"],
+    ["1,000", "1.000"],
+    ["1.234,56", "1234.56"],
+    ["1,234.56", "1234.56"],
+    // fr-FR groups with a narrow no-break space, de-AT with a no-break space.
+    ["1 234,56", "1234.56"],
+    ["1 234,56", "1234.56"],
+    ["1 234,56", "1234.56"],
+    ["€ 2,50", "2.50"],
+    ["2,", "2."],
+    [",5", ".5"],
+    ["-2,5", "-2.5"],
+    ["", ""],
+    ["  ", ""],
+    // Two decimal marks: no number, so the field keeps its last valid value.
+    ["1,2,3", "1.2.3"],
+  ])("on a tenant with a decimal comma reads %j as %j", (text, expected) => {
+    expect(normalizeNumberInputText(text, ",")).toBe(expected);
+  });
+
+  it.each([
+    ["2.50", "2.50"],
+    ["2,50", "2.50"],
+    ["1,5", "1.5"],
+    ["0,500", "0.500"],
+    ["1,000", "1000"],
+    ["12,345,678", "12345678"],
+    ["-1,000", "-1000"],
+    ["£1,000", "1000"],
+    ["1,234.56", "1234.56"],
+    ["1.234,56", "1234.56"],
+    // de-CH groups with an apostrophe, typed or typographic.
+    ["1'234.56", "1234.56"],
+    ["1’234.56", "1234.56"],
+    ["", ""],
+    ["1,2,3", "1.2.3"],
+  ])("on a tenant with a decimal point reads %j as %j", (text, expected) => {
+    expect(normalizeNumberInputText(text, ".")).toBe(expected);
+  });
+
+  it("reads a locale's own decimal mark as the point", () => {
+    expect(normalizeNumberInputText("1٫5", "٫")).toBe("1.5");
+  });
+
+  // NumberInput shows a value at its precision with the tenant's decimal mark
+  // and no grouping; leaving the field reads that text back.
+  it.each(["de-DE", "de-CH", "en-US", "fr-FR"])(
+    "%s: what the field shows reads back as the same number",
+    (locale) => {
+      const { decimalChar } = getLocaleSeparators(locale);
+      for (const value of [0, 1.5, 2.05, 1234.56, 1000, -12.34]) {
+        const shown = value.toFixed(2).replace(".", decimalChar);
+        expect(Number(normalizeNumberInputText(shown, decimalChar))).toBe(value);
+      }
+    },
+  );
+});
+
+describe("blockNonNumericKeys", () => {
+  /** Whether the handler lets ``key`` through. */
+  function passes(
+    handler: ReturnType<typeof blockNonNumericKeys>,
+    key: string,
+    modifiers: Partial<Record<"ctrlKey" | "metaKey" | "altKey", boolean>> = {},
+  ) {
+    const preventDefault = vi.fn();
+    handler({
+      key,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      ...modifiers,
+      preventDefault,
+    });
+    return preventDefault.mock.calls.length === 0;
+  }
+
+  it("lets both decimal marks into a decimal field and neither into a whole-number one", () => {
+    const decimals = blockNonNumericKeys({ allowDecimal: true });
+    const wholeNumbers = blockNonNumericKeys({ allowDecimal: false });
+
+    expect([".", ","].map((key) => passes(decimals, key))).toEqual([true, true]);
+    expect([".", ","].map((key) => passes(wholeNumbers, key))).toEqual([false, false]);
+    for (const handler of [decimals, wholeNumbers]) {
+      expect(passes(handler, "7")).toBe(true);
+      expect(passes(handler, "Backspace")).toBe(true);
+      expect(passes(handler, "v", { metaKey: true })).toBe(true);
+      expect(passes(handler, "e")).toBe(false);
+      expect(passes(handler, "-")).toBe(false);
+    }
+    expect(
+      passes(blockNonNumericKeys({ allowDecimal: true, allowNegative: true }), "-"),
+    ).toBe(true);
   });
 });

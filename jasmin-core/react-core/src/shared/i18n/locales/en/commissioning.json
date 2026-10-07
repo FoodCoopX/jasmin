@@ -733,6 +733,7 @@
   },
   "no_active_delivery_days": "No active delivery days",
   "no_active_delivery_days_message": "No active delivery days are configured for the selected period.",
+  "no_delivery_days_in_week": "No delivery days this week",
   "no_offers_created": "No offers created — nothing to offer for this week.",
   "no_offer_groups_found": "No offer groups found — please create at least one before creating offers.",
   "no_other_variations": "No other variants",

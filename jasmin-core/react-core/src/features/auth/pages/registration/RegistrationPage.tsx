@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Card, Steps, Typography } from "antd";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { LanguageSwitcher } from "@shared/ui";
 import StepCoopShares from "./steps/StepCoopShares";
 import StepShareTypeVariation from "./steps/StepShareTypeVariation";
 import StepConsents from "./steps/StepConsents";
@@ -67,16 +68,14 @@ export default function RegistrationPage() {
   const { Component } = steps[current];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        padding: "32px 16px",
-      }}
-    >
+    // The language the wizard is filled in becomes the new member's
+    // ``user_language``, which the set-password email and every email after
+    // it are written in, so a visitor must be able to correct the language
+    // taken from their browser before they register.
+    <div className="auth-page auth-page--top auth-page--with-language">
+      <div className="auth-language-switcher">
+        <LanguageSwitcher />
+      </div>
       <Card style={{ width: 1000, boxShadow: "0 4px 12px var(--color-shadow)" }}>
         <Title level={3} className="text-center">
           {t(

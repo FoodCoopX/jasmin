@@ -34,12 +34,13 @@ describe("supported languages", () => {
     );
   });
 
-  it("gives every language a distinct code, a label and a flag", () => {
+  it("gives every language a distinct code, a label, its own name and a flag", () => {
     expect(new Set(SUPPORTED_LANGUAGE_CODES).size).toBe(
       SUPPORTED_LANGUAGES.length,
     );
     for (const language of SUPPORTED_LANGUAGES) {
       expect(language.label).not.toBe("");
+      expect(language.name).not.toBe("");
       expect(language.flag).not.toBe("");
     }
   });

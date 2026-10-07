@@ -4,7 +4,6 @@ import {
   Card,
   Col,
   Flex,
-  InputNumber,
   Row,
   Space,
   Spin,
@@ -20,10 +19,10 @@ import {
 } from "@shared/api/generated/tenants/tenants";
 import RichTextEditorModal from "@shared/modals/RichTextEditorModal";
 import { AutoSaveIndicator } from "@shared/ui";
+import NumberInput from "@shared/ui/NumberInput";
 import { blockNonNumericKeys } from "@shared/utils/numberFormat";
 import {
   useDateFormat,
-  useNumberFormat,
   useAutoSavedSettings,
   useTenant,
 } from "@hooks/index";
@@ -119,7 +118,6 @@ export default function SettingsPage({
 }: SettingsPageProps) {
   const { t } = useTranslation();
   const { tenant, refreshTenant } = useTenant();
-  const { separators } = useNumberFormat();
   const { dateFormat } = useDateFormat();
 
   const {
@@ -264,7 +262,7 @@ export default function SettingsPage({
             value,
             (newValue) =>
               handleSettingChange(setting.key, newValue, setting.type),
-            { decimalChar: separators.decimalChar, dateFormat },
+            { dateFormat },
           )}
           {SettingsRenderer.renderDescription(setting)}
         </div>
@@ -275,7 +273,6 @@ export default function SettingsPage({
       handleSettingChange,
       openRichTextEditor,
       t,
-      separators.decimalChar,
       dateFormat,
     ],
   );
@@ -425,17 +422,14 @@ function TiersField({ setting, value, onChange }: TiersFieldProps) {
               {tierLabel} {index + 1}:
             </Text>
             <Text>{tierFrom}</Text>
-            <InputNumber
+            <NumberInput
+              aria-label={`${tierLabel} ${index + 1}`}
               min={1}
               value={tier}
               onChange={(val) => updateTier(index, val)}
               style={{ width: "100px" }}
               disabled={index === 0}
-              decimalSeparator="."
-              onKeyDown={blockNonNumericKeys({
-                allowDecimal: true,
-                decimalChar: ".",
-              })}
+              onKeyDown={blockNonNumericKeys({ allowDecimal: true })}
             />
             <Text>{tierPU}</Text>
             {index > 0 && (

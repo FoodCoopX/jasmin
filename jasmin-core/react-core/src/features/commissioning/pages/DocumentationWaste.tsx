@@ -83,6 +83,8 @@ export default function DocumentationWaste() {
           if (record.key != -1) return true;
         },
       },
+      // A waste is stored with two decimals, so it is typed and shown with them.
+      amount: { inputType: "positive_decimal2" },
     },
   });
 

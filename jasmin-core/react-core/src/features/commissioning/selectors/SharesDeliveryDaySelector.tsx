@@ -6,6 +6,7 @@ import { useDateFormat, useDeliveryDayLabel, useIsMobile } from '@hooks/index';
 import { activeAtDateForWeek, getStatusColor } from "@shared/utils";
 import { useShareDeliveryDays } from '@features/commissioning/hooks';
 import { SteppedSelect } from "@shared/selectors";
+import { EmptyHint } from "@shared/ui";
 
 const { Option } = Select;
 
@@ -16,7 +17,6 @@ interface SharesDeliveryDaySelectorProps {
     | ((value: string | null, selectedDay?: unknown) => void)
     | null;
   include_null_option?: boolean;
-  preserveSelection?: boolean;
   active_at_date?: string;
   selectedYear?: number;
   selectedWeek?: number | null;
@@ -28,7 +28,6 @@ const SharesDeliveryDaySelector = ({
   setSelectedSharesDeliveryDay,
   onSharesDeliveryDayChange = null,
   include_null_option = false,
-  preserveSelection = true,
   active_at_date,
   selectedYear,
   selectedWeek,
@@ -49,9 +48,11 @@ const SharesDeliveryDaySelector = ({
     (selectedYear && selectedWeek
       ? activeAtDateForWeek(selectedYear, selectedWeek)
       : undefined);
-  const { shareDeliveryDays, loading } = useShareDeliveryDays(
-    effectiveActiveAtDate ? { active_at_date: effectiveActiveAtDate } : {},
-  );
+  const isWeekScoped = !!effectiveActiveAtDate;
+  const { shareDeliveryDays, loading, pending, noDaysListed } =
+    useShareDeliveryDays(
+      effectiveActiveAtDate ? { active_at_date: effectiveActiveAtDate } : {},
+    );
 
   // Enrich delivery days with labels and status colors
   // (status color via the shared ``getStatusColor``).
@@ -76,29 +77,46 @@ const SharesDeliveryDaySelector = ({
     });
   }, [shareDeliveryDays, formatDate, t]);
 
-  // Handle default selection
+  // Once the list is in, the pick is one of its days; a list still on its way,
+  // also one waiting offline for the network, changes nothing. A listed pick
+  // stays; anything else becomes the first day, or no day where "all delivery
+  // days" is offered. A week without delivery days, or whose days failed to
+  // load, leaves nothing to pick. The list of every delivery day keeps its
+  // pick when it comes back empty: a page may set a day of its own whenever
+  // none is picked, and clearing it here would undo that in a loop.
   useEffect(() => {
-    if (loading || !enrichedDays.length) return;
-
-    if (preserveSelection) {
-      const currentExists = enrichedDays.some(
-        (d) => d.id === selectedSharesDeliveryDay,
-      );
-      if (!selectedSharesDeliveryDay || !currentExists) {
-        const defaultValue = include_null_option ? null : enrichedDays[0].value;
-        setSelectedSharesDeliveryDay(defaultValue);
+    if (pending) return;
+    if (!enrichedDays.length) {
+      if (isWeekScoped && selectedSharesDeliveryDay !== null) {
+        setSelectedSharesDeliveryDay(null);
       }
-    } else {
-      setSelectedSharesDeliveryDay(enrichedDays[0].value);
+      return;
+    }
+    const keepPick =
+      selectedSharesDeliveryDay === null
+        ? include_null_option
+        : enrichedDays.some((day) => day.value === selectedSharesDeliveryDay);
+    if (!keepPick) {
+      setSelectedSharesDeliveryDay(
+        include_null_option ? null : enrichedDays[0].value,
+      );
     }
   }, [
     enrichedDays,
-    loading,
+    pending,
+    isWeekScoped,
     selectedSharesDeliveryDay,
     setSelectedSharesDeliveryDay,
-    preserveSelection,
     include_null_option,
   ]);
+
+  const weekHasNoDays = isWeekScoped && noDaysListed;
+  const placeholder = weekHasNoDays
+    ? t("commissioning.no_delivery_days_in_week")
+    : t("placeholder.shares_delivery_day_selector");
+  const emptyWeekHint = weekHasNoDays ? (
+    <EmptyHint>{t("commissioning.no_delivery_days_in_week")}</EmptyHint>
+  ) : undefined;
 
   // Compute date label for a delivery day in the selected week
   const calculateDate = useCallback(
@@ -225,8 +243,9 @@ const SharesDeliveryDaySelector = ({
           canGoNext={canGoNext}
           selectStyle={{ width: isMobile ? "10em" : suffix ? "22em" : "15em" }}
           selectAriaLabel={t("placeholder.shares_delivery_day_selector")}
-          placeholder={t("placeholder.shares_delivery_day_selector")}
+          placeholder={placeholder}
           loading={loading}
+          notFoundContent={emptyWeekHint}
         >
           {include_null_option && (
             <Option key="none" value={null}>
@@ -252,9 +271,10 @@ const SharesDeliveryDaySelector = ({
       onChange={handleSharesDeliveryDayChange}
       options={sharesDeliveryDayOptions}
       className="bold-select week-selector-select"
-      placeholder={t("placeholder.shares_delivery_day_selector")}
+      placeholder={placeholder}
       aria-label={t("placeholder.shares_delivery_day_selector")}
       loading={loading}
+      notFoundContent={emptyWeekHint}
     />
   );
 };

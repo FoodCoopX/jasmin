@@ -187,6 +187,39 @@ def _validated_additional_theoretical_body(
     return data
 
 
+def _refuse_another_week(model: str, pk: str, data: dict[str, Any]) -> None:
+    """Refuse an update whose body names another week than the stored row's.
+
+    The update always writes into the stored row's week, so a client listing an
+    entry of next week among this week's rows would change next week's entry
+    with what was meant for this week. The callers send the week they list,
+    which for a row of that week is its own. A missing row is left to the
+    update's own lookup.
+    """
+    week_fields = ("year", "delivery_week")
+    sent = {field: data[field] for field in week_fields if field in data}
+    if not sent:
+        return
+    actual_model = DocumentationSummaryService.MODEL_MAPPING[model]["actual"]
+    stored = actual_model._default_manager.filter(id=pk).values(*week_fields).first()
+    if stored is None:
+        return
+    named = {**stored, **sent}
+    if named == stored:
+        return
+    # A client without a translation for the code shows this message, so it
+    # says what to do.
+    raise CommissioningError(
+        f"This entry belongs to week {stored['delivery_week']} of {stored['year']}, "
+        f"not to week {named['delivery_week']} of {named['year']}. "
+        "Please reload the page and try again.",
+        field=next(field for field in week_fields if named[field] != stored[field]),
+        code="documentation.week_mismatch",
+        # The entry's own week, so a client can name it without parsing prose.
+        details={"year": stored["year"], "delivery_week": stored["delivery_week"]},
+    )
+
+
 def _optional_summary_scope(instance: Any) -> dict[str, Any]:
     """``day_number``/``seller`` summary filters for an additional-theoretical row.
 
@@ -738,6 +771,7 @@ class DocumentationSummaryViewSet(RolePermissionsMixin, viewsets.ViewSet):
     ) -> Response:
         model = _validated_model(request)
         data = _validated_additional_theoretical_body(request, partial=True)
+        _refuse_another_week(model, pk, data)
 
         instance = DocumentationSummaryService.update_additional_theoretical_amount(
             data, pk, model

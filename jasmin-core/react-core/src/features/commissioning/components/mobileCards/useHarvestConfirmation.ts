@@ -3,6 +3,7 @@ import type { Key } from "react";
 import { commissioningHarvestPartialUpdate } from "@shared/api/generated/commissioning/commissioning";
 import type { Harvest } from "@shared/api/generated/models";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
+import { roundHalfUp } from "@shared/utils/lineNetto";
 
 /**
  * Manages the "confirm harvest" modal state for the harvesting list mobile
@@ -30,8 +31,14 @@ export function useHarvestConfirmation(params: {
   const open = useCallback((rec: TableRecord) => {
     setRecord(rec);
     const expected = (rec.computed_total_amount as number) || 0;
-    const existing = rec.harvest_amount as number | null | undefined;
-    setAmount(existing ?? expected);
+    const existing = rec.harvest_amount as number | string | null | undefined;
+    // The server keeps a harvest to two decimals, and the field shows it so.
+    // The expected amount comes from plans kept to three decimals and is
+    // summed in floats (10.2 - 3.4 is 6.799999999999999), so the dialog starts
+    // from the amount the field shows, rounded half up as the field rounds it
+    // (toFixed rounds 1.005 down); an untouched confirm would otherwise send
+    // one the server refuses.
+    setAmount(roundHalfUp(Number(existing ?? expected), 2));
   }, []);
 
   const close = useCallback(() => {

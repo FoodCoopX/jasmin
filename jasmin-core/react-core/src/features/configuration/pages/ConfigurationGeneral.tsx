@@ -42,13 +42,13 @@ type TenantFormState = Partial<Writable<Omit<Tenant, "logo" | "bio_logo">>> & {
 };
 
 /**
- * Options for the tenant language select. The code is appended to each label
- * because this is a long settings form, where a bare native language name is
- * easy to skim past.
+ * Options for the tenant language select. The code is appended to each
+ * language's own name because this is a long settings form, where a bare
+ * native language name is easy to skim past.
  */
 const TENANT_LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((language) => ({
   value: language.code,
-  label: `${language.label} (${language.code.toUpperCase()})`,
+  label: `${language.name} (${language.code.toUpperCase()})`,
 }));
 
 export default function ConfigurationGeneral() {

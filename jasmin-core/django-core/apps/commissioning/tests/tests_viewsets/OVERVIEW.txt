@@ -1,6 +1,6 @@
 Viewset Tests Overview
 ======================
-1101 tests | 202 test classes | 36 files
+1166 tests | 209 test classes | 38 files
 Run: poetry run pytest apps/commissioning/tests/tests_viewsets/ --no-header --tb=short -q
 
 Counts are collected cases, so a parametrized method counts once per case.
@@ -125,6 +125,30 @@ test_coop_share_transfer.py (50 tests) — office coop share transfer between me
                                                keeps shares (409) and its minimum (400); a row no transfer
                                                created → 400; anonymous refused
 
+test_crate_line_ids.py (44 tests) — a crate line is one crate type at one price, rabatt and tax rate
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  TestDocumentCrateLineIds                32   per delivery note / invoice: each line has an id of its own,
+                                               kept through a price edit and shared with the document's
+                                               crate_items; a PATCH or DELETE changes only the named
+                                               line (a price edit keeps the line whole, the named row survives a
+                                               reduction, zeroing a one-row line deletes it and a crate-only
+                                               document, a price matching another line merges them); a bare
+                                               crate type id still names every line; a gone named row → 409
+                                               crate_line.changed while other lines remain, else written anew;
+                                               another document's row is never touched; a malformed id or
+                                               another crate type's line → 400 crate_line.invalid_id; create
+                                               answers with its new row's line
+  TestSummaryInvoiceAcrossACratePriceChange 1 a summary invoice billing a crate at two prices corrects one price
+                                               band on its own
+  TestOrderCrateLineIds                   11   two rows set to 5 give 5, not 10; a direct line edit leaves the
+                                               offer-bound line alone; a bare crate type id sets the type total;
+                                               a reduction comes off the direct rows before the deposit rows,
+                                               never below zero, and the row naming the line keeps a crate, so
+                                               a lowered deposit line leaves nothing behind its deleted order
+                                               line or on the delivery note; a finalized order → 409; a delete
+                                               removes only its line's direct rows; a gone row → 409; a
+                                               malformed id → 400; create answers with its new row's line
+
 test_crates_viewsets.py (48 tests)
 ──────────────────────────────────
   TestCrateOrderContentList                3   a reseller's crate summary for one delivery day: staff and
@@ -193,7 +217,7 @@ test_delivery_viewsets.py (49 tests)
                                                ContactEntity); resending the stored IBAN, other edits and no or a
                                                blank IBAN prompt for nothing
 
-test_documentation_viewsets.py (62 tests)
+test_documentation_viewsets.py (67 tests)
 ─────────────────────────────────────────
   TestPlotViewSet                          6   list, is_active filter, create, retrieve, delete
   TestWasteViewSet                         4   list; create with a page-level storage; plain storage required
@@ -215,7 +239,9 @@ test_documentation_viewsets.py (62 tests)
   TestDocumentationSummaryAction           1   empty summary for an unused week
   TestAddAdditionalTheoreticalAmount       9   invalid model / unusable value / missing share_article → 400;
                                                unknown share_article → 404; valid payload creates the row
-  TestUpdateAdditionalTheoreticalAmount    1   invalid model → 400
+  TestUpdateAdditionalTheoreticalAmount    6   invalid model → 400; a body naming another week or
+                                               year is refused (documentation.week_mismatch) and
+                                               writes nothing; its own week, or none, still updates
   TestMovementSourceDeleteRecascades       3   deleting a movement source re-cascades the stock snapshots
   TestListFiltersDoNotScopeDetailRoutes    3   a forecast / waste detail route reaches a row outside
                                                the list window, and a stale week filter on the URL does

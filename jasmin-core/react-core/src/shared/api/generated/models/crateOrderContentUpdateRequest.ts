@@ -9,7 +9,8 @@
 /**
  * Validated request body for ``CrateOrderContentViewSet.partial_update``.
 
-The crate type comes from the URL; the period (year / delivery_week /
+The crate line comes from the URL (its line id, or a bare crate type id
+for every line of the type); the period (year / delivery_week /
 day_number / reseller) is required to scope the rows while the mutable
 line fields are optional (PATCH). Same rationale as the create serializer
 — keep malformed period ints off the 500 path.

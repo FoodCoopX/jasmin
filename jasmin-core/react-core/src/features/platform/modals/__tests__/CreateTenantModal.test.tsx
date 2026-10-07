@@ -40,6 +40,17 @@ describe("CreateTenantModal language picker", () => {
     ]);
   });
 
+  it("names each language in full, so a screen reader doesn't spell a code", () => {
+    render(<CreateTenantModal onClose={vi.fn()} onSuccess={vi.fn()} />);
+
+    const options = within(languageSelect()).getAllByRole("option");
+
+    expect(options.map((option) => option.textContent)).toEqual([
+      "Deutsch (DE)",
+      "English (EN)",
+    ]);
+  });
+
   it("does not offer a language the backend rejects", () => {
     render(<CreateTenantModal onClose={vi.fn()} onSuccess={vi.fn()} />);
 

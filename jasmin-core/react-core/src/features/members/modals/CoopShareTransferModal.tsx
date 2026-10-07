@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Alert, Checkbox, DatePicker, Form, Input, InputNumber, Modal } from "antd";
+import { Alert, Checkbox, DatePicker, Form, Input, Modal } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ import {
 import type { CoopShareTransfer } from "@shared/api/generated/models";
 import { ModalCancelSaveFooter } from "@shared/modals/shared";
 import MemberSelector from "@shared/selectors/MemberSelector";
+import NumberInput from "@shared/ui/NumberInput";
 import OnboardingNoEmailHint from "@shared/ui/OnboardingNoEmailHint";
 import { notify } from "@shared/utils";
 import { getErrorCode, getErrorMessage } from "@shared/utils/apiError";
@@ -244,7 +245,7 @@ export default function CoopShareTransferModal({
             },
           ]}
         >
-          <InputNumber className="w-full" min={1} precision={0} step={1} />
+          <NumberInput className="w-full" min={1} precision={0} step={1} />
         </Form.Item>
         <Form.Item
           name="transfer_date"

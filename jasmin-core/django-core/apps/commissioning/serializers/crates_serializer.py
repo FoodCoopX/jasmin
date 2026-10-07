@@ -47,7 +47,8 @@ class CrateOrderContentCreateRequestSerializer(serializers.Serializer):
 class CrateOrderContentUpdateRequestSerializer(serializers.Serializer):
     """Validated request body for ``CrateOrderContentViewSet.partial_update``.
 
-    The crate type comes from the URL; the period (year / delivery_week /
+    The crate line comes from the URL (its line id, or a bare crate type id
+    for every line of the type); the period (year / delivery_week /
     day_number / reseller) is required to scope the rows while the mutable
     line fields are optional (PATCH). Same rationale as the create serializer
     — keep malformed period ints off the 500 path.
@@ -70,8 +71,8 @@ class CrateOrderContentUpdateRequestSerializer(serializers.Serializer):
 
 
 # The two write bodies below are what the crate lines on delivery notes and
-# invoices are built from. ``create`` inserts a row and ``update`` rewrites every
-# row of the crate type through ``QuerySet.update()``; neither path runs
+# invoices are built from. ``create`` inserts a row and ``update`` rewrites the
+# rows of one crate line through ``QuerySet.update()``; neither path runs
 # ``full_clean()``, so these fields are the only place the model's limits hold
 # (``rabatt`` 0-100, ``numeric(5, 2)`` prices and tax rates, a 500-char note).
 # Each field mirrors its model column. The optional ones are left out of

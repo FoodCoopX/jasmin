@@ -7,12 +7,16 @@ from typing import Any
 from django.db import transaction
 from django.db.models import Q, QuerySet
 
+from core.db_locks import acquire_advisory_xact_lock
+
 from ..constants import crates_should_be_on_documents
-from ..errors import CrateNotFound, CratesDisabledOnDocuments
+from ..errors import CrateNotFound, CratesDisabledOnDocuments, FinalizedError
 from ..models import Crate, CrateOrderContent, Order
 from ..utils.iso_week_utils import week_day_to_date
 from ..utils.tax_rate_utils import effective_crate_tax_rate
-from .crate_summary import build_crate_summary_row, summarize_crate_items
+from .crate_content_service import CrateContentService
+from .crate_lines import crate_line_rows, parse_crate_line_id
+from .crate_summary import summarize_crate_items, summarize_crate_line
 
 
 class CrateOrderContentService:
@@ -43,23 +47,140 @@ class CrateOrderContentService:
         )
 
     @staticmethod
-    def _serialize(crate_order_content: CrateOrderContent) -> dict[str, Any]:
-        """Serialize a CrateOrderContent into a flat dict.
+    def _slot_order(
+        year: int,
+        delivery_week: int,
+        day_number: int,
+        reseller,
+    ) -> Order | None:
+        """The reseller's order for a delivery day; there is at most one."""
+        return Order.objects.filter(
+            reseller=reseller,
+            year=year,
+            delivery_week=delivery_week,
+            day_number=day_number,
+        ).first()
 
-        Money fields go out as canonical 2dp strings with ``line_netto``
-        computed once in Decimal on the backend (via
-        ``build_crate_summary_row``), matching the DN/invoice crate
-        summary — never as JSON floats.
+    @staticmethod
+    def _lock_crate_type(order_pk: str, crate_type_id: str) -> str:
+        """Take the per-(order, crate type) lock that writes to an order's crate
+        lines serialise on, and return its key."""
+        lock_key = f"crate_totals:Order:{order_pk}:{crate_type_id}"
+        acquire_advisory_xact_lock(lock_key)
+        return lock_key
+
+    @staticmethod
+    def _line_summary(
+        period_q: Q, crate_type_id: str, row_pk: str | None
+    ) -> dict[str, Any]:
+        """The period's crate line that holds the row ``row_pk``, or for None the
+        first line of the crate type the order list shows. {} when there is
+        none."""
+        rows = CrateOrderContent.objects.filter(
+            period_q, crate_type_id=crate_type_id
+        ).select_related("crate_type")
+        if row_pk is not None:
+            return summarize_crate_line(rows, row_pk) or {}
+        shown = (line for line in summarize_crate_items(rows) if line["amount"] > 0)
+        return next(shown, {})
+
+    @staticmethod
+    def _take_off_line(line_pks: list[str], row_pk: str | None, new_total: int) -> None:
+        """Lower the crate line made of the rows ``line_pks`` to ``new_total``.
+
+        The crates come off the rows added directly to the order first, then
+        off the offer-bound rows, which their order line rebuilds whenever it
+        is saved, so a reduction taken there lasts until then. Within each kind
+        the row ``row_pk`` goes last and keeps a crate unless the line goes to
+        zero: the line is named by that row, and a write naming a line whose
+        row is gone answers 409 ``crate_line.changed``. No row goes below zero,
+        and a row brought to zero is deleted.
         """
-        return build_crate_summary_row(
-            crate_type_id=crate_order_content.crate_type_id,
-            crate_type_name=crate_order_content.crate_type.name,
-            amount=crate_order_content.amount,
-            price=crate_order_content.price_per_unit,
-            rabatt=crate_order_content.rabatt,
-            tax_rate=crate_order_content.tax_rate,
-            extras={"note": crate_order_content.note},
+        rows = list(
+            CrateOrderContent.objects.select_for_update().filter(pk__in=line_pks)
         )
+        excess = sum(row.amount for row in rows) - new_total
+        rows.sort(
+            key=lambda row: (row.order_id is None, str(row.pk) == row_pk, str(row.pk))
+        )
+        for row in rows:
+            keep = min(1, new_total) if str(row.pk) == row_pk else 0
+            taken = min(excess, max(row.amount - keep, 0))
+            if taken <= 0:
+                continue
+            excess -= taken
+            row.amount -= taken
+            if row.amount:
+                row.save(update_fields=["amount"])
+            else:
+                row.delete()
+
+    @staticmethod
+    def _write_line(
+        order: Order,
+        line: list[CrateOrderContent],
+        row_pk: str | None,
+        update_data: dict,
+        lock_key: str,
+    ) -> None:
+        """Write ``update_data`` onto the rows of one crate line of ``order``.
+
+        The amount is the line's new total. Offer-bound rows are rebuilt from
+        their order line whenever it is saved, so an increase lands on a row
+        added directly to the order: another of the line's direct rows, else a
+        new one, while a line of one direct row takes it itself. A reduction
+        comes off the line's own rows instead (``_take_off_line``): a row added
+        to hold it would be negative, and would outlive the offer-bound rows it
+        offsets once their order line is deleted, as a crate credit on the
+        order's delivery note. The price, rabatt and note go on every row of
+        the line, the note on its own because a row added for an increase
+        carries the service's ``+N`` note.
+        """
+        line_pks = [row.pk for row in line]
+        update_fields = {
+            field: update_data[field]
+            for field in ("price_per_unit", "rabatt")
+            if field in update_data
+        }
+        if update_fields:
+            CrateOrderContent.objects.filter(pk__in=line_pks).update(**update_fields)
+        current_total = sum(row.amount for row in line)
+        new_total = update_data.get("amount", current_total)
+        if new_total < current_total:
+            CrateOrderContentService._take_off_line(line_pks, row_pk, new_total)
+        elif new_total > current_total:
+            direct = [row.pk for row in line if row.order_id and row.pk != row_pk]
+            # None makes the service adjust the scope itself, an empty queryset
+            # makes it add a row.
+            adjustment_qs: QuerySet[CrateOrderContent] | None
+            if direct:
+                adjustment_qs = CrateOrderContent.objects.filter(pk__in=direct)
+            elif len(line) == 1 and line[0].order_id:
+                adjustment_qs = None
+            else:
+                adjustment_qs = CrateOrderContent.objects.none()
+            CrateContentService.apply_total_amount_change(
+                scope_qs=CrateOrderContent.objects.filter(pk__in=line_pks),
+                adjustment_qs=adjustment_qs,
+                new_total_amount=new_total,
+                # The line's rows carry the new price and rabatt already; a row
+                # added for the increase takes them from create_kwargs.
+                update_fields={},
+                create_kwargs={
+                    "order": order,
+                    "crate_type_id": line[0].crate_type_id,
+                    "price_per_unit": line[0].price_per_unit,
+                    "rabatt": line[0].rabatt,
+                    "tax_rate": line[0].tax_rate,
+                    **update_fields,
+                },
+                model_class=CrateOrderContent,
+                lock_key=lock_key,
+            )
+        if "note" in update_data:
+            CrateOrderContent.objects.filter(pk__in=line_pks).update(
+                note=update_data["note"]
+            )
 
     # ──────────────────────────────────────────────
     # Public API
@@ -151,7 +272,13 @@ class CrateOrderContentService:
             **kwargs,
         )
 
-        result = CrateOrderContentService._serialize(crate_order_content)
+        # The crate line the new row joins, named as the order list names it.
+        result = CrateOrderContentService._line_summary(
+            Q(order=order) | Q(order_content__order=order),
+            crate_type_id,
+            crate_order_content.pk,
+        )
+        result["note"] = crate_order_content.note
         result["order_id"] = order.id
         # Mirror the OrderContent path (_serialize_order_metadata) and the
         # refresh metadata block: the frontend formats the order number as
@@ -166,51 +293,63 @@ class CrateOrderContentService:
 
     @staticmethod
     @transaction.atomic
-    def update_crate_order_content_by_crate_type(
-        crate_type_id: str,
+    def update_crate_order_content_line(
+        line_id: str,
         year: int,
         delivery_week: int,
         day_number: int,
         reseller: str,
         update_data: dict,
     ) -> dict[str, Any]:
-        """Update all CrateOrderContent records matching crate_type + order context."""
+        """Write ``update_data`` onto the crate line ``line_id`` names on the
+        reseller's order for the period, every line of the crate type for a bare
+        crate type id, and return that line ({} when none is left to show).
+
+        A line id whose named row is gone answers 409 ``crate_line.changed``
+        while the order holds other crates of the type; a type the order holds
+        no crates of answers 404.
+        """
         if not crates_should_be_on_documents():
             raise CratesDisabledOnDocuments(
                 "Crates are disabled on documents for this tenant."
             )
-        filter_q = CrateOrderContentService._period_filter(
+        parsed = parse_crate_line_id(line_id)
+        order = CrateOrderContentService._slot_order(
             year, delivery_week, day_number, reseller
         )
-        crate_order_contents = CrateOrderContent.objects.filter(
-            filter_q, crate_type_id=crate_type_id
-        )
-
-        if not crate_order_contents.exists():
+        if order is None:
             raise CrateOrderContent.DoesNotExist(
                 "No CrateOrderContent found for the given crate type and period."
             )
-
-        allowed_fields = {"amount", "price_per_unit", "rabatt", "note"}
-        for crate_order_content in crate_order_contents:
-            for field in allowed_fields:
-                if field in update_data:
-                    setattr(crate_order_content, field, update_data[field])
-            crate_order_content.save()
-
-        # Return single record matching the updated crate type
-        summary = CrateOrderContentService.get_crates_summary_for_period(
+        if order.is_finalized:
+            raise FinalizedError("Cannot modify the crates of a finalized order.")
+        lock_key = CrateOrderContentService._lock_crate_type(
+            order.pk, parsed.crate_type_id
+        )
+        period_q = CrateOrderContentService._period_filter(
             year, delivery_week, day_number, reseller
         )
-        return next(
-            (item for item in summary if str(item["crate_type"]) == str(crate_type_id)),
-            summary[0] if summary else {},
+        line = crate_line_rows(
+            CrateOrderContent.objects.filter(
+                period_q, crate_type_id=parsed.crate_type_id
+            ),
+            parsed,
+        )
+        if not line:
+            raise CrateOrderContent.DoesNotExist(
+                "No CrateOrderContent found for the given crate type and period."
+            )
+        CrateOrderContentService._write_line(
+            order, line, parsed.row_pk, update_data, lock_key
+        )
+        return CrateOrderContentService._line_summary(
+            period_q, parsed.crate_type_id, parsed.row_pk
         )
 
     @staticmethod
     @transaction.atomic
-    def delete_crate_order_content_by_crate_type(
-        crate_type_id: str,
+    def delete_crate_order_content_line(
+        line_id: str,
         year: int | None = None,
         delivery_week: int | None = None,
         day_number: int | None = None,
@@ -218,7 +357,14 @@ class CrateOrderContentService:
         order_id: str | None = None,
         scope: Callable[[QuerySet], QuerySet] | None = None,
     ) -> bool:
-        """Delete all CrateOrderContent records for a crate type within an order context.
+        """Delete the crate line ``line_id`` names within an order context,
+        every line of the crate type for a bare crate type id.
+
+        With ``order_id`` only the rows added directly to that order go: an
+        offer-bound row is rebuilt from its order line. The period branch
+        deletes every row of the line. The line is found among the period's
+        rows of the crate type, or the order's when no period is given, under
+        the lock the order's crate line writes take.
 
         ``scope`` is an optional queryset transform the caller supplies to bind
         the otherwise reseller-blind ``order_id`` branch to an authorization
@@ -230,19 +376,37 @@ class CrateOrderContentService:
         ``order_content`` linkage paths) so re-scoping it would wrongly skip
         ``order_content``-linked rows.
         """
+        parsed = parse_crate_line_id(line_id)
+        slot_order = None
+        if year and delivery_week and day_number is not None and reseller:
+            context_q = CrateOrderContentService._period_filter(
+                year, delivery_week, day_number, reseller
+            )
+            if not order_id:
+                slot_order = CrateOrderContentService._slot_order(
+                    year, delivery_week, day_number, reseller
+                )
+        elif order_id:
+            context_q = Q(order_id=order_id) | Q(order_content__order_id=order_id)
+        else:
+            return False
+        lock_order_pk = order_id or (slot_order.pk if slot_order else None)
+        if lock_order_pk is None:
+            return False
+        CrateOrderContentService._lock_crate_type(lock_order_pk, parsed.crate_type_id)
+        type_rows = CrateOrderContent.objects.filter(
+            context_q, crate_type_id=parsed.crate_type_id
+        )
+        qs = type_rows
         if order_id:
             qs = CrateOrderContent.objects.filter(
-                crate_type_id=crate_type_id, order_id=order_id
+                crate_type_id=parsed.crate_type_id, order_id=order_id
             )
             if scope is not None:
                 qs = scope(qs)
-        elif year and delivery_week and day_number is not None and reseller:
-            filter_q = CrateOrderContentService._period_filter(
-                year, delivery_week, day_number, reseller
-            )
-            qs = CrateOrderContent.objects.filter(filter_q, crate_type_id=crate_type_id)
-        else:
-            return False
+        if parsed.row_pk is not None:
+            line = crate_line_rows(type_rows, parsed)
+            qs = qs.filter(pk__in=[row.pk for row in line])
 
         deleted_count, _ = qs.delete()
         return deleted_count > 0

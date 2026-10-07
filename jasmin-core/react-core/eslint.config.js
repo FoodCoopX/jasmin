@@ -44,6 +44,18 @@ const noInlineI18nFallback = [
   },
 ]
 
+// Number fields go through NumberInput. AntD's InputNumber reads only a "." as
+// the decimal point and drops every other character, so on a tenant that writes
+// a decimal comma a typed "2,50" becomes 250. This is a syntax selector rather
+// than no-restricted-imports because the layering blocks below set that rule
+// per path, and a later block replaces a rule's options instead of merging them.
+const noRawInputNumber = {
+  selector:
+    "ImportDeclaration[source.value='antd'] > ImportSpecifier[imported.name='InputNumber'], ImportDeclaration[source.value=/^antd\\/(es|lib)\\/input-number/]",
+  message:
+    'Use NumberInput (@shared/ui/NumberInput): AntD InputNumber ignores the tenant decimal separator, so a typed 2,50 becomes 250.',
+}
+
 export default [
   {
     ignores: [
@@ -103,7 +115,7 @@ export default [
       // mustn't ship). `warn` / `error` are allowed; for intentional dev
       // logging use the `logger` util in src/shared/utils/logger.ts.
       'no-console': ['error', { allow: ['warn', 'error'] }],
-      'no-restricted-syntax': ['error', ...noInlineI18nFallback],
+      'no-restricted-syntax': ['error', ...noInlineI18nFallback, noRawInputNumber],
     },
   },
   ...tseslint.configs.recommended.map((config) => ({
@@ -144,7 +156,7 @@ export default [
       // See the js/jsx block: forbid bare console.log/info/debug; route
       // intentional dev logging through the `logger` util.
       'no-console': ['error', { allow: ['warn', 'error'] }],
-      'no-restricted-syntax': ['error', ...noInlineI18nFallback],
+      'no-restricted-syntax': ['error', ...noInlineI18nFallback, noRawInputNumber],
     },
   },
   // A route table declares each page as a local `lazy()` component beside the
@@ -153,6 +165,11 @@ export default [
   {
     files: ['src/app/routing/routes/**'],
     rules: { 'react-refresh/only-export-components': 'off' },
+  },
+  // NumberInput is the one place that wraps AntD's InputNumber.
+  {
+    files: ['src/shared/ui/NumberInput.tsx'],
+    rules: { 'no-restricted-syntax': ['error', ...noInlineI18nFallback] },
   },
   // Accessibility (jsx-a11y): static, build-time catch of the machine-detectable
   // a11y issues in hand-written JSX — missing alt, label-less controls, bad ARIA,

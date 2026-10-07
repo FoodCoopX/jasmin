@@ -11,6 +11,8 @@
  *    it as a new member's ``user_language``.
  */
 
+import { act, renderHook } from "@testing-library/react";
+import { useTranslation } from "react-i18next";
 import { describe, expect, it } from "vitest";
 
 import i18n, { activateLanguage } from "@shared/i18n";
@@ -67,5 +69,36 @@ describe("activateLanguage", () => {
     expect(i18n.language).toBe("en");
     await activateLanguage("de");
     expect(i18n.language).toBe("de");
+  });
+
+  it("repaints text rendered before the bundle arrived when i18next already names the language", async () => {
+    // As on a visit that boots on English — the language last shown in this
+    // browser, or index.html's ``lang`` — while only German is resident:
+    // i18next names English, and every key falls back to German until the
+    // English bundle lands.
+    i18n.removeResourceBundle("en", "translation");
+    await i18n.changeLanguage("en");
+    const { result } = renderHook(() => useTranslation().t("common.language"));
+    expect(result.current).toBe("Sprache");
+
+    await act(() => activateLanguage("en"));
+
+    expect(i18n.language).toBe("en");
+    expect(result.current).toBe("Language");
+  });
+
+  it("lets the latest call win over an earlier one still fetching", async () => {
+    // As when the language the app booted in is still loading and the
+    // visitor's language is decided or picked meanwhile: the earlier call
+    // waits on the French fetch, the later one switches to resident German at
+    // once, and the fetch that lands last must not switch back.
+    expect(i18n.hasResourceBundle("fr", "translation")).toBe(false);
+    try {
+      await Promise.all([activateLanguage("fr"), activateLanguage("de")]);
+
+      expect(i18n.language).toBe("de");
+    } finally {
+      i18n.removeResourceBundle("fr", "translation");
+    }
   });
 });

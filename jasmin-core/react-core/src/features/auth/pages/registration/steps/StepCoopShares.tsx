@@ -1,10 +1,11 @@
-import { Alert, Button, Flex, Form, InputNumber, Typography } from "antd";
+import { Alert, Button, Flex, Form, Typography } from "antd";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCurrency, useTenant } from "@hooks/index";
 import type { StepProps } from "../types";
 import ConsentDocumentField from "@shared/consent/ConsentDocumentField";
 import { useCurrentConsentDoc } from "@shared/consent/useCurrentConsentDoc";
+import NumberInput from "@shared/ui/NumberInput";
 
 const { Paragraph, Text } = Typography;
 
@@ -79,10 +80,11 @@ export default function StepCoopShares({ data, update, next }: StepProps) {
           label={t("auth.registration.coop.shares_label")}
           htmlFor="coop-shares-count"
         >
-          <InputNumber
+          <NumberInput
             id="coop-shares-count"
             min={min}
             max={max}
+            precision={0}
             value={count}
             onChange={(v) => setCount(Number(v) || min)}
             className="w-full"

@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Checkbox,
-  InputNumber,
   Modal,
   Space,
   Spin,
@@ -11,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ModalCancelSaveFooter } from "@shared/modals/shared";
+import NumberInput from "@shared/ui/NumberInput";
 import {
   commissioningVirtualVariationComponentsCreate,
   getCommissioningVirtualVariationComponentsListQueryKey,
@@ -248,7 +248,7 @@ export default function VirtualComponentModal({
                         <Text type="secondary" style={{ fontSize: "0.85em" }}>
                           {t("commissioning.quantity")}:
                         </Text>
-                        <InputNumber
+                        <NumberInput
                           min={1}
                           max={5}
                           step={1}

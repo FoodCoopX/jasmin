@@ -4,9 +4,9 @@
  *
  * The real list lives in ``apps/shared/languages.py`` (``LanguageChoices``)
  * and reaches the client as the generated ``UserLanguageEnum`` /
- * ``TenantLanguageEnum``. This module adds the two things a schema enum
- * cannot carry — a display label and a flag — so every picker, type guard
- * and payload builder reads one list instead of repeating its own.
+ * ``TenantLanguageEnum``. This module adds what a schema enum cannot carry —
+ * a display label, the language's own name and a flag — so every picker,
+ * type guard and payload builder reads one list instead of repeating its own.
  *
  * This is narrower than "languages the UI can render": i18next also ships
  * ``fr`` and ``it`` bundles and will display them if detection selects one.
@@ -21,8 +21,15 @@ import { UserLanguageEnum } from "@shared/api/generated/models";
 
 export interface SupportedLanguage {
   code: UserLanguageEnum;
-  /** The language's own name, as a speaker of it would read it. */
+  /** What a picker shows for the language. */
   label: string;
+  /**
+   * The language's own name, as a speaker of it would read it. A screen
+   * reader announces the language by this name, since a short label such as
+   * "DE" comes out spelled letter by letter; a form that names the language
+   * in full shows it too.
+   */
+  name: string;
   flag: string;
 }
 
@@ -32,8 +39,8 @@ export interface SupportedLanguage {
  * generated enum's own ordering carries no display meaning.
  */
 export const SUPPORTED_LANGUAGES: readonly SupportedLanguage[] = [
-  { code: UserLanguageEnum.de, label: "Deutsch", flag: "🇩🇪" },
-  { code: UserLanguageEnum.en, label: "English", flag: "🇺🇸" },
+  { code: UserLanguageEnum.de, label: "DE", name: "Deutsch", flag: "🇩🇪" },
+  { code: UserLanguageEnum.en, label: "EN", name: "English", flag: "🇺🇸" },
 ];
 
 export const SUPPORTED_LANGUAGE_CODES: readonly UserLanguageEnum[] =

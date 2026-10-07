@@ -18,7 +18,12 @@ import { useTranslation } from "react-i18next";
 export interface SteppedSelectProps
   extends Pick<
     SelectProps,
-    "value" | "onChange" | "options" | "loading" | "placeholder"
+    | "value"
+    | "onChange"
+    | "options"
+    | "loading"
+    | "placeholder"
+    | "notFoundContent"
   > {
   onPrev: () => void;
   onNext: () => void;
@@ -48,6 +53,7 @@ const SteppedSelect = ({
   options,
   loading,
   placeholder,
+  notFoundContent,
   onPrev,
   onNext,
   canGoPrev,
@@ -85,6 +91,7 @@ const SteppedSelect = ({
         aria-label={selectAriaLabel}
         placeholder={placeholder}
         loading={loading}
+        notFoundContent={notFoundContent}
       >
         {children}
       </Select>

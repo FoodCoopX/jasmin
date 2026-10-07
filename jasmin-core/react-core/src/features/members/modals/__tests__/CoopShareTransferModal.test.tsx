@@ -4,7 +4,8 @@
  * Boundary mocked: the generated transfer mutation hook, ``MemberSelector``
  * (a plain select that applies ``filterMember``), ``ModalCancelSaveFooter``
  * (plain buttons), ``notify``, the api error helpers, ``useDateFormat``,
- * ``useMembers`` and ``useOnboardingMode``. The real AntD ``Form`` runs, so
+ * ``useMembers``, ``useOnboardingMode`` and the tenant the amount field reads
+ * its number format from. The real AntD ``Form`` runs, so
  * validation, the payload (including both transfer notes), the cancel /
  * below-minimum hints and the onboarding-mode note are exercised for real. The ``t`` mock appends its interpolation values so the
  * notes' member labels can be asserted.
@@ -157,6 +158,13 @@ vi.mock("@hooks/index", () => ({
     ],
   }),
 }));
+
+// The amount field reads the tenant's number format straight from useTenant.
+vi.mock("@hooks/configuration/useTenant", async () => {
+  const { makeUseTenantMock } = await import("@/test/tenantMock");
+  const tenant = makeUseTenantMock();
+  return { useTenant: () => tenant };
+});
 
 import CoopShareTransferModal from "../CoopShareTransferModal";
 

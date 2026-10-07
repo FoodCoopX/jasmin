@@ -924,7 +924,7 @@ describe("on a phone", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("confirms a harvest from a card with the amount entered, and turns its button green", async () => {
+  it("confirms a harvest from a card with the amount entered in the tenant's number format, and turns its button green", async () => {
     auth.roles = ["gardener"];
     await openPage();
     expect(looksConfirmed(confirmButtonOf("Carrots"))).toBe(false);
@@ -933,15 +933,16 @@ describe("on a phone", () => {
     const dialog = await confirmDialog();
     expect(within(dialog).getByText("Carrots")).toBeInTheDocument();
     expect(dialog).toHaveTextContent(`commissioning.expected_harvest: 45 ${KG}`);
-    const amount = within(dialog).getByRole("spinbutton");
+    const amount = within(dialog).getByRole("spinbutton", { name: CONFIRM });
     expect(amount).toHaveAttribute("aria-valuenow", "45");
+    // The tenant writes numbers the German way, with a decimal comma.
     await userEvent.clear(amount);
-    await userEvent.type(amount, "43");
+    await userEvent.type(amount, "43,5");
     const readsBefore = api.summary.mock.calls.length;
     await userEvent.click(within(dialog).getByRole("button", { name: SET_AS_EXPECTED }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: CONFIRM })).not.toBeInTheDocument());
     expect(api.confirm).toHaveBeenCalledTimes(1);
-    expect(api.confirm).toHaveBeenCalledWith("h-carrots", { amount: 43, year: 2026, delivery_week: 41, day_number: TUESDAY });
+    expect(api.confirm).toHaveBeenCalledWith("h-carrots", { amount: 43.5, year: 2026, delivery_week: 41, day_number: TUESDAY });
     expect(looksConfirmed(confirmButtonOf("Carrots"))).toBe(true);
     // The list is read again with the harvest recorded.
     await waitFor(() => expect(api.summary.mock.calls.length).toBeGreaterThan(readsBefore));

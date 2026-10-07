@@ -101,6 +101,25 @@
 }
 
 /* ------------------------------------------------------------------
+ * Language switcher in the top-right corner of a signed-out page. The
+ * page's top padding holds the content below it, so nothing can slide
+ * under the switcher once the page grows taller than the screen, as the
+ * login page does when a phone stacks its cards. Declared after
+ * .auth-page--top, whose padding it overrides at the top.
+ * ------------------------------------------------------------------ */
+.auth-page--with-language {
+  position: relative;
+  /* 16px above the switcher + its 32px height + 16px clear below. */
+  padding-top: 64px;
+}
+
+.auth-language-switcher {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+/* ------------------------------------------------------------------
  * New-password strength meter (reset / set password). The bar is pulled
  * up to sit snug under the password input; the hint below is small + muted.
  * ------------------------------------------------------------------ */

@@ -91,6 +91,32 @@ describe("useEditableTable", () => {
     });
   });
 
+  it("edit() opens a whole value of an integer column without its zero decimals and leaves a fraction as stored", async () => {
+    const integerColumns: EditableColumnConfig<Row>[] = [
+      { title: "Name", dataIndex: "name", inputType: "text" },
+      { title: "Amount", dataIndex: "amount", inputType: "positive_integer" },
+    ];
+    // Amounts as a two-decimal field returns them.
+    const whole = { ...sampleRow, amount: "8.00" } as unknown as Row;
+    const fractional = { ...sampleRow, id: "r2", key: "r2", amount: "2.50" } as unknown as Row;
+    const { result } = renderHook(() =>
+      useEditableTable<Row>({ columns: integerColumns }),
+    );
+    act(() => {
+      result.current.setDataWithTransform([whole, fractional]);
+    });
+
+    await act(async () => {
+      await result.current.edit(whole);
+    });
+    expect(result.current.form.getFieldsValue(true).amount).toBe("8");
+
+    await act(async () => {
+      await result.current.edit(fractional);
+    });
+    expect(result.current.form.getFieldsValue(true).amount).toBe("2.50");
+  });
+
   it("cancel() clears editingKey and removes any unsaved (key=-1) draft row", () => {
     const { result } = renderHook(() =>
       useEditableTable<Row>({ columns: baseColumns }),

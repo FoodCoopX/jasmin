@@ -11,7 +11,7 @@ export type ShareDeliveryDayOption = Option<SharesDeliveryDay>;
 export const useShareDeliveryDays = (params: CommissioningSharesDeliveryDaysListParams = {}) => {
   const { t } = useTranslation();
 
-  const { data, isLoading, error, refetch } = useCommissioningSharesDeliveryDaysList(params);
+  const { data, isLoading, isPending, error, refetch } = useCommissioningSharesDeliveryDaysList(params);
 
   const shareDeliveryDays: ShareDeliveryDayOption[] = useMemo(() => {
     let filteredData = data ?? [];
@@ -49,6 +49,13 @@ export const useShareDeliveryDays = (params: CommissioningSharesDeliveryDaysList
     toursExist: shareDeliveryDays.some(day => (day.number_of_tours ?? 0) > 1),
     toursByDay,
     loading: isLoading,
+    // True until the list is in, also while the request waits offline for
+    // the network, when `loading` is false. Until then an empty list says
+    // nothing about the days.
+    pending: isPending,
+    // The list is in and holds no day. A list that failed to load is not
+    // taken for one without days.
+    noDaysListed: !isPending && !error && shareDeliveryDays.length === 0,
     error,
     refetch,
   };

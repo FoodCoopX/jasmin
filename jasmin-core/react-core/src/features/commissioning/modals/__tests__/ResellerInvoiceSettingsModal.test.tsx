@@ -3,7 +3,10 @@
  * (identity numbers, IBAN, invoice address, invoice email, payment terms and
  * early-payment discount), saved with a partial update. Rendered for real —
  * AntD form, the shared EditFormModal and useModalMutation — with only the
- * generated client and the toast helper mocked.
+ * generated client, the toast helper and the tenant mocked.
+ *
+ * The tenant writes numbers the English way, with a decimal point, except
+ * under the last heading, where it writes them with a decimal comma.
  */
 
 import { render, screen, waitFor, within } from "@testing-library/react";
@@ -39,6 +42,17 @@ vi.mock("@shared/utils/notify", () => ({ default: notifyMock }));
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   commissioningResellersPartialUpdate: partialUpdateMock,
 }));
+
+// The tenant's settings, per test; an unset setting falls back to the caller's default.
+const tenantSettings = vi.hoisted(() => ({ values: {} as Record<string, unknown> }));
+vi.mock("@hooks/configuration/useTenant", async () => {
+  const { makeUseTenantMock } = await import("@/test/tenantMock");
+  const tenant = makeUseTenantMock({
+    getSetting: (key: string, defaultValue?: unknown) =>
+      key in tenantSettings.values ? tenantSettings.values[key] : defaultValue,
+  });
+  return { useTenant: () => tenant };
+});
 
 import ResellerInvoiceSettingsModal from "../ResellerInvoiceSettingsModal";
 
@@ -93,6 +107,7 @@ async function save() {
 }
 
 beforeEach(() => {
+  tenantSettings.values = { number_locale: "en-US" };
   partialUpdateMock.mockReset();
   Object.values(notifyMock).forEach((fn) => fn.mockReset());
 });
@@ -348,5 +363,47 @@ describe("ResellerInvoiceSettingsModal saving", () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(partialUpdateMock).not.toHaveBeenCalled();
+  });
+});
+
+// ── A tenant that writes a decimal comma ────────────────────────────────────
+
+describe("ResellerInvoiceSettingsModal on a tenant that writes a decimal comma", () => {
+  beforeEach(() => {
+    tenantSettings.values = { number_locale: "de-DE" };
+  });
+
+  it("shows the early-payment discount with a decimal comma", async () => {
+    renderModal();
+
+    await waitFor(() =>
+      expect(field("resellers.early_payment_discount_percent")).toHaveValue(
+        "2,50",
+      ),
+    );
+  });
+
+  it("sends a discount typed with a decimal comma as a decimal string, and whole days", async () => {
+    partialUpdateMock.mockResolvedValue(makeReseller());
+    renderModal();
+    await waitFor(() =>
+      expect(field("resellers.payment_terms_in_days")).toHaveValue("14"),
+    );
+
+    await userEvent.clear(field("resellers.early_payment_discount_percent"));
+    await userEvent.type(
+      field("resellers.early_payment_discount_percent"),
+      "3,75",
+    );
+    // Payment terms are whole days: a typed fraction is rounded.
+    await userEvent.clear(field("resellers.payment_terms_in_days"));
+    await userEvent.type(field("resellers.payment_terms_in_days"), "14,5");
+    await save();
+
+    await waitFor(() => expect(partialUpdateMock).toHaveBeenCalledTimes(1));
+    expect(partialUpdateMock.mock.calls[0][1]).toMatchObject({
+      early_payment_discount_percent: "3.75",
+      payment_terms_in_days: 15,
+    });
   });
 });

@@ -15,10 +15,12 @@
  * setState-in-render loop", which is all a smoke test owns.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import { RowSaveRefused } from "@shared/tables/BasicEditableTable/RowSaveRefused";
+import type { EditableTableProps } from "@shared/tables/BasicEditableTable/types";
 import { profileRenders, flushMicrotasks } from "@/test/profileRenders";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -52,6 +54,14 @@ vi.mock("@hooks/index", () => ({
 // Mocking both wholesale keeps the generated API + @react-pdf helpers out
 // of the picture entirely — the page just reads the returned fields.
 
+// The tab on screen, the order's crate lines and what is being read, per test.
+const ordersState = vi.hoisted(() => ({
+  activeTab: "offers",
+  dataCrates: [] as Record<string, unknown>[],
+  loading: false,
+  cratesLoading: false,
+}));
+
 vi.mock("@features/commissioning/hooks/useOrdersData", () => ({
   useOrdersData: () => ({
     // Selection state
@@ -63,7 +73,7 @@ vi.mock("@features/commissioning/hooks/useOrdersData", () => ({
     setSelectedDay: vi.fn(),
     selectedReseller: null,
     setSelectedReseller: vi.fn(),
-    activeTab: "offers",
+    activeTab: ordersState.activeTab,
     setActiveTab: vi.fn(),
     showOnlyOrderedOffers: false,
     setShowOnlyOrderedOffers: vi.fn(),
@@ -74,10 +84,11 @@ vi.mock("@features/commissioning/hooks/useOrdersData", () => ({
     filteredDataArticles: [],
     filteredDataArticlesCount: 0,
     filteredDataOffersCount: 0,
-    dataCrates: [],
-    dataCratesCount: 0,
+    dataCrates: ordersState.dataCrates,
+    dataCratesCount: ordersState.dataCrates.length,
     daysWithOrders: [],
-    loading: false,
+    loading: ordersState.loading,
+    cratesLoading: ordersState.cratesLoading,
 
     // Order state
     orderState: {
@@ -161,10 +172,20 @@ vi.mock("@shared/selectors", () => ({
   ResellerSelector: () => <div data-testid="reseller-selector" />,
 }));
 
-// EditableTable (eagerly mounted inside every Tabs pane) → tiny stub.
-// Re-export the permission gate helpers the page imports from this barrel.
+// EditableTable (one inside the Tabs pane on screen) → tiny stub that keeps
+// the props of the crate table, the one focusing the crate type, and of the
+// order-line table on screen. Re-export the permission gate helpers the page
+// imports from this barrel.
+const tables = vi.hoisted(() => ({
+  crates: null as unknown,
+  orderLines: null as unknown,
+}));
 vi.mock("@shared/tables", () => ({
-  EditableTable: () => <div data-testid="editable-table" />,
+  EditableTable: (props: { focusIndex?: string }) => {
+    if (props.focusIndex === "crate_type_name") tables.crates = props;
+    else tables.orderLines = props;
+    return <div data-testid="editable-table" />;
+  },
   gatedByPermission: (canModify: boolean) => ({ canModify }),
   gatedByPermissionOnlyEdit: (canModify: boolean) => ({ canModify }),
   SUMMARY_ROW_STYLE: {},
@@ -193,7 +214,101 @@ function makeQueryClient() {
   });
 }
 
+function renderOrders() {
+  return render(
+    <QueryClientProvider client={makeQueryClient()}>
+      <Orders />
+    </QueryClientProvider>,
+  );
+}
+
+function crateTable(): EditableTableProps {
+  if (!tables.crates) throw new Error("The crate table never rendered");
+  return tables.crates as EditableTableProps;
+}
+
+beforeEach(() => {
+  ordersState.activeTab = "offers";
+  ordersState.dataCrates = [];
+  ordersState.loading = false;
+  ordersState.cratesLoading = false;
+  tables.crates = null;
+  tables.orderLines = null;
+});
+
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+describe("Orders crate lines", () => {
+  // Small crates ordered at two prices: two lines of one crate type, each
+  // named by a crate row of its own.
+  const SMALL_CRATES_AT_125 = {
+    id: "ct-small_row-1",
+    crate_type: "ct-small",
+    crate_type_name: "Small",
+    amount: 4,
+    price_per_unit: "1.25",
+    rabatt: 0,
+    tax_rate: 19,
+  };
+  const SMALL_CRATES_AT_150 = {
+    ...SMALL_CRATES_AT_125,
+    id: "ct-small_row-4",
+    amount: 2,
+    price_per_unit: "1.50",
+  };
+
+  it("refuses a new crate line of a crate type the order lists, while each line of that type saves on its own", async () => {
+    ordersState.activeTab = "crates";
+    ordersState.dataCrates = [SMALL_CRATES_AT_125, SMALL_CRATES_AT_150];
+    renderOrders();
+    await screen.findByText("commissioning.orders");
+    const crates = crateTable();
+
+    let refusal: unknown;
+    try {
+      crates.customSave!({ crate_type: "ct-small", amount: 3 }, { key: -1 });
+    } catch (error) {
+      refusal = error;
+    }
+    expect(refusal).toBeInstanceOf(RowSaveRefused);
+    expect(refusal).toMatchObject({
+      message: "validation.unique.crate_type",
+      fieldErrors: { crate_type_name: "validation.unique.crate_type" },
+    });
+
+    // The table holds no crate-type uniqueness of its own, which would refuse
+    // either line of the type.
+    expect(crates.uniqueCheck).toBeUndefined();
+    expect(
+      crates.customSave!(
+        { crate_type: "ct-small", amount: 3 },
+        { ...SMALL_CRATES_AT_150, key: "ct-small_row-4" },
+      ),
+    ).toEqual({
+      crate_type: "ct-small",
+      amount: 3,
+      year: 2026,
+      delivery_week: 24,
+      day_number: 0,
+      reseller: null,
+    });
+  });
+
+  it("spins only the crate table while only the crate list is read again", async () => {
+    ordersState.cratesLoading = true;
+    ordersState.activeTab = "articles";
+    const articlesTab = renderOrders();
+    await screen.findByText("commissioning.orders");
+    // A spinner over the order lines would catch the click on the next line.
+    expect(tables.orderLines).toMatchObject({ loading: false });
+    articlesTab.unmount();
+
+    ordersState.activeTab = "crates";
+    renderOrders();
+    await screen.findByText("commissioning.orders");
+    expect(crateTable().loading).toBe(true);
+  });
+});
 
 describe("Orders (render-loop smoke)", () => {
   it("renders without crashing", async () => {

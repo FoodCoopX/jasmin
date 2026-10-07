@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Alert, InputNumber, Modal, Space, Statistic, Typography } from "antd";
+import { Alert, Modal, Space, Statistic, Typography } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -10,6 +10,7 @@ import {
   useCommissioningMyMemberDataRetrieve,
 } from "@shared/api/generated/commissioning/commissioning";
 import ConsentBlock, { ConsentDocumentKind } from "@shared/consent/ConsentBlock";
+import NumberInput from "@shared/ui/NumberInput";
 import { getErrorMessage } from "@shared/utils/apiError";
 import { blockNonNumericKeys } from "@shared/utils/numberFormat";
 import { useCurrency, useTenant } from "@hooks/index";
@@ -169,19 +170,17 @@ export default function MemberCoopSharesModal({
 
         <div>
           <Text>{t("members.coop_subscribe_amount_label")}</Text>
-          <InputNumber
+          <NumberInput
+            aria-label={t("members.coop_subscribe_amount_label")}
             min={1}
             step={1}
             precision={0}
             value={amount}
             onChange={setAmount}
             className="w-full"
-            // Integer-only: hard-block non-digit keystrokes (AntD otherwise
-            // only coerces on blur).
-            onKeyDown={blockNonNumericKeys({
-              allowDecimal: false,
-              decimalChar: ".",
-            })}
+            // Integer-only: hard-block non-digit keystrokes (the field
+            // otherwise only coerces on blur).
+            onKeyDown={blockNonNumericKeys({ allowDecimal: false })}
           />
         </div>
 

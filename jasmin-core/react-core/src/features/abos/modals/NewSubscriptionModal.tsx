@@ -9,7 +9,6 @@ import {
   DatePicker,
   Flex,
   Form,
-  InputNumber,
   Modal,
   Row,
   Segmented,
@@ -55,6 +54,7 @@ import {
 import { useDeliveryStationPicker } from "../hooks/useDeliveryStationPicker";
 import ShareTypeVariationPickerGrid from "../components/ShareTypeVariationPickerGrid";
 import { DeliveryStationMap } from "@shared/ui";
+import NumberInput from "@shared/ui/NumberInput";
 import ToolTipIcon from "@shared/ui/ToolTipIcon";
 import { filterVariationsForTrial, notify } from "@shared/utils";
 import { getErrorCode, getErrorMessage } from "@shared/utils/apiError";
@@ -350,7 +350,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
 
   // Explicit solidarity floor for the effective mode: the trial-specific floor
   // when this is a trial that uses the trial reference, else the regular floor
-  // (null when the variation sets none). The InputNumber min falls back to the
+  // (null when the variation sets none). The price field's min falls back to the
   // (trial-aware) reference when there's no explicit floor — mirrors the server
   // guard in ``SubscriptionSerializer.validate`` so client + server agree.
   const explicitSolidarityFloor =
@@ -1117,7 +1117,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                   label={t("members.quantity")}
                   rules={[{ required: true, message: t("common.required") }]}
                 >
-                  <InputNumber min={1} className="w-full" />
+                  <NumberInput min={1} precision={0} className="w-full" />
                 </Form.Item>
               </Col>
               <Col span={16}>
@@ -1154,7 +1154,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                             ),
                           }),
                           // Untere Grenze (solidarity floor the office/member may
-                          // not go below — same value the InputNumber min enforces).
+                          // not go below — same value the price field's min enforces).
                           // Trial-aware: the trial floor when this is a trial.
                           explicitSolidarityFloor
                             ? t("abos.solidarity_floor_hint", {
@@ -1169,7 +1169,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                       : undefined
                   }
                 >
-                  <InputNumber
+                  <NumberInput
                     // Solidarity floor (variation's solidarity_min, or the
                     // effective reference if none) AT the chosen valid_from — the
                     // trial pair applies for a trial. The backend re-validates

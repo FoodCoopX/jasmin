@@ -50,6 +50,11 @@ import {
   generatePdfFilename,
   isWeekInPast,
 } from "@shared/utils";
+import {
+  isNextWeekOnlyRowKey,
+  mergePurchaseListRows,
+  nextIsoWeek,
+} from "./purchaseListWeeks";
 
 const shareArticleFilters = {
   is_harvest_share_article: true,
@@ -113,28 +118,27 @@ export default function PurchaseList() {
     },
   });
 
+  // Next week comes from a query of its own below, so ticking the box leaves
+  // this one's key as it is.
   const listParams =
     useMemo<CommissioningDocumentationSummarySummaryRetrieveParams>(
       () => ({
         year: selectedYear,
         delivery_week: selectedWeek ?? currentWeek,
         is_past: isPast,
-        ...(includeNextWeek && { include_next_week: true }),
         model: "purchase",
         seller: selectedReseller ?? undefined,
         is_preparation_lists: true,
       }),
-      [selectedYear, selectedWeek, includeNextWeek, selectedReseller, isPast],
+      [selectedYear, selectedWeek, selectedReseller, isPast],
     );
 
   const nextWeekParams =
     useMemo<CommissioningDocumentationSummarySummaryRetrieveParams>(() => {
-      const week = selectedWeek ?? currentWeek;
-      const nextWeek = week >= 52 ? 1 : week + 1;
-      const nextYear = week >= 52 ? selectedYear + 1 : selectedYear;
+      const nextWeek = nextIsoWeek(selectedYear, selectedWeek ?? currentWeek);
       return {
-        year: nextYear,
-        delivery_week: nextWeek,
+        year: nextWeek.year,
+        delivery_week: nextWeek.week,
         is_past: false,
         model: "purchase",
         seller: selectedReseller ?? undefined,
@@ -153,78 +157,29 @@ export default function PurchaseList() {
   // Both weeks feed the table; show the spinner while either is in flight.
   const isFetching = currentWeekFetching || nextWeekFetching;
 
-  const data = useMemo(() => {
-    // Directional cast at the orval boundary: the raw rows don't carry the
-    // table-only ``key`` yet (EditableTable derives it from ``id``).
-    const items = (rawCurrentWeek ?? []) as DocumentationSummaryRecord[];
+  // Directional casts at the orval boundary: the raw rows don't carry the
+  // table-only ``key`` yet (EditableTable derives it from ``id``).
+  const data = useMemo(
+    () =>
+      mergePurchaseListRows(
+        rawCurrentWeek as DocumentationSummaryRecord[] | undefined,
+        includeNextWeek
+          ? (rawNextWeek as DocumentationSummaryRecord[] | undefined)
+          : undefined,
+      ),
+    [rawCurrentWeek, rawNextWeek, includeNextWeek],
+  );
 
-    const filteredData = items.filter((item) => {
-      return !!(
-        item.theoretical_purchase_amount ||
-        item.additional_theoretical_purchase_amount ||
-        item.purchase_amount
-      );
-    });
-
-    if (includeNextWeek && rawNextWeek) {
-      const nextWeekItems = rawNextWeek as DocumentationSummaryRecord[];
-
-      const nextWeekMap = new Map<string, DocumentationSummaryRecord>();
-      for (const item of nextWeekItems) {
-        const key = `${item.share_article}_${item.unit}_${item.size}`;
-        nextWeekMap.set(key, item);
-      }
-
-      for (const item of filteredData) {
-        const key = `${item.share_article}_${item.unit}_${item.size}`;
-        const nextWeekItem = nextWeekMap.get(key);
-        item.next_week_theoretical = nextWeekItem
-          ? (nextWeekItem.theoretical_purchase_amount ?? 0)
-          : 0;
-      }
-
-      for (const [key, nextWeekItem] of nextWeekMap) {
-        const nextWeekTheoretical = nextWeekItem.theoretical_purchase_amount ?? 0;
-        if (
-          nextWeekTheoretical &&
-          !filteredData.some(
-            (item) => `${item.share_article}_${item.unit}_${item.size}` === key,
-          )
-        ) {
-          filteredData.push({
-            ...nextWeekItem,
-            theoretical_purchase_amount: 0,
-            additional_theoretical_purchase_amount: 0,
-            // Synthesised next-week-only placeholder: no actual purchase
-            // documented for the current week yet.
-            purchase_amount: null,
-            next_week_theoretical: nextWeekTheoretical,
-          });
-        }
-      }
-    } else {
-      for (const item of filteredData) {
-        item.next_week_theoretical = 0;
-      }
-    }
-
-    return filteredData;
-  }, [rawCurrentWeek, rawNextWeek, includeNextWeek]);
-
+  // A purchase this week changes the stock next week starts from, so a save
+  // refreshes both weeks; next week's query refetches only while it's shown.
   const invalidateData = useCallback(() => {
-    queryClient.invalidateQueries({
-      queryKey:
-        getCommissioningDocumentationSummarySummaryRetrieveQueryKey(listParams),
-    });
-    if (includeNextWeek) {
+    for (const params of [listParams, nextWeekParams]) {
       queryClient.invalidateQueries({
         queryKey:
-          getCommissioningDocumentationSummarySummaryRetrieveQueryKey(
-            nextWeekParams,
-          ),
+          getCommissioningDocumentationSummarySummaryRetrieveQueryKey(params),
       });
     }
-  }, [queryClient, listParams, nextWeekParams, includeNextWeek]);
+  }, [queryClient, listParams, nextWeekParams]);
   const { onDeleteSuccess } = useInvalidateAfterTableMutation(invalidateData);
 
   // Save returns an ``AdditionalTheoretical*`` row; the list is the
@@ -334,7 +289,7 @@ export default function PurchaseList() {
   }, [data, getUnitLabel, getVegetableSizeLabel, t, parseNumber, format]);
 
   const customSave = useCallback(
-    (transformedData: Record<string, unknown>) => {
+    (transformedData: Record<string, unknown>, record: TableRecord) => {
       const parse = (value: unknown): number => {
         const num = parseFloat(value as string);
         return isNaN(num) ? 0 : num;
@@ -355,14 +310,24 @@ export default function PurchaseList() {
       const rawAmount = amountPerPu > 0 ? manualAmountPu * amountPerPu : 0;
       const calculatedAmount = Math.round(rawAmount * 100) / 100;
 
-      return {
+      const payload = {
         ...transformedData,
         amount: calculatedAmount,
         year: selectedYear,
         delivery_week: selectedWeek ?? currentWeek,
-        size: "M",
+        size: transformedData.size || "M",
         model: "purchase",
         seller: selectedReseller,
+      };
+      if (!isNextWeekOnlyRowKey(record.key)) return payload;
+      // A next-week-only row creates the week's entry for its line. Without a
+      // picked supplier it takes next week's, and a blank note goes as null,
+      // which leaves the line's notes alone: a blank string would clear them.
+      const note = transformedData.note;
+      return {
+        ...payload,
+        seller: selectedReseller ?? record.seller ?? null,
+        note: typeof note === "string" && note.trim() ? note : null,
       };
     },
     [selectedYear, selectedWeek, selectedReseller],
@@ -568,6 +533,9 @@ export default function PurchaseList() {
     selectedResellerLabel,
   ]);
 
+  // The table saves a next-week-only row through ``update`` under its key. The
+  // row has no entry yet, so it goes to the create endpoint, which upserts the
+  // week's entry: a second save before the refetch updates the first one's.
   const apiFunctions = useMemo<ApiFunctions>(
     () =>
       wrapApiFunctions<
@@ -579,10 +547,14 @@ export default function PurchaseList() {
             payload,
           ),
         update: (id, payload) =>
-          commissioningDocumentationSummaryUpdateAdditionalTheoreticalAmountPartialUpdate(
-            id,
-            payload as unknown as CommissioningDocumentationSummaryUpdateAdditionalTheoreticalAmountPartialUpdateBody,
-          ),
+          isNextWeekOnlyRowKey(id)
+            ? commissioningDocumentationSummaryAddAdditionalTheoreticalAmountCreate(
+                payload,
+              )
+            : commissioningDocumentationSummaryUpdateAdditionalTheoreticalAmountPartialUpdate(
+                id,
+                payload as unknown as CommissioningDocumentationSummaryUpdateAdditionalTheoreticalAmountPartialUpdateBody,
+              ),
       }),
     [],
   );

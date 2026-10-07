@@ -1109,7 +1109,7 @@ class CrateOrderContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
             get_day_number_parameter(required=True),
             get_reseller_parameter(required=True),
         ],
-        description="Get aggregated crate summary for a period and reseller.",
+        description="List a reseller's crate lines for a delivery day; each id names one line.",
         responses={200: CrateOrderSummarySerializer(many=True)},
     )
     def list(self, request: Request) -> Response:
@@ -1137,7 +1137,7 @@ class CrateOrderContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
 
     @extend_schema(
         request=CrateOrderContentCreateRequestSerializer,
-        description="Create a crate order content record.",
+        description="Add a crate row to the order and answer with the crate line holding it.",
         responses={
             201: CrateOrderSummarySerializer,
             404: ErrorResponseSerializer,
@@ -1171,12 +1171,12 @@ class CrateOrderContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
 
     @extend_schema(
         request=CrateOrderContentUpdateRequestSerializer,
-        description="Partially update crate order content records by crate type.",
+        description="Update the crate line the id names; a bare crate type id names every line of the type.",
         responses={
             200: PolymorphicProxySerializer(
                 component_name="CrateOrderContentPartialUpdateResponse",
-                # Non-empty path → the serialized summary row; all-deleted path
-                # (the updated amount zeroed every crate in the period) → the
+                # A line to show → the serialized crate line; none to show (no
+                # line of the crate type with a positive amount) → the
                 # ``{"success": true}`` acknowledgement envelope.
                 serializers=[
                     CrateOrderSummarySerializer,
@@ -1198,24 +1198,24 @@ class CrateOrderContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
         data = serializer.validated_data
 
         enforce_own_reseller(request, data["reseller"])
-        result = CrateOrderContentService.update_crate_order_content_by_crate_type(
-            crate_type_id=pk,
+        result = CrateOrderContentService.update_crate_order_content_line(
+            line_id=pk,
             year=data["year"],
             delivery_week=data["delivery_week"],
             day_number=data["day_number"],
             reseller=data["reseller"],
             update_data=data,
         )
-        # The service returns {} when the update left no crate rows in the
-        # period (e.g. the new amount zeroed every crate of this type). Return a
-        # small acknowledgement envelope instead of an empty body so the schema
-        # stays honest and the frontend table still receives a truthy payload.
+        # The service returns {} when the update left no line of the crate type
+        # with a positive amount to show. Return a small acknowledgement
+        # envelope instead of an empty body so the schema stays honest and the
+        # frontend table still receives a truthy payload.
         if not result:
             return Response({"success": True})
         return Response(CrateOrderSummarySerializer(result).data)
 
     @extend_schema(
-        description="Delete crate order content records by crate type.",
+        description="Delete the order's directly added crate rows on the line the id names; a bare crate type id names every line of the type.",
         parameters=[
             get_year_parameter(required=True),
             get_delivery_week_parameter(required=True),
@@ -1242,8 +1242,8 @@ class CrateOrderContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
 
         enforce_own_reseller(request, reseller)
 
-        deleted = CrateOrderContentService.delete_crate_order_content_by_crate_type(
-            crate_type_id=pk,
+        deleted = CrateOrderContentService.delete_crate_order_content_line(
+            line_id=pk,
             year=year,
             delivery_week=delivery_week,
             day_number=day_number,

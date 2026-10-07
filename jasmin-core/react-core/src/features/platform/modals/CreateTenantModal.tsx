@@ -122,7 +122,7 @@ export default function CreateTenantModal({ onClose, onSuccess }: CreateTenantMo
             >
               {SUPPORTED_LANGUAGES.map((language) => (
                 <option key={language.code} value={language.code}>
-                  {language.label}
+                  {`${language.name} (${language.code.toUpperCase()})`}
                 </option>
               ))}
             </select>

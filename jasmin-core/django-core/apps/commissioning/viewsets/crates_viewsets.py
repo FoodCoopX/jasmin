@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from django.db import transaction
@@ -17,10 +18,12 @@ from rest_framework.response import Response
 
 from apps.authz.permissions import IsOffice, IsStaff, RolePermissionsMixin
 from apps.shared.request_utils import body
+from core.db_locks import acquire_advisory_xact_lock
 from core.serializers import ErrorResponseSerializer
 
 from ..constants import crates_should_be_on_documents, get_default_tax_rate_crates
 from ..errors import (
+    CompositeIdInvalid,
     CrateContentInvoiceMissingRequired,
     CrateDeliveryNoteContentMissingRequired,
     CrateNetPriceInUse,
@@ -52,7 +55,12 @@ from ..serializers import (
     CrateNetPriceSerializer,
 )
 from ..services import CrateContentService
-from ..services.crate_summary import build_crate_summary_row, summarize_crate_items
+from ..services.crate_lines import CrateLineId, crate_line_rows, parse_crate_line_id
+from ..services.crate_summary import (
+    build_crate_summary_row,
+    summarize_crate_items,
+    summarize_crate_line,
+)
 from ..utils.iso_week_utils import date_from_order
 from ..utils.lookup import get_or_404
 from ..utils.query_params import validate_query_params
@@ -97,15 +105,15 @@ def _crate_update_fields(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Split a validated crate update into ``(update_fields, new_row_defaults)``.
 
-    ``update_fields`` is written to every existing row of the crate type, so it
-    carries only the keys the client sent: a body without ``price_per_unit``,
+    ``update_fields`` is written to every row of the crate line, so it carries
+    only the keys the client sent: a body without ``price_per_unit``,
     ``rabatt`` or ``tax_rate`` keeps the stored values instead of clearing the
     price and discount of a document line. ``tax_rate`` is NOT NULL, so an
     explicit null resolves the crate's rate and writes that.
 
     ``new_row_defaults`` covers a row the service creates for the amount
-    difference when the crate type has no rows yet: an omitted ``rabatt``
-    stores 0 (as ``create`` does) and an omitted ``tax_rate`` the resolved rate.
+    difference when the line has no rows: an omitted ``rabatt`` stores 0 (as
+    ``create`` does) and an omitted ``tax_rate`` the resolved rate.
     """
     update_fields: dict[str, Any] = {
         field: data[field] for field in ("price_per_unit", "rabatt") if field in data
@@ -144,6 +152,118 @@ def _reject_if_crates_disabled() -> None:
         )
 
 
+def _delivery_note_extras(delivery_note: DeliveryNoteReseller) -> dict[str, Any]:
+    return {
+        "delivery_note_id": str(delivery_note.id),
+        "delivery_note_number": delivery_note.display_number,
+        "delivery_note_prefix": delivery_note.prefix,
+        "delivery_note_is_finalized": delivery_note.is_finalized,
+    }
+
+
+def _invoice_extras(invoice: InvoiceReseller) -> dict[str, Any]:
+    return {
+        "invoice_id": str(invoice.id),
+        "invoice_number": invoice.display_number,
+        "invoice_prefix": invoice.prefix,
+        "invoice_is_finalized": invoice.is_finalized,
+    }
+
+
+def _crate_line_of_type(pk: str | None, crate_type: Crate) -> CrateLineId:
+    """Parse the crate line id ``pk`` of a write whose body or query names
+    ``crate_type``. A line of another crate type is a malformed request."""
+    line_id = parse_crate_line_id(pk or "")
+    if line_id.row_pk is not None and line_id.crate_type_id != str(crate_type.id):
+        raise CompositeIdInvalid(
+            f"Crate line {pk!r} is not a line of crate type {crate_type.id!r}.",
+            code="crate_line.invalid_id",
+        )
+    return line_id
+
+
+@dataclass(frozen=True)
+class _DocumentCrateRows:
+    """The crate rows of one crate type on one delivery note or invoice.
+
+    A write to one of their lines reads them, picks the line it names and
+    writes it, all under the per-(document, crate type) advisory lock, so no
+    other write changes the line in between.
+    """
+
+    model: type[CrateDeliveryNoteContent] | type[CrateContentInvoiceReseller]
+    document_field: str
+    document: DeliveryNoteReseller | InvoiceReseller
+    crate_type: Crate
+
+    @property
+    def lock_key(self) -> str:
+        return (
+            f"crate_totals:{type(self.document).__name__}:"
+            f"{self.document.id}:{self.crate_type.id}"
+        )
+
+    def queryset(self) -> QuerySet:
+        return self.model.objects.filter(
+            **{self.document_field: self.document}, crate_type=self.crate_type
+        )
+
+
+def _write_crate_line(
+    rows: _DocumentCrateRows,
+    line_id: CrateLineId,
+    amount: int,
+    fields: tuple[dict[str, Any], dict[str, Any]],
+) -> str | None:
+    """Set the line ``line_id`` names to ``amount`` crates and stamp the
+    update ``fields`` (see ``_crate_update_fields``) on its rows.
+
+    The scope is the line's row pks, never its values: the service re-sums the
+    scope after stamping a new price or rabatt, which a value filter would no
+    longer match. The line's other rows take the amount change, so the row
+    naming the line stays, and with it the line's id; a line of one row takes
+    the change itself and goes when it reaches 0. A line whose named row is
+    gone is written anew while the document has no crates of the type.
+
+    Returns the pk of the row whose line answers the request: the named row,
+    or the row written in its place. None for a bare crate type id, which the
+    type's first line answers.
+    """
+    update_fields, new_row_defaults = fields
+    acquire_advisory_xact_lock(rows.lock_key)
+    before = list(rows.queryset())
+    line_pks = [row.pk for row in crate_line_rows(before, line_id)]
+    others = [pk for pk in line_pks if pk != line_id.row_pk]
+    CrateContentService.apply_total_amount_change(
+        scope_qs=rows.model.objects.filter(pk__in=line_pks),
+        adjustment_qs=rows.model.objects.filter(pk__in=others) if others else None,
+        new_total_amount=amount,
+        update_fields=update_fields,
+        create_kwargs={
+            rows.document_field: rows.document,
+            "crate_type": rows.crate_type,
+            **new_row_defaults,
+        },
+        model_class=rows.model,
+        lock_key=rows.lock_key,
+    )
+    if line_id.row_pk is None:
+        return None
+    after = set(rows.queryset().values_list("pk", flat=True))
+    created = sorted(after - {row.pk for row in before})
+    if line_id.row_pk not in after and created:
+        return created[0]
+    return line_id.row_pk
+
+
+def _delete_crate_line(rows: _DocumentCrateRows, line_id: CrateLineId) -> None:
+    """Delete the rows of the line ``line_id`` names, every row of the crate
+    type for a bare crate type id, under the lock the line's writes take."""
+    acquire_advisory_xact_lock(rows.lock_key)
+    line_pks = [row.pk for row in crate_line_rows(rows.queryset(), line_id)]
+    rows.model.objects.filter(pk__in=line_pks).delete()
+
+
 class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     read_permission = IsStaff
     write_permission = IsOffice
@@ -158,37 +278,36 @@ class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSe
         self,
         delivery_note: DeliveryNoteReseller,
         crate_type: Crate,
+        row_pk: str | None,
+        requested_id: str,
     ) -> dict[str, Any]:
-        date = date_from_order(delivery_note.order)
-        extras = {
-            "delivery_note_id": str(delivery_note.id),
-            "delivery_note_number": delivery_note.display_number,
-            "delivery_note_prefix": delivery_note.prefix,
-            "delivery_note_is_finalized": delivery_note.is_finalized,
-        }
+        """The crate line holding the row ``row_pk``, or the type's first line
+        for None; a zero line under ``requested_id`` when there is none."""
+        extras = _delivery_note_extras(delivery_note)
         rows = CrateDeliveryNoteContent.objects.filter(
             delivery_note=delivery_note, crate_type=crate_type
         ).select_related("crate_type")
-        # Group by (crate_type, price, rabatt, tax) and sum per-row line_netto so
-        # the per-line figure matches the document footer — not a lossy max().
-        summary = summarize_crate_items(rows, extras=extras)
-        return (
-            summary[0]
-            if summary
-            else build_crate_summary_row(
-                crate_type_id=str(crate_type.id),
-                crate_type_name=crate_type.name,
-                amount=0,
-                price=0,
-                rabatt=0,
-                tax_rate=_get_tax_rate(crate_type, date),
-                extras=extras,
-            )
+        line = summarize_crate_line(rows, row_pk, extras=extras)
+        if line is not None:
+            return line
+        placeholder = build_crate_summary_row(
+            crate_type_id=str(crate_type.id),
+            crate_type_name=crate_type.name,
+            amount=0,
+            price=0,
+            rabatt=0,
+            tax_rate=_get_tax_rate(crate_type, date_from_order(delivery_note.order)),
+            extras=extras,
         )
+        placeholder["id"] = requested_id
+        return placeholder
 
     @extend_schema(
         parameters=[get_delivery_note_id_parameter()],
-        description="Get aggregated summary of crates by type for a delivery note.",
+        description=(
+            "List a delivery note's crate lines: one per crate type, price, rabatt "
+            "and tax rate, named `{crate type id}_{row id}`."
+        ),
         responses={
             200: CrateItemSummarySerializer(many=True),
             400: ErrorResponseSerializer,
@@ -207,19 +326,16 @@ class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSe
             delivery_note=delivery_note
         ).select_related("crate_type")
         summary = summarize_crate_items(
-            rows,
-            extras={
-                "delivery_note_id": str(delivery_note.id),
-                "delivery_note_number": delivery_note.display_number,
-                "delivery_note_prefix": delivery_note.prefix,
-                "delivery_note_is_finalized": delivery_note.is_finalized,
-            },
+            rows, extras=_delivery_note_extras(delivery_note)
         )
         return Response(summary)
 
     @transaction.atomic
     @extend_schema(
-        description="Create a new crate entry for a delivery note.",
+        description=(
+            "Add a crate row to a delivery note and answer with the crate line "
+            "that holds it."
+        ),
         request=CrateDeliveryNoteContentWriteRequestSerializer,
         responses={
             201: CrateItemSummarySerializer,
@@ -264,7 +380,7 @@ class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSe
             requested_tax_rate = _get_tax_rate(
                 crate_type, date_from_order(delivery_note.order)
             )
-        CrateDeliveryNoteContent.objects.create(
+        row = CrateDeliveryNoteContent.objects.create(
             delivery_note=delivery_note,
             crate_type=crate_type,
             amount=data["amount"],
@@ -275,13 +391,19 @@ class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSe
         )
 
         return Response(
-            self._get_crate_summary(delivery_note, crate_type),
+            self._get_crate_summary(
+                delivery_note, crate_type, row.pk, str(crate_type.id)
+            ),
             status=status.HTTP_201_CREATED,
         )
 
     @transaction.atomic
     @extend_schema(
-        description="Update crate amount for a delivery note via adjustment entries.",
+        description=(
+            "Set the amount, price, rabatt and tax rate of one crate line of a "
+            "delivery note, through adjustment entries. The id names the line; a "
+            "bare crate type id names every line of that type."
+        ),
         request=CrateDeliveryNoteContentWriteRequestSerializer,
         responses={
             200: CrateItemSummarySerializer,
@@ -313,45 +435,41 @@ class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSe
         _reject_finalized(delivery_note, "delivery note", "modify crates in finalized")
 
         crate_type = get_or_404(Crate, crate_type_id, "Crate type")
+        line_id = _crate_line_of_type(pk, crate_type)
         data = _validated_crate_write(
             CrateDeliveryNoteContentWriteRequestSerializer, request
         )
 
-        scope_qs = CrateDeliveryNoteContent.objects.filter(
-            delivery_note=delivery_note,
-            crate_type=crate_type,
-        )
         # tax_rate is NOT NULL — an adjustment row created by the service would
         # otherwise INSERT NULL. Resolve it like create()/the invoice paths.
-        update_fields, new_row_defaults = _crate_update_fields(
+        fields = _crate_update_fields(
             data,
             lambda: _get_tax_rate(crate_type, date_from_order(delivery_note.order)),
         )
-        CrateContentService.apply_total_amount_change(
-            scope_qs=scope_qs,
-            adjustment_qs=None,
-            new_total_amount=data["amount"],
-            update_fields=update_fields,
-            create_kwargs={
-                "delivery_note": delivery_note,
-                "crate_type": crate_type,
-                **new_row_defaults,
-            },
-            model_class=CrateDeliveryNoteContent,
-            lock_key=f"crate_totals:DeliveryNoteReseller:{delivery_note.id}:{crate_type.id}",
+        row_pk = _write_crate_line(
+            _DocumentCrateRows(
+                CrateDeliveryNoteContent, "delivery_note", delivery_note, crate_type
+            ),
+            line_id,
+            data["amount"],
+            fields,
         )
 
         return Response(
-            self._get_crate_summary(delivery_note, crate_type),
+            self._get_crate_summary(delivery_note, crate_type, row_pk, str(pk)),
             status=status.HTTP_200_OK,
         )
 
+    @transaction.atomic
     @extend_schema(
         parameters=[
             get_delivery_note_id_parameter(),
             get_crate_type_parameter(),
         ],
-        description="Delete all crate entries for a crate_type and delivery note.",
+        description=(
+            "Delete one crate line of a delivery note. The id names the line; a "
+            "bare crate type id deletes every line of that type."
+        ),
         responses={
             204: None,
             400: ErrorResponseSerializer,
@@ -386,10 +504,12 @@ class CrateDeliveryNoteContentViewSet(RolePermissionsMixin, viewsets.ModelViewSe
 
         crate_type = get_or_404(Crate, crate_type_id, "Crate type")
 
-        CrateDeliveryNoteContent.objects.filter(
-            delivery_note=delivery_note,
-            crate_type=crate_type,
-        ).delete()
+        _delete_crate_line(
+            _DocumentCrateRows(
+                CrateDeliveryNoteContent, "delivery_note", delivery_note, crate_type
+            ),
+            _crate_line_of_type(pk, crate_type),
+        )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -413,34 +533,36 @@ class CrateContentInvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelVie
         self,
         invoice: InvoiceReseller,
         crate_type: Crate,
+        row_pk: str | None,
+        requested_id: str,
     ) -> dict[str, Any]:
-        extras = {
-            "invoice_id": str(invoice.id),
-            "invoice_number": invoice.display_number,
-            "invoice_prefix": invoice.prefix,
-            "invoice_is_finalized": invoice.is_finalized,
-        }
+        """The crate line holding the row ``row_pk``, or the type's first line
+        for None; a zero line under ``requested_id`` when there is none."""
+        extras = _invoice_extras(invoice)
         rows = CrateContentInvoiceReseller.objects.filter(
             invoice=invoice, crate_type=crate_type
         ).select_related("crate_type")
-        summary = summarize_crate_items(rows, extras=extras)
-        return (
-            summary[0]
-            if summary
-            else build_crate_summary_row(
-                crate_type_id=str(crate_type.id),
-                crate_type_name=crate_type.name,
-                amount=0,
-                price=0,
-                rabatt=0,
-                tax_rate=get_default_tax_rate_crates(),
-                extras=extras,
-            )
+        line = summarize_crate_line(rows, row_pk, extras=extras)
+        if line is not None:
+            return line
+        placeholder = build_crate_summary_row(
+            crate_type_id=str(crate_type.id),
+            crate_type_name=crate_type.name,
+            amount=0,
+            price=0,
+            rabatt=0,
+            tax_rate=get_default_tax_rate_crates(),
+            extras=extras,
         )
+        placeholder["id"] = requested_id
+        return placeholder
 
     @extend_schema(
         parameters=[get_invoice_id_parameter()],
-        description="Get aggregated summary of crates by type for an invoice.",
+        description=(
+            "List an invoice's crate lines: one per crate type, price, rabatt and "
+            "tax rate, named `{crate type id}_{row id}`."
+        ),
         responses={
             200: CrateItemSummarySerializer(many=True),
             400: ErrorResponseSerializer,
@@ -458,20 +580,15 @@ class CrateContentInvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelVie
         rows = CrateContentInvoiceReseller.objects.filter(
             invoice=invoice
         ).select_related("crate_type")
-        summary = summarize_crate_items(
-            rows,
-            extras={
-                "invoice_id": str(invoice.id),
-                "invoice_number": invoice.display_number,
-                "invoice_prefix": invoice.prefix,
-                "invoice_is_finalized": invoice.is_finalized,
-            },
-        )
+        summary = summarize_crate_items(rows, extras=_invoice_extras(invoice))
         return Response(summary)
 
     @transaction.atomic
     @extend_schema(
-        description="Create a new crate entry for an invoice.",
+        description=(
+            "Add a crate row to an invoice and answer with the crate line that "
+            "holds it."
+        ),
         request=CrateInvoiceContentWriteRequestSerializer,
         responses={
             201: CrateItemSummarySerializer,
@@ -505,7 +622,7 @@ class CrateContentInvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelVie
         requested_tax_rate = data.get("tax_rate")
         if requested_tax_rate is None:
             requested_tax_rate = _get_tax_rate(crate_type, invoice.date)
-        CrateContentInvoiceReseller.objects.create(
+        row = CrateContentInvoiceReseller.objects.create(
             invoice=invoice,
             crate_type=crate_type,
             amount=data["amount"],
@@ -516,13 +633,17 @@ class CrateContentInvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelVie
         )
 
         return Response(
-            self._get_crate_summary(invoice, crate_type),
+            self._get_crate_summary(invoice, crate_type, row.pk, str(crate_type.id)),
             status=status.HTTP_201_CREATED,
         )
 
     @transaction.atomic
     @extend_schema(
-        description="Update crate amount for an invoice via adjustment entries.",
+        description=(
+            "Set the amount, price, rabatt and tax rate of one crate line of an "
+            "invoice, through adjustment entries. The id names the line; a bare "
+            "crate type id names every line of that type."
+        ),
         request=CrateInvoiceContentWriteRequestSerializer,
         responses={
             200: CrateItemSummarySerializer,
@@ -549,44 +670,39 @@ class CrateContentInvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelVie
         _reject_finalized(invoice, "invoice", "modify crates in finalized")
 
         crate_type = get_or_404(Crate, crate_type_id, "Crate type")
+        line_id = _crate_line_of_type(pk, crate_type)
         data = _validated_crate_write(
             CrateInvoiceContentWriteRequestSerializer, request
         )
 
         # Same canonical resolution as create() above.
-        update_fields, new_row_defaults = _crate_update_fields(
+        fields = _crate_update_fields(
             data, lambda: _get_tax_rate(crate_type, invoice.date)
         )
-
-        scope_qs = CrateContentInvoiceReseller.objects.filter(
-            invoice=invoice,
-            crate_type=crate_type,
-        )
-        CrateContentService.apply_total_amount_change(
-            scope_qs=scope_qs,
-            adjustment_qs=None,
-            new_total_amount=data["amount"],
-            update_fields=update_fields,
-            create_kwargs={
-                "invoice": invoice,
-                "crate_type": crate_type,
-                **new_row_defaults,
-            },
-            model_class=CrateContentInvoiceReseller,
-            lock_key=f"crate_totals:InvoiceReseller:{invoice.id}:{crate_type.id}",
+        row_pk = _write_crate_line(
+            _DocumentCrateRows(
+                CrateContentInvoiceReseller, "invoice", invoice, crate_type
+            ),
+            line_id,
+            data["amount"],
+            fields,
         )
 
         return Response(
-            self._get_crate_summary(invoice, crate_type),
+            self._get_crate_summary(invoice, crate_type, row_pk, str(pk)),
             status=status.HTTP_200_OK,
         )
 
+    @transaction.atomic
     @extend_schema(
         parameters=[
             get_invoice_id_parameter(),
             get_crate_type_parameter(),
         ],
-        description="Delete all crate entries for a crate_type and invoice.",
+        description=(
+            "Delete one crate line of an invoice. The id names the line; a bare "
+            "crate type id deletes every line of that type."
+        ),
         responses={
             204: None,
             400: ErrorResponseSerializer,
@@ -613,10 +729,12 @@ class CrateContentInvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelVie
 
         crate_type = get_or_404(Crate, crate_type_id, "Crate type")
 
-        CrateContentInvoiceReseller.objects.filter(
-            invoice=invoice,
-            crate_type=crate_type,
-        ).delete()
+        _delete_crate_line(
+            _DocumentCrateRows(
+                CrateContentInvoiceReseller, "invoice", invoice, crate_type
+            ),
+            _crate_line_of_type(pk, crate_type),
+        )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

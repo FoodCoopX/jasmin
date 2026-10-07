@@ -3,7 +3,6 @@ import {
   Divider,
   Form,
   Input,
-  InputNumber,
   Row,
   Space,
   Switch,
@@ -11,6 +10,7 @@ import {
 } from "antd";
 
 import { EditFormModal, useModalMutation } from "@shared/modals/shared";
+import NumberInput from "@shared/ui/NumberInput";
 import type { FC } from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -92,7 +92,7 @@ export const ResellerInvoiceSettingsModal: FC<
     run(
       async () => {
         // ``early_payment_discount_percent`` is a Decimal-as-string on the
-        // wire; the InputNumber yields a number — coerce to string before
+        // wire; the NumberInput yields a number — coerce to string before
         // sending so the server-side ``DecimalField`` parser doesn't lose
         // trailing zeros.
         const payload: Record<string, unknown> = { ...values };
@@ -163,12 +163,12 @@ export const ResellerInvoiceSettingsModal: FC<
             name="customer_number"
             label={t("resellers.customer_number")}
           >
-            <InputNumber min={0} className="w-full" />
+            <NumberInput min={0} precision={0} className="w-full" />
           </Form.Item>
         </Col>
         <Col span={12}>
           <Form.Item name="filial_number" label={t("resellers.filial_number")}>
-            <InputNumber min={0} className="w-full" />
+            <NumberInput min={0} precision={0} className="w-full" />
           </Form.Item>
         </Col>
       </Row>
@@ -263,7 +263,7 @@ export const ResellerInvoiceSettingsModal: FC<
             name="payment_terms_in_days"
             label={t("resellers.payment_terms_in_days")}
           >
-            <InputNumber min={0} className="w-full" />
+            <NumberInput min={0} precision={0} className="w-full" />
           </Form.Item>
         </Col>
         <Col span={8}>
@@ -271,7 +271,7 @@ export const ResellerInvoiceSettingsModal: FC<
             name="early_payment_discount_percent"
             label={t("resellers.early_payment_discount_percent")}
           >
-            <InputNumber min={0} max={100} step={0.01} className="w-full" />
+            <NumberInput min={0} max={100} step={0.01} className="w-full" />
           </Form.Item>
         </Col>
         <Col span={8}>
@@ -279,7 +279,7 @@ export const ResellerInvoiceSettingsModal: FC<
             name="early_payment_discount_days"
             label={t("resellers.early_payment_discount_days")}
           >
-            <InputNumber min={0} className="w-full" />
+            <NumberInput min={0} precision={0} className="w-full" />
           </Form.Item>
         </Col>
       </Row>

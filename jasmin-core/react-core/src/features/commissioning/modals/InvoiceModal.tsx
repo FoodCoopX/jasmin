@@ -25,7 +25,8 @@ import { formatAmountForUnit } from "@shared/utils";
 import { makeContentCustomEdit, makeFkCustomSave } from "./resellerContentTableCallbacks";
 import { withUpstreamDiffs } from "./upstreamDiffColumns";
 import { useCurrency, useDateFormat, useDefaultTaxRates, useNumberFormat, useTenant, useUnitOptions } from '@hooks/index';
-import { useAmountUnitSizeColumns, useCratesColumns, useOfferTiers, useShareArticleColumn } from '@features/commissioning/hooks';
+import { useAmountUnitSizeColumns, useOfferTiers, useShareArticleColumn } from '@features/commissioning/hooks';
+import { useDocumentCrateTable } from "@features/commissioning/hooks/useDocumentCrateTable";
 import { FinalizedNotice, InvoiceSendStatus } from '@features/commissioning/components';
 // InvoicePDFGenerator statically imports @react-pdf/renderer (it
 // renders ``<PDFViewer>`` for inline preview). Lazy-loading it here
@@ -99,19 +100,17 @@ export default function InvoiceModal({
   );
   const isFinalized = invoiceData?.is_finalized ?? false;
 
-  // Mirror the table rows into local state so the invoice totals + tax
+  // Mirror the line table's rows into local state so the invoice totals + tax
   // breakdown below can be derived LIVE from the current rows. An in-place
   // edit (update path) deliberately does NOT invalidate the retrieve query
   // (that would re-sort the edited row, since the backend has no stable
   // ordering on the items), so the cached invoice-level aggregates would
   // otherwise go stale. Re-seed whenever the server data changes (create /
   // delete DO invalidate); ``onDataChange`` keeps it current during edits.
+  // The crate table's rows come from ``useDocumentCrateTable`` below.
   const [liveLineItems, setLiveLineItems] =
     useState<InvoiceContentRecord[]>(lineItems);
-  const [liveCrateItems, setLiveCrateItems] =
-    useState<CrateContentRecord[]>(lineItemsCrates);
   useEffect(() => setLiveLineItems(lineItems), [lineItems]);
-  useEffect(() => setLiveCrateItems(lineItemsCrates), [lineItemsCrates]);
   const permissions = useMemo(
     () => gatedByPermission(!isFinalized && isOffice),
     [isFinalized, isOffice],
@@ -123,12 +122,13 @@ export default function InvoiceModal({
     });
   }, [queryClient, invoiceId]);
 
-  // Invalidate the invoice query on CREATE so the new row lands with its
-  // server id. UPDATE deliberately skips invalidation so an edited row doesn't
-  // spring to a new sort position mid-flow — the office sees the new values via
-  // local state, and the invoice totals / tax-breakdown recompute LIVE from
-  // the table rows (see ``taxBreakdown`` above), so they stay current.
-  // DELETE invalidates so the row vanishes from the table.
+  // The line items' table: invalidate the invoice query on CREATE so the new
+  // row lands with its server id. UPDATE deliberately skips invalidation so an
+  // edited row doesn't spring to a new sort position mid-flow — the office
+  // sees the new values via local state, and the invoice totals /
+  // tax-breakdown recompute LIVE from the table rows (see ``taxBreakdown``
+  // below), so they stay current. DELETE invalidates so the row vanishes from
+  // the table.
   const handleSaveSuccess = useCallback(
     (_record: TableRecord, action: "create" | "update") => {
       if (action === "create") {
@@ -175,48 +175,6 @@ export default function InvoiceModal({
       },
     },
   });
-
-  const { cratesColumns: columnsCrates, crates: crateOptions } =
-    useCratesColumns();
-
-  // Filter out crate-types already used on this invoice — same
-  // pattern as Orders.tsx (useColumnsOrders.filteredColumnsCrates).
-  // Without this the office could pick the same crate twice and hit
-  // the (invoice, crate_type) unique constraint at save.
-  const filteredColumnsCrates = useMemo(() => {
-    const usedCrateTypes = new Set(
-      lineItemsCrates.map(
-        (item) => (item as Record<string, unknown>).crate_type,
-      ),
-    );
-    const availableOptions = crateOptions.filter(
-      (opt) => !usedCrateTypes.has(opt.value as string),
-    );
-    return columnsCrates.map((col) =>
-      col.key === "crate_type_name"
-        ? { ...col, options: availableOptions }
-        : col,
-    );
-  }, [columnsCrates, crateOptions, lineItemsCrates]);
-
-  // When no unused crate-types remain, disable the add-row button on
-  // the crates table (edit/delete still allowed for existing rows).
-  const cratesPermissions = useMemo(() => {
-    const usedCrateTypes = new Set(
-      lineItemsCrates.map(
-        (item) => (item as Record<string, unknown>).crate_type,
-      ),
-    );
-    const hasAvailable = crateOptions.some(
-      (opt) => !usedCrateTypes.has(opt.value as string),
-    );
-    const baseCanWrite = !isFinalized && isOffice;
-    return {
-      canAdd: baseCanWrite && hasAvailable,
-      canEdit: baseCanWrite,
-      canDelete: baseCanWrite,
-    };
-  }, [crateOptions, lineItemsCrates, isFinalized, isOffice]);
 
   const columnsPrices = useMemo<EditableColumnConfig<InvoiceContentRecord>[]>(
     () => [
@@ -278,24 +236,9 @@ export default function InvoiceModal({
     [invoiceId],
   );
 
-  const customSaveCrates = useMemo(
-    () => makeFkCustomSave("invoice_id", invoiceData?.id),
-    [invoiceData?.id],
-  );
-
   const customEdit = useMemo(
     () => makeContentCustomEdit(defaultTaxRateArticles),
     [defaultTaxRateArticles],
-  );
-
-  const customDeleteCrates = useCallback(
-    (record: TableRecord) => {
-      return {
-        crate_type: (record as Record<string, unknown>).crate_type,
-        invoice_id: invoiceId,
-      };
-    },
-    [invoiceId],
   );
 
   const apiFunctionsContents = useMemo<ApiFunctions>(
@@ -325,6 +268,17 @@ export default function InvoiceModal({
       }),
     [],
   );
+
+  const { rows: liveCrateItems, tableProps: crateTableProps } =
+    useDocumentCrateTable({
+      crateItems: lineItemsCrates,
+      documentField: "invoice_id",
+      documentId: invoiceId,
+      canWrite: !isFinalized && isOffice,
+      apiFunctions: apiFunctionsCrates,
+      refetchDocument: invalidateInvoice,
+      repeatedTypeMessage: t("validation.unique.invoice_modal_crate"),
+    });
 
   const columns = useMemo<EditableColumnConfig<InvoiceContentRecord>[]>(
     () => [
@@ -500,21 +454,9 @@ export default function InvoiceModal({
                 <ToolTipIcon title={t("tooltip.crates_used_in_invoice")} />
               </div>
               <EditableTable
-                key="crates"
-                columns={filteredColumnsCrates as EditableColumnConfig[]}
-                apiFunctions={apiFunctionsCrates}
-                initialData={lineItemsCrates}
-                permissions={cratesPermissions}
+                key={`crates-${invoiceId}`}
+                {...crateTableProps}
                 loading={loading}
-                customSave={customSaveCrates}
-                customDelete={customDeleteCrates}
-                uniqueCheck={["crate_type"]}
-                uniqueCheckMessage={t("validation.unique.invoice_modal_crate")}
-                onDataChange={(d) =>
-                  setLiveCrateItems(d as CrateContentRecord[])
-                }
-                onSaveSuccess={handleSaveSuccess}
-                onDeleteSuccess={handleDeleteSuccess}
               />
             </>
           )}

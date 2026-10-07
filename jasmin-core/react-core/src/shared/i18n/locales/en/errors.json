@@ -384,6 +384,10 @@
   "crate_content_invoice": {
     "missing_required": "Invoice, crate type and amount are required."
   },
+  "crate_line": {
+    "invalid_id": "Invalid crate line — please reload the page and try again.",
+    "changed": "The crate lines have changed in the meantime — please reload the page and make the change again."
+  },
   "amount": {
     "invalid": "Invalid amount — please enter a valid number."
   },
@@ -480,7 +484,8 @@
     "no_amounts": "No share type variation amounts were provided."
   },
   "documentation": {
-    "invalid_model": "Invalid documentation model."
+    "invalid_model": "Invalid documentation model.",
+    "week_mismatch": "This entry belongs to another week — please reload the page and try again."
   },
   "finalize": {
     "app_label_invalid": "Invalid app_label — only commissioning is supported.",

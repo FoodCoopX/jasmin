@@ -137,6 +137,8 @@ class TestCreateCrateOrderContent:
         )
 
         assert result["crate_type"] == crate.pk
+        row = CrateOrderContent.objects.get(crate_type=crate)
+        assert result["id"] == f"{crate.pk}_{row.pk}"
         assert result["amount"] == Decimal("10")
         # Money out as canonical 2dp strings (not Decimal/float), with
         # backend-computed line_netto = 10 * 3.00.
@@ -250,10 +252,128 @@ class TestCreateCrateOrderContent:
 
 
 # ---------------------------------------------------------------------------
-# delete_crate_order_content_by_crate_type
+# update_crate_order_content_line
+# ---------------------------------------------------------------------------
+def _update(reseller, line_id, **update_data):
+    return CrateOrderContentService.update_crate_order_content_line(
+        line_id=line_id,
+        year=2026,
+        delivery_week=15,
+        day_number=2,
+        reseller=reseller,
+        update_data=update_data,
+    )
+
+
+@pytest.mark.django_db
+class TestUpdateCrateOrderContentLine:
+    def test_a_line_of_one_direct_row_takes_the_new_amount_itself(self, tenant):
+        reseller = ResellerFactory()
+        order = OrderFactory(
+            reseller=reseller, year=2026, delivery_week=15, day_number=2
+        )
+        crate = CrateFactory()
+        row = CrateOrderContent.objects.create(
+            order=order,
+            crate_type=crate,
+            amount=3,
+            price_per_unit=Decimal("2.50"),
+            tax_rate=Decimal("19.00"),
+        )
+
+        result = _update(reseller, f"{crate.pk}_{row.pk}", amount=5, note="Pallet")
+
+        row.refresh_from_db()
+        assert (row.amount, row.note) == (5, "Pallet")
+        assert CrateOrderContent.objects.filter(crate_type=crate).count() == 1
+        assert result["id"] == f"{crate.pk}_{row.pk}"
+
+    def test_an_offer_bound_line_gets_a_direct_row_at_its_values(self, tenant):
+        """An offer-bound row is rebuilt whenever its order line is saved, so
+        the difference goes on a new row added to the order, at the line's
+        price, rabatt and tax rate so that it stays part of the line."""
+        reseller = ResellerFactory()
+        order = OrderFactory(
+            reseller=reseller, year=2026, delivery_week=15, day_number=2
+        )
+        crate = CrateFactory()
+        deposit = _make_coc(order, crate, amount=4, price=Decimal("2.50"), rabatt=5)
+
+        result = _update(reseller, f"{crate.pk}_{deposit.pk}", amount=6)
+
+        deposit.refresh_from_db()
+        assert deposit.amount == 4
+        added = CrateOrderContent.objects.get(order=order, crate_type=crate)
+        assert (added.amount, added.price_per_unit, added.rabatt, added.tax_rate) == (
+            2,
+            Decimal("2.50"),
+            5,
+            Decimal("19.00"),
+        )
+        assert result["amount"] == 6
+        assert result["id"] == f"{crate.pk}_{min(deposit.pk, added.pk)}"
+
+    def test_a_reduction_with_a_new_price_reprices_the_rows_it_keeps(self, tenant):
+        reseller = ResellerFactory()
+        order = OrderFactory(
+            reseller=reseller, year=2026, delivery_week=15, day_number=2
+        )
+        crate = CrateFactory()
+        deposit = _make_coc(order, crate, amount=4, price=Decimal("2.50"))
+        line_id = f"{crate.pk}_{deposit.pk}"
+
+        result = _update(
+            reseller, line_id, amount=3, price_per_unit=Decimal("2.60"), rabatt=10
+        )
+
+        deposit.refresh_from_db()
+        assert (deposit.amount, deposit.price_per_unit, deposit.rabatt) == (
+            3,
+            Decimal("2.60"),
+            10,
+        )
+        assert list(CrateOrderContent.objects.filter(crate_type=crate)) == [deposit]
+        assert (result["id"], result["amount"], result["price_per_unit"]) == (
+            line_id,
+            3,
+            "2.60",
+        )
+
+    def test_a_bare_crate_type_id_lowers_the_type_on_its_own_rows(self, tenant):
+        """A page that names a line by its crate type alone lowers the type's
+        total; the crates come off its rows, and no row is added or left below
+        zero."""
+        reseller = ResellerFactory()
+        order = OrderFactory(
+            reseller=reseller, year=2026, delivery_week=15, day_number=2
+        )
+        crate = CrateFactory()
+        _make_coc(order, crate, amount=2)
+        _make_coc(order, crate, amount=1)
+
+        result = _update(reseller, crate.pk, amount=2)
+
+        amounts = CrateOrderContent.objects.filter(crate_type=crate).values_list(
+            "amount", flat=True
+        )
+        assert sum(amounts) == 2
+        assert min(amounts) > 0
+        assert not CrateOrderContent.objects.filter(order=order).exists()
+        assert result["amount"] == 2
+
+    def test_a_type_without_rows_in_the_period_is_not_found(self, tenant):
+        reseller = ResellerFactory()
+        OrderFactory(reseller=reseller, year=2026, delivery_week=15, day_number=2)
+
+        with pytest.raises(CrateOrderContent.DoesNotExist):
+            _update(reseller, CrateFactory().pk, amount=5)
+
+
+# ---------------------------------------------------------------------------
+# delete_crate_order_content_line
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
-class TestDeleteCrateOrderContentByCrateType:
+class TestDeleteCrateOrderContentLine:
     def test_deletes_matching_records(self, tenant):
         reseller = ResellerFactory()
         order = OrderFactory(
@@ -263,8 +383,8 @@ class TestDeleteCrateOrderContentByCrateType:
         _make_coc(order, crate, amount=5)
         _make_coc(order, crate, amount=3)
 
-        deleted = CrateOrderContentService.delete_crate_order_content_by_crate_type(
-            crate_type_id=crate.pk,
+        deleted = CrateOrderContentService.delete_crate_order_content_line(
+            line_id=crate.pk,
             year=2026,
             delivery_week=15,
             day_number=2,
@@ -274,8 +394,28 @@ class TestDeleteCrateOrderContentByCrateType:
         assert deleted is True
         assert CrateOrderContent.objects.filter(crate_type=crate).count() == 0
 
+    def test_a_line_id_deletes_only_its_line_in_the_period(self, tenant):
+        reseller = ResellerFactory()
+        order = OrderFactory(
+            reseller=reseller, year=2026, delivery_week=15, day_number=2
+        )
+        crate = CrateFactory()
+        kept = _make_coc(order, crate, amount=5, price=Decimal("2.00"))
+        removed = _make_coc(order, crate, amount=3, price=Decimal("2.50"))
+
+        deleted = CrateOrderContentService.delete_crate_order_content_line(
+            line_id=f"{crate.pk}_{removed.pk}",
+            year=2026,
+            delivery_week=15,
+            day_number=2,
+            reseller=reseller,
+        )
+
+        assert deleted is True
+        assert list(CrateOrderContent.objects.filter(crate_type=crate)) == [kept]
+
     def test_returns_false_with_no_context(self, tenant):
-        deleted = CrateOrderContentService.delete_crate_order_content_by_crate_type(
-            crate_type_id="fake-id",
+        deleted = CrateOrderContentService.delete_crate_order_content_line(
+            line_id="fake-id",
         )
         assert deleted is False

@@ -13,6 +13,7 @@ import type {
   Share,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
+import { useShareDeliveryDays } from "@features/commissioning/hooks";
 import { ExportCsvShareWeights } from "@features/commissioning/modals";
 import { WeekSelector } from "@shared/selectors";
 import { SharesDeliveryDaySelector } from "@features/commissioning/selectors";
@@ -26,7 +27,7 @@ import type {
   EditableColumnConfig,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
-import { ExplainerText } from "@shared/ui";
+import { EmptyHint, ExplainerText } from "@shared/ui";
 import {
   useInvalidateAfterTableMutation,
   useNumberFormat,
@@ -67,7 +68,13 @@ export default function ShareWeights() {
     [selectedYear, selectedWeek, selectedDay],
   );
 
-  const canFetch = !!selectedWeek && !!selectedDay;
+  // The week's delivery days, from the same query as the day selector. A day
+  // picked in another week stays picked until they arrive and may not be one
+  // of them, so the shares are asked for only once it is.
+  const { shareDeliveryDays: weekDays, noDaysListed: weekHasNoDays } =
+    useShareDeliveryDays(activeAtDate ? { active_at_date: activeAtDate } : {});
+  const canFetch =
+    !!selectedWeek && weekDays.some((day) => day.value === selectedDay);
   const queryClient = useQueryClient();
 
   // React Query — failures route through the global queryCache.onError
@@ -77,11 +84,13 @@ export default function ShareWeights() {
   });
   const data = useMemo<ShareRow[]>(
     () =>
-      ((rawData ?? []) as unknown as Share[]).map((item) => ({
-        ...item,
-        key: item.id ?? "",
-      })),
-    [rawData],
+      canFetch
+        ? ((rawData ?? []) as unknown as Share[]).map((item) => ({
+            ...item,
+            key: item.id ?? "",
+          }))
+        : [],
+    [rawData, canFetch],
   );
   const invalidateData = useCallback(() => {
     queryClient.invalidateQueries({
@@ -185,10 +194,10 @@ export default function ShareWeights() {
         active_at_date={activeAtDate}
         selectedYear={selectedYear}
         selectedWeek={selectedWeek}
-        preserveSelection={false}
       />
 
-      {canFetch && (
+      {/* A pick still waiting for its week's days keeps the table, spinning. */}
+      {selectedDay ? (
         <EditableTable
           key={`${selectedYear}-${selectedWeek}-${selectedDay}`}
           columns={columns}
@@ -196,11 +205,13 @@ export default function ShareWeights() {
           initialData={data}
           onSaveSuccess={onSaveSuccess}
           onDeleteSuccess={onDeleteSuccess}
-          loading={isFetching}
+          loading={!canFetch || isFetching}
           className="w-max custom-jasmin-table"
           permissions={permissions}
         />
-      )}
+      ) : weekHasNoDays ? (
+        <EmptyHint>{t("commissioning.no_delivery_days_in_week")}</EmptyHint>
+      ) : null}
       <ExplainerText title={t("common.info")}>
         {t("explainers.share_weights")}
       </ExplainerText>

@@ -92,3 +92,9 @@
   left: 8px;
   top: 8px;
 }
+
+/* The user menu marks the language in effect with a check mark at the end of
+   its entry (LanguageMenuItemLabel). */
+.language-menu-item__check {
+  margin-left: auto;
+}

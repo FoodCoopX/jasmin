@@ -2,7 +2,6 @@ import {
   Checkbox,
   DatePicker,
   Input,
-  InputNumber,
   Select,
   Typography,
 } from "antd";
@@ -11,6 +10,7 @@ import { toApiDate } from "@shared/utils";
 import type { ComponentType } from "react";
 import { ReactNode } from "react";
 import { blockNonNumericKeys } from "@shared/utils/numberFormat";
+import NumberInput from "@shared/ui/NumberInput";
 import ToolTipIcon from "@shared/ui/ToolTipIcon";
 import { RemittanceTemplateInput } from "./RemittanceTemplateInput";
 
@@ -118,10 +118,6 @@ export interface SettingConfig {
 }
 
 interface RenderOptions {
-  /** Tenant decimal separator (from useNumberFormat) for ``number`` inputs —
-   * so the input shows/accepts the tenant's separator (e.g. ``.`` → 40.00) and
-   * rejects everything else. Defaults to ``.``. */
-  decimalChar?: string;
   /** Tenant date display format (from useDateFormat) for ``date`` settings —
    * so the picker shows the tenant's format instead of the ISO default. */
   dateFormat?: string;
@@ -243,7 +239,8 @@ export const SettingsRenderer = {
         return (
           <div>
             <Text strong>{setting.label}</Text>
-            <InputNumber
+            <NumberInput
+              aria-label={setting.label}
               value={value as number}
               onChange={onChange}
               placeholder={setting.defaultValue?.toString()}
@@ -251,15 +248,12 @@ export const SettingsRenderer = {
               min={setting.min}
               max={setting.max}
               // Default to whole-number entry (reject "100,4" / stray chars);
-              // decimal fields (tax rates, percentages) opt in via `precision`.
-              // ``decimalSeparator`` is the tenant's separator so the field
-              // shows e.g. 40.00 (not 40,00) and rejects any other character.
+              // decimal fields (tax rates, percentages) opt in via `precision`
+              // and take "." or "," as the decimal mark.
               step={setting.step ?? 1}
               precision={setting.precision ?? 0}
-              decimalSeparator={options.decimalChar ?? "."}
               onKeyDown={blockNonNumericKeys({
                 allowDecimal: (setting.precision ?? 0) > 0,
-                decimalChar: options.decimalChar ?? ".",
                 allowNegative: (setting.min ?? 0) < 0,
               })}
               disabled={setting.disabled}

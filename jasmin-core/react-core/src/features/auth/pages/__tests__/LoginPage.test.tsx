@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -62,14 +62,26 @@ vi.mock("react-router-dom", async () => {
 });
 
 import { AuthProvider } from "@shared/contexts/AuthContext";
+import { LocaleProvider, useLocale } from "@shared/contexts/LocaleContext";
+import { SUPPORTED_LANGUAGES } from "@shared/i18n/languages";
 import LoginPage from "../LoginPage";
 import { clearAccessToken, getAccessToken } from "@shared/services/tokenStore";
+
+/** The language the app speaks, which JasminApp hands to i18next. */
+let pageLanguage: string | null = null;
+function LanguageProbe() {
+  pageLanguage = useLocale().language;
+  return null;
+}
 
 function renderLogin() {
   return render(
     <MemoryRouter>
       <AuthProvider>
-        <LoginPage />
+        <LocaleProvider>
+          <LoginPage />
+          <LanguageProbe />
+        </LocaleProvider>
       </AuthProvider>
     </MemoryRouter>,
   );
@@ -80,6 +92,7 @@ beforeEach(() => {
   captchaReset.mockClear();
   clearAccessToken();
   localStorage.clear();
+  pageLanguage = null;
   Object.defineProperty(window, "location", {
     configurable: true,
     value: { ...window.location, hostname: "test.localhost" },
@@ -347,6 +360,31 @@ describe("LoginPage (integration)", () => {
     );
   });
 
+  it("starts in the browser's language and lets the visitor switch it", async () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["de-DE", "de"]);
+    const { container } = renderLogin();
+
+    const switcher = screen.getByRole("combobox", { name: "common.language" });
+    const languageOf = (code: string) =>
+      SUPPORTED_LANGUAGES.find((language) => language.code === code)!;
+    const shownLanguage = () =>
+      container.querySelector(".ant-select-selection-item")?.textContent;
+    expect(pageLanguage).toBe("de");
+    expect(shownLanguage()).toBe(languageOf("de").label);
+
+    const user = userEvent.setup();
+    await user.click(switcher);
+    const list = await screen.findByRole("listbox");
+    await user.click(
+      within(list).getByRole("option", { name: languageOf("en").name }),
+    );
+
+    await waitFor(() => expect(pageLanguage).toBe("en"));
+    expect(shownLanguage()).toBe(languageOf("en").label);
+    // Kept in this browser for the next visit.
+    expect(localStorage.getItem("language")).toBe("en");
+  });
+
   // Render-loop smoke test — if a context, hook or memo regression starts
   // re-rendering the page on every commit, this catches the runaway loop
   // long before it becomes a perf bug. The bound is intentionally LOOSE:
@@ -358,7 +396,9 @@ describe("LoginPage (integration)", () => {
 
     render(
       <MemoryRouter>
-        <AuthProvider>{profiler.wrap(<LoginPage />, "login")}</AuthProvider>
+        <AuthProvider>
+          <LocaleProvider>{profiler.wrap(<LoginPage />, "login")}</LocaleProvider>
+        </AuthProvider>
       </MemoryRouter>,
     );
 

@@ -6,12 +6,14 @@
  * and the money summary under the grids. EditableTable is replaced by a stub
  * that records the props each grid receives and renders every row through
  * the real column ``render`` functions, so cell money goes through the real
- * ``useCurrency`` / ``useNumberFormat`` formatting (de-DE, EUR). The column
- * hooks themselves are real; only the generated API client is mocked.
+ * ``useCurrency`` / ``useNumberFormat`` formatting (de-DE, EUR); a test that
+ * needs the table's own editing renders the crate grid through the real
+ * EditableTable instead. The column hooks themselves are real; only the
+ * generated API client is mocked.
  */
 
-import { act, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,6 +54,11 @@ vi.mock("@hooks/configuration/useTenant", async () => {
 const authState = vi.hoisted(() => ({ roles: ["office"] as string[] }));
 vi.mock("@shared/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { roles: authState.roles } }),
+}));
+
+// The real crate grid edits its rows inline.
+vi.mock("@shared/contexts/ModalContext", () => ({
+  useModal: () => ({ isModalMode: false }),
 }));
 
 const api = vi.hoisted(() => ({
@@ -118,17 +125,22 @@ vi.mock("@features/commissioning/pdfs/forResellers/InvoicePDFGenerator", () => (
   ),
 }));
 
-// The props each grid received on its latest render. The two grids are told
-// apart by their unique check: the crate grid checks ``crate_type``.
+// The props each grid received on its latest render. The crate grid is the one
+// with a crate type column. With ``realCrates`` set, the crate grid is the
+// real EditableTable.
 type GridName = "lines" | "crates";
 const grids = vi.hoisted(() => ({
   props: {} as Partial<Record<"lines" | "crates", unknown>>,
+  realCrates: false,
 }));
 
 vi.mock("@shared/tables", async () => {
   const { gatedByPermission } = await import("@shared/tables/tablePermissions");
   const { wrapApiFunctions } = await import(
     "@shared/tables/BasicEditableTable/wrapApiFunctions"
+  );
+  const { default: RealEditableTable } = await import(
+    "@shared/tables/BasicEditableTable"
   );
   const leafColumns = (
     columns: EditableColumnConfig<TableRecord>[],
@@ -140,12 +152,15 @@ vi.mock("@shared/tables", async () => {
     gatedByPermission,
     wrapApiFunctions,
     EditableTable: (props: EditableTableProps) => {
-      const name: GridName = [props.uniqueCheck ?? []]
-        .flat()
-        .includes("crate_type")
+      const name: GridName = props.columns.some(
+        (column) => column.key === "crate_type_name",
+      )
         ? "crates"
         : "lines";
       grids.props[name] = props;
+      if (name === "crates" && grids.realCrates) {
+        return <RealEditableTable {...props} />;
+      }
       const columns = leafColumns(props.columns).filter((c) => !c.hidden);
       return (
         <table
@@ -225,6 +240,17 @@ const SMALL_CRATES = {
   tax_rate: 19,
 };
 
+// Small crates billed at two prices: two lines of one crate type, each named
+// by a crate row of its own. 4 at 1.25 = 5.00 and 2 at 1.50 = 3.00 net.
+const SMALL_CRATES_AT_125 = { ...SMALL_CRATES, id: "ct-small_row-1" };
+const SMALL_CRATES_AT_150 = {
+  ...SMALL_CRATES,
+  id: "ct-small_row-7",
+  amount: 2,
+  price_per_unit: "1.50",
+  line_netto: "3.00",
+};
+
 function makeInvoice(overrides: Record<string, unknown> = {}) {
   return {
     id: "inv-1",
@@ -264,12 +290,18 @@ function renderModal({
   api.retrieve.mockReturnValue({ data: invoice, isFetching: false });
   const client = makeQueryClient();
   const invalidateSpy = vi.spyOn(client, "invalidateQueries");
-  render(
+  const modalFor = (invoiceId: string) => (
     <QueryClientProvider client={client}>
-      <InvoiceModal visible={visible} invoiceId="inv-1" onClose={onClose} />
-    </QueryClientProvider>,
+      <InvoiceModal visible={visible} invoiceId={invoiceId} onClose={onClose} />
+    </QueryClientProvider>
   );
-  return { invalidateSpy, onClose };
+  const { rerender } = render(modalFor("inv-1"));
+  /** Shows ``other`` in the open modal, as read again or as the next invoice picked. */
+  const show = (other: Record<string, unknown>) => {
+    api.retrieve.mockReturnValue({ data: other, isFetching: false });
+    rerender(modalFor(other.id as string));
+  };
+  return { invalidateSpy, onClose, show };
 }
 
 function grid(name: GridName): EditableTableProps {
@@ -280,10 +312,75 @@ function grid(name: GridName): EditableTableProps {
 
 const INVOICE_QUERY_KEY = ["/api/commissioning/invoices/inv-1/"];
 
+// ── The real crate grid ─────────────────────────────────────────────────────
+
+const CRATE_TYPE = "commissioning.crate_type_name";
+const AMOUNT = "commissioning.amount";
+const PRICE = "commissioning.single_price";
+const DISCOUNT = "commissioning.rabatt";
+
+type User = ReturnType<typeof userEvent.setup>;
+
+// Checking ``pointer-events`` before each click reads every ancestor's computed
+// style, which the styles AntD injects make slow in jsdom; the crate grid's
+// cells and buttons all take clicks.
+const crateGridUser = () =>
+  userEvent.setup({ delay: null, pointerEventsCheck: PointerEventsCheckLevel.Never });
+
+const crateRows = () =>
+  Array.from(document.querySelectorAll<HTMLElement>(".ant-table-tbody > tr.ant-table-row"));
+
+function crateCell(row: HTMLElement, title: string): HTMLElement {
+  const headers = Array.from(document.querySelectorAll(".ant-table-thead > tr > th"));
+  const index = headers.findIndex((header) => header.textContent?.trim() === title);
+  const cell = row.querySelectorAll<HTMLElement>(":scope > td")[index];
+  if (index < 0 || !cell) throw new Error(`No crate column titled ${title}`);
+  return cell;
+}
+
+/** What each crate line shows under ``title``. */
+const shownUnder = (title: string) =>
+  crateRows().map((row) => crateCell(row, title).textContent);
+
+/** The crate line open for editing: the one offering a save button. */
+function editingRow(): HTMLElement {
+  const row = screen.getByRole("button", { name: "table.save" }).closest("tr");
+  if (!row) throw new Error("No crate line is being edited");
+  return row;
+}
+
+/** Opens a crate line by clicking its cell under ``title``, ready for typing. */
+async function openAt(user: User, row: HTMLElement, title: string) {
+  await user.click(crateCell(row, title));
+  const input = within(editingRow()).getByLabelText(title);
+  await waitFor(() => expect(input).toHaveFocus());
+  return input;
+}
+
+async function pickCrateType(user: User, label: string) {
+  await user.click(
+    within(editingRow()).getByRole("combobox", { name: CRATE_TYPE }),
+  );
+  const option = await waitFor(() => {
+    const match = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option",
+      ),
+    ).find((item) => item.textContent === label);
+    if (!match) throw new Error(`No crate type ${label} is offered`);
+    return match;
+  });
+  await user.click(option);
+}
+
+const saveLine = (user: User) =>
+  user.click(screen.getByRole("button", { name: "table.save" }));
+
 beforeEach(() => {
   tenantSettings.values = {};
   authState.roles = ["office"];
   grids.props = {};
+  grids.realCrates = false;
   Object.values(api).forEach((fn) => fn.mockReset());
 });
 
@@ -753,5 +850,143 @@ describe("InvoiceModal crates", () => {
     expect(
       screen.getByText("commissioning.netto (19%): 8,00 €"),
     ).toBeInTheDocument();
+  });
+
+  it("reads the invoice again after a crate line is saved, since the server can merge it with another line", () => {
+    const { invalidateSpy } = renderModal();
+
+    act(() =>
+      grid("crates").onSaveSuccess?.({ ...SMALL_CRATES, key: "crate-1" }, "update"),
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: INVOICE_QUERY_KEY });
+  });
+});
+
+// ── Crate lines in the real table ───────────────────────────────────────────
+
+describe("InvoiceModal crate lines", () => {
+  beforeEach(() => {
+    grids.realCrates = true;
+  });
+
+  it("shows each price of a crate type on its own line, opens one at a time and saves it under its own id", async () => {
+    const user = crateGridUser();
+    renderModal({
+      invoice: makeInvoice({
+        crate_items: [SMALL_CRATES_AT_125, SMALL_CRATES_AT_150],
+      }),
+    });
+    api.cratesPartialUpdate.mockImplementation(
+      async (id: string, body: Record<string, unknown>) => ({
+        ...SMALL_CRATES_AT_150,
+        id,
+        amount: Number(body.amount),
+        line_netto: "4.50",
+      }),
+    );
+    await waitFor(() => expect(shownUnder(AMOUNT)).toEqual(["4", "2"]));
+    expect(shownUnder(PRICE)).toEqual(["1,25 €", "1,50 €"]);
+    // 3.00 leeks + 5.00 + 3.00 crates at 19 %.
+    expect(
+      screen.getByText("commissioning.netto (19%): 11,00 €"),
+    ).toBeInTheDocument();
+
+    const amount = await openAt(user, crateRows()[1], AMOUNT);
+
+    expect(screen.getAllByRole("button", { name: "table.save" })).toHaveLength(1);
+    expect(editingRow()).toBe(crateRows()[1]);
+
+    await user.clear(amount);
+    await user.type(amount, "3");
+    await saveLine(user);
+
+    await waitFor(() => expect(api.cratesPartialUpdate).toHaveBeenCalledTimes(1));
+    expect(api.cratesPartialUpdate).toHaveBeenCalledWith(
+      "ct-small_row-7",
+      expect.objectContaining({
+        crate_type: "ct-small",
+        amount: "3",
+        invoice_id: "inv-1",
+      }),
+    );
+    await waitFor(() => expect(shownUnder(AMOUNT)).toEqual(["4", "3"]));
+    expect(shownUnder(PRICE)).toEqual(["1,25 €", "1,50 €"]);
+    // 3.00 leeks + 5.00 + 4.50 crates at 19 %.
+    expect(
+      screen.getByText("commissioning.netto (19%): 12,50 €"),
+    ).toBeInTheDocument();
+  });
+
+  it("refuses a new line whose crate type the invoice lists by the time it is saved, on the crate type, and sends nothing", async () => {
+    const user = crateGridUser();
+    const { show } = renderModal();
+    await waitFor(() => expect(crateRows()).toHaveLength(1));
+
+    await user.click(screen.getByRole("button", { name: /table\.add_plus_icon/ }));
+    await pickCrateType(user, "Large");
+    await user.type(within(editingRow()).getByLabelText(AMOUNT), "2");
+    // Meanwhile a large-crate line was added to the invoice elsewhere.
+    show(
+      makeInvoice({
+        crate_items: [
+          SMALL_CRATES,
+          {
+            ...SMALL_CRATES,
+            id: "ct-large_row-9",
+            crate_type: "ct-large",
+            crate_type_name: "Large",
+            amount: 1,
+          },
+        ],
+      }),
+    );
+    await saveLine(user);
+
+    const refused = "validation.unique.invoice_modal_crate";
+    expect(
+      await screen.findByText(`${refused} — table.save_failed_hint`),
+    ).toBeInTheDocument();
+    expect(
+      within(crateCell(editingRow(), CRATE_TYPE)).getByRole("alert"),
+    ).toHaveTextContent(refused);
+    expect(api.cratesCreate).not.toHaveBeenCalled();
+  });
+
+  it("shows the next invoice's own crate line, not what was saved on the one before", async () => {
+    const user = crateGridUser();
+    // Both invoices name their small-crate line by the crate type, so the
+    // line has the same id on either invoice.
+    const firstLine = { ...SMALL_CRATES, id: "ct-small" };
+    const nextLine = { ...firstLine, amount: 2, line_netto: "2.50" };
+    const { show } = renderModal({
+      invoice: makeInvoice({ crate_items: [firstLine] }),
+    });
+    api.cratesPartialUpdate.mockImplementation(
+      async (id: string, body: Record<string, unknown>) => ({
+        ...firstLine,
+        id,
+        rabatt: Number(body.rabatt),
+        line_netto: "4.50",
+      }),
+    );
+    await waitFor(() => expect(shownUnder(AMOUNT)).toEqual(["4"]));
+
+    const discount = await openAt(user, crateRows()[0], DISCOUNT);
+    await user.clear(discount);
+    await user.type(discount, "10");
+    await saveLine(user);
+    await waitFor(() => expect(shownUnder(DISCOUNT)).toEqual(["10 %"]));
+
+    show(
+      makeInvoice({
+        id: "inv-2",
+        invoice_number: "2026-008",
+        crate_items: [nextLine],
+      }),
+    );
+
+    await waitFor(() => expect(shownUnder(AMOUNT)).toEqual(["2"]));
+    expect(shownUnder(DISCOUNT)).toEqual([""]);
   });
 });

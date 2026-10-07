@@ -739,6 +739,7 @@
   },
   "no_active_delivery_days": "Keine aktiven Liefertage",
   "no_active_delivery_days_message": "Für den ausgewählten Zeitraum sind keine aktiven Liefertage konfiguriert.",
+  "no_delivery_days_in_week": "Keine Liefertage in dieser Woche",
   "no_offers_created": "Keine Angebote erstellt — für diese Woche gibt es nichts anzubieten.",
   "no_offer_groups_found": "Keine Angebotsgruppen gefunden — bitte mindestens eine anlegen, bevor Angebote erstellt werden.",
   "no_other_variations": "Keine weiteren Varianten",

@@ -23,6 +23,7 @@ import { useAuth } from "@shared/contexts/AuthContext";
 import { useLocale } from "@shared/contexts/LocaleContext";
 import { SUPPORTED_LANGUAGES } from "@shared/i18n/languages";
 import { useIsMobile } from "@hooks/index";
+import LanguageMenuItemLabel from "./LanguageMenuItemLabel";
 import UserProfileModal, { type UserProfileTab } from "./UserProfileModal";
 
 export default function UserMenu() {
@@ -122,15 +123,10 @@ export default function UserMenu() {
           children: SUPPORTED_LANGUAGES.map((lang) => ({
             key: `language-${lang.code}`,
             label: (
-              <Space>
-                <span aria-hidden>{lang.flag}</span>
-                <span>{lang.label}</span>
-                {language === lang.code && (
-                  <span aria-hidden style={{ marginLeft: "auto" }}>
-                    ✓
-                  </span>
-                )}
-              </Space>
+              <LanguageMenuItemLabel
+                language={lang}
+                isCurrent={language === lang.code}
+              />
             ),
             onClick: () => {
               void saveLanguage(lang.code);

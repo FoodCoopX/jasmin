@@ -294,10 +294,10 @@ export function useOrdersData() {
     dataRef.current = data;
   }, [data]);
 
-  // Creating the first line/crate for a day creates the Order
-  // server-side, so the day-selector dots (a separate DaysWithOrders query) must
-  // refresh. The contents/crates lists stay uninvalidated on create per the
-  // no-refetch-on-create policy — this only bumps the dots query.
+  // Creating the first line/crate for a day creates the Order server-side, so
+  // the day-selector dots (a separate DaysWithOrders query) must refresh. This
+  // only bumps the dots query; which lists a save reads again is up to
+  // ``handleSaveSuccess``.
   const invalidateDaysWithOrders = useCallback(() => {
     queryClient.invalidateQueries({
       queryKey: getCommissioningDaysWithOrdersRetrieveQueryKey(listParams),
@@ -331,9 +331,13 @@ export function useOrdersData() {
           | { order_deleted?: boolean }
           | undefined;
         // Always refetch so the OrderInfoPanel (totals, finalized flags,
-        // order number) stays in sync.
+        // order number) stays in sync, and the crate list, which loses the
+        // line's deposit crates with it.
         queryClient.invalidateQueries({
           queryKey: getCommissioningOrderContentsListQueryKey(listParams),
+        });
+        queryClient.invalidateQueries({
+          queryKey: getCommissioningCrateContentsListQueryKey(listParams),
         });
         if (res?.order_deleted) {
           // The parent Order was cascade-deleted server-side. Clear the
@@ -359,9 +363,6 @@ export function useOrdersData() {
           setOrderNote("");
           queryClient.invalidateQueries({
             queryKey: getCommissioningDaysWithOrdersRetrieveQueryKey(listParams),
-          });
-          queryClient.invalidateQueries({
-            queryKey: getCommissioningCrateContentsListQueryKey(listParams),
           });
         }
       },
@@ -401,12 +402,10 @@ export function useOrdersData() {
   const { data: rawDaysData, isFetching: daysFetching } =
     useCommissioningDaysWithOrdersRetrieve(listParams);
 
-  const hasOrder = useMemo(() => {
-    // Read the top-level ``order`` block, NOT ``items[0]`` — a crates-only
-    // order has zero OrderContent rows, so ``items`` is empty even though an
-    // order exists. The crates query + order state below both gate on this.
-    return !!rawOrderData?.order?.order_id;
-  }, [rawOrderData]);
+  // Read the top-level ``order`` block, NOT ``items[0]`` — a crates-only
+  // order has zero OrderContent rows, so ``items`` is empty even though an
+  // order exists. The crates query + order state below both gate on this.
+  const hasOrder = !!rawOrderData?.order?.order_id;
 
   const { data: rawCratesData, isFetching: cratesFetching } = useCommissioningCrateContentsList(
     listParams,
@@ -417,7 +416,11 @@ export function useOrdersData() {
   // (year/week/day/reseller). With the global ``staleTime: 0`` a revisited
   // cached key has ``isLoading === false``, so only ``isFetching`` drives the
   // table's refresh spinner on a selector change.
-  const loading = orderFetching || daysFetching || (hasOrder && cratesFetching);
+  const loading = orderFetching || daysFetching;
+  // The crate list is read again after every save (``handleSaveSuccess``), and
+  // only the crate table waits for it. A table's spinner dims it and catches
+  // its clicks, so on the order-line tables it would hold up the next entry.
+  const cratesLoading = loading || (hasOrder && cratesFetching);
 
   const daysWithOrders = useMemo(() => {
     if (!rawDaysData) return [] as number[];
@@ -838,18 +841,22 @@ export function useOrdersData() {
   const summaryDataArticles = useMemo(() => calculateSummaryData(filteredDataArticles, true), [filteredDataArticles, calculateSummaryData]);
   const summaryDataCrates = useMemo(() => calculateSummaryData(dataCrates, true), [dataCrates, calculateSummaryData]);
 
-  // No-op: matches the codebase-wide policy of never re-fetching the
-  // list on save (CREATE or UPDATE). EditableTable inserts the new row
-  // at the top on create and replaces in place on update; refetching
-  // would re-sort by the backend's default ordering and yank the row
-  // away mid-flow. ``handleDataChange`` (separate callback) takes care
-  // of the order metadata sync on every change.
-  const handleSaveSuccess = useCallback(
-    (_record: unknown, _action: "create" | "update") => {
-      // intentional no-op — see comment above
-    },
-    [],
-  );
+  // A save (CREATE or UPDATE) reads the crate list again: saving an order line
+  // deletes and re-creates its deposit crates, and a saved crate line can merge
+  // with another line of its crate type, so the crate lines and their ids
+  // change on the server. It leaves the order lines' list alone: EditableTable
+  // inserts the new row at the top on create and replaces in place on update,
+  // and refetching would re-sort by the backend's default ordering and yank the
+  // row away mid-flow. ``handleDataChange`` (separate callback) takes care of
+  // the order metadata sync on every change. A save in a slot without an order
+  // is the exception: it creates the order, and the crate list is only read
+  // once the order list shows one (``hasOrder``), so it reads the order list.
+  const handleSaveSuccess = useCallback(() => {
+    const queryKey = hasOrder
+      ? getCommissioningCrateContentsListQueryKey(listParams)
+      : getCommissioningOrderContentsListQueryKey(listParams);
+    queryClient.invalidateQueries({ queryKey });
+  }, [queryClient, listParams, hasOrder]);
 
   // The latest un-persisted note edit, tagged with the order it belongs to.
   // Tagging (rather than reading ``orderState.orderId`` at flush time) is what
@@ -928,7 +935,7 @@ export function useOrdersData() {
     dataCrates,
     dataCratesCount: dataCrates.length,
     daysWithOrders,
-    loading,
+    loading, cratesLoading,
 
     // Order state
     orderState,

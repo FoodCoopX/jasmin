@@ -13,6 +13,7 @@ import { TenantContext } from "./TenantContext";
 import { authPartialUpdate } from "@shared/api/generated/auth/auth";
 import {
   ThemeEnum,
+  type UserLanguageEnum,
   type UserProfileUpdateRequest,
 } from "@shared/api/generated/models";
 import { isSupportedLanguageCode } from "@shared/i18n/languages";
@@ -49,14 +50,26 @@ async function loadDayjsLocale(language: string): Promise<void> {
   }
 }
 
+/** How many ``applyDayjsLocale`` calls have begun, so each can tell whether a
+ * later one started while its locale was loading. */
+let dayjsLocaleRequests = 0;
+
 /** Activate the requested locale on dayjs once it's been (lazily)
  * registered. Synchronous call sites use this fire-and-forget; the
  * brief window between the call and the chunk arriving is invisible
  * in practice because most user-visible date rendering happens
- * after at least one paint. */
+ * after at least one paint.
+ *
+ * The latest call decides. Every locale but the built-in English is a fetch
+ * away, so one requested earlier can land after one requested later — the
+ * language worked out before the stored session is read, say, after the
+ * signed-in user's — and must not take dayjs over then. */
 function applyDayjsLocale(language: string): void {
+  const request = ++dayjsLocaleRequests;
   loadDayjsLocale(language)
-    .then(() => dayjs.locale(language))
+    .then(() => {
+      if (request === dayjsLocaleRequests) dayjs.locale(language);
+    })
     .catch((err) =>
       console.warn(`Failed to activate dayjs locale "${language}":`, err),
     );
@@ -84,7 +97,6 @@ interface LocaleContextValue {
   setLanguage: (newLanguage: string) => void;
   setSidebarCollapsed: (newSidebarCollapsed: boolean) => void;
   toggleSidebar: () => void;
-  getBrowserLanguage: () => string;
 }
 
 const LocaleContext = createContext<LocaleContextValue | undefined>(undefined);
@@ -93,6 +105,59 @@ const DEVICE_PREFERS_DARK = "(prefers-color-scheme: dark)";
 
 function isThemePreference(value: unknown): value is ThemeEnum {
   return Object.values(ThemeEnum).includes(value as ThemeEnum);
+}
+
+/** The language last picked with a switcher in this browser, if the app still
+ * offers it. */
+function readLanguagePick(): UserLanguageEnum | null {
+  try {
+    const stored = localStorage.getItem("language");
+    return isSupportedLanguageCode(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeLanguagePick(language: string): void {
+  if (!isSupportedLanguageCode(language)) return;
+  try {
+    localStorage.setItem("language", language);
+  } catch {
+    // Without storage the pick holds until the page is reloaded.
+  }
+}
+
+/** The first of the browser's preferred languages that the app offers, by its
+ * base language (``de-AT`` counts as ``de``), or null when it offers none. */
+function preferredBrowserLanguage(): UserLanguageEnum | null {
+  for (const tag of [...(navigator.languages ?? []), navigator.language]) {
+    const base = tag?.split("-")[0].toLowerCase();
+    if (isSupportedLanguageCode(base)) return base;
+  }
+  return null;
+}
+
+/**
+ * The language the app speaks — the first of:
+ *   1. the signed-in user's saved ``user_language``;
+ *   2. the language last picked with a switcher in this browser;
+ *   3. the browser's own language, when the app offers it;
+ *   4. the farm's ``tenant_language``;
+ *   5. German, the in-house default and i18next's ``fallbackLng``.
+ * Every page reads the same chain, signed in or not, so signing in changes the
+ * language only for a user whose profile names another one.
+ */
+function resolveLanguage(
+  userLanguage: string | undefined,
+  tenantLanguage: string | null,
+): string {
+  return (
+    userLanguage ||
+    readLanguagePick() ||
+    preferredBrowserLanguage() ||
+    tenantLanguage ||
+    "de"
+  );
 }
 
 /** Whether the device is set to dark, following it when that changes. */
@@ -137,7 +202,9 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   // TenantProvider — ``useTenant()`` would throw.
   const tenantCtx = useContext(TenantContext);
   const tenantLanguage = tenantCtx?.tenant?.tenant_language ?? null;
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(() =>
+    resolveLanguage(user?.user_language, tenantLanguage),
+  );
   const [themePreference, setThemePreference] = useState<ThemeEnum>(
     ThemeEnum.system,
   );
@@ -152,37 +219,15 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get browser language as fallback
-  const getBrowserLanguage = useCallback(() => {
-    const browserLang =
-      navigator.language ||
-      (navigator as unknown as { userLanguage?: string }).userLanguage;
-    return browserLang?.split("-")[0] || "en"; // Get just the language code (e.g., 'en' from 'en-US')
-  }, []);
-
-  // Initialize language from user, tenant, or browser.
-  //
-  // Precedence:
-  //   1. ``user.user_language`` — the logged-in user's saved preference
-  //      wins. They explicitly set this on their profile.
-  //   2. ``tenant.tenant_language`` — used pre-login (LoginPage) AND
-  //      post-logout so the marketing/auth surface speaks the tenant's
-  //      configured language instead of whatever the browser thinks.
-  //   3. Browser ``navigator.language`` — last resort, e.g. when the
-  //      LocaleProvider runs on the platform domain (no TenantProvider
-  //      mounted) before the super-admin signs in.
+  // The language follows the chain in ``resolveLanguage``: the signed-in
+  // user's saved language, else the one picked in this browser, else the
+  // browser's own when the app offers it, else the farm's, else German. It is
+  // decided again when the user signs in or out, and when ``tenantLanguage``
+  // arrives with the anonymous tenant fetch — which changes the language only
+  // for a visitor who picked none and whose browser names none the app offers.
   useEffect(() => {
-    let initialLanguage = "en"; // Default fallback
+    const initialLanguage = resolveLanguage(user?.user_language, tenantLanguage);
     let initialSidebarCollapsed = false;
-
-    if (user?.user_language) {
-      initialLanguage = user.user_language;
-    } else if (tenantLanguage) {
-      initialLanguage = tenantLanguage;
-    } else {
-      // Use browser language detection
-      initialLanguage = getBrowserLanguage();
-    }
 
     // The signed-in user's saved choice; signed out, the last one made in this
     // browser; and with neither, the device decides.
@@ -207,11 +252,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     setThemePreference(initialThemePreference);
     setSidebarCollapsed(initialSidebarCollapsed);
     applyDayjsLocale(initialLanguage);
-    // ``tenantLanguage`` arrives asynchronously after the pre-login
-    // tenant bootstrap fetch — re-running this effect when it
-    // resolves is what makes the LoginPage flip from browser-default
-    // to the tenant's configured language.
-  }, [user, tenantLanguage, getBrowserLanguage]);
+  }, [user, tenantLanguage]);
 
   // Update dayjs locale when language changes
   useEffect(() => {
@@ -239,6 +280,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         if (newPreferences.language) {
           setLanguage(newPreferences.language);
           applyDayjsLocale(newPreferences.language);
+          storeLanguagePick(newPreferences.language);
         }
         if (newPreferences.theme) {
           setThemePreference(newPreferences.theme);
@@ -269,10 +311,12 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
           await authPartialUpdate(String(user.id), profilePayload);
         }
 
-        // Update local state
+        // Update local state. The language is also kept in this browser, so the
+        // signed-out pages speak it after sign-out.
         if (newPreferences.language) {
           setLanguage(newPreferences.language);
           applyDayjsLocale(newPreferences.language);
+          storeLanguagePick(newPreferences.language);
         }
         if (newPreferences.theme) {
           setThemePreference(newPreferences.theme);
@@ -379,7 +423,6 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setLanguage: setLanguageLocal,
       setSidebarCollapsed: setSidebarCollapsedLocal,
       toggleSidebar,
-      getBrowserLanguage,
     }),
     [
       language,
@@ -395,7 +438,6 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setLanguageLocal,
       setSidebarCollapsedLocal,
       toggleSidebar,
-      getBrowserLanguage,
     ],
   );
 

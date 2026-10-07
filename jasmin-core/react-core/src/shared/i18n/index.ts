@@ -21,15 +21,8 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    // DE is the in-house default. EN, FR, IT translations still
-    // ship and stay fully supported — switching via the language
-    // switcher writes ``i18nextLng`` to localStorage and the
-    // LanguageDetector picks that up on every subsequent load. The
-    // fallback below kicks in only when:
-    //   * no language was previously picked (first visit), OR
-    //   * the active language is missing a specific key.
-    // Either way the user sees DE rather than auto-tracking their
-    // browser's locale.
+    // German, the in-house default, fills in any key the active language
+    // lacks.
     fallbackLng: 'de',
 
     defaultNS: 'translation',
@@ -41,12 +34,15 @@ i18n
     },
 
     detection: {
-      // ``navigator`` is omitted on purpose — auto-tracking the browser
-      // language would show the app in EN to anyone visiting from
-      // an English-locale machine on first load, which isn't what
-      // we want for a German-first coop product. ``localStorage``
-      // still wins (so user-picked language persists), and
-      // ``htmlTag`` stays as a last-resort hook for SSR scenarios.
+      // LocaleProvider decides the app's language — the signed-in user's,
+      // else one picked in this browser, else the browser's own when the app
+      // offers it, else the farm's, else German — and JasminApp switches to
+      // it through ``activateLanguage``. Before that, and on the super-admin
+      // domain, which has no such bridge, the detector's choice stands: the
+      // language last shown in this browser (``i18nextLng``, cached on every
+      // change), else the ``lang`` of index.html. ``navigator`` stays out:
+      // the browser's languages are LocaleProvider's to weigh, and it takes
+      // only those the app offers, where the detector would take any.
       order: ['localStorage', 'htmlTag'],
       caches: ['localStorage'],
       lookupLocalStorage: 'i18nextLng',
@@ -74,6 +70,10 @@ async function importLanguage(
   }
 }
 
+/** How many ``activateLanguage`` calls have begun, so each can tell whether a
+ * later one started while it waited. */
+let activationCount = 0;
+
 /**
  * Load a language's bundle if it isn't resident, then switch to it.
  *
@@ -82,28 +82,43 @@ async function importLanguage(
  * and not on a store addition, which makes the swap a single repaint rather
  * than a frame of German followed by a frame of the target language.
  *
+ * A call that brings a bundle in switches even when i18next already names
+ * that language, as it does from the start of a visit that boots on English
+ * (the language last shown in this browser, or index.html's ``lang``). Until
+ * the bundle lands every key falls back to German, and only the
+ * ``languageChanged`` of the switch repaints what was rendered meanwhile.
+ *
  * Whatever happens, the language i18next ends up on is one whose bundle is
  * loaded — a failed fetch settles on German. Several call sites read
  * ``i18n.language`` synchronously and one of them posts it as a new member's
  * ``user_language``, so it must never name a bundle that isn't there.
+ *
+ * When calls overlap, the latest one decides: a call whose fetch lands after a
+ * later call began does not switch, so a slow bundle — the one the app booted
+ * in, or a language the visitor picked and then changed — can't undo the
+ * language chosen since.
  */
 export async function activateLanguage(language: string): Promise<void> {
   const code = (language || '').split('-')[0];
   if (!code) return;
+  const activation = ++activationCount;
+  let added = false;
 
   if (!i18n.hasResourceBundle(code, 'translation')) {
     try {
       const bundle = await importLanguage(code);
       if (bundle) {
         i18n.addResourceBundle(code, 'translation', bundle, true, true);
+        added = true;
       }
     } catch (err) {
       console.warn(`Failed to load the "${code}" translations:`, err);
     }
   }
+  if (activation !== activationCount) return;
 
   const target = i18n.hasResourceBundle(code, 'translation') ? code : 'de';
-  if (i18n.language !== target) {
+  if (added || i18n.language !== target) {
     await i18n.changeLanguage(target);
   }
 }

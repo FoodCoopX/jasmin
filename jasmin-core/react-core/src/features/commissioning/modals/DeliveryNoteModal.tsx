@@ -23,7 +23,8 @@ import { useDateFormat, useDefaultTaxRates, useNoteColumn, useNumberFormat, useT
 import { formatAmountForUnit } from "@shared/utils";
 import { makeContentCustomEdit, makeFkCustomSave } from "./resellerContentTableCallbacks";
 import { withUpstreamDiffs } from "./upstreamDiffColumns";
-import { useAmountUnitSizeColumns, useCratesColumns, useShareArticleColumn } from '@features/commissioning/hooks';
+import { useAmountUnitSizeColumns, useShareArticleColumn } from '@features/commissioning/hooks';
+import { useDocumentCrateTable } from "@features/commissioning/hooks/useDocumentCrateTable";
 import { FinalizedNotice } from '@features/commissioning/components';
 import { EditableTable, gatedByPermission, wrapApiFunctions } from "@shared/tables";
 import type {
@@ -141,50 +142,6 @@ export default function DeliveryNoteModal({
     },
   });
 
-  const { cratesColumns: columnsCrates, crates: crateOptions } =
-    useCratesColumns({
-      without_price: true,
-    });
-
-  // Filter out crate-types already used on this delivery note — same
-  // pattern as Orders.tsx (useColumnsOrders.filteredColumnsCrates).
-  // Without this, the office could pick the same crate type twice and
-  // hit the (delivery_note, crate_type) unique constraint at save.
-  const filteredColumnsCrates = useMemo(() => {
-    const usedCrateTypes = new Set(
-      lineItemsCrates.map(
-        (item) => (item as Record<string, unknown>).crate_type,
-      ),
-    );
-    const availableOptions = crateOptions.filter(
-      (opt) => !usedCrateTypes.has(opt.value as string),
-    );
-    return columnsCrates.map((col) =>
-      col.key === "crate_type_name"
-        ? { ...col, options: availableOptions }
-        : col,
-    );
-  }, [columnsCrates, crateOptions, lineItemsCrates]);
-
-  // When no unused crate-types remain, disable the add-row button on
-  // the crates table (edit/delete still allowed for existing rows).
-  const cratesPermissions = useMemo(() => {
-    const usedCrateTypes = new Set(
-      lineItemsCrates.map(
-        (item) => (item as Record<string, unknown>).crate_type,
-      ),
-    );
-    const hasAvailable = crateOptions.some(
-      (opt) => !usedCrateTypes.has(opt.value as string),
-    );
-    const baseCanWrite = !isFinalized && isOffice;
-    return {
-      canAdd: baseCanWrite && hasAvailable,
-      canEdit: baseCanWrite,
-      canDelete: baseCanWrite,
-    };
-  }, [crateOptions, lineItemsCrates, isFinalized, isOffice]);
-
   // Invalidate the delivery-note retrieve query after every save AND
   // delete. Mirrors InvoiceModal — the local-state-only pattern of
   // ``useInvalidateAfterTableMutation`` lets stale rows linger when
@@ -197,11 +154,10 @@ export default function DeliveryNoteModal({
     });
   }, [queryClient, deliveryNoteId]);
 
-  // CREATE invalidates so the delivery-note's tax-breakdown
-  // summary + crate-type filter (which depends on used types) get
-  // re-derived; UPDATE skips invalidation so an edited row stays
-  // where the office put it. DELETE always invalidates so the row
-  // vanishes and totals refresh.
+  // The line items' table: CREATE invalidates so the delivery-note's
+  // tax-breakdown summary gets re-derived; UPDATE skips invalidation so
+  // an edited row stays where the office put it. DELETE always
+  // invalidates so the row vanishes and totals refresh.
   const handleSaveSuccess = useCallback(
     (_record: TableRecord, action: "create" | "update") => {
       if (action === "create") {
@@ -247,11 +203,6 @@ export default function DeliveryNoteModal({
     [deliveryNoteId],
   );
 
-  const customSaveCrates = useMemo(
-    () => makeFkCustomSave("delivery_note_id", deliveryNoteData?.id),
-    [deliveryNoteData?.id],
-  );
-
   // ``tax_rate`` defaults to the tenant fallback so the model (``OrderableItem``)
   // NOT NULL constraint is satisfied even if the office never picks a
   // share_article (the on-change handler overrides it with the picked article's
@@ -259,16 +210,6 @@ export default function DeliveryNoteModal({
   const customEdit = useMemo(
     () => makeContentCustomEdit(defaultTaxRateArticles),
     [defaultTaxRateArticles],
-  );
-
-  const customDeleteCrates = useCallback(
-    (record: TableRecord) => {
-      return {
-        crate_type: (record as Record<string, unknown>).crate_type,
-        delivery_note_id: deliveryNoteId,
-      };
-    },
-    [deliveryNoteId],
   );
 
   const apiFunctionsContents = useMemo<ApiFunctions>(
@@ -299,6 +240,17 @@ export default function DeliveryNoteModal({
       }),
     [],
   );
+
+  const { tableProps: crateTableProps } = useDocumentCrateTable({
+    crateItems: lineItemsCrates,
+    documentField: "delivery_note_id",
+    documentId: deliveryNoteId,
+    canWrite: !isFinalized && isOffice,
+    apiFunctions: apiFunctionsCrates,
+    refetchDocument: invalidateDeliveryNote,
+    repeatedTypeMessage: t("validation.unique.delivery_note_modal_crate"),
+    withoutPrice: true,
+  });
 
   return (
     <Modal
@@ -361,20 +313,9 @@ export default function DeliveryNoteModal({
                 <h5>{t("commissioning.crates")}</h5>
               </div>
               <EditableTable
-                key="crates"
-                columns={filteredColumnsCrates as EditableColumnConfig[]}
-                apiFunctions={apiFunctionsCrates}
-                initialData={lineItemsCrates}
-                onSaveSuccess={handleSaveSuccess}
-                onDeleteSuccess={handleDeleteSuccess}
-                permissions={cratesPermissions}
+                key={`crates-${deliveryNoteId}`}
+                {...crateTableProps}
                 loading={loading}
-                customSave={customSaveCrates}
-                customDelete={customDeleteCrates}
-                uniqueCheck={["crate_type"]}
-                uniqueCheckMessage={t(
-                  "validation.unique.delivery_note_modal_crate",
-                )}
               />
             </>
           )}

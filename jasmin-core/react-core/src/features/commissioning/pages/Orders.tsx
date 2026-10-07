@@ -27,6 +27,7 @@ import {
   useOrdersData,
   type OrderDays,
 } from "@features/commissioning/hooks/useOrdersData";
+import { refuseRepeatedCrateType } from "@features/commissioning/hooks/useDocumentCrateTable";
 import { OrderDaySelectors } from "@features/commissioning/selectors/OrderDaySelectors";
 import { OrderInfoPanel } from "@features/commissioning/components/OrderInfoPanel";
 
@@ -81,6 +82,7 @@ export default function Orders() {
     calculatePricePerUnit,
     data,
     loading,
+    cratesLoading,
     summaryColumns,
     summaryDataOffers,
     summaryDataArticles,
@@ -155,18 +157,18 @@ export default function Orders() {
     ],
   );
 
+  // An order bills a crate type at each price, discount and VAT rate, one line
+  // each, so the crate table holds no crate-type uniqueness; only a new line
+  // must take a crate type the order doesn't list yet. ``listParams`` is the
+  // selected slot (year, delivery week, day, reseller), which names the order.
   const customSaveCrates = useCallback(
-    (transformedData: Record<string, unknown>) => {
+    (transformedData: Record<string, unknown>, record: TableRecord) => {
       if (!transformedData.crate_type) return null;
-      return {
-        ...transformedData,
-        year: selectedYear,
-        delivery_week: selectedWeek,
-        day_number: selectedDay,
-        reseller: selectedReseller,
-      };
+      const message = t("validation.unique.crate_type");
+      refuseRepeatedCrateType(dataCrates, transformedData, record, message);
+      return { ...transformedData, ...listParams };
     },
-    [selectedYear, selectedWeek, selectedDay, selectedReseller],
+    [listParams, dataCrates, t],
   );
 
   const customEdit = useCallback(
@@ -387,7 +389,7 @@ export default function Orders() {
               apiFunctions={apiFunctionsCrates}
               focusIndex="crate_type_name"
               initialData={dataCrates as unknown as TableRecord[]}
-              loading={loading}
+              loading={cratesLoading}
               onDataChange={
                 handleCratesDataChange as (data: TableRecord[]) => void
               }
@@ -395,8 +397,6 @@ export default function Orders() {
               customSave={customSaveCrates}
               customEdit={customEdit}
               customDelete={customDeleteCrates}
-              uniqueCheck={["crate_type"]}
-              uniqueCheckMessage={t("validation.unique.crate_type")}
               permissions={canModifyPermissions}
               summaryRows={[
                 {
@@ -442,6 +442,8 @@ export default function Orders() {
       filteredDataOffersCount,
       filteredDataArticlesCount,
       dataCratesCount,
+      loading,
+      cratesLoading,
       handleDataChange,
       handleCratesDataChange,
       handleSaveSuccess,

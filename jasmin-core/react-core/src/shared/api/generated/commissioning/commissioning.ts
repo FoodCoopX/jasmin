@@ -3892,7 +3892,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Get aggregated crate summary for a period and reseller.
+ * List a reseller's crate lines for a delivery day; each id names one line.
  */
 export const commissioningCrateContentsList = (
     params: CommissioningCrateContentsListParams,
@@ -3982,7 +3982,7 @@ export function useCommissioningCrateContentsList<TData = Awaited<ReturnType<typ
 
 
 /**
- * Create a crate order content record.
+ * Add a crate row to the order and answer with the crate line holding it.
  */
 export const commissioningCrateContentsCreate = (
     crateOrderContentCreateRequest: CrateOrderContentCreateRequest,
@@ -4043,7 +4043,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Partially update crate order content records by crate type.
+ * Update the crate line the id names; a bare crate type id names every line of the type.
  */
 export const commissioningCrateContentsPartialUpdate = (
     id: string,
@@ -4104,7 +4104,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Delete crate order content records by crate type.
+ * Delete the order's directly added crate rows on the line the id names; a bare crate type id names every line of the type.
  */
 export const commissioningCrateContentsDestroy = (
     id: string,
@@ -4164,7 +4164,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Get aggregated summary of crates by type for a delivery note.
+ * List a delivery note's crate lines: one per crate type, price, rabatt and tax rate, named `{crate type id}_{row id}`.
  */
 export const commissioningCrateContentsDeliveryNoteList = (
     params: CommissioningCrateContentsDeliveryNoteListParams,
@@ -4254,7 +4254,7 @@ export function useCommissioningCrateContentsDeliveryNoteList<TData = Awaited<Re
 
 
 /**
- * Create a new crate entry for a delivery note.
+ * Add a crate row to a delivery note and answer with the crate line that holds it.
  */
 export const commissioningCrateContentsDeliveryNoteCreate = (
     crateDeliveryNoteContentWriteRequest: CrateDeliveryNoteContentWriteRequest,
@@ -4401,7 +4401,7 @@ export function useCommissioningCrateContentsDeliveryNoteRetrieve<TData = Awaite
 
 
 /**
- * Update crate amount for a delivery note via adjustment entries.
+ * Set the amount, price, rabatt and tax rate of one crate line of a delivery note, through adjustment entries. The id names the line; a bare crate type id names every line of that type.
  */
 export const commissioningCrateContentsDeliveryNoteUpdate = (
     id: string,
@@ -4520,7 +4520,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Delete all crate entries for a crate_type and delivery note.
+ * Delete one crate line of a delivery note. The id names the line; a bare crate type id deletes every line of that type.
  */
 export const commissioningCrateContentsDeliveryNoteDestroy = (
     id: string,
@@ -4580,7 +4580,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Get aggregated summary of crates by type for an invoice.
+ * List an invoice's crate lines: one per crate type, price, rabatt and tax rate, named `{crate type id}_{row id}`.
  */
 export const commissioningCrateContentsInvoiceList = (
     params: CommissioningCrateContentsInvoiceListParams,
@@ -4670,7 +4670,7 @@ export function useCommissioningCrateContentsInvoiceList<TData = Awaited<ReturnT
 
 
 /**
- * Create a new crate entry for an invoice.
+ * Add a crate row to an invoice and answer with the crate line that holds it.
  */
 export const commissioningCrateContentsInvoiceCreate = (
     crateInvoiceContentWriteRequest: CrateInvoiceContentWriteRequest,
@@ -4817,7 +4817,7 @@ export function useCommissioningCrateContentsInvoiceRetrieve<TData = Awaited<Ret
 
 
 /**
- * Update crate amount for an invoice via adjustment entries.
+ * Set the amount, price, rabatt and tax rate of one crate line of an invoice, through adjustment entries. The id names the line; a bare crate type id names every line of that type.
  */
 export const commissioningCrateContentsInvoiceUpdate = (
     id: string,
@@ -4936,7 +4936,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Delete all crate entries for a crate_type and invoice.
+ * Delete one crate line of an invoice. The id names the line; a bare crate type id deletes every line of that type.
  */
 export const commissioningCrateContentsInvoiceDestroy = (
     id: string,

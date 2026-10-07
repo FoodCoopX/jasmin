@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Form, InputNumber, Typography } from "antd";
+import { Form, Typography } from "antd";
 import type { FC } from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type { DeliveryStation } from "@shared/api/generated/models";
 import { EditFormModal, useModalMutation } from "@shared/modals/shared";
+import NumberInput from "@shared/ui/NumberInput";
 
 const { Paragraph } = Typography;
 
@@ -25,8 +26,8 @@ interface DeliveryStationFeeModalProps {
  * Per-row modal for the pickup-station fees the solawi owes a station. NET,
  * either/or: at most one of per-box / per-month / per-year applies (the other
  * two stay 0). fees_billing_period is the billing cadence. Fees are
- * Decimal-as-string on the wire, so InputNumber values are coerced to String
- * before the partial update. Mirrors ResellerInvoiceSettingsModal.
+ * Decimal-as-string on the wire, so the number fields' values are coerced to
+ * String before the partial update. Mirrors ResellerInvoiceSettingsModal.
  */
 export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
   open,
@@ -65,7 +66,7 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
   const handleSubmit = (values: Record<string, unknown>) =>
     run(
       async () => {
-        // Money fields are Decimal-as-string on the wire; InputNumber yields a
+        // Money fields are Decimal-as-string on the wire; NumberInput yields a
         // number → coerce back to String so the server DecimalField keeps cents.
         const payload: Record<string, unknown> = { ...values };
         for (const key of [
@@ -112,7 +113,7 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
         name="fee_per_box_net"
         label={t("delivery_stations.fee_per_box_net")}
       >
-        <InputNumber
+        <NumberInput
           min={0}
           step={0.01}
           suffix={currencySymbol}
@@ -123,7 +124,7 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
         name="fee_per_month_net"
         label={t("delivery_stations.fee_per_month_net")}
       >
-        <InputNumber
+        <NumberInput
           min={0}
           step={0.01}
           suffix={currencySymbol}
@@ -134,7 +135,7 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
         name="fee_per_year_net"
         label={t("delivery_stations.fee_per_year_net")}
       >
-        <InputNumber
+        <NumberInput
           min={0}
           step={0.01}
           suffix={currencySymbol}

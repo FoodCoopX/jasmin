@@ -1,4 +1,4 @@
-import { Descriptions, InputNumber, Modal, Typography } from "antd";
+import { Descriptions, Modal, Typography } from "antd";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -8,6 +8,7 @@ import {
   useVariationLabel,
 } from "@hooks/index";
 import type { AboRecord } from "@features/abos/pages/types";
+import NumberInput from "@shared/ui/NumberInput";
 
 interface OfferSpotModalProps {
   open: boolean;
@@ -107,7 +108,7 @@ export function OfferSpotModal({
           {record?.quantity}
         </Descriptions.Item>
         <Descriptions.Item label={t("abos.price_per_delivery")}>
-          <InputNumber
+          <NumberInput
             // Descriptions.Item's label isn't programmatically tied to the
             // control — give the input its own accessible name.
             aria-label={t("abos.price_per_delivery")}

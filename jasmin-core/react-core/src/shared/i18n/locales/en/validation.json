@@ -2,10 +2,10 @@
   "unique": {
     "abos": "This combination already exists.",
     "share_article_unit_size_must_be_unique": "The combination of article/unit/size must be unique.",
-    "crate_type": "Crate type must be unique.",
-    "delivery_note_modal_crate": "Crate in the delivery note must be unique.",
+    "crate_type": "This crate type is already listed — change its line instead.",
+    "delivery_note_modal_crate": "This crate type is already on the delivery note — change its line instead.",
     "documentation_purchase": "Entry in the purchase documentation must be unique.",
-    "invoice_modal_crate": "Crate in the invoice must be unique.",
+    "invoice_modal_crate": "This crate type is already on the invoice — change its line instead.",
     "list_share_articles": "The combination in the share article must be unique.",
     "member_share_type_variation_valid_from": "Only one identical share type may run per member from the same date.",
     "members_member_number_must_be_unique": "Member number must be unique.",

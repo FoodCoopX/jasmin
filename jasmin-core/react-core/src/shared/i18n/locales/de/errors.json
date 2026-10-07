@@ -384,6 +384,10 @@
   "crate_content_invoice": {
     "missing_required": "Rechnung, Kistentyp und Menge sind erforderlich."
   },
+  "crate_line": {
+    "invalid_id": "Ungültige Kisten-Position — bitte die Seite neu laden und erneut versuchen.",
+    "changed": "Die Kisten-Positionen haben sich inzwischen geändert — bitte die Seite neu laden und die Änderung erneut vornehmen."
+  },
   "amount": {
     "invalid": "Menge ungültig — bitte eine gültige Zahl eingeben."
   },
@@ -480,7 +484,8 @@
     "no_amounts": "Es wurden keine Mengen für Anteilsvarianten angegeben."
   },
   "documentation": {
-    "invalid_model": "Ungültiger Modelltyp für die Dokumentation."
+    "invalid_model": "Ungültiger Modelltyp für die Dokumentation.",
+    "week_mismatch": "Dieser Eintrag gehört zu einer anderen Woche — bitte die Seite neu laden und erneut versuchen."
   },
   "finalize": {
     "app_label_invalid": "Ungültiges „app_label“ — nur „commissioning“ ist zulässig.",

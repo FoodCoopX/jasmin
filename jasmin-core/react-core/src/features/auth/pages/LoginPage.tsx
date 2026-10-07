@@ -6,6 +6,7 @@ import {
 } from "@shared/auth/FriendlyCaptcha";
 import { useAuth } from "@shared/contexts/AuthContext";
 import { AboutModal } from "@shared/modals";
+import { LanguageSwitcher } from "@shared/ui";
 import { getErrorMessage } from "@shared/utils/apiError";
 import {
   Alert,
@@ -149,7 +150,10 @@ const LoginPage = () => {
   const displayError = error || localError;
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-page--with-language">
+      <div className="auth-language-switcher">
+        <LanguageSwitcher />
+      </div>
       <div
         className={`auth-stack ${
           isSuperAdminDomain

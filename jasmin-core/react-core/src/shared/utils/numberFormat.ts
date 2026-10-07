@@ -97,6 +97,53 @@ export function parseDecimalInput(value: unknown): number | null {
 }
 
 /**
+ * What a number typed or pasted into a ``NumberInput`` reads as: the text in
+ * canonical form ("." as the decimal point, no grouping), for the field's own
+ * number parser. ``decimalChar`` is the tenant's decimal mark.
+ *
+ * "." and "," both work as the decimal mark whatever the locale, as in the
+ * table inputs, and grouping is dropped:
+ * - spaces (fr-FR groups with U+202F, de-AT with a no-break space) and
+ *   apostrophes (de-CH) go;
+ * - with both marks in the text, the last one is the decimal mark and the
+ *   other groups: "1.234,56" and "1,234.56" both read 1234.56;
+ * - a lone comma is the decimal mark, except where it splits the digits of a
+ *   "."-tenant into thousands: "1,000" reads 1000 there, "1,5" and "0,500"
+ *   stay decimals;
+ * - a tenant decimal mark other than "." or "," reads as the point too, so
+ *   whatever the field shows parses back to the same number;
+ * - anything else that is no part of a number (currency signs and the like)
+ *   is stripped, as AntD's own parser does.
+ *
+ * Empty text stays "", so a cleared field reads as no value rather than 0.
+ * Text with two decimal marks ("1,2,3") stays invalid, and the field keeps its
+ * last valid value. Not ``parseLocaleNumber``: that reads a de-DE "2.50" as
+ * 250.
+ */
+export function normalizeNumberInputText(
+  text: string,
+  decimalChar: string,
+): string {
+  let compact = text.replace(/[\s'’]/g, "");
+  if (decimalChar !== "." && decimalChar !== ",") {
+    compact = compact.replaceAll(decimalChar, ".");
+  }
+  const lastComma = compact.lastIndexOf(",");
+  const lastPoint = compact.lastIndexOf(".");
+  let canonical = compact;
+  if (lastComma >= 0 && lastPoint >= 0) {
+    const groupMark = lastComma > lastPoint ? "." : ",";
+    canonical = compact.replaceAll(groupMark, "").replaceAll(",", ".");
+  } else if (lastComma >= 0) {
+    const groupsThousands =
+      decimalChar === "." &&
+      /^-?[1-9]\d{0,2}(,\d{3})+$/.test(compact.replace(/[^\d,-]/g, ""));
+    canonical = compact.replaceAll(",", groupsThousands ? "" : ".");
+  }
+  return canonical.replace(/[^\w.-]+/g, "");
+}
+
+/**
  * The decimal and grouping characters this locale uses. Derived from
  * `Intl.NumberFormat.formatToParts` so we don't hard-code per-locale
  * rules — works for any BCP-47 tag the browser knows.
@@ -113,10 +160,14 @@ export function getLocaleSeparators(locale: string = DEFAULT_LOCALE): {
 
 /**
  * Build a keydown handler that hard-blocks non-numeric characters in a numeric
- * input. AntD ``InputNumber`` only coerces invalid text on blur — it does NOT
- * stop you typing "5,kers" while focused — so config number fields need this
- * guard to actually prevent invalid keystrokes. Paste of garbage is still
- * sanitised by InputNumber's own blur coercion.
+ * input. ``NumberInput`` only coerces invalid text on blur — it does NOT stop
+ * you typing "5,kers" while focused — so config number fields need this guard
+ * to actually prevent invalid keystrokes. Paste of garbage is still sanitised
+ * by the field's own blur coercion.
+ *
+ * Where decimals are allowed, "." and "," both pass: ``NumberInput`` reads
+ * either as the decimal mark, whatever the tenant's locale. Whole-number
+ * fields take digits only.
  *
  * Typed structurally (not React.KeyboardEvent) so this stays a React-free util;
  * the shape is satisfied by a real keyboard event, so it drops straight into
@@ -124,7 +175,6 @@ export function getLocaleSeparators(locale: string = DEFAULT_LOCALE): {
  */
 export function blockNonNumericKeys(opts: {
   allowDecimal: boolean;
-  decimalChar: string;
   allowNegative?: boolean;
 }) {
   const navKeys = new Set([
@@ -152,7 +202,7 @@ export function blockNonNumericKeys(opts: {
     if (navKeys.has(e.key)) return;
     if (/^[0-9]$/.test(e.key)) return;
     if (opts.allowNegative && e.key === "-") return;
-    if (opts.allowDecimal && e.key === opts.decimalChar) return;
+    if (opts.allowDecimal && (e.key === "." || e.key === ",")) return;
     e.preventDefault();
   };
 }

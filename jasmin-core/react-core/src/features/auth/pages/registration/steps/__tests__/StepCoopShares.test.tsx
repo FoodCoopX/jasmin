@@ -1,8 +1,11 @@
 /**
  * Registration step 1 (cooperative shares): under the generic intro it shows
- * the tenant's own explanation of its shares, when the office has written one.
+ * the tenant's own explanation of its shares, when the office has written one,
+ * and it takes a whole number of shares. The tenant sets no number format, so
+ * the count is typed the German way, with a decimal comma.
  */
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,6 +31,12 @@ vi.mock("@hooks/index", async () => {
   };
 });
 
+// The share count field reads the tenant's number format straight from useTenant.
+vi.mock("@hooks/configuration/useTenant", async () => {
+  const { makeUseTenantMock } = await import("@/test/tenantMock");
+  return { useTenant: () => makeUseTenantMock({ tenant: state.tenant }) };
+});
+
 vi.mock("@shared/consent/useCurrentConsentDoc", () => ({
   useCurrentConsentDoc: () => ({ doc: null, isLoading: false }),
 }));
@@ -40,6 +49,11 @@ const props: StepProps = {
   next: vi.fn(),
   back: vi.fn(),
 };
+
+beforeEach(() => {
+  vi.mocked(props.update).mockReset();
+  vi.mocked(props.next).mockReset();
+});
 
 describe("StepCoopShares", () => {
   beforeEach(() => {
@@ -68,5 +82,23 @@ describe("StepCoopShares", () => {
 
     expect(screen.getByText("auth.registration.coop.intro")).toBeInTheDocument();
     expect(container.querySelector(".text-preline")).toBeNull();
+  });
+
+  it("rounds a typed fraction to a whole number of shares", async () => {
+    const user = userEvent.setup();
+    render(<StepCoopShares {...props} />);
+    const count = screen.getByLabelText("auth.registration.coop.shares_label");
+
+    await user.clear(count);
+    await user.type(count, "3,5");
+    await user.click(
+      screen.getByRole("button", { name: "auth.registration.actions.next" }),
+    );
+
+    expect(count).toHaveValue("4");
+    expect(props.update).toHaveBeenCalledWith(
+      expect.objectContaining({ coop_shares_count: 4 }),
+    );
+    expect(props.next).toHaveBeenCalledTimes(1);
   });
 });

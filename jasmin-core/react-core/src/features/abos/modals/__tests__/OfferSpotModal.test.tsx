@@ -1,9 +1,11 @@
 // OfferSpotModal sends the offer with the reviewed price, and can't send while
-// onboarding mode is on (it may be switched on while the modal is open).
+// onboarding mode is on (it may be switched on while the modal is open). The
+// tenant sets no number format, so the price is shown and typed the German way,
+// with a decimal comma.
 
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("react-i18next", () => ({
@@ -24,6 +26,13 @@ vi.mock("@hooks/index", () => ({
   useVariationLabel: () => (value: unknown) => String(value ?? ""),
   useOnboardingMode: () => hookState.onboardingMode,
 }));
+
+// The price field reads the tenant's number format straight from useTenant.
+vi.mock("@hooks/configuration/useTenant", async () => {
+  const { makeUseTenantMock } = await import("@/test/tenantMock");
+  const tenant = makeUseTenantMock();
+  return { useTenant: () => tenant };
+});
 
 import { OfferSpotModal } from "../OfferSpotModal";
 import type { AboRecord } from "@features/abos/pages/types";
@@ -68,6 +77,20 @@ describe("OfferSpotModal", () => {
     ).not.toBeInTheDocument();
     await userEvent.click(send);
     expect(onConfirm).toHaveBeenCalledWith(12.5);
+  });
+
+  it("sends a price typed with a decimal comma", async () => {
+    const onConfirm = renderModal();
+    const price = screen.getByRole("spinbutton", {
+      name: "abos.price_per_delivery",
+    });
+    await waitFor(() => expect(price).toHaveValue("12,50"));
+
+    await userEvent.clear(price);
+    await userEvent.type(price, "13,50");
+    await userEvent.click(screen.getByRole("button", { name: "abos.notify_member" }));
+
+    expect(onConfirm).toHaveBeenCalledWith(13.5);
   });
 
   it("can't send while onboarding mode is on and says why", async () => {

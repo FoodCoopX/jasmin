@@ -10,6 +10,7 @@ export { default as DateRangeStatusLegend } from './DateRangeStatusLegend';
 export { default as AutoSaveIndicator } from './AutoSaveIndicator';
 export { default as HideInactiveSwitch } from './HideInactiveSwitch';
 export { default as LabeledSwitch } from './LabeledSwitch';
+export { default as LanguageSwitcher } from './LanguageSwitcher';
 export { default as DisabledReasonTooltip } from './DisabledReasonTooltip';
 export type { DisabledReasonTooltipProps } from './DisabledReasonTooltip';
 export { default as OnboardingNoEmailHint } from './OnboardingNoEmailHint';

@@ -6,12 +6,13 @@
  * users, and the VAT-rate autofill a new line needs before it can be saved.
  * EditableTable is replaced by a stub that records the props each grid
  * receives and renders every row through the real column ``render``
- * functions; the column hooks are real and only the generated API client is
- * mocked.
+ * functions; a test that needs the table's own editing renders the crate
+ * grid through the real EditableTable instead. The column hooks are real and
+ * only the generated API client is mocked.
  */
 
-import { act, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,6 +53,11 @@ vi.mock("@hooks/configuration/useTenant", async () => {
 const authState = vi.hoisted(() => ({ roles: ["office"] as string[] }));
 vi.mock("@shared/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { roles: authState.roles } }),
+}));
+
+// The real crate grid edits its rows inline.
+vi.mock("@shared/contexts/ModalContext", () => ({
+  useModal: () => ({ isModalMode: false }),
 }));
 
 const api = vi.hoisted(() => ({
@@ -109,17 +115,22 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   }),
 }));
 
-// The props each grid received on its latest render. The two grids are told
-// apart by their unique check: the crate grid checks ``crate_type``.
+// The props each grid received on its latest render. The crate grid is the one
+// with a crate type column. With ``realCrates`` set, the crate grid is the
+// real EditableTable.
 type GridName = "lines" | "crates";
 const grids = vi.hoisted(() => ({
   props: {} as Partial<Record<"lines" | "crates", unknown>>,
+  realCrates: false,
 }));
 
 vi.mock("@shared/tables", async () => {
   const { gatedByPermission } = await import("@shared/tables/tablePermissions");
   const { wrapApiFunctions } = await import(
     "@shared/tables/BasicEditableTable/wrapApiFunctions"
+  );
+  const { default: RealEditableTable } = await import(
+    "@shared/tables/BasicEditableTable"
   );
   const leafColumns = (
     columns: EditableColumnConfig<TableRecord>[],
@@ -131,12 +142,15 @@ vi.mock("@shared/tables", async () => {
     gatedByPermission,
     wrapApiFunctions,
     EditableTable: (props: EditableTableProps) => {
-      const name: GridName = [props.uniqueCheck ?? []]
-        .flat()
-        .includes("crate_type")
+      const name: GridName = props.columns.some(
+        (column) => column.key === "crate_type_name",
+      )
         ? "crates"
         : "lines";
       grids.props[name] = props;
+      if (name === "crates" && grids.realCrates) {
+        return <RealEditableTable {...props} />;
+      }
       const columns = leafColumns(props.columns).filter((c) => !c.hidden);
       return (
         <table
@@ -212,6 +226,17 @@ const SMALL_CRATES = {
   tax_rate: 19,
 };
 
+// Small crates delivered at two prices: two lines of one crate type, each
+// named by a crate row of its own.
+const SMALL_CRATES_AT_125 = { ...SMALL_CRATES, id: "ct-small_row-1" };
+const SMALL_CRATES_AT_150 = {
+  ...SMALL_CRATES,
+  id: "ct-small_row-7",
+  amount: 2,
+  price_per_unit: "1.50",
+  line_netto: "3.00",
+};
+
 function makeDeliveryNote(overrides: Record<string, unknown> = {}) {
   return {
     id: "dn-1",
@@ -248,16 +273,22 @@ function renderModal({
   api.retrieve.mockReturnValue({ data: deliveryNote, isFetching: false });
   const client = makeQueryClient();
   const invalidateSpy = vi.spyOn(client, "invalidateQueries");
-  render(
+  const modalFor = (deliveryNoteId: string) => (
     <QueryClientProvider client={client}>
       <DeliveryNoteModal
         visible={visible}
-        deliveryNoteId="dn-1"
+        deliveryNoteId={deliveryNoteId}
         onClose={onClose}
       />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { invalidateSpy, onClose };
+  const { rerender } = render(modalFor("dn-1"));
+  /** Shows ``note`` in the open modal, as read again or as the next note picked. */
+  const show = (note: Record<string, unknown>) => {
+    api.retrieve.mockReturnValue({ data: note, isFetching: false });
+    rerender(modalFor(note.id as string));
+  };
+  return { invalidateSpy, onClose, show };
 }
 
 function grid(name: GridName): EditableTableProps {
@@ -274,10 +305,74 @@ function makeForm() {
 
 const DELIVERY_NOTE_QUERY_KEY = ["/api/commissioning/delivery_notes/dn-1/"];
 
+// ── The real crate grid ─────────────────────────────────────────────────────
+
+const CRATE_TYPE = "commissioning.crate_type_name";
+const AMOUNT = "commissioning.amount";
+const NOTE = "commissioning.note";
+
+type User = ReturnType<typeof userEvent.setup>;
+
+// Checking ``pointer-events`` before each click reads every ancestor's computed
+// style, which the styles AntD injects make slow in jsdom; the crate grid's
+// cells and buttons all take clicks.
+const crateGridUser = () =>
+  userEvent.setup({ delay: null, pointerEventsCheck: PointerEventsCheckLevel.Never });
+
+const crateRows = () =>
+  Array.from(document.querySelectorAll<HTMLElement>(".ant-table-tbody > tr.ant-table-row"));
+
+function crateCell(row: HTMLElement, title: string): HTMLElement {
+  const headers = Array.from(document.querySelectorAll(".ant-table-thead > tr > th"));
+  const index = headers.findIndex((header) => header.textContent?.trim() === title);
+  const cell = row.querySelectorAll<HTMLElement>(":scope > td")[index];
+  if (index < 0 || !cell) throw new Error(`No crate column titled ${title}`);
+  return cell;
+}
+
+/** What each crate line shows under ``title``. */
+const shownUnder = (title: string) =>
+  crateRows().map((row) => crateCell(row, title).textContent);
+
+/** The crate line open for editing: the one offering a save button. */
+function editingRow(): HTMLElement {
+  const row = screen.getByRole("button", { name: "table.save" }).closest("tr");
+  if (!row) throw new Error("No crate line is being edited");
+  return row;
+}
+
+/** Opens a crate line by clicking its cell under ``title``, ready for typing. */
+async function openAt(user: User, row: HTMLElement, title: string) {
+  await user.click(crateCell(row, title));
+  const input = within(editingRow()).getByLabelText(title);
+  await waitFor(() => expect(input).toHaveFocus());
+  return input;
+}
+
+async function pickCrateType(user: User, label: string) {
+  await user.click(
+    within(editingRow()).getByRole("combobox", { name: CRATE_TYPE }),
+  );
+  const option = await waitFor(() => {
+    const match = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option",
+      ),
+    ).find((item) => item.textContent === label);
+    if (!match) throw new Error(`No crate type ${label} is offered`);
+    return match;
+  });
+  await user.click(option);
+}
+
+const saveLine = (user: User) =>
+  user.click(screen.getByRole("button", { name: "table.save" }));
+
 beforeEach(() => {
   tenantSettings.values = {};
   authState.roles = ["office"];
   grids.props = {};
+  grids.realCrates = false;
   Object.values(api).forEach((fn) => fn.mockReset());
 });
 
@@ -632,5 +727,135 @@ describe("DeliveryNoteModal crates", () => {
 
     expect(screen.getByTestId("crates-grid")).toBeInTheDocument();
     expect(screen.getByTestId("crates-crate-1-amount")).toHaveTextContent("4");
+  });
+
+  it("reads the delivery note again after a crate line is saved, since the server can merge it with another line", () => {
+    const { invalidateSpy } = renderModal();
+
+    act(() =>
+      grid("crates").onSaveSuccess?.({ ...SMALL_CRATES, key: "crate-1" }, "update"),
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: DELIVERY_NOTE_QUERY_KEY,
+    });
+  });
+});
+
+// ── Crate lines in the real table ───────────────────────────────────────────
+
+describe("DeliveryNoteModal crate lines", () => {
+  beforeEach(() => {
+    grids.realCrates = true;
+  });
+
+  it("shows each line of a crate type on its own row, opens one at a time and saves it under its own id", async () => {
+    const user = crateGridUser();
+    renderModal({
+      deliveryNote: makeDeliveryNote({
+        crate_items: [SMALL_CRATES_AT_125, SMALL_CRATES_AT_150],
+      }),
+    });
+    api.cratesPartialUpdate.mockImplementation(
+      async (id: string, body: Record<string, unknown>) => ({
+        ...SMALL_CRATES_AT_150,
+        id,
+        amount: Number(body.amount),
+      }),
+    );
+    await waitFor(() => expect(shownUnder(AMOUNT)).toEqual(["4", "2"]));
+    expect(shownUnder(CRATE_TYPE)).toEqual(["Small", "Small"]);
+
+    const amount = await openAt(user, crateRows()[1], AMOUNT);
+
+    expect(screen.getAllByRole("button", { name: "table.save" })).toHaveLength(1);
+    expect(editingRow()).toBe(crateRows()[1]);
+
+    await user.clear(amount);
+    await user.type(amount, "5");
+    await saveLine(user);
+
+    await waitFor(() => expect(api.cratesPartialUpdate).toHaveBeenCalledTimes(1));
+    expect(api.cratesPartialUpdate).toHaveBeenCalledWith(
+      "ct-small_row-7",
+      expect.objectContaining({
+        crate_type: "ct-small",
+        amount: "5",
+        delivery_note_id: "dn-1",
+      }),
+    );
+    await waitFor(() => expect(shownUnder(AMOUNT)).toEqual(["4", "5"]));
+  });
+
+  it("refuses a new line whose crate type the note lists by the time it is saved, on the crate type, and sends nothing", async () => {
+    const user = crateGridUser();
+    const { show } = renderModal();
+    await waitFor(() => expect(crateRows()).toHaveLength(1));
+
+    await user.click(screen.getByRole("button", { name: /table\.add_plus_icon/ }));
+    await pickCrateType(user, "Large");
+    await user.type(within(editingRow()).getByLabelText(AMOUNT), "2");
+    // Meanwhile a large-crate line was added to the note elsewhere.
+    show(
+      makeDeliveryNote({
+        crate_items: [
+          SMALL_CRATES,
+          {
+            ...SMALL_CRATES,
+            id: "ct-large_row-9",
+            crate_type: "ct-large",
+            crate_type_name: "Large",
+            amount: 1,
+          },
+        ],
+      }),
+    );
+    await saveLine(user);
+
+    const refused = "validation.unique.delivery_note_modal_crate";
+    expect(
+      await screen.findByText(`${refused} — table.save_failed_hint`),
+    ).toBeInTheDocument();
+    expect(
+      within(crateCell(editingRow(), CRATE_TYPE)).getByRole("alert"),
+    ).toHaveTextContent(refused);
+    expect(api.cratesCreate).not.toHaveBeenCalled();
+  });
+
+  it("shows the next delivery note's own crate line, not what was saved on the one before", async () => {
+    const user = crateGridUser();
+    // Both notes name their small-crate line by the crate type, so the line
+    // has the same id on either note.
+    const firstLine = { ...SMALL_CRATES, id: "ct-small", note: null };
+    const nextLine = { ...firstLine, amount: 3 };
+    const { show } = renderModal({
+      deliveryNote: makeDeliveryNote({ crate_items: [firstLine] }),
+    });
+    api.cratesPartialUpdate.mockImplementation(
+      async (id: string, body: Record<string, unknown>) => ({
+        ...firstLine,
+        id,
+        note: body.note,
+      }),
+    );
+    await waitFor(() => expect(shownUnder(AMOUNT)).toEqual(["4"]));
+
+    const note = await openAt(user, crateRows()[0], NOTE);
+    await user.type(note, "Two came back broken");
+    await saveLine(user);
+    await waitFor(() =>
+      expect(shownUnder(NOTE)).toEqual(["Two came back broken"]),
+    );
+
+    show(
+      makeDeliveryNote({
+        id: "dn-2",
+        delivery_note_number: "2026-012",
+        crate_items: [nextLine],
+      }),
+    );
+
+    await waitFor(() => expect(shownUnder(AMOUNT)).toEqual(["3"]));
+    expect(shownUnder(NOTE)).toEqual([""]);
   });
 });

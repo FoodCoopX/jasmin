@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
 from rest_framework import status
 
-from apps.commissioning.models import Forecast, Harvest, Purchase, Waste
+from apps.commissioning.models import (
+    AdditionalTheoreticalPurchase,
+    Forecast,
+    Harvest,
+    MovementShareArticle,
+    Purchase,
+    Waste,
+)
 from apps.commissioning.tests.factories import (
     ForecastFactory,
     HarvestFactory,
     MovementShareArticleFactory,
     PlotFactory,
     PurchaseFactory,
+    ResellerFactory,
     ShareArticleFactory,
     StorageFactory,
     WasteFactory,
@@ -742,6 +751,18 @@ class TestAddAdditionalTheoreticalAmount:
         assert resp.data["code"] == "share_article.not_found"
 
 
+def _update_additional_url(pk: str) -> str:
+    return reverse(
+        "documentation_summary-update-additional-theoretical-amount",
+        kwargs={"pk": pk},
+    )
+
+
+# A purchase entry of week 16, which the purchase list of week 15 shows beside
+# its own rows while "include next week" is ticked.
+ENTRY_YEAR, ENTRY_WEEK = 2026, 16
+
+
 @pytest.mark.django_db
 class TestUpdateAdditionalTheoreticalAmount:
     def test_invalid_model_returns_400(self, api_client, tenant):
@@ -751,6 +772,106 @@ class TestUpdateAdditionalTheoreticalAmount:
         )
         resp = api_client.patch(url, {"model": "not-real"}, format="json")
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def _entry(self, api_client) -> Purchase:
+        """The entry with an extra amount, a PU and a note, as the list adds it."""
+        StorageFactory(is_short_term_harvest_storage=True)
+        article = ShareArticleFactory(is_purchased=True)
+        resp = api_client.post(
+            URL_DS_ADD_ADDITIONAL,
+            {
+                "model": "purchase",
+                "year": ENTRY_YEAR,
+                "delivery_week": ENTRY_WEEK,
+                "share_article": str(article.id),
+                "unit": "KG",
+                "size": "L",
+                "seller": str(ResellerFactory().id),
+                "amount": "2.00",
+                "amount_per_pu": "1.5",
+                "note": "next",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        return Purchase.objects.get(share_article=article)
+
+    @staticmethod
+    def _written(purchase: Purchase) -> tuple:
+        """What an update can write: the extra amounts, the PU, the movements."""
+        article = purchase.share_article
+        purchase.refresh_from_db()
+        return (
+            list(
+                AdditionalTheoreticalPurchase.objects.filter(
+                    share_article=article
+                ).values_list("year", "delivery_week", "amount", "note")
+            ),
+            purchase.amount_per_pu,
+            list(
+                MovementShareArticle.objects.filter(share_article=article)
+                .order_by("id")
+                .values_list("id", "date", "amount")
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        "week,field",
+        [
+            ({"year": ENTRY_YEAR, "delivery_week": ENTRY_WEEK - 1}, "delivery_week"),
+            ({"year": ENTRY_YEAR + 1, "delivery_week": ENTRY_WEEK}, "year"),
+            ({"delivery_week": ENTRY_WEEK - 1}, "delivery_week"),
+        ],
+        ids=["another-week", "another-year", "week-alone"],
+    )
+    def test_a_body_naming_another_week_is_refused(
+        self, api_client, tenant, week, field
+    ):
+        purchase = self._entry(api_client)
+        before = self._written(purchase)
+
+        resp = api_client.patch(
+            _update_additional_url(purchase.id),
+            {
+                "model": "purchase",
+                **week,
+                "amount": "10.00",
+                "amount_per_pu": "2.5",
+                "note": "this week",
+            },
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "documentation.week_mismatch"
+        assert resp.data["field"] == field
+        assert resp.data["details"] == {
+            "year": ENTRY_YEAR,
+            "delivery_week": ENTRY_WEEK,
+        }
+        # A client without a translation for the code shows the message.
+        assert "reload the page" in resp.data["message"]
+        assert self._written(purchase) == before
+
+    @pytest.mark.parametrize(
+        "week",
+        [{"year": ENTRY_YEAR, "delivery_week": ENTRY_WEEK}, {}],
+        ids=["its-own-week", "no-week"],
+    )
+    def test_a_body_naming_the_rows_own_week_or_none_updates_it(
+        self, api_client, tenant, week
+    ):
+        purchase = self._entry(api_client)
+
+        resp = api_client.patch(
+            _update_additional_url(purchase.id),
+            {"model": "purchase", **week, "amount": "4.00", "note": "edited"},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        additional, _, _ = self._written(purchase)
+        assert additional == [(ENTRY_YEAR, ENTRY_WEEK, Decimal("4.00"), "edited")]
 
 
 _CASCADE = (

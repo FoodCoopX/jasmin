@@ -325,7 +325,6 @@ export default function DeliveryTours() {
           selectedSharesDeliveryDay={selectedDay}
           setSelectedSharesDeliveryDay={setSelectedDay}
           onSharesDeliveryDayChange={setSelectedDay}
-          preserveSelection={true}
         />
         <DateRangeStatusLegend />
 

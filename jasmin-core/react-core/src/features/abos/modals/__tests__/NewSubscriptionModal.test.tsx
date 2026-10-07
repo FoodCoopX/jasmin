@@ -11,10 +11,11 @@
  *
  * Boundary mocked: every ``@hooks/index`` hook (the modal's data layer),
  * ``useRoles`` / ``useMemberSelfService`` (member vs office), the two
- * generated create fns, ``notify`` and ``getErrorMessage``. AntD
- * ``InputNumber`` and ``DatePicker`` are stubbed to plain controlled inputs
- * (jsdom-friendly + lets us read the ``disabled`` / ``min`` props directly);
- * the real AntD ``Form`` / ``Modal`` run unmocked.
+ * generated create fns, ``notify``, ``getErrorMessage`` and the tenant that
+ * ``NumberInput`` reads its number format from. AntD ``InputNumber`` (under
+ * ``NumberInput``) and ``DatePicker`` are stubbed to plain controlled inputs
+ * (jsdom-friendly + lets us read the ``disabled`` / ``min`` / ``precision``
+ * props directly); the real AntD ``Form`` / ``Modal`` run unmocked.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
@@ -99,6 +100,13 @@ vi.mock("@shared/utils/apiError", () => ({
   getErrorMessage: (_e: unknown, fallback: string) => fallback,
 }));
 
+// NumberInput reads the tenant's number format straight from useTenant.
+vi.mock("@hooks/configuration/useTenant", async () => {
+  const { makeUseTenantMock } = await import("@/test/tenantMock");
+  const tenant = makeUseTenantMock();
+  return { useTenant: () => tenant };
+});
+
 // ── Tenant settings toggle ─────────────────────────────────────────────────
 const getSettingMock = vi.fn();
 
@@ -176,36 +184,38 @@ vi.mock("@hooks/index", () => ({
 
 // ── AntD InputNumber / DatePicker stubs ────────────────────────────────────
 // Plain controlled inputs so the real AntD Form drives them, the
-// ``disabled``/``min`` props are readable from the DOM, and value coercion to
-// ``number``/``Dayjs`` matches what the modal expects out of each field.
+// ``disabled``/``min``/``precision`` props are readable from the DOM, and value
+// coercion to ``number``/``Dayjs`` matches what the modal expects out of each
+// field. NumberInput hands its ref on, so the number stub takes one.
 vi.mock("antd", async (importOriginal) => {
   const actual = await importOriginal<typeof import("antd")>();
-  const StubInputNumber = ({
-    value,
-    onChange,
-    disabled,
-    min,
-    id,
-  }: {
-    value?: number;
-    onChange?: (v: number | null) => void;
-    disabled?: boolean;
-    min?: number;
-    id?: string;
-  }) => (
+  const { forwardRef } = await import("react");
+  const StubInputNumber = forwardRef<
+    HTMLInputElement,
+    {
+      value?: number;
+      onChange?: (v: number | null) => void;
+      disabled?: boolean;
+      min?: number;
+      precision?: number;
+      id?: string;
+    }
+  >(({ value, onChange, disabled, min, precision, id }, ref) => (
     <input
+      ref={ref}
       // ``id`` is injected by AntD Form.Item from the field ``name`` — both the
       // quantity + price fields render this stub, so tests target by id.
       id={id}
       data-disabled={String(Boolean(disabled))}
       data-min={String(min)}
+      data-precision={String(precision)}
       disabled={disabled}
       value={value ?? ""}
       onChange={(e) =>
         onChange?.(e.target.value === "" ? null : Number(e.target.value))
       }
     />
-  );
+  ));
   const StubDatePicker = ({
     value,
     onChange,
@@ -431,6 +441,18 @@ describe("NewSubscriptionModal — solidarity price gating", () => {
     const priceInput = priceField();
     expect(priceInput).toHaveAttribute("data-disabled", "false");
     expect(priceInput).toHaveAttribute("data-min", "5");
+  });
+});
+
+describe("NewSubscriptionModal — quantity", () => {
+  it("takes a whole number of shares", () => {
+    rolesMock.mockReturnValue({ isMemberOnly: false });
+    getSettingMock.mockImplementation((_k: string, fb?: unknown) => fb);
+
+    renderModal();
+    selectVariation();
+
+    expect(field("quantity")).toHaveAttribute("data-precision", "0");
   });
 });
 

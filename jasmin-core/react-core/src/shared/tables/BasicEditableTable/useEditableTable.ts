@@ -294,12 +294,12 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
 
       let formValues: Record<string, unknown> = { ...record };
 
-      // Set of inputTypes that represent whole numbers — the backend's
-      // Decimal serializer may have padded the value with trailing zeros
-      // ("8" stored as Decimal("8.00") and returned as the string "8.00"),
-      // which looks wrong in an integer-typed cell. Normalize once on
-      // edit-entry to a clean integer string. Decimal-typed columns are
-      // intentionally left alone — "8.00" in a price field is correct.
+      // Set of inputTypes that represent whole numbers. The backend's Decimal
+      // serializer returns a stored 8 as "8.00", which looks wrong in an
+      // integer-typed cell, so a whole value opens as a clean "8". A value
+      // with a fraction stays as stored: a save sends every field, so a cut
+      // value would be written back even when only another field changed.
+      // Decimal-typed columns are left alone: "8.00" in a price is correct.
       const integerInputTypes = new Set([
         "integer",
         "positive_integer",
@@ -326,7 +326,7 @@ export const useEditableTable = <T extends TableRecord = TableRecord>({
           const raw = formValues[column.dataIndex];
           if (raw !== null && raw !== undefined && raw !== "") {
             const n = Number(raw);
-            if (Number.isFinite(n)) {
+            if (Number.isInteger(n)) {
               formValues[column.dataIndex] = String(Math.trunc(n));
             }
           }

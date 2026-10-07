@@ -800,6 +800,22 @@ describe("CommissioningListPacking without a plan", () => {
     expect(downloadButton()).toBeDisabled();
   });
 
+  it("shows no day, nothing to pack and nothing to download in a week without delivery days", async () => {
+    api.deliveryDays.mockImplementation(async ({ active_at_date }: { active_at_date: string }) =>
+      active_at_date === "2026-10-17" ? [] : [...farm.deliveryDays],
+    );
+    renderPage();
+    await screen.findByText("Carrots");
+
+    await userEvent.click(arrow(WEEK, "common.next"));
+
+    await waitFor(() => expect(selectNamed(DAY)).toHaveTextContent("commissioning.no_delivery_days_in_week"));
+    expect(shownIn(selectNamed(DAY))).toBe("");
+    await waitFor(() => expect(anyTableBusy()).toBe(false));
+    expect(tables().map(rowsOf)).toEqual([[], []]);
+    expect(downloadButton()).toBeDisabled();
+  });
+
   it("lists none of a share option's articles when its plan cannot be loaded, and still lists the others", async () => {
     api.planning.mockImplementation(async (params: PlanningParams) => {
       if (params.share_option === VEGETABLES && params.delivery_week === 41) {

@@ -1,6 +1,7 @@
-import { InputNumber, Modal } from "antd";
+import { Modal } from "antd";
 import { useTranslation } from "react-i18next";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
+import NumberInput from "@shared/ui/NumberInput";
 
 interface HarvestConfirmationModalProps {
   record: TableRecord | null;
@@ -43,10 +44,12 @@ export function HarvestConfirmationModal({
             {(record.computed_total_amount as number) || 0}{" "}
             {record.computed_unit_label as string}
           </div>
-          <InputNumber
+          <NumberInput
+            aria-label={t("commissioning.actual_harvest")}
             value={amount}
             onChange={onChangeAmount}
             min={0}
+            precision={2}
             size="large"
             style={{ width: "100%", fontSize: 18 }}
             addonAfter={record.computed_unit_label as string}
