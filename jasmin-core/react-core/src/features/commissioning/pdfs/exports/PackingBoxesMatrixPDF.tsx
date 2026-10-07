@@ -63,6 +63,9 @@ export interface PackingBoxesMatrixPDFProps {
   /** Render the trailing per-combination count row. On for the packing boxes
    *  matrix (box count); off for the member per-share list (no box count). */
   showCountRow?: boolean;
+  /** A cell's text, as the page shows it — an amount in the tenant's number
+   *  format. Defaults to a plain box count. */
+  cellText?: (value: unknown, item: PackingBoxesMatrixItem) => string;
   t: TFunction;
 }
 
@@ -81,6 +84,7 @@ export const PackingBoxesMatrixPage = ({
   tenant,
   pillKey = "commissioning.packing_list_boxes",
   showCountRow = true,
+  cellText = (value) => formatComboCount(value),
   t,
 }: PackingBoxesMatrixPDFProps) => {
   const groups = groupComboColumns(columns, t);
@@ -245,7 +249,7 @@ export const PackingBoxesMatrixPage = ({
                     ...groupEdgeStyles(groupEdge, column.key),
                   ]}
                 >
-                  <Text>{formatComboCount(item[column.key])}</Text>
+                  <Text>{cellText(item[column.key], item)}</Text>
                 </View>
               ))}
               <View

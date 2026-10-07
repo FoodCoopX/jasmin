@@ -258,7 +258,7 @@ export default function CommissioningListResellers() {
 
                       return (
                         <div
-                          key={item.share_article_id}
+                          key={item.id}
                           className="mobile-card-item"
                           style={{ cursor: "default" }}
                         >
@@ -327,7 +327,7 @@ export default function CommissioningListResellers() {
                     className="custom-jasmin-table"
                     columns={columns}
                     dataSource={reseller.order.contents}
-                    rowKey="share_article_id"
+                    rowKey="id"
                     loading={loadingResellers}
                     pagination={false}
                     size="small"

@@ -150,141 +150,35 @@ vi.mock("@shared/utils/downloadBlob", () => ({
 }));
 
 import PackingListBoxes from "../PackingListBoxes";
+import {
+  ALIKE_ALL_DAY,
+  ALIKE_PER_TOUR,
+  article,
+  boxesOf,
+  deliveryDay,
+  FARM_SHOP,
+  FRIDAY,
+  HONEY_ONLY,
+  HONEY_SMALL,
+  MARKET,
+  MEDIUM,
+  MEDIUM_WITH_HONEY,
+  MEMBER_COLUMNS,
+  MONDAY,
+  PER_STATION,
+  SCHOOL,
+  scope,
+  SMALL,
+  THURSDAY,
+  TUESDAY,
+  TUESDAY_BOXES,
+  TUESDAY_COLUMNS,
+  TUESDAY_MEMBER_AMOUNTS,
+  WASH,
+} from "./packingListBoxes.fixtures";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-// Backend day numbers: 0 = Monday … 6 = Sunday.
-const MONDAY = 0;
-const TUESDAY = 1;
-const THURSDAY = 3;
-const FRIDAY = 4;
-
-const deliveryDay = (id: string, dayNumber: number, tours = 1): SharesDeliveryDay => ({
-  id,
-  day_number: dayNumber as SharesDeliveryDay["day_number"],
-  valid_from: "2026-01-05",
-  valid_until: null,
-  number_of_tours: tours,
-});
-
-const station = (id: string, shortName: string): DeliveryStation => ({
-  id,
-  short_name: shortName,
-  is_active: true,
-});
-
-const FARM_SHOP = station("st-farm-shop", "Farm shop");
-const MARKET = station("st-market", "Market");
-const SCHOOL = station("st-school", "School");
-
-const HONEY_SMALL: PackingBoxesMatrixAddOn = {
-  variation_id: "var-honey-S",
-  size: "S",
-  sort_order: 1,
-  share_type_id: "st-honey",
-  share_type_short_name: "Honey",
-  share_type_sort_index: 1,
-};
-
-/** A box with a base share of one size (or none) and the add-ons packed into it. */
-const box = (
-  base: { shareType: "Veg" | "Honey"; size: string; sortOrder: number } | null,
-  addOns: PackingBoxesMatrixAddOn[],
-  count: number,
-  key = `combo_${base ? `var-${base.shareType}-${base.size}` : "none"}|${addOns
-    .map((addOn) => addOn.variation_id)
-    .join("-")}`,
-): PackingBoxesMatrixColumn => ({
-  key,
-  base_variation_id: base ? `var-${base.shareType}-${base.size}` : null,
-  base_size: base?.size ?? "",
-  base_sort_order: base?.sortOrder ?? 0,
-  base_share_type_id: base ? `st-${base.shareType}` : null,
-  base_share_type_name: base?.shareType ?? "",
-  base_share_type_short_name: base?.shareType ?? "",
-  // Vegetables first; honey, and boxes without a base share, after them.
-  base_share_type_sort_index: !base || base.shareType === "Honey" ? 1 : 0,
-  add_ons: addOns,
-  count,
-});
-
-const vegetables = (size: string, sortOrder: number) =>
-  ({ shareType: "Veg", size, sortOrder }) as const;
-
-const SMALL = box(vegetables("S", 1), [], 12);
-const MEDIUM = box(vegetables("M", 2), [], 30);
-const MEDIUM_WITH_HONEY = box(vegetables("M", 2), [HONEY_SMALL], 5);
-/** The box of members who take honey but no vegetables. */
-const HONEY_ONLY = box(null, [HONEY_SMALL], 2);
-const TUESDAY_COLUMNS = [SMALL, MEDIUM, MEDIUM_WITH_HONEY, HONEY_ONLY];
-
-type MatrixRow = PackingBoxesMatrix["rows"][number];
-
-/** One article and how much of it goes into each column's box, in order. */
-const article = (
-  name: string,
-  unit: string,
-  size: string,
-  columns: PackingBoxesMatrixColumn[],
-  amounts: (number | undefined)[],
-  note = "",
-): MatrixRow =>
-  // The amounts sit under the column keys, which the generated row type
-  // leaves out.
-  ({
-    id: `sa-${name}_${unit}_${size}`,
-    share_article_id: `sa-${name}`,
-    share_article_name: name,
-    unit,
-    size,
-    note,
-    ...Object.fromEntries(columns.map((column, index) => [column.key, amounts[index]])),
-  }) as MatrixRow;
-
-const WASH = "Wash before packing";
-
-/** Tuesday's boxes, packed alike for every station. */
-const TUESDAY_BOXES: PackingBoxesMatrix = {
-  // The server's order; the page groups and orders the columns itself.
-  columns: [MEDIUM_WITH_HONEY, HONEY_ONLY, SMALL, MEDIUM],
-  rows: [
-    article("Carrots", "BUNCH", "M", TUESDAY_COLUMNS, [1, 2, 2, 0]),
-    article("Lettuce", "PCS", "L", TUESDAY_COLUMNS, [1, 1, 1, 0], WASH),
-    article("Forest honey", "PCS", "", TUESDAY_COLUMNS, [0, 0, 1, 1]),
-  ],
-};
-
-/** Small and medium vegetable boxes holding a single article. */
-const boxesOf = (name: string, small: number, medium: number): PackingBoxesMatrix => {
-  const columns = [box(vegetables("S", 1), [], 4), box(vegetables("M", 2), [], 6)];
-  return { columns, rows: [article(name, "PCS", "", columns, [small, medium])] };
-};
-
-/** One share size in what a member may take: a variation without add-ons. */
-const shareSize = (shareType: "Veg" | "Honey", size: string, sortOrder: number) =>
-  box({ shareType, size, sortOrder }, [], 0, `variation_var-${shareType}-${size}`);
-
-const MEMBER_COLUMNS = [shareSize("Veg", "S", 1), shareSize("Veg", "M", 2), shareSize("Honey", "S", 1)];
-
-/** What a member of each share size takes on Tuesday. */
-const TUESDAY_MEMBER_AMOUNTS: PackingBoxesMatrix = {
-  columns: MEMBER_COLUMNS,
-  rows: [
-    article("Lettuce", "PCS", "", MEMBER_COLUMNS, [1, 2]),
-    article("Forest honey", "PCS", "", MEMBER_COLUMNS, [undefined, undefined, 1]),
-  ],
-};
-
-/** Where a packing list belongs: a day, and maybe one station or one tour. */
-const scope = (
-  dayNumber: number,
-  { station: stationId, tour }: { station?: string; tour?: number } = {},
-) => `${dayNumber}/${stationId ?? "every station"}/${tour ?? "every tour"}`;
-
-// How consistent the planned amounts of a delivery day are.
-const ALIKE_ALL_DAY: GranularityCheckResponse = { days_ok: true, tours_ok: true };
-const ALIKE_PER_TOUR: GranularityCheckResponse = { days_ok: false, tours_ok: true };
-const PER_STATION: GranularityCheckResponse = { days_ok: false, tours_ok: false };
 
 type MatrixParams = { day_number: number; delivery_station?: string; tour?: number };
 
@@ -351,6 +245,7 @@ const NOTE = "commissioning.note";
 const NO_BASE = "commissioning.no_base_combination";
 const BUNCH = "commissioning.units.bunch";
 const PIECES = "commissioning.units.pcs";
+const KILOS = "commissioning.units.kg";
 
 function selectNamed(name: string): HTMLElement {
   const select = screen.getByRole("combobox", { name }).closest<HTMLElement>(".ant-select");
@@ -428,6 +323,15 @@ function cardOf(text: string): HTMLElement {
   if (!card) throw new Error(`No card shows ${text}`);
   return card;
 }
+
+/** What a phone card lists: each kind of box with its figure and unit. */
+const figuresOn = (card: HTMLElement) =>
+  Array.from(card.querySelectorAll(".text-muted-xs"), (label) => [
+    label.textContent ?? "",
+    Array.from(label.nextElementSibling?.children ?? [], (part) => part.textContent ?? "").join(
+      " ",
+    ),
+  ]);
 
 const isBusy = (container: HTMLElement = document.body) =>
   container.querySelector('[aria-busy="true"]') !== null;
@@ -556,10 +460,36 @@ describe("PackingListBoxes matrix", () => {
       ],
     ]);
     expect(bodyRows()).toHaveLength(3);
-    // Whole numbers; a box without the article leaves its cell blank.
-    expect(cellsOf("Carrots")).toEqual(["Carrots", BUNCH, "1", "2", "2", "", ""]);
-    expect(cellsOf("Lettuce")).toEqual(["Lettuce", PIECES, "1", "1", "1", "", WASH]);
-    expect(cellsOf("Forest honey")).toEqual(["Forest honey", PIECES, "", "", "1", "1", ""]);
+    // At the unit's precision in the farm's number format; a box without the
+    // article leaves its cell blank.
+    expect(cellsOf("Carrots")).toEqual(["Carrots", BUNCH, "1,0", "2,0", "2,0", "", ""]);
+    expect(cellsOf("Lettuce")).toEqual(["Lettuce", PIECES, "1,0", "1,0", "1,0", "", WASH]);
+    expect(cellsOf("Forest honey")).toEqual(["Forest honey", PIECES, "", "", "1,0", "1,0", ""]);
+  });
+
+  it("shows a fraction of a kilo per box at the kilo's precision, on screen and on paper", async () => {
+    farm.boxes[scope(TUESDAY)] = {
+      columns: TUESDAY_COLUMNS,
+      rows: [article("Potatoes", "KG", "M", TUESDAY_COLUMNS, [0.5, 0.25, 1.25, 0])],
+    };
+    renderPage();
+    await screen.findByText("Potatoes");
+
+    expect(cellsOf("Potatoes")).toEqual(["Potatoes", KILOS, "0,50", "0,25", "1,25", "", ""]);
+
+    await userEvent.click(downloadButton());
+
+    await waitFor(() => expect(printed.documents).toHaveLength(1));
+    const { cellText, data } = printed.documents[0].props as {
+      cellText: (value: unknown, item: Record<string, unknown>) => string;
+      data: Record<string, unknown>[];
+    };
+    expect(TUESDAY_COLUMNS.map((column) => cellText(data[0][column.key], data[0]))).toEqual([
+      "0,50",
+      "0,25",
+      "1,25",
+      "",
+    ]);
   });
 
   it("counts the boxes of each kind in a row below the articles", async () => {
@@ -575,7 +505,7 @@ describe("PackingListBoxes matrix", () => {
     await screen.findByText("Carrots");
 
     expect(headerRows()[0]).toEqual([ARTICLE, UNIT, "commissioning.size", "Veg", NO_BASE, NOTE]);
-    expect(cellsOf("Carrots").slice(0, 4)).toEqual(["Carrots", BUNCH, "commissioning.medium", "1"]);
+    expect(cellsOf("Carrots").slice(0, 4)).toEqual(["Carrots", BUNCH, "commissioning.medium", "1,0"]);
     expect(cellsOf("Forest honey")[2]).toBe("");
 
     await userEvent.click(downloadButton());
@@ -634,8 +564,8 @@ describe("PackingListBoxes for a farm that uploads its weekly share amounts", ()
       [ARTICLE, UNIT, "Veg", "Honey", NOTE],
       ["commissioning.S", "commissioning.M", "commissioning.S"],
     ]);
-    expect(cellsOf("Lettuce")).toEqual(["Lettuce", PIECES, "1", "2", "", ""]);
-    expect(cellsOf("Forest honey")).toEqual(["Forest honey", PIECES, "", "", "1", ""]);
+    expect(cellsOf("Lettuce")).toEqual(["Lettuce", PIECES, "1,0", "2,0", "", ""]);
+    expect(cellsOf("Forest honey")).toEqual(["Forest honey", PIECES, "", "", "1,0", ""]);
     expect(screen.queryByText("commissioning.box_count")).not.toBeInTheDocument();
     expect(countRow()).toEqual([]);
   });
@@ -931,14 +861,34 @@ describe("PackingListBoxes on a phone", () => {
     viewport.mobile = true;
   });
 
-  it("shows each article as a card with its unit instead of the table", async () => {
+  it("shows each article as a card with its amount in every kind of box it goes into", async () => {
     renderPage();
     await screen.findByText("Carrots");
 
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(within(cardOf("Carrots")).getByText(BUNCH)).toBeInTheDocument();
-    expect(within(cardOf("Lettuce")).getByText(PIECES)).toBeInTheDocument();
-    expect(within(cardOf("Forest honey")).getByText(PIECES)).toBeInTheDocument();
+    expect(figuresOn(cardOf("Carrots"))).toEqual([
+      ["Veg commissioning.S", `1,0 ${BUNCH}`],
+      ["Veg commissioning.M", `2,0 ${BUNCH}`],
+      ["Veg commissioning.MHoney·commissioning.S", `2,0 ${BUNCH}`],
+    ]);
+    // A box without a base share is named by its combination alone.
+    expect(figuresOn(cardOf("Forest honey"))).toEqual([
+      ["Veg commissioning.MHoney·commissioning.S", `1,0 ${PIECES}`],
+      [`${NO_BASE}Honey·commissioning.S`, `1,0 ${PIECES}`],
+    ]);
+    expect(within(cardOf("Lettuce")).getByText(WASH)).toBeInTheDocument();
+  });
+
+  it("counts the boxes of each kind on a card above the articles", async () => {
+    renderPage();
+    await screen.findByText("Carrots");
+
+    expect(figuresOn(cardOf("commissioning.box_count"))).toEqual([
+      ["Veg commissioning.S", "12"],
+      ["Veg commissioning.M", "30"],
+      ["Veg commissioning.MHoney·commissioning.S", "5"],
+      [`${NO_BASE}Honey·commissioning.S`, "2"],
+    ]);
   });
 
   it("shows a spinner instead of cards while the boxes load", async () => {

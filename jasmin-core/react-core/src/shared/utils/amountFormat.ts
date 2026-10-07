@@ -23,6 +23,21 @@ export const formatAmountForUnit = (
 ): string => format(value, decimalsForUnit(unit));
 
 /**
+ * A produce amount as a matrix cell shows it: blank for none — null, empty,
+ * zero or not a number — and otherwise at its unit's display precision.
+ */
+export const amountCellText = (
+  value: unknown,
+  unit: string | null | undefined,
+  format: NumberFormatter,
+): string => {
+  const amount = Number(value);
+  return value == null || value === "" || !Number.isFinite(amount) || amount === 0
+    ? ""
+    : formatAmountForUnit(amount, unit, format);
+};
+
+/**
  * Build a numeric table-cell renderer that blanks null / empty / non-finite
  * values and otherwise formats via `format` at the given precision. Use it
  * instead of an inline `value ? format(Number(value), N) : ""` cell body.

@@ -19,7 +19,12 @@ export {
     getStatusColor,
 } from './columnEditability';
 
-export { decimalsForUnit, formatAmountForUnit, renderNumber } from './amountFormat';
+export {
+  amountCellText,
+  decimalsForUnit,
+  formatAmountForUnit,
+  renderNumber,
+} from './amountFormat';
 export { getShareOptionLabel } from './shareOptionLabel';
 
 export { getDayName } from './weekdayNames';

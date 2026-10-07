@@ -128,7 +128,7 @@ export function MobileCardMetricsRow({
 }
 
 interface MobileCardMetricProps {
-  label?: string;
+  label?: ReactNode;
   value: ReactNode;
   unit?: string;
   emphasis?: "primary" | "secondary";

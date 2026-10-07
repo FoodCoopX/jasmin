@@ -19,6 +19,8 @@ interface PackingBoxesMatrixPDFGeneratorProps {
   /** Render the per-combination count row (default true; off for the member
    *  per-share list). */
   showCountRow?: boolean;
+  /** A cell's text; see `PackingBoxesMatrixPDFProps.cellText`. */
+  cellText?: PackingBoxesMatrixPDFProps["cellText"];
   filename: string;
   buttonText: string;
   t: TFunction;
@@ -33,6 +35,7 @@ export default function PackingBoxesMatrixPDFGenerator({
   tenant,
   pillKey,
   showCountRow,
+  cellText,
   filename,
   buttonText,
   t,
@@ -53,6 +56,7 @@ export default function PackingBoxesMatrixPDFGenerator({
         tenant,
         pillKey,
         showCountRow,
+        cellText,
         t,
       }}
     />

@@ -13,7 +13,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -355,6 +355,22 @@ const figuresOf = (block: HTMLElement): Record<string, string> =>
 
 const downloadButton = () => screen.getByRole("button", { name: DOWNLOAD });
 
+/** An order with carrots both by the bunch and by the kilo, and beetroot. */
+const FARM_SHOP_LINES = [
+  line("Beetroot", 6, 2, { unit: "BUNCH" }),
+  line("Carrots", 10, 5, { unit: "BUNCH" }),
+  line("Carrots", 20, 10),
+];
+
+/** Takes the beetroot out of the farm shop's order, and the office comes back
+ *  to the tab, so the page fetches the orders again. */
+async function beetrootTakenOut() {
+  farm.orders[slot(2026, 41, TUESDAY)] = [orderOf("Farm Shop", FARM_SHOP_LINES.slice(1))];
+  await act(async () => {
+    window.dispatchEvent(new Event("visibilitychange"));
+  });
+}
+
 /** A request that answers only when the test says so. */
 function pending<T>() {
   let answer!: (value: T) => void;
@@ -495,6 +511,21 @@ describe("CommissioningListResellers cards", () => {
 
     await waitFor(() => expect(printed.documents).toHaveLength(1));
     expect(printed.documents[0].props).toMatchObject({ locale: "en-US" });
+  });
+
+  it("lists an article ordered in two units as two lines, also once the order is fetched again", async () => {
+    farm.orders[slot(2026, 41, TUESDAY)] = [orderOf("Farm Shop", FARM_SHOP_LINES)];
+    renderPage();
+    await screen.findByText("Farm Shop");
+    expect(rowsOf("Farm Shop")).toHaveLength(3);
+
+    await beetrootTakenOut();
+
+    await waitFor(() => expect(rowsOf("Farm Shop")).toHaveLength(2));
+    expect(rowsOf("Farm Shop").map(([amount]) => amount)).toEqual([
+      `2,0 ${PU} (10,0 ${BUNCHES})`,
+      `2,0 ${PU} (20,0 ${KG})`,
+    ]);
   });
 
   it("leaves out a reseller whose order holds nothing to pack", async () => {
@@ -705,6 +736,21 @@ describe("CommissioningListResellers on a phone", () => {
       "commissioning.amount": `1.250,0 ${KG}`,
       [PU]: `100,0 (12,50 ${KG}/${PU})`,
     });
+  });
+
+  it("shows an article ordered in two units as two blocks, also once the order is fetched again", async () => {
+    farm.orders[slot(2026, 41, TUESDAY)] = [orderOf("Farm Shop", FARM_SHOP_LINES)];
+    renderPage();
+    await screen.findByText("Farm Shop");
+
+    await beetrootTakenOut();
+
+    const blocks = () => Array.from(cardOf("Farm Shop").querySelectorAll<HTMLElement>(".mobile-card-item"));
+    await waitFor(() => expect(blocks()).toHaveLength(2));
+    expect(blocks().map((block) => figuresOf(block)["commissioning.amount"])).toEqual([
+      `10,0 ${BUNCHES}`,
+      `20,0 ${KG}`,
+    ]);
   });
 
   it("labels the delivery day in the short phone format", async () => {

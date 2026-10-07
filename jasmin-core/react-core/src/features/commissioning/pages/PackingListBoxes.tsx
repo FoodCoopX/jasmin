@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -40,15 +40,21 @@ import {
   useShareDeliveryDays,
 } from "@features/commissioning/hooks";
 import type { ShareDeliveryDayOption } from "@features/commissioning/hooks/useShareDeliveryDays";
+import {
+  PackingListBoxesCountCard,
+  PackingListBoxesMobileCard,
+} from "@features/commissioning/components/mobileCards";
 import { PackingBoxesMatrixPDFGenerator } from "@features/commissioning/pdfs";
 import {
   currentWeek,
   useIsMobile,
+  useNumberFormat,
   useTenant,
   useYearWeekState,
 } from "@hooks/index";
 import {
   activeAtDateForWeek,
+  amountCellText,
   formatDayLabel,
   formatWeekLabel,
   generatePdfFilename,
@@ -57,6 +63,23 @@ import {
 } from "@shared/utils";
 
 const currentDay = dayjs().isoWeekday();
+
+/** The matrix the page shows: the boxes of each combination, or — for a farm
+ *  that uploads its weekly share amounts — the amounts per share. */
+function usePackingMatrix(
+  params: CommissioningPackingListBoxesMatrixRetrieveParams,
+  { enabled, usesExternalDemand }: { enabled: boolean; usesExternalDemand: boolean },
+) {
+  const boxesQuery = useCommissioningPackingListBoxesMatrixRetrieve(params, {
+    query: { enabled: enabled && !usesExternalDemand },
+  });
+  const memberQuery = useCommissioningPackingListMemberAmountsRetrieve(
+    params as CommissioningPackingListMemberAmountsRetrieveParams,
+    { query: { enabled: enabled && usesExternalDemand } },
+  );
+  const query = usesExternalDemand ? memberQuery : boxesQuery;
+  return { data: query.data, isFetching: query.isFetching };
+}
 
 /**
  * Packing boxes MATRIX (v2 of PackingListBoxes).
@@ -215,17 +238,10 @@ export default function PackingListBoxes() {
       ],
     );
 
-  const boxesQuery = useCommissioningPackingListBoxesMatrixRetrieve(matrixParams, {
-    query: { enabled: queryEnabled && !usesExternalDemand },
+  const { data, isFetching } = usePackingMatrix(matrixParams, {
+    enabled: queryEnabled,
+    usesExternalDemand,
   });
-  const memberQuery = useCommissioningPackingListMemberAmountsRetrieve(
-    matrixParams as CommissioningPackingListMemberAmountsRetrieveParams,
-    { query: { enabled: queryEnabled && usesExternalDemand } },
-  );
-  const data = usesExternalDemand ? memberQuery.data : boxesQuery.data;
-  const isFetching = usesExternalDemand
-    ? memberQuery.isFetching
-    : boxesQuery.isFetching;
 
   const matrixColumns = useMemo<PackingBoxesMatrixColumn[]>(
     () => data?.columns ?? [],
@@ -243,9 +259,21 @@ export default function PackingListBoxes() {
     [data, withUnitSizeLabels],
   );
 
+  // A cell is an article's amount in one box of a combination, often a
+  // fraction: shown at its unit's precision in the tenant's number format, on
+  // screen, on the phone and on paper alike.
+  const { format } = useNumberFormat();
+  const amountText = useCallback(
+    (value: unknown, record: Record<string, unknown>) =>
+      amountCellText(value, record.unit as string | undefined, format),
+    [format],
+  );
+
   // --- Combination columns (grouped by base share_type) — the SAME columns
   // the delivery-station member matrix uses. ---
-  const comboColumns = useBoxCombinationColumns(matrixColumns);
+  const comboColumns = useBoxCombinationColumns(matrixColumns, {
+    renderCell: amountText,
+  });
 
   const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
     () => [...baseColumns, ...comboColumns, noteColumn],
@@ -338,11 +366,16 @@ export default function PackingListBoxes() {
             showSize={showSize}
             // Flat per-variation (import) matrix has no box counts.
             showCountRow={!usesExternalDemand}
+            cellText={amountText}
             filename={pdfFilename}
             buttonText={t("download.packing_list")}
             t={t}
           />
         </div>
+      )}
+
+      {isMobile && !usesExternalDemand && matrixColumns.length > 0 && (
+        <PackingListBoxesCountCard groups={comboColumns} columns={matrixColumns} />
       )}
 
       {noColumns ? (
@@ -361,6 +394,14 @@ export default function PackingListBoxes() {
           summaryPosition="bottom"
           summaryLabelColumnIndex={0}
           className="w-max custom-jasmin-table"
+          renderMobileCard={(record) => (
+            <PackingListBoxesMobileCard
+              record={record}
+              groups={comboColumns}
+              columns={matrixColumns}
+              amountText={amountText}
+            />
+          )}
         />
       )}
       {!isMobile && (
