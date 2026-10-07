@@ -15,7 +15,7 @@ apps/commissioning/serializers/shares_serializer.py: 1067
 apps/commissioning/services/default_share_content_service.py: 1184
 apps/commissioning/services/documentation_summary_service.py: 1086
 apps/commissioning/services/invoice_service.py: 1111
-apps/commissioning/services/offer_service.py: 1085
+apps/commissioning/services/offer_service.py: 1081
 apps/commissioning/services/order_content_service.py: 1121
 apps/commissioning/views/reseller_views.py: 1729
 apps/commissioning/views/stock_views.py: 1347

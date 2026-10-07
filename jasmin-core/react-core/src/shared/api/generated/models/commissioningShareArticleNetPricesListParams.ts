@@ -16,6 +16,10 @@ active_at_date?: string;
  */
 current?: boolean;
 /**
+ * Only the prices of extra articles (true) or of regular share articles (false). Omitted, both are returned.
+ */
+is_extra?: boolean;
+/**
  * Share article ID (Jasmin ID format)
  */
 share_article?: string;

@@ -478,6 +478,14 @@ class ShareArticleNetPriceViewSet(
                 ),
             ),
             get_active_at_date_parameter(),
+            catalogue_param(
+                "is_extra",
+                required=False,
+                description=(
+                    "Only the prices of extra articles (true) or of regular "
+                    "share articles (false). Omitted, both are returned."
+                ),
+            ),
         ],
     )
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -486,11 +494,12 @@ class ShareArticleNetPriceViewSet(
     def get_queryset(self) -> QuerySet[ShareArticleNetPrice]:
         params = validate_query_params(
             self.request,
-            optional=["share_article", "current", "active_at_date"],
+            optional=["share_article", "current", "active_at_date", "is_extra"],
         )
         share_article = params["share_article"]
         current = params["current"]
         active_at_date = params["active_at_date"]
+        is_extra = params["is_extra"]
 
         if active_at_date:
             queryset = ShareArticleNetPrice.current.active_at_date(active_at_date)
@@ -503,6 +512,8 @@ class ShareArticleNetPriceViewSet(
 
         if share_article is not None:
             queryset = queryset.filter(share_article=share_article)
+        if is_extra is not None:
+            queryset = queryset.filter(share_article__is_extra=is_extra)
 
         # Latest first — modals scroll through price history newest-on-top.
         # Tie-break on id so the order is stable when two rows share a date.

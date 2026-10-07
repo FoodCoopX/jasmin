@@ -14,7 +14,7 @@ test_badge_viewsets.py (16 tests)
   TestUnconfirmedMembersViewSet            4   unconfirmed_members badge count
   TestUnconfirmedCoopSharesViewSet         4   unconfirmed_coop_shares badge count
 
-test_basics_viewsets.py (62 tests)
+test_basics_viewsets.py (63 tests)
 ──────────────────────────────────
   TestSeasonViewSet                        3   list, create (with valid_from/valid_until)
   TestSeasonOneOpenConstraint              2   DB refuses a second open season; open + closed allowed
@@ -32,8 +32,9 @@ test_basics_viewsets.py (62 tests)
                                                share_article or unknown variations — every one named, tolerated
                                                on the delete branch — 400 on a bad payload or a unit outside the
                                                choices), permissions (member/anon)
-  TestShareArticleNetPriceFiltering        3   share_article filter; current returns the open-ended
-                                               price; active_at_date supersedes current
+  TestShareArticleNetPriceFiltering        4   share_article filter; current returns the open-ended
+                                               price; active_at_date supersedes current; is_extra
+                                               narrows to extra or regular articles' prices
   TestShareArticleNetPriceViewSet          2   deletability of an active vs. a future price
   TestShareArticleNetPriceDestroyGuard     3   DELETE enforces can_be_deleted: active price of
                                                in-use article → 409 + row kept; unused → 204;

@@ -21,11 +21,19 @@ from django.db import DatabaseError
 from django.utils import timezone
 
 from apps.commissioning.errors import DataImportInvalid
-from apps.commissioning.models import Crate, DeliveryStation, Member, Reseller
+from apps.commissioning.models import (
+    Crate,
+    DeliveryStation,
+    Member,
+    Reseller,
+    ShareArticle,
+)
+from apps.commissioning.models.choices import UnitOptions
 from apps.commissioning.serializers import CrateSerializer, ShareArticleSerializer
 from apps.commissioning.services.data_import import (
     _MAX_IMPORT_ROWS,
     DataImportResult,
+    ImportOptions,
     _collect_bool_fields,
     _CsvLine,
     _decode_csv,
@@ -1070,3 +1078,97 @@ class TestResellerAndDeliveryStationImport:
         assert result.errors[0]["row"] == 4
         assert "city" in result.errors[0]["error"]
         assert not DeliveryStation.objects.filter(short_name="NOCITY").exists()
+
+
+# The template the extra articles page hands out: the grid locks the unit and
+# never shows ``is_extra``, so neither is a column; the page sends both as
+# fixed values instead.
+_EXTRA_ARTICLE_CSV = b"".join(
+    [
+        b"Active,Article number,Name,Description\n",
+        b"is_active,article_number,name,description\n",
+        b"true|false,string,string,string\n",
+        b"true,X-100,Gardening course,Two afternoons\n",
+        b"\n",
+        b"true,X-101,Tractor hire,\n",
+    ]
+)
+_EXTRA_ARTICLE_VALUES = {"is_extra": True, "default_movement_unit": "PCS"}
+
+
+@pytest.mark.django_db
+class TestImportFixedValues:
+    def test_template_rows_become_extra_articles_in_pieces(self, tenant):
+        result = import_rows_from_csv(
+            "share_article",
+            _EXTRA_ARTICLE_CSV,
+            options=ImportOptions(fixed_values=_EXTRA_ARTICLE_VALUES),
+        )
+
+        assert result.failed == 0, result.errors
+        assert result.successful == 2
+        course = ShareArticle.objects.get(article_number="X-100")
+        assert course.is_extra is True
+        assert course.default_movement_unit == UnitOptions.PCS
+        assert course.description == "Two afternoons"
+        assert ShareArticle.objects.get(article_number="X-101").is_extra is True
+
+    def test_fixed_values_win_over_the_files_own_cells(self, tenant):
+        csv_bytes = (
+            b"name,article_number,is_extra,default_movement_unit\n"
+            b"Seed workshop,X-102,false,KG\n"
+        )
+
+        result = import_rows_from_csv(
+            "share_article",
+            csv_bytes,
+            options=ImportOptions(fixed_values=_EXTRA_ARTICLE_VALUES),
+        )
+
+        assert result.failed == 0, result.errors
+        workshop = ShareArticle.objects.get(article_number="X-102")
+        assert workshop.is_extra is True
+        assert workshop.default_movement_unit == UnitOptions.PCS
+
+    def test_the_dry_run_previews_the_same_rows_and_saves_nothing(self, tenant):
+        result = import_rows_from_csv(
+            "share_article",
+            _EXTRA_ARTICLE_CSV,
+            dry_run=True,
+            options=ImportOptions(fixed_values=_EXTRA_ARTICLE_VALUES),
+        )
+
+        assert result.failed == 0, result.errors
+        assert result.successful == 2
+        assert not ShareArticle.objects.filter(
+            article_number__in=["X-100", "X-101"]
+        ).exists()
+
+    @pytest.mark.parametrize("field", ["no_such_field", "can_be_deleted"])
+    def test_a_field_the_import_cannot_write_is_refused(self, tenant, field):
+        with pytest.raises(DataImportInvalid):
+            import_rows_from_csv(
+                "share_article",
+                _EXTRA_ARTICLE_CSV,
+                options=ImportOptions(fixed_values={field: True}),
+            )
+
+        assert not ShareArticle.objects.filter(article_number="X-100").exists()
+
+    def test_without_fixed_values_the_share_article_import_is_unchanged(self, tenant):
+        csv_bytes = (
+            b"Name,Article number,Unit\n"
+            b"name,article_number,default_movement_unit\n"
+            b"string,string,KG|PCS\n"
+            b"Carrots,SA-200,KG\n"
+            b"Leeks,SA-201,\n"
+        )
+
+        result = import_rows_from_csv("share_article", csv_bytes)
+
+        assert result.successful == 1
+        assert result.failed == 1
+        assert "default_movement_unit" in result.errors[0]["error"]
+        carrots = ShareArticle.objects.get(article_number="SA-200")
+        assert carrots.is_extra is False
+        assert carrots.default_movement_unit == UnitOptions.KG

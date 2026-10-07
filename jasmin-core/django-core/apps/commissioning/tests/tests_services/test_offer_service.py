@@ -150,12 +150,14 @@ class TestCopyOffersToNextWeek:
 
     def test_skips_duplicate(self, tenant):
         article = ShareArticleFactory()
+        group = OfferGroupFactory()
         offer = OfferFactory(
             year=2026,
             delivery_week=10,
             share_article=article,
             unit="KG",
             size="M",
+            offer_group=group,
             amount=Decimal("20"),
         )
         # Already exists in next week
@@ -165,6 +167,7 @@ class TestCopyOffersToNextWeek:
             share_article=article,
             unit="KG",
             size="M",
+            offer_group=group,
             amount=Decimal("5"),
         )
 
@@ -185,17 +188,20 @@ class TestCopyOffersToNextWeek:
 
     def test_dedups_in_batch_duplicates(self, tenant):
         """Two source offers collapsing to the SAME target slot
-        (same article/unit/size, same target week) must produce ONE copy,
+        (same article/unit/size/group, same target week; one of them
+        reseller-specific, which the slot constraint allows) must produce ONE copy,
         not two — the in-memory batch is deduped like the persisted-row
         check, since both would pass the exists() check (nothing persisted
         yet)."""
         article = ShareArticleFactory()
+        group = OfferGroupFactory()
         a = OfferFactory(
             year=2026,
             delivery_week=10,
             share_article=article,
             unit="KG",
             size="M",
+            offer_group=group,
             amount=Decimal("20"),
         )
         b = OfferFactory(
@@ -204,6 +210,8 @@ class TestCopyOffersToNextWeek:
             share_article=article,
             unit="KG",
             size="M",
+            offer_group=group,
+            reseller=ResellerFactory(),
             amount=Decimal("30"),
         )
 
@@ -221,6 +229,59 @@ class TestCopyOffersToNextWeek:
             ).count()
             == 1
         )
+
+    def test_copies_past_another_groups_offer_for_the_same_article(self, tenant):
+        article = ShareArticleFactory()
+        group_a = OfferGroupFactory()
+        group_b = OfferGroupFactory()
+        OfferFactory(
+            year=2026,
+            delivery_week=11,
+            share_article=article,
+            unit="KG",
+            size="M",
+            offer_group=group_a,
+        )
+        offer_b = OfferFactory(
+            year=2026,
+            delivery_week=10,
+            share_article=article,
+            unit="KG",
+            size="M",
+            offer_group=group_b,
+        )
+
+        result = OfferService.copy_offers_to_next_week([offer_b.pk])
+
+        assert result["created_count"] == 1
+        assert result["skipped_count"] == 0
+        new_offer = Offer.objects.get(pk=result["created_ids"][0])
+        assert new_offer.offer_group_id == group_b.pk
+        assert new_offer.delivery_week == 11
+
+    def test_two_groups_offers_for_one_article_both_copied(self, tenant):
+        article = ShareArticleFactory()
+        offers = [
+            OfferFactory(
+                year=2026,
+                delivery_week=10,
+                share_article=article,
+                unit="KG",
+                size="M",
+                offer_group=OfferGroupFactory(),
+            )
+            for _ in range(2)
+        ]
+
+        result = OfferService.copy_offers_to_next_week([o.pk for o in offers])
+
+        assert result["created_count"] == 2
+        assert result["skipped_count"] == 0
+        assert set(
+            Offer.objects.filter(
+                year=2026, delivery_week=11, share_article=article
+            ).values_list("offer_group_id", flat=True)
+        ) == {o.offer_group_id for o in offers}
 
 
 # ---------------------------------------------------------------------------

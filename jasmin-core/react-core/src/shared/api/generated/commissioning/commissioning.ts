@@ -6380,6 +6380,9 @@ formData.append(`file`, commissioningDataImportCreateBody.file)
 if(commissioningDataImportCreateBody.dry_run !== undefined) {
  formData.append(`dry_run`, commissioningDataImportCreateBody.dry_run.toString())
  }
+if(commissioningDataImportCreateBody.fixed_values !== undefined) {
+ formData.append(`fixed_values`, commissioningDataImportCreateBody.fixed_values)
+ }
 
       return axiosService<DataImportResponse>(
       {url: `/api/commissioning/data_import/`, method: 'POST',

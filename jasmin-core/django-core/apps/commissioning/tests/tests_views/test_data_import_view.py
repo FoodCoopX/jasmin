@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import datetime
+import json
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,7 @@ from apps.commissioning.models import (
     Member,
     PaymentCycle,
     Reseller,
+    ShareArticle,
     Subscription,
 )
 from apps.commissioning.models.choices import PaymentCycleOptions
@@ -222,6 +224,82 @@ class TestBankColumnsRequireStepUp:
         )
         assert resp.status_code == 400, resp.content
         assert resp.json()["code"] == "data_import.invalid"
+
+
+def _extra_articles_csv() -> SimpleUploadedFile:
+    return SimpleUploadedFile(
+        "extras.csv",
+        b"name,article_number\nGardening course,X-300\n",
+        content_type="text/csv",
+    )
+
+
+@pytest.mark.django_db
+class TestFixedValues:
+    def test_fixed_values_are_set_on_every_row(self, api_client):
+        resp = api_client.post(
+            URL,
+            {
+                "model_name": "share_article",
+                "file": _extra_articles_csv(),
+                "fixed_values": json.dumps(
+                    {"is_extra": True, "default_movement_unit": "PCS"}
+                ),
+            },
+            format="multipart",
+        )
+
+        assert resp.status_code == 200, resp.content
+        assert resp.json()["successful"] == 1, resp.json()["errors"]
+        article = ShareArticle.objects.get(article_number="X-300")
+        assert article.is_extra is True
+        assert article.default_movement_unit == "PCS"
+
+    @pytest.mark.parametrize("raw", ["{not json", "[1, 2]", '"PCS"'])
+    def test_fixed_values_that_are_no_json_object_are_refused(self, api_client, raw):
+        resp = api_client.post(
+            URL,
+            {
+                "model_name": "share_article",
+                "file": _extra_articles_csv(),
+                "fixed_values": raw,
+            },
+            format="multipart",
+        )
+
+        assert resp.status_code == 400, resp.content
+        assert resp.json()["code"] == "data_import.invalid"
+        assert resp.json()["field"] == "fixed_values"
+        assert not ShareArticle.objects.filter(article_number="X-300").exists()
+
+    def test_a_field_the_import_cannot_write_is_refused(self, api_client):
+        resp = api_client.post(
+            URL,
+            {
+                "model_name": "share_article",
+                "file": _extra_articles_csv(),
+                "fixed_values": json.dumps({"no_such_field": "x"}),
+            },
+            format="multipart",
+        )
+
+        assert resp.status_code == 400, resp.content
+        assert resp.json()["field"] == "fixed_values"
+
+    def test_a_bank_field_in_fixed_values_needs_step_up(self, api_client):
+        resp = api_client.post(
+            URL,
+            {
+                "model_name": "member",
+                "file": _upload("members_sample.csv"),
+                "fixed_values": json.dumps({"account_owner": "Someone Else"}),
+            },
+            format="multipart",
+        )
+
+        assert resp.status_code == 403, resp.content
+        assert resp.json()["code"] == "auth.step_up_required"
+        assert Member.objects.count() == 0
 
 
 @pytest.mark.django_db

@@ -149,16 +149,8 @@ class OfferService:
         def _next_week(offer):
             return Week(offer.year, offer.delivery_week) + 1
 
-        def key_fn(offer):
-            next_week = _next_week(offer)
-            return (
-                next_week.year,
-                next_week.week,
-                offer.share_article_id,
-                offer.unit,
-                offer.size,
-            )
-
+        # The group is part of the slot, as in ``offer_unique_general_per_slot``:
+        # another group's offer for the same article next week is no duplicate.
         def exists_filter(offer):
             next_week = _next_week(offer)
             return {
@@ -167,7 +159,11 @@ class OfferService:
                 "share_article_id": offer.share_article_id,
                 "unit": offer.unit,
                 "size": offer.size,
+                "offer_group_id": offer.offer_group_id,
             }
+
+        def key_fn(offer):
+            return tuple(exists_filter(offer).values())
 
         def mutate_fn(offer):
             next_week = _next_week(offer)

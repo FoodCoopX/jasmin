@@ -23,7 +23,10 @@ from apps.commissioning.errors import (
     ConfirmationDateRequiresOnboardingMode,
 )
 from apps.commissioning.models import Member
-from apps.commissioning.services.data_import import import_rows_from_csv
+from apps.commissioning.services.data_import import (
+    ImportOptions,
+    import_rows_from_csv,
+)
 from apps.commissioning.services.member_cancellation import (
     cancel_coop_shares_of_departed_member,
     cancel_member_with_coop_shares,
@@ -310,7 +313,7 @@ class TestImportConfirmActiveUsers:
                 self._csv("import.onboarding@example.com"),
                 importing_user=login,
                 dry_run=dry_run,
-                confirm_active_users=False,
+                options=ImportOptions(confirm_active_users=False),
             )
 
         assert result.successful == 1, result.errors

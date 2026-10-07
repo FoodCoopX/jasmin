@@ -5,7 +5,12 @@ import {
 } from "@features/commissioning/hooks";
 import { DeliveryStationsOverviewPDFGenerator } from "@features/commissioning/pdfs";
 import { filterBulkComboColumns } from "@features/commissioning/utils/filterBulkComboColumns";
-import { useTenant, useYearWeekState } from "@hooks/index";
+import {
+  useNumberFormat,
+  useShareTypeVariationSizeOptions,
+  useTenant,
+  useYearWeekState,
+} from "@hooks/index";
 import { useCommissioningDeliveryStationToursOverviewRetrieve } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningDeliveryStationToursOverviewRetrieveParams,
@@ -23,46 +28,87 @@ import {
   generatePdfFilename,
   getDayName,
 } from "@shared/utils";
-import { Table } from "antd";
+import { Spin, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+/** A station's count under one column key; the generated type leaves those keys out. */
+const countAt = (station: StationOverview, key: string) =>
+  Number((station as unknown as Record<string, unknown>)[key]);
+
 // Flat per-variation columns (grouped by share type) for import-shares tenants:
 // they have no box combinations, so the tour table shows one column per active
 // share_type_variation. Each cell is that variation's box count at the station
 // (the demand-service-backed ``variation_<id>`` value, which works in both modes).
-function buildVariationColumns(
+function useVariationColumns(
   variations: ShareTypeVariationMetadata[],
 ): ColumnsType<StationOverview> {
-  const groups = new Map<
-    string,
-    { name: string; vars: ShareTypeVariationMetadata[] }
-  >();
-  for (const variation of variations) {
-    const group = groups.get(variation.share_type_id) ?? {
-      name: variation.share_type_name,
-      vars: [],
-    };
-    group.vars.push(variation);
-    groups.set(variation.share_type_id, group);
-  }
-  return [...groups.values()].map((group) => ({
-    title: group.name,
-    align: "center" as const,
-    children: group.vars.map((variation) => ({
-      title: variation.size || variation.display_name,
-      dataIndex: variation.key,
-      key: variation.key,
+  const { format } = useNumberFormat();
+  const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
+
+  return useMemo(() => {
+    const groups = new Map<
+      string,
+      { name: string; vars: ShareTypeVariationMetadata[] }
+    >();
+    for (const variation of variations) {
+      const group = groups.get(variation.share_type_id) ?? {
+        name: variation.share_type_name,
+        vars: [],
+      };
+      group.vars.push(variation);
+      groups.set(variation.share_type_id, group);
+    }
+    return [...groups.values()].map((group) => ({
+      title: group.name,
       align: "center" as const,
-      width: "5em",
-      render: (value: unknown) => {
-        const n = Number(value);
-        return Number.isFinite(n) && n !== 0 ? n : "";
-      },
-    })),
-  }));
+      children: group.vars.map((variation) => ({
+        title: variation.size
+          ? getShareTypeVariationSizeLabel(variation.size)
+          : variation.display_name,
+        dataIndex: variation.key,
+        key: variation.key,
+        align: "center" as const,
+        width: "5em",
+        render: (value: unknown) => {
+          const count = Number(value);
+          return Number.isFinite(count) && count !== 0 ? format(count, 0) : "";
+        },
+      })),
+    }));
+  }, [variations, format, getShareTypeVariationSizeLabel]);
+}
+
+/**
+ * The tours that still deliver once the bulk-packed share sizes are left out:
+ * a box tour keeps only its other kinds of box, and a tour left with none —
+ * or, for a farm that uploads its share amounts, with no share of another
+ * size at any of its stations — is dropped from the screen and the PDF alike.
+ */
+function toursWithoutBulk(
+  tours: TourOverview[],
+  bulkVariationIds: ReadonlySet<string>,
+  variations: ShareTypeVariationMetadata[],
+  usesExternalDemand: boolean,
+): TourOverview[] {
+  if (usesExternalDemand) {
+    return tours.filter((tour) =>
+      tour.stations.some((station) =>
+        variations.some((variation) => {
+          const count = countAt(station, variation.key);
+          return Number.isFinite(count) && count !== 0;
+        }),
+      ),
+    );
+  }
+  return tours
+    .map((tour) => ({
+      ...tour,
+      columns: filterBulkComboColumns(tour.columns, bulkVariationIds),
+    }))
+    .filter((tour) => tour.columns.length > 0);
 }
 
 // One tour's table: rows = stations, columns = THAT tour's box combinations.
@@ -72,17 +118,15 @@ function TourTable({
   tourNumber,
   columns: matrixColumns,
   stations,
-  variations,
+  variationColumns,
   usesExternalDemand,
-  loading,
   t,
 }: {
   tourNumber: number;
   columns: PackingBoxesMatrixColumn[];
   stations: StationOverview[];
-  variations: ShareTypeVariationMetadata[];
+  variationColumns: ColumnsType<StationOverview>;
   usesExternalDemand: boolean;
-  loading: boolean;
   t: TFunction;
 }) {
   const comboColumns = useBoxCombinationColumns(matrixColumns);
@@ -102,10 +146,10 @@ function TourTable({
       },
       // Import tenants have no combinations → show flat per-variation columns.
       ...(usesExternalDemand
-        ? buildVariationColumns(variations)
+        ? variationColumns
         : (comboColumns as unknown as ColumnsType<StationOverview>)),
     ],
-    [comboColumns, usesExternalDemand, variations, t],
+    [comboColumns, usesExternalDemand, variationColumns, t],
   );
 
   return (
@@ -116,7 +160,6 @@ function TourTable({
         dataSource={stations}
         pagination={false}
         size="small"
-        loading={loading}
         className="custom-jasmin-table w-max"
         rowKey={(record) => record.delivery_station_day_id}
         bordered
@@ -140,28 +183,38 @@ export default function DeliveryStationsOverview() {
     false,
   ) as boolean;
 
-  // delivery days
-  const [shareDeliveryDaysFilters, setShareDeliveryDaysFilters] = useState({
-    active_at_date: activeAtDateForWeek(selectedYear, selectedWeek),
-  });
+  // Derived in the same render as the week, so the days listed are never
+  // another week's.
+  const shareDeliveryDaysFilters = useMemo(
+    () => ({ active_at_date: activeAtDateForWeek(selectedYear, selectedWeek) }),
+    [selectedYear, selectedWeek],
+  );
 
+  const {
+    dayNumbers,
+    pending: daysPending,
+    noDaysListed: weekHasNoDays,
+    error: daysError,
+  } = useShareDeliveryDays(shareDeliveryDaysFilters);
+
+  // Once the week's days are in, the pick is one of them: a listed pick stays,
+  // anything else becomes the first day, and a week without days leaves none.
   useEffect(() => {
-    setShareDeliveryDaysFilters({
-      active_at_date: activeAtDateForWeek(selectedYear, selectedWeek),
-    });
-  }, [selectedYear, selectedWeek]);
-
-  const { dayNumbers } = useShareDeliveryDays(shareDeliveryDaysFilters);
-
-  // Select first day by default
-  useEffect(() => {
-    if (
-      dayNumbers.length > 0 &&
-      !dayNumbers.some((day) => day === selectedDeliveryDay)
-    ) {
+    if (daysPending) return;
+    if (dayNumbers.length === 0) {
+      if (selectedDeliveryDay !== null) setSelectedDeliveryDay(null);
+      return;
+    }
+    if (!dayNumbers.some((day) => day === selectedDeliveryDay)) {
       setSelectedDeliveryDay(dayNumbers[0]);
     }
-  }, [dayNumbers, selectedDeliveryDay]);
+  }, [dayNumbers, daysPending, selectedDeliveryDay]);
+
+  // A day picked in another week stays picked until this week's days arrive
+  // and may not be one of them, so the tours are asked for only once it is.
+  const dayInWeek =
+    selectedDeliveryDay !== null &&
+    dayNumbers.some((day) => day === selectedDeliveryDay);
 
   // The retrieve-params type marks year/delivery_week/day_number as
   // required. We always return a fully-typed object (with 0 placeholders
@@ -176,19 +229,13 @@ export default function DeliveryStationsOverview() {
       [selectedYear, selectedWeek, selectedDeliveryDay],
     );
 
-  const { data: responseData, isLoading: loading } =
-    useCommissioningDeliveryStationToursOverviewRetrieve(queryParams, {
-      query: {
-        enabled: selectedDeliveryDay !== null,
-      },
-    });
-
-  // Only tours that actually have box combinations (deliveries) are returned,
-  // each with its own columns — iterate them directly.
-  const tours = useMemo<TourOverview[]>(
-    () => responseData?.tours ?? [],
-    [responseData?.tours],
-  );
+  const {
+    data: responseData,
+    isSuccess: toursLoaded,
+    isError: toursFailed,
+  } = useCommissioningDeliveryStationToursOverviewRetrieve(queryParams, {
+    query: { enabled: dayInWeek && selectedWeek != null },
+  });
 
   // Day-wide variation metadata (import tenants render these as flat columns).
   const rawVariations = useMemo<ShareTypeVariationMetadata[]>(
@@ -200,9 +247,8 @@ export default function DeliveryStationsOverview() {
   // delivery box lists — hide them here. The tour metadata carries no
   // ``is_packed_bulk`` flag, so we look it up from the variations list
   // (frontend-only filter) and drop those ids from the flat columns.
-  const { shareTypeVariations: bulkVariations } = useShareTypeVariations({
-    is_packed_bulk: true,
-  });
+  const { shareTypeVariations: bulkVariations, loading: bulkLoading } =
+    useShareTypeVariations({ is_packed_bulk: true });
   const bulkVariationIds = useMemo(
     () => new Set(bulkVariations.map((variation) => String(variation.id))),
     [bulkVariations],
@@ -211,19 +257,25 @@ export default function DeliveryStationsOverview() {
     () => rawVariations.filter((v) => !bulkVariationIds.has(String(v.id))),
     [rawVariations, bulkVariationIds],
   );
+  const variationColumns = useVariationColumns(variations);
 
-  // Subscription tenants render each tour's box combinations. A bulk-packed
-  // variation surfaces as a standalone combo column there too, so drop those
-  // combos (by bulk base variation) once here — the filtered tours feed both
-  // the on-screen tables and the PDF.
-  const filteredTours = useMemo<TourOverview[]>(
+  // The bulk filter runs before a tour counts as delivering, so the on-screen
+  // tables and the PDF both see only the tours left with something to deliver.
+  const tours = useMemo<TourOverview[]>(
     () =>
-      tours.map((tour) => ({
-        ...tour,
-        columns: filterBulkComboColumns(tour.columns, bulkVariationIds),
-      })),
-    [tours, bulkVariationIds],
+      toursWithoutBulk(
+        responseData?.tours ?? [],
+        bulkVariationIds,
+        variations,
+        usesExternalDemand,
+      ),
+    [responseData?.tours, bulkVariationIds, variations, usesExternalDemand],
   );
+
+  const showTours = dayInWeek && toursLoaded && !bulkLoading;
+  // A failed load is reported by the app's error toast, not as an empty day.
+  const showSpinner =
+    !showTours && !weekHasNoDays && !daysError && !toursFailed;
 
   return (
     <div>
@@ -248,10 +300,10 @@ export default function DeliveryStationsOverview() {
 
       {/* PDF Download — combination-based, so only for subscription tenants
           (import tenants have no combos; the on-page flat view covers them). */}
-      {tours.length > 0 && !loading && !usesExternalDemand && (
+      {showTours && tours.length > 0 && !usesExternalDemand && (
         <div style={{ marginTop: "3em" }}>
           <DeliveryStationsOverviewPDFGenerator
-            tours={filteredTours.map((tour) => ({
+            tours={tours.map((tour) => ({
               tour_number: tour.tour_number,
               columns: tour.columns,
               stations: tour.stations,
@@ -274,24 +326,33 @@ export default function DeliveryStationsOverview() {
         </div>
       )}
 
-      {filteredTours.map((tour) => (
-        <TourTable
-          key={tour.tour_number}
-          tourNumber={tour.tour_number}
-          columns={tour.columns}
-          stations={tour.stations}
-          variations={variations}
-          usesExternalDemand={usesExternalDemand}
-          loading={loading}
-          t={t}
-        />
-      ))}
+      {showTours &&
+        tours.map((tour) => (
+          <TourTable
+            key={tour.tour_number}
+            tourNumber={tour.tour_number}
+            columns={tour.columns}
+            stations={tour.stations}
+            variationColumns={variationColumns}
+            usesExternalDemand={usesExternalDemand}
+            t={t}
+          />
+        ))}
 
-      {/* Show message when no tours have deliveries */}
-      {tours.length === 0 && !loading && (
+      {showTours && tours.length === 0 && (
         <PastWarningMessage>
           {t("commissioning.packing_list_no_columns")}
         </PastWarningMessage>
+      )}
+
+      {weekHasNoDays && (
+        <EmptyHint>{t("commissioning.no_delivery_days_in_week")}</EmptyHint>
+      )}
+
+      {showSpinner && (
+        <div className="flex-center">
+          <Spin />
+        </div>
       )}
 
       <ExplainerText title={t("common.info")}>

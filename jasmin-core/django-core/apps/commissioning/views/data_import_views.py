@@ -12,6 +12,8 @@ Request (multipart/form-data):
     file        the filled-in CSV (template format: row 0 titles,
                 row 1 field names, row 2 type hints; two-row hand-rolled
                 CSVs also work)
+    fixed_values  optional JSON object of field values set on every row,
+                over the file's own cells
 
 Response (200): see :class:`DataImportResult` for the shape.
 Response (400): unknown ``model_name``, undecodable file, missing data row.
@@ -19,7 +21,9 @@ Response (400): unknown ``model_name``, undecodable file, missing data row.
 
 from __future__ import annotations
 
+import json
 import os
+from typing import Any
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -37,7 +41,9 @@ from core.serializers import ErrorResponseSerializer
 from ..errors import DataImportInvalid, RequiredFieldMissing
 from ..serializers.imports_serializer import DataImportResponseSerializer
 from ..services.data_import import (
+    BANK_DATA_IMPORT_COLUMNS,
     MODEL_IMPORT_REGISTRY,
+    ImportOptions,
     bank_data_columns_in_csv,
     get_serializer_for_model,
     import_rows_from_csv,
@@ -93,6 +99,16 @@ class DataImportView(APIViewRolePermissionsMixin, APIView):
                             "many-FK imports like subscriptions."
                         ),
                     },
+                    "fixed_values": {
+                        "type": "string",
+                        "description": (
+                            "A JSON object of field values set on every row, "
+                            "over the file's own cells, e.g. "
+                            '``{"is_extra": true, "default_movement_unit": '
+                            '"PCS"}`` for extra articles. Only fields the '
+                            "import can write are accepted."
+                        ),
+                    },
                 },
                 "required": ["model_name", "file"],
             }
@@ -127,6 +143,7 @@ class DataImportView(APIViewRolePermissionsMixin, APIView):
         # Accepts a boolean or true/false, 1/0, yes/no, on/off (the form part
         # arrives as a string); absent means a real run.
         dry_run = parse_body_bool(body(request), "dry_run")
+        fixed_values = _parse_fixed_values(body(request).get("fixed_values"))
 
         # ``size`` is what the multipart parser recorded; the bounded read is
         # what actually holds, for an upload whose size is unknown or wrong.
@@ -137,7 +154,9 @@ class DataImportView(APIViewRolePermissionsMixin, APIView):
             raise DataImportInvalid(_UPLOAD_TOO_LARGE, field="file")
 
         if not dry_run:
-            self._require_step_up_for_bank_columns(request, model_name, file_bytes)
+            self._require_step_up_for_bank_columns(
+                request, model_name, file_bytes, fixed_values
+            )
 
         # ``import_rows_from_csv`` raises ``DataImportInvalid`` directly for
         # whole-file problems; the global handler renders it. Per-row failures
@@ -147,15 +166,23 @@ class DataImportView(APIViewRolePermissionsMixin, APIView):
             file_bytes,
             importing_user=request.user,
             dry_run=dry_run,
-            # In onboarding mode a linked member stays unconfirmed so the office
-            # can confirm it with its historical date and without an email.
-            confirm_active_users=not onboarding_mode_enabled(),
+            options=ImportOptions(
+                # In onboarding mode a linked member stays unconfirmed so the
+                # office can confirm it with its historical date and without
+                # an email.
+                confirm_active_users=not onboarding_mode_enabled(),
+                fixed_values=fixed_values,
+            ),
         )
 
         return Response(result.to_dict(), status=status.HTTP_200_OK)
 
     def _require_step_up_for_bank_columns(
-        self, request: Request, model_name: str, file_bytes: bytes
+        self,
+        request: Request,
+        model_name: str,
+        file_bytes: bytes,
+        fixed_values: dict[str, Any],
     ) -> None:
         """Refuse a real import that writes bank data without fresh step-up auth.
 
@@ -166,9 +193,27 @@ class DataImportView(APIViewRolePermissionsMixin, APIView):
         """
         # An unknown model gets its 400 before any step-up prompt.
         get_serializer_for_model(model_name)
-        if not bank_data_columns_in_csv(file_bytes):
+        # A bank field set through ``fixed_values`` writes bank data as surely
+        # as a column in the file.
+        bank_columns = bank_data_columns_in_csv(file_bytes)
+        if not bank_columns and not BANK_DATA_IMPORT_COLUMNS.intersection(fixed_values):
             return
         # Raises ``StepUpRequired`` (403 ``auth.step_up_required``, the code the
         # frontend interceptor answers with the step-up modal and a retry) when
         # the access token carries no fresh step-up claim.
         RequiresStepUp().has_permission(request, self)
+
+
+def _parse_fixed_values(raw: object) -> dict[str, Any]:
+    """The ``fixed_values`` form field as a dict; absent or blank is none."""
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return {}
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else None
+    except ValueError:
+        parsed = None
+    if not isinstance(parsed, dict):
+        raise DataImportInvalid(
+            "fixed_values must be a JSON object", field="fixed_values"
+        )
+    return parsed

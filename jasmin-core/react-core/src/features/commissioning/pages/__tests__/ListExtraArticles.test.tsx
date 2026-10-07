@@ -78,12 +78,13 @@ type PriceModalStubProps = {
 };
 type TemplateStubProps = {
   columns: { dataIndex?: string | number }[]; filename: string; modelName?: string;
-  onUploadSuccess?: () => void; onImported?: () => void;
+  fixedValues?: Row; onUploadSuccess?: () => void; onImported?: () => void;
 };
 
 // The props the stubbed list export and import template got on their last render.
 const stubs = vi.hoisted(() => ({
   exportCsv: null as ExportCsvStubProps | null, template: null as TemplateStubProps | null,
+  priceExport: null as (DialogStubProps & { extrasOnly?: boolean }) | null,
 }));
 
 vi.mock("@features/commissioning/modals", () => {
@@ -96,12 +97,16 @@ vi.mock("@features/commissioning/modals", () => {
       ) : null;
     };
   const ListExport = stubDialog("Extra article list export", "Close list export");
+  const PriceExport = stubDialog("Price export", "Close price export");
   return {
     ExportCsv: (props: ExportCsvStubProps) => {
       stubs.exportCsv = props;
       return <ListExport open={props.open} onClose={props.onClose} />;
     },
-    ExportCsvPricesShareArticle: stubDialog("Price export", "Close price export"),
+    ExportCsvPricesShareArticle: (props: DialogStubProps & { extrasOnly?: boolean }) => {
+      stubs.priceExport = props;
+      return <PriceExport open={props.open} onClose={props.onClose} />;
+    },
     ShareArticleExtraPriceModal: ({ visible, onClose, share_article, share_article_name }: PriceModalStubProps) =>
       visible ? (
         <div role="dialog" aria-label="Prices">
@@ -163,7 +168,7 @@ const httpError = (status: number, data: Row) =>
 beforeEach(() => {
   auth.roles = ["office"];
   tenantState.settings = {};
-  Object.assign(stubs, { exportCsv: null, template: null });
+  Object.assign(stubs, { exportCsv: null, template: null, priceExport: null });
   serverArticles = [COURSE, JUTE_BAG, TRACTOR, CARROTS];
   let createdCount = 0;
   // Like the backend, a list without ``is_extra`` holds the regular articles only.
@@ -585,6 +590,14 @@ describe("ListExtraArticles exports and import", () => {
     }
   });
 
+  it("exports the prices of the extras only", async () => {
+    const { user } = await renderLoaded();
+
+    await user.click(screen.getByRole("button", { name: /commissioning\.export_prices/ }));
+
+    expect(stubs.priceExport?.extrasOnly).toBe(true);
+  });
+
   it("exports the extras the list shows, with its columns, under the list's name", async () => {
     const { user } = await renderLoaded();
 
@@ -608,7 +621,7 @@ describe("ListExtraArticles exports and import", () => {
     expect(screen.queryByRole("button", { name: "csv_upload.open" })).not.toBeInTheDocument();
   });
 
-  it("opens the share-article import with a template of the list's columns and reloads the list after it", async () => {
+  it("imports share articles as extras in pieces with a template of the list's columns and reloads the list after it", async () => {
     tenantState.settings = { allow_upload_for_data_lists: true };
     const { user } = await renderLoaded();
 
@@ -617,6 +630,7 @@ describe("ListExtraArticles exports and import", () => {
     expect(await screen.findByRole("dialog", { name: "csv_upload.import_title" })).toBeInTheDocument();
     expect(stubs.template).toMatchObject({
       filename: "commissioning.extra_articles_template.csv", modelName: "share_article",
+      fixedValues: { is_extra: true, default_movement_unit: "PCS" },
     });
     expect(stubs.template?.columns.map((column) => column.dataIndex)).toEqual(
       expect.arrayContaining(["is_active", "article_number", "name", "description"]),

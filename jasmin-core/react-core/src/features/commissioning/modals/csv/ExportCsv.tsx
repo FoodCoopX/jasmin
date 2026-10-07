@@ -57,6 +57,11 @@ export default function ExportCsv({
     [getSetting],
   );
 
+  // A column drawn through `render` may be a button or a link (a price
+  // button, an orders link) that carries a `dataIndex` only as the table's
+  // key: no row has a field under it, so it has nothing to export. A data
+  // column the grid merely formats keeps its field in the rows, even when the
+  // field is empty.
   const exportableColumns = useMemo(() => {
     const flatCols: ColumnDef[] = [];
     const flatten = (cols: ColumnDef[]) => {
@@ -69,11 +74,28 @@ export default function ExportCsv({
       }
     };
     flatten(columns);
-    return flatCols;
-  }, [columns]);
+    return flatCols.filter(
+      (col) =>
+        !col.render ||
+        data.some((row) => (col.dataIndex as string) in row),
+    );
+  }, [columns, data]);
 
-  const [selectedKeys, setSelectedKeys] = useState<string[]>(() =>
-    exportableColumns.map((c) => c.dataIndex as string),
+  // The office's unticked columns, so a column that becomes exportable once
+  // the rows arrive starts out ticked.
+  const [deselectedKeys, setDeselectedKeys] = useState<string[]>([]);
+  const exportableKeys = useMemo(
+    () => exportableColumns.map((col) => col.dataIndex as string),
+    [exportableColumns],
+  );
+  const selectedKeys = useMemo(
+    () => exportableKeys.filter((key) => !deselectedKeys.includes(key)),
+    [exportableKeys, deselectedKeys],
+  );
+  const handleSelectionChange = useCallback(
+    (keys: string[]) =>
+      setDeselectedKeys(exportableKeys.filter((key) => !keys.includes(key))),
+    [exportableKeys],
   );
 
   const noneSelected = selectedKeys.length === 0;
@@ -124,7 +146,7 @@ export default function ExportCsv({
       <CheckboxMultiSelectList
         items={items}
         selectedKeys={selectedKeys}
-        onChange={setSelectedKeys}
+        onChange={handleSelectionChange}
         withSelectAll
       />
     </Modal>

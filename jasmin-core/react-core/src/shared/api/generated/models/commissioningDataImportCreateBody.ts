@@ -12,4 +12,6 @@ export type CommissioningDataImportCreateBody = {
   file: Blob;
   /** Validate every row (including FK resolution) without persisting anything — the preview pass for many-FK imports like subscriptions. */
   dry_run?: boolean;
+  /** A JSON object of field values set on every row, over the file's own cells, e.g. ``{"is_extra": true, "default_movement_unit": "PCS"}`` for extra articles. Only fields the import can write are accepted. */
+  fixed_values?: string;
 };

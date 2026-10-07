@@ -911,6 +911,31 @@ class TestShareArticleNetPriceFiltering:
         assert [row["id"] for row in resp.data] == [closed.id]
         assert open_ended.id not in {row["id"] for row in resp.data}
 
+    def test_is_extra_narrows_to_the_prices_of_one_kind_of_article(
+        self, api_client, tenant
+    ):
+        regular = ShareArticleNetPriceFactory()
+        extra = ShareArticleNetPriceFactory(
+            share_article=ShareArticleFactory(
+                is_extra=True, default_movement_unit="PCS"
+            )
+        )
+
+        only_extras = api_client.get(URL_SHARE_ARTICLE_NET_PRICE, {"is_extra": "true"})
+        only_regular = api_client.get(
+            URL_SHARE_ARTICLE_NET_PRICE, {"is_extra": "false"}
+        )
+        unfiltered = api_client.get(URL_SHARE_ARTICLE_NET_PRICE)
+
+        assert only_extras.status_code == status.HTTP_200_OK
+        extra_ids = {row["id"] for row in only_extras.data}
+        assert extra.id in extra_ids
+        assert regular.id not in extra_ids
+        regular_ids = {row["id"] for row in only_regular.data}
+        assert regular.id in regular_ids
+        assert extra.id not in regular_ids
+        assert {regular.id, extra.id} <= {row["id"] for row in unfiltered.data}
+
 
 @pytest.mark.django_db
 class TestShareArticleNetPriceViewSet:

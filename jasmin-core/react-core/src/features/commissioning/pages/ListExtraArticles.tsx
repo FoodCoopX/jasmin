@@ -41,6 +41,10 @@ const EXTRA_LIST_PARAMS: CommissioningShareArticlesListParams = {
   is_extra: true,
 };
 
+// Every uploaded row is an extra in pieces; the grid locks the unit and never
+// shows the flag, so the template has neither column.
+const EXTRA_IMPORT_VALUES = { is_extra: true, default_movement_unit: "PCS" };
+
 const extraArticlesResource: CrudResource<ShareArticleRow> = {
   useList: useCommissioningShareArticlesList,
   create: (payload) =>
@@ -158,7 +162,8 @@ export default function ListExtraArticles() {
         readOnly: true,
         options: unitOptions,
         // Extras are constrained server-side to PCS only — keep the column
-        // visible (so the value is shown), but never editable.
+        // visible (so the value is shown), but never editable. The import
+        // sets it on every row, so the template leaves it out.
         render: (value: string) => {
           const unitOption = unitOptions.find(
             (option: { value: string; label: string }) =>
@@ -234,6 +239,8 @@ export default function ListExtraArticles() {
         columns={columns}
         filename={t("commissioning.extra_articles_template.csv")}
         modelName="share_article"
+        entityLabel={t("commissioning.extra_articles")}
+        fixedValues={EXTRA_IMPORT_VALUES}
         onUploadSuccess={list.invalidate}
       />
 
@@ -248,6 +255,7 @@ export default function ListExtraArticles() {
       <ExportCsvPricesShareArticle
         open={priceExportVisible}
         onClose={() => setPriceExportVisible(false)}
+        extrasOnly
       />
 
       <ShareArticleExtraPriceModal

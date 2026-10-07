@@ -87,6 +87,11 @@ interface DownloadCsvTemplateButtonProps {
    * CSV before committing. Off by default (existing pages unaffected).
    */
   allowDryRun?: boolean;
+  /**
+   * Field values the backend sets on every imported row, over the file's own
+   * cells — for a page whose rows all share values its template leaves out.
+   */
+  fixedValues?: Record<string, unknown>;
 }
 
 // Maps an EditableColumnConfig `inputType` to a short, comma-free type hint
@@ -178,6 +183,7 @@ export default function DownloadCsvTemplateButton({
   onUploadSuccess,
   onImported,
   allowDryRun = false,
+  fixedValues,
 }: DownloadCsvTemplateButtonProps) {
   const { t } = useTranslation();
 
@@ -194,6 +200,7 @@ export default function DownloadCsvTemplateButton({
       form.append("model_name", modelName);
       form.append("file", file);
       if (dryRun) form.append("dry_run", "true");
+      if (fixedValues) form.append("fixed_values", JSON.stringify(fixedValues));
       const response = await axiosService.post<DataImportResponse>(
         "/api/commissioning/data_import/",
         form,

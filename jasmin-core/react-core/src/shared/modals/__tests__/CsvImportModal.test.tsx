@@ -5,10 +5,11 @@
  * offers a DRY RUN, so an office user learns about a bad file before importing
  * it.
  */
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import api from "@shared/services/api";
 import { CsvImportButton } from "../CsvImportModal";
 
 vi.mock("react-i18next", () => ({
@@ -78,5 +79,45 @@ describe("CsvImportButton", () => {
     // readOnly columns are not importable serializer inputs — documenting one
     // would send the office chasing a column the backend rejects.
     expect(screen.queryByText("iban_masked")).not.toBeInTheDocument();
+  });
+
+  describe("upload", () => {
+    const post = vi.mocked(api.post);
+    const sentForm = () => post.mock.calls[0][1] as FormData;
+
+    async function importFile() {
+      post.mockResolvedValue({
+        data: { model_name: "share_article", successful: 1, failed: 0, results: [], errors: [] },
+      });
+      await open();
+      const inputs = document.querySelectorAll<HTMLInputElement>('input[type="file"]');
+      await userEvent.upload(
+        inputs[inputs.length - 1],
+        new File(["name\nTractor hire\n"], "things.csv", { type: "text/csv" }),
+      );
+      await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    }
+
+    it("sends the page's fixed values with the file", async () => {
+      post.mockClear();
+      renderButton({ fixedValues: { is_extra: true, default_movement_unit: "PCS" } });
+
+      await importFile();
+
+      expect(sentForm().get("model_name")).toBe("share_article");
+      expect(JSON.parse(String(sentForm().get("fixed_values")))).toEqual({
+        is_extra: true,
+        default_movement_unit: "PCS",
+      });
+    });
+
+    it("sends no fixed values when the page has none", async () => {
+      post.mockClear();
+      renderButton();
+
+      await importFile();
+
+      expect(sentForm().has("fixed_values")).toBe(false);
+    });
   });
 });

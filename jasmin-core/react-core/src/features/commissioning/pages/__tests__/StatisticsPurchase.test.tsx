@@ -154,7 +154,10 @@ function openPopup(selector: string): HTMLElement {
 
 type User = ReturnType<typeof userEvent.setup>;
 
+// The picker sits inside the page's Spin, which blocks pointer events on it
+// until the weeks have loaded.
 async function pickPreset(user: User, preset: string) {
+  await waitFor(() => expect(spinner()).toBeNull());
   await user.click(rangeInputs()[0]);
   await user.click(within(openPopup(".ant-picker-dropdown")).getByText(preset));
 }

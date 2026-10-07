@@ -4,7 +4,7 @@ COMMISSIONING APP — VIEW TESTS OVERVIEW
 
 Directory: apps/commissioning/tests/tests_views/
 Total files: 12
-Total tests: 429
+Total tests: 435
 Run: poetry run pytest apps/commissioning/tests/tests_views/ -q
 
 Counts are collected cases, so a parametrized method counts once per case and a
@@ -43,7 +43,7 @@ alphabetical order.
      - test_a_failed_invoice_is_refunded
 
 ================================================================================
-2. test_data_import_view.py  (22 tests)
+2. test_data_import_view.py  (28 tests)
    View: data_import_views — CSV sample upload / dry-run import per model
 --------------------------------------------------------------------------------
    TestMemberSampleUpload  (7 cases)
@@ -59,6 +59,12 @@ alphabetical order.
      - test_dry_run_without_step_up_is_allowed
      - test_real_import_with_step_up_imports
      - test_unknown_model_is_a_400_not_a_step_up_prompt
+
+   TestFixedValues  (6 cases)
+     - test_fixed_values_are_set_on_every_row
+     - test_fixed_values_that_are_no_json_object_are_refused
+     - test_a_field_the_import_cannot_write_is_refused
+     - test_a_bank_field_in_fixed_values_needs_step_up
 
    TestSubscriptionSampleUpload
      - test_office_uploads_subscription_sample

@@ -211,6 +211,45 @@ def _collect_bool_fields(
     }
 
 
+@dataclass(frozen=True)
+class ImportOptions:
+    """How each row of an import is saved.
+
+    ``confirm_active_users`` decides whether a member row linked to an
+    existing active user is confirmed on import. The import view turns it off
+    in onboarding mode, where the office confirms members with their
+    historical dates afterwards.
+
+    ``fixed_values`` are set on every row over whatever the file says, for a
+    list page whose rows all share values the template leaves out (the extra
+    articles page: ``is_extra`` and the unit ``PCS``).
+    """
+
+    confirm_active_users: bool = True
+    fixed_values: dict[str, Any] = field(default_factory=dict)
+
+
+def check_fixed_values(
+    serializer_cls: type[drf_serializers.BaseSerializer],
+    fixed_values: dict[str, Any],
+) -> None:
+    """Refuse fixed values for fields the serializer would not write.
+
+    Fixed values replace a column's cell in every row, so a key the serializer
+    ignores or keeps read-only would be dropped without a word.
+    """
+    instance = serializer_cls()
+    fields = instance.fields if isinstance(instance, drf_serializers.Serializer) else {}
+    unwritable = sorted(
+        key for key in fixed_values if key not in fields or fields[key].read_only
+    )
+    if unwritable:
+        raise DataImportInvalid(
+            f"fixed_values names fields this import cannot set: {unwritable}",
+            field="fixed_values",
+        )
+
+
 def _flatten_drf_errors(errors: Any) -> str:
     """Turn a DRF error dict / list into a short single-line message.
 
@@ -509,7 +548,7 @@ def import_rows_from_csv(
     importing_user=None,
     *,
     dry_run: bool = False,
-    confirm_active_users: bool = True,
+    options: ImportOptions | None = None,
 ) -> DataImportResult:
     """Run an import end-to-end. Pure logic — no HTTP.
 
@@ -521,10 +560,7 @@ def import_rows_from_csv(
     ``importing_user`` is the office user running the import (threaded down so
     member rows can be linked to an existing JasminUser, recording the actor).
 
-    ``confirm_active_users`` decides whether a member row linked to an existing
-    active user is confirmed on import. The import view turns it off in
-    onboarding mode, where the office confirms members with their historical
-    dates afterwards.
+    ``options`` says how each row is saved (see :class:`ImportOptions`).
 
     ``dry_run`` validates every row — including FK resolution (e.g. a
     Subscription's member / variation / station-day natural keys) — WITHOUT
@@ -533,6 +569,8 @@ def import_rows_from_csv(
     saved, no member↔user links are made, and no rate-limit quota is consumed.
     """
     serializer_cls = get_serializer_for_model(model_name)
+    options = options or ImportOptions()
+    check_fixed_values(serializer_cls, options.fixed_values)
     # One line past what a full-size upload needs (the three template rows plus
     # the cap): enough to tell "at the cap" from "over it", and it keeps the
     # parse off the rest of a runaway file (whose bytes the view caps first).
@@ -584,6 +622,7 @@ def import_rows_from_csv(
             if not payload:
                 # Blank line in the middle of the file — silently skip.
                 continue
+            payload.update(options.fixed_values)
             serializer = serializer_cls(data=payload)
             try:
                 if serializer.is_valid():
@@ -611,7 +650,7 @@ def import_rows_from_csv(
                                 model_name,
                                 payload,
                                 importing_user,
-                                confirm_active_users=confirm_active_users,
+                                confirm_active_users=options.confirm_active_users,
                             )
                         result.results.append({"row": row_number, "id": None})
                     else:
@@ -630,7 +669,7 @@ def import_rows_from_csv(
                                 model_name,
                                 payload,
                                 importing_user,
-                                confirm_active_users=confirm_active_users,
+                                confirm_active_users=options.confirm_active_users,
                             )
                         result.results.append(
                             {"row": row_number, "id": getattr(instance, "id", None)}

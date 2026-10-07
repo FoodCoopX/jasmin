@@ -29,6 +29,8 @@ export interface CsvImportModalProps {
   notice?: ReactNode;
   /** Per-field help, keyed by `dataIndex`. Omit to hide the columns table. */
   help?: Record<string, string>;
+  /** Field values the backend sets on every row, over the file's own cells. */
+  fixedValues?: Record<string, unknown>;
 }
 
 /**
@@ -47,6 +49,7 @@ export function CsvImportModal({
   entityLabel,
   notice,
   help,
+  fixedValues,
 }: CsvImportModalProps) {
   const { t } = useTranslation();
   const entity = entityLabel ?? t(`csv_upload.model.${modelName}`);
@@ -120,6 +123,7 @@ export function CsvImportModal({
               filename={filename}
               modelName={modelName}
               allowDryRun
+              fixedValues={fixedValues}
               onUploadSuccess={onUploadSuccess}
               onImported={onClose}
             />
