@@ -1,4 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Alert, Button } from "antd";
+import dayjs from "dayjs";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,7 +29,7 @@ import {
   useShareTypeVariationColumns,
   variationColumnKey,
 } from "@features/commissioning/hooks";
-import { notify } from "@shared/utils";
+import { notify, toApiDate } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 
 /**
@@ -38,8 +40,16 @@ import { getErrorMessage } from "@shared/utils/apiError";
  * grouped by their share type, rendered via `useShareTypeVariationColumns`
  * (also used by `DeliveryStationsDetails`). Each cell holds the default
  * quantity; clearing it (or 0) deletes the underlying row. Saving a row
- * sends a single `bulk_upsert` so all variation cells apply atomically.
+ * sends one `bulk_upsert` with the cells that changed.
  */
+
+/** A default quantity as the bulk upsert takes it: a positive number as text,
+ *  or null for none — a blank cell and 0 both mean none. */
+function quantityOf(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : null;
+}
 
 /** Share-article rows as returned by the API with `is_data_list=true`. */
 interface ShareArticleListRow {
@@ -55,10 +65,6 @@ export default function DefaultShareArticlesInShare() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { isOffice } = useRoles();
-  const permissions = useMemo(
-    () => gatedByPermissionOnlyEdit(isOffice),
-    [isOffice],
-  );
   const { unitOptions } = useUnitOptions();
 
   // --- Shared column hooks ------------------------------------------------
@@ -82,7 +88,7 @@ export default function DefaultShareArticlesInShare() {
     },
   });
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => toApiDate(dayjs())!, []);
   const {
     variationColumns,
     variations,
@@ -101,8 +107,20 @@ export default function DefaultShareArticlesInShare() {
     () => getCommissioningDefaultShareArticlesInShareListQueryKey(),
     [],
   );
-  const { data: defaultsRaw, isFetching: defaultsFetching } =
-    useCommissioningDefaultShareArticlesInShareList();
+  const {
+    data: defaultsRaw,
+    isFetching: defaultsFetching,
+    isSuccess: defaultsLoaded,
+    isError: defaultsFailed,
+    refetch: refetchDefaults,
+  } = useCommissioningDefaultShareArticlesInShareList();
+
+  // Read-only until the stored amounts are in: without them every cell looks
+  // empty, and a save would clear what is stored.
+  const permissions = useMemo(
+    () => gatedByPermissionOnlyEdit(isOffice && defaultsLoaded),
+    [isOffice, defaultsLoaded],
+  );
 
   // --- Pivot --------------------------------------------------------------
 
@@ -164,37 +182,45 @@ export default function DefaultShareArticlesInShare() {
       // ``showSearchBar`` + ``apiFunctions.list`` are both set) against a
       // stale closure. Search still works client-side over ``initialData``.
       update: async (id, data) => {
+        // Only the cells that differ from what is stored: a cell the office
+        // didn't touch must not overwrite, or clear, an amount on the server.
         const entries: DefaultShareArticleInShareBulkEntry[] = [];
         for (const v of variations) {
-          if (!v.id) continue;
-          const key = variationColumnKey(v.id);
-          if (!(key in data)) continue;
-          const raw = data[key];
-          let quantity: string | null;
-          if (raw === null || raw === undefined || raw === "") {
-            quantity = null;
-          } else {
-            const parsed = Number(raw);
-            quantity =
-              Number.isFinite(parsed) && parsed > 0 ? String(parsed) : null;
+          if (!v.id || !(variationColumnKey(v.id) in data)) continue;
+          const quantity = quantityOf(data[variationColumnKey(v.id)]);
+          const stored = defaultsIndex.get(`${id}:${v.id}`)?.quantity;
+          if (quantity !== quantityOf(stored)) {
+            entries.push({ share_type_variation: v.id, quantity });
           }
-          entries.push({ share_type_variation: v.id, quantity });
         }
-        try {
-          await bulkUpsert.mutateAsync({ share_article: id, entries });
-        } catch (err) {
-          notify.error(
-            getErrorMessage(
-              err,
-              t("commissioning.default_share_articles_save_failed"),
-            ),
-          );
-          throw err;
+        let stored = [...defaultsIndex.values()].filter(
+          (d) => d.share_article === id,
+        );
+        if (entries.length > 0) {
+          try {
+            stored = await bulkUpsert.mutateAsync({ share_article: id, entries });
+          } catch (err) {
+            notify.error(
+              getErrorMessage(
+                err,
+                t("commissioning.default_share_articles_save_failed"),
+              ),
+            );
+            throw err;
+          }
         }
-        return { data };
+        // The row as stored, so a cell saved as 0 or left blank shows empty.
+        const row: Record<string, unknown> = { ...data };
+        for (const v of variations) {
+          if (!v.id) continue;
+          row[variationColumnKey(v.id)] =
+            stored.find((d) => d.share_type_variation === v.id)?.quantity ??
+            null;
+        }
+        return { data: row };
       },
     }),
-    [variations, bulkUpsert, t],
+    [variations, bulkUpsert, defaultsIndex, t],
   );
 
   // --- Columns -----------------------------------------------------------
@@ -234,6 +260,21 @@ export default function DefaultShareArticlesInShare() {
           {t("commissioning.default_share_articles_in_share")}
         </h1>
       </div>
+
+      {defaultsFailed && (
+        <Alert
+          type="error"
+          showIcon
+          message={t("table.load_failed_title")}
+          description={t("table.load_failed_hint")}
+          action={
+            <Button size="small" onClick={() => refetchDefaults()}>
+              {t("table.retry")}
+            </Button>
+          }
+          className="editable-table-banner"
+        />
+      )}
 
       <EditableTable
         columns={columns}

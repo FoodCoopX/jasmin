@@ -285,14 +285,17 @@ function renderModal({ showDaysTogether = false } = {}) {
   );
   const view = render(modal(false, null));
 
-  /** Opens on `row` once the days, sizes and articles have arrived. */
-  async function open(row: PlanningRow = CARROTS) {
-    await waitFor(() => {
-      expect(api.deliveryDays).toHaveBeenCalled();
-      expect(api.variations).toHaveBeenCalled();
-      expect(api.shareArticles).toHaveBeenCalled();
-      expect(queryClient.isFetching()).toBe(0);
-    });
+  /** Opens on `row` once the days, sizes and articles have arrived — or at
+   *  once with `early`, as the office may click before they have. */
+  async function open(row: PlanningRow = CARROTS, { early = false } = {}) {
+    if (!early) {
+      await waitFor(() => {
+        expect(api.deliveryDays).toHaveBeenCalled();
+        expect(api.variations).toHaveBeenCalled();
+        expect(api.shareArticles).toHaveBeenCalled();
+        expect(queryClient.isFetching()).toBe(0);
+      });
+    }
     view.rerender(modal(true, row));
     await waitFor(() => expect(bodyRows()).toHaveLength(1));
   }
@@ -744,6 +747,56 @@ describe("BackupModal editing", () => {
 
     expect(amountInput(THU, SMALL)).toHaveValue("0,750");
     expect(within(backupRow()).getByRole("combobox", { name: VEGETABLE })).toBeInTheDocument();
+  });
+});
+
+// ── Opened before the days and sizes are in ─────────────────────────────────
+
+describe("BackupModal opened before its days and sizes are in", () => {
+  /** Holds the delivery days back until the test answers them. */
+  function holdDays() {
+    let respond: (() => void) | undefined;
+    api.deliveryDays.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          respond = () => resolve(DELIVERY_DAYS.map((day) => ({ ...day })));
+        }),
+    );
+    return {
+      answer: () =>
+        act(async () => {
+          respond?.();
+        }),
+      asked: () => waitFor(() => expect(respond).toBeDefined()),
+    };
+  }
+
+  it("offers no editing until they arrive, then shows the stored amounts and saves them with a new size", async () => {
+    const days = holdDays();
+    const modal = renderModal();
+    await days.asked();
+    await modal.open(CARROTS, { early: true });
+
+    expect(within(backupRow()).queryByRole("button", { name: "table.edit" })).not.toBeInTheDocument();
+
+    await days.answer();
+
+    await waitFor(() => expect(shownAmounts()).toEqual(CARROT_BACKUP));
+    await startEditing();
+    await pick(SIZE, "commissioning.large");
+    await save();
+
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1));
+    expect(api.update).toHaveBeenCalledWith(
+      CARROTS.id,
+      expect.objectContaining({
+        backup_size: "L",
+        [amountKey("sdd-tue", "var-small")]: "0.500",
+        [amountKey("sdd-tue", "var-large")]: "1.000",
+        [amountKey("sdd-thu", "var-small")]: "0.750",
+        [amountKey("sdd-thu", "var-large")]: 0,
+      }),
+    );
   });
 });
 

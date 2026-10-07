@@ -360,7 +360,7 @@ async function typeAmount(user: User, title: string, text: string) {
   if (text) await user.type(input, text);
 }
 
-/** An article's amounts as one bulk upsert sends them, a null for each variation without one. */
+/** A bulk upsert of an article's changed amounts, a null for an amount cleared. */
 const upsert = (articleId: string, amounts: [Variation, string | null][]) => ({
   share_article: articleId,
   entries: amounts
@@ -512,8 +512,15 @@ describe("DefaultShareArticlesInShare variations", () => {
     await saveRow(user);
 
     await savedOnce();
-    expect(lastUpsert().entries).toContainEqual({ share_type_variation: runningM.id, quantity: "3" });
-    expect(lastUpsert().entries).toHaveLength(5);
+    expect(lastUpsert().entries).toEqual([{ share_type_variation: runningM.id, quantity: "3" }]);
+  });
+
+  it("takes the local date as today, also just after midnight", async () => {
+    // In Berlin the UTC date is still Sunday's until 02:00 on a summer Monday.
+    vi.setSystemTime(new Date(2026, 9, 12, 0, 30));
+    await renderLoaded();
+
+    expect(api.listVariations).toHaveBeenCalledWith({ active_at_date: "2026-10-12", physical: true });
   });
 
   it("still lists the articles, without amount columns, when no variation is running today", async () => {
@@ -539,18 +546,14 @@ describe("DefaultShareArticlesInShare editing", () => {
     await saveRow(user);
 
     await savedOnce();
-    expect(lastUpsert()).toEqual(
-      upsert(BEETROOT.id, [
-        [FRUIT_S, null], [FRUIT_L, null], [VEGETABLES_S, "1"], [VEGETABLES_M, null], [VEGETABLES_L, "2.5"],
-      ]),
-    );
+    expect(lastUpsert()).toEqual(upsert(BEETROOT.id, [[VEGETABLES_S, "1"], [VEGETABLES_L, "2.5"]]));
     await reloaded();
     await waitFor(() => expect(amountsOf("Beetroot")).toEqual(["", "", "1", "", "2,5"]));
     expect(screen.queryByRole("button", { name: "table.save" })).not.toBeInTheDocument();
     expect(serverDefaults.filter((row) => row.share_article === BEETROOT.id)).toHaveLength(2);
   });
 
-  it("sends every running variation of a changed row and removes the amount the office cleared", async () => {
+  it("sends only the amounts the office changed or cleared, leaving the rest as stored", async () => {
     const { user } = await renderLoaded();
 
     await editRow(user, "Carrots");
@@ -559,17 +562,27 @@ describe("DefaultShareArticlesInShare editing", () => {
     await saveRow(user);
 
     await savedOnce();
-    expect(lastUpsert()).toEqual(
-      upsert(CARROTS.id, [
-        [FRUIT_S, null], [FRUIT_L, null], [VEGETABLES_S, "0.5"], [VEGETABLES_M, "1.75"], [VEGETABLES_L, null],
-      ]),
-    );
+    expect(lastUpsert()).toEqual(upsert(CARROTS.id, [[VEGETABLES_M, "1.75"], [VEGETABLES_L, null]]));
     await reloaded();
     await waitFor(() => expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1,75", ""]));
     // The amount for the XL, which no longer runs, stays as it was.
     expect(serverDefaults).toContainEqual(
       expect.objectContaining({ share_article: CARROTS.id, share_type_variation: VEGETABLES_XL.id, quantity: "2.000" }),
     );
+  });
+
+  it("sends nothing for a row saved unchanged, and shows a 0 typed into an empty cell as empty", async () => {
+    const { user } = await renderLoaded();
+
+    await editRow(user, "Beetroot");
+    await typeAmount(user, VEGETABLES_S_COLUMN, "0");
+    await saveRow(user);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "table.save" })).not.toBeInTheDocument(),
+    );
+    expect(api.bulkUpsert).not.toHaveBeenCalled();
+    expect(amountsOf("Beetroot")).toEqual(["", "", "", "", ""]);
   });
 
   it("treats an amount of 0 as no amount", async () => {
@@ -593,11 +606,7 @@ describe("DefaultShareArticlesInShare editing", () => {
     await typeAmount(user, VEGETABLES_M_COLUMN, "2{Enter}");
 
     await savedOnce();
-    expect(lastUpsert()).toEqual(
-      upsert(PARSLEY.id, [
-        [FRUIT_S, null], [FRUIT_L, "0.75"], [VEGETABLES_S, "1"], [VEGETABLES_M, "2"], [VEGETABLES_L, null],
-      ]),
-    );
+    expect(lastUpsert()).toEqual(upsert(PARSLEY.id, [[VEGETABLES_M, "2"]]));
   });
 
   it("offers inputs only for the amounts, keeping the article and its unit as they are", async () => {
@@ -645,9 +654,7 @@ describe("DefaultShareArticlesInShare amount inputs", () => {
 
     await savedOnce();
     expect(lastUpsert()).toEqual(
-      upsert(BEETROOT.id, [
-        [FRUIT_S, null], [FRUIT_L, null], [VEGETABLES_S, "1.25"], [VEGETABLES_M, "2.51"], [VEGETABLES_L, null],
-      ]),
+      upsert(BEETROOT.id, [[VEGETABLES_S, "1.25"], [VEGETABLES_M, "2.51"]]),
     );
   });
 
@@ -715,6 +722,21 @@ describe("DefaultShareArticlesInShare empty and error states", () => {
     await waitFor(() => expect(spinner()).not.toBeInTheDocument());
     expect(screen.getByText("table.no_data")).toBeInTheDocument();
     expect(bodyRows()).toHaveLength(0);
+  });
+
+  it("keeps the amounts read-only and offers a retry when they fail to load", async () => {
+    api.listDefaults.mockRejectedValueOnce(httpError(503, { message: "Down" }));
+    const { user } = renderPage();
+
+    expect(await screen.findByText("table.load_failed_title")).toBeInTheDocument();
+    await waitFor(() => expect(rowOf("Carrots")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "table.edit" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "table.retry" }));
+
+    await waitFor(() => expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1", "1,25"]));
+    expect(within(rowOf("Carrots")).getByRole("button", { name: "table.edit" })).toBeEnabled();
+    expect(screen.queryByText("table.load_failed_title")).not.toBeInTheDocument();
   });
 
   it("keeps the page up when the articles fail to load", async () => {

@@ -126,6 +126,11 @@ const NEXT_FRIDAY: Day = {
   id: "day-fri-next", day_number: 4, valid_from: "2026-10-26", valid_until: null,
   number_of_tours: null,
 };
+// An earlier Tuesday, ended in January; the day picker still offers it.
+const ENDED_TUESDAY: Day = {
+  id: "day-tue-ended", day_number: 1, valid_from: "2025-01-06", valid_until: "2026-01-04",
+  number_of_tours: 2,
+};
 
 const WEEKDAY_KEYS: Record<number, string> = { 1: "delivery.di", 4: "delivery.fr" };
 const shownDate = (isoDate: string) => isoDate.split("-").reverse().join(".");
@@ -441,6 +446,32 @@ describe("DeliveryTours loading", () => {
       expect(api.saveTours).not.toHaveBeenCalled();
     },
   );
+
+  it("takes no edits until the day's saved plan is in, as a save replaces the whole plan", async () => {
+    let respond: (() => void) | undefined;
+    api.tours.mockImplementation(
+      (params) => new Promise((resolve) => (respond = () => resolve(listedPlan(params)))),
+    );
+    const { user } = renderPage();
+    await waitFor(() => expect(respond).toBeDefined());
+    await waitFor(() => expect(paletteStations()).toContain("Town Hall"));
+
+    await place(user, TOWN_HALL, { tour: 1, position: 3 });
+    await settle();
+    expect(api.saveTours).not.toHaveBeenCalled();
+
+    await answer(respond);
+    await opened();
+    await place(user, TOWN_HALL, { tour: 1, position: 3 });
+
+    expect(await savedPlan()).toEqual({
+      delivery_day: TUESDAY.id,
+      tours: [
+        { tour_number: 1, positions: [at(1, MARKET_HALL), at(2, BAKERY), at(3, TOWN_HALL)] },
+        { tour_number: 2, positions: [at(1, SCHOOL)] },
+      ],
+    });
+  });
 });
 
 // ── Choosing a delivery day ─────────────────────────────────────────────────
@@ -475,6 +506,45 @@ describe("DeliveryTours choosing a delivery day", () => {
     await waitFor(() => expect(tourHeadings()).toEqual(["commissioning.tour_label(number=1)"]));
     await waitFor(() => expect(shownTours()).toEqual([[]]));
     expect(paletteStations()).toEqual(["Old Mill", "Church Square"]);
+    await settle();
+    expect(api.saveTours).not.toHaveBeenCalled();
+  });
+
+  it("keeps a column for every tour the saved plan uses", async () => {
+    farm.plans[NEXT_FRIDAY.id] = [{ tour_number: 2, positions: [at(1, CHURCH)] }];
+    const { user } = renderPage();
+    await opened();
+
+    await chooseDay(user, NEXT_FRIDAY);
+
+    await opened([[], ["1 Church Square"]]);
+    expect(paletteStations()).toEqual(["Old Mill"]);
+  });
+
+  it("gives an ended day its own number of tours, with its stations in them", async () => {
+    farm.days.push(ENDED_TUESDAY);
+    farm.stations[ENDED_TUESDAY.id] = [MILL, CHURCH];
+    farm.plans[ENDED_TUESDAY.id] = [{ tour_number: 2, positions: [at(1, CHURCH)] }];
+    const { user } = renderPage();
+    await opened();
+
+    await chooseDay(user, ENDED_TUESDAY);
+
+    await opened([[], ["1 Church Square"]]);
+    expect(paletteStations()).toEqual(["Old Mill"]);
+  });
+
+  it("starts a day without stations from an empty grid, not the last day's plan", async () => {
+    farm.stations[NEXT_FRIDAY.id] = [];
+    const { user } = renderPage();
+    await opened();
+
+    await chooseDay(user, NEXT_FRIDAY);
+
+    await waitFor(() => expect(positionRows()).toHaveLength(0));
+    expect(
+      within(grid()).queryByRole("button", { name: /commissioning\.remove_station/ }),
+    ).not.toBeInTheDocument();
     await settle();
     expect(api.saveTours).not.toHaveBeenCalled();
   });

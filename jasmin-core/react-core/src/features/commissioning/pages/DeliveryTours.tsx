@@ -55,7 +55,6 @@ export default function DeliveryTours() {
   const { t } = useTranslation();
   const { isOffice } = useRoles();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [numberOfTours, setNumberOfTours] = useState(1);
 
   const deliveryStationsFilters = useMemo(() => {
     return selectedDay !== null ? { delivery_day: selectedDay } : {};
@@ -66,8 +65,43 @@ export default function DeliveryTours() {
   // hook returns a new array ref every render).
   const deliveryStationsRef = useRef<DeliveryStationOption[]>([]);
   deliveryStationsRef.current = deliveryStations;
+  const stationKey = deliveryStations.map((station) => station.value).join();
 
-  const [tourPlans, setTourPlans] = useState<StationSlot[][]>([[], []]);
+  const listParams = useMemo<CommissioningDeliveryToursListParams>(
+    () => ({
+      delivery_day: selectedDay!,
+    }),
+    [selectedDay],
+  );
+  const { data: toursData, refetch: refetchTours } =
+    useCommissioningDeliveryToursList(listParams, {
+      query: {
+        enabled: !!selectedDay,
+      },
+    });
+
+  // The selected day's own tour count, out of every day the day picker
+  // offers (ended ones too), and never fewer tours than the saved plan uses:
+  // a stop the grid has no column for would be dropped by the next save.
+  const { toursByDay } = useShareDeliveryDays();
+  const numberOfTours = useMemo(() => {
+    const plannedTours = ((toursData ?? []) as DeliveryTourResponse[]).map(
+      (tour) => tour.tour_number,
+    );
+    const dayTours = selectedDay ? (toursByDay[selectedDay] ?? 1) : 1;
+    return Math.max(dayTours, ...plannedTours);
+  }, [selectedDay, toursByDay, toursData]);
+
+  const [tourPlans, setTourPlans] = useState<StationSlot[][]>([]);
+  // The day whose saved plan the grid holds. Every save replaces a day's whole
+  // plan, so the grid takes edits only once it holds the selected day's.
+  const [planDay, setPlanDay] = useState<string | null>(null);
+  const canEdit = isOffice && planDay === selectedDay;
+
+  // Another day starts from an empty grid, not the last day's plan.
+  useEffect(() => {
+    setTourPlans([]);
+  }, [selectedDay]);
 
   useEffect(() => {
     if (deliveryStations.length > 0) {
@@ -102,13 +136,6 @@ export default function DeliveryTours() {
   );
   const stationColorMap = usePastelColorMap(stationIds);
 
-  const listParams = useMemo<CommissioningDeliveryToursListParams>(
-    () => ({
-      delivery_day: selectedDay!,
-    }),
-    [selectedDay],
-  );
-
   const shareDeliveryDaysParams =
     useMemo<CommissioningSharesDeliveryDaysListParams>(
       () => ({ active_at_date: toApiDate(dayjs())! }),
@@ -120,13 +147,12 @@ export default function DeliveryTours() {
       [],
     );
 
-  const {
-    shareDeliveryDays: currentlyActiveDeliveryDays,
-    toursByDay: currentToursByDay,
-  } = useShareDeliveryDays(shareDeliveryDaysParams);
+  const { shareDeliveryDays: currentlyActiveDeliveryDays } =
+    useShareDeliveryDays(shareDeliveryDaysParams);
 
-  const { shareDeliveryDays: futureDeliveryDays, toursByDay: futureToursByDay } =
-    useShareDeliveryDays(futureShareDeliveryDaysParams);
+  const { shareDeliveryDays: futureDeliveryDays } = useShareDeliveryDays(
+    futureShareDeliveryDaysParams,
+  );
 
   const shareDeliveryDays = useMemo(() => {
     return [...currentlyActiveDeliveryDays, ...futureDeliveryDays];
@@ -163,31 +189,12 @@ export default function DeliveryTours() {
     }
   }, [distinctShareDeliveryDays, selectedDay]);
 
-  useEffect(() => {
-    // Merge toursByDay: prefer current, fallback to future
-    const mergedToursByDay = { ...futureToursByDay, ...currentToursByDay };
-
-    if (Object.keys(mergedToursByDay).length > 0 && selectedDay) {
-      const tours = mergedToursByDay[selectedDay] || 1;
-      setNumberOfTours(tours);
-    } else {
-      setNumberOfTours(2);
-    }
-  }, [selectedDay, currentToursByDay, futureToursByDay]);
-
   // Filter out already assigned stations
   const availableStations = useMemo(() => {
     return deliveryStations.filter(
       (station) => !assignedStationIds.has(station.value),
     );
   }, [deliveryStations, assignedStationIds]);
-
-  const { data: toursData, refetch: refetchTours } =
-    useCommissioningDeliveryToursList(listParams, {
-      query: {
-        enabled: !!selectedDay,
-      },
-    });
 
   // Transform API response into tour plans
   useEffect(() => {
@@ -223,7 +230,8 @@ export default function DeliveryTours() {
     }
 
     setTourPlans(emptyTourPlans);
-  }, [toursData, numberOfTours, deliveryStations.length]);
+    setPlanDay(selectedDay);
+  }, [toursData, numberOfTours, stationKey, selectedDay]);
 
   // Auto-save via TanStack mutation. The grid is optimistic local state; on a
   // failure we surface it AND refetch so the UI can't keep showing a plan that
@@ -341,7 +349,7 @@ export default function DeliveryTours() {
                       label: station.label,
                       color: stationColorMap.get(station.value),
                     }}
-                    canDrag={isOffice}
+                    canDrag={canEdit}
                   />
                 ))
               )}
@@ -393,7 +401,7 @@ export default function DeliveryTours() {
                                   }
                                 : null
                             }
-                            canEdit={isOffice}
+                            canEdit={canEdit}
                             emptyLabel={t("commissioning.drop_station_here")}
                             removeAriaLabelFor={(label) =>
                               t("commissioning.remove_station", { station: label })

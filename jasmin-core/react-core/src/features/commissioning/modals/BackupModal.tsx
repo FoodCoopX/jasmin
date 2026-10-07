@@ -64,11 +64,6 @@ export default function BackupModal({
   const { t } = useTranslation();
   const { isOffice } = useRoles();
   const { format } = useNumberFormat();
-  const permissions = useMemo(
-    () => gatedByPermissionOnlyEdit(isOffice),
-    [isOffice],
-  );
-
   const { unitOptions, getUnitLabel } = useUnitOptions();
   const { vegetableSizeOptions, getVegetableSizeLabel } =
     useVegetableSizeOptions();
@@ -83,13 +78,20 @@ export default function BackupModal({
   // planning page uses, so the backup grid's day and variation sets can never
   // drift from the base table (requireStations mirrors the base page's
   // get_delivery_stations:true, which drops station-less days).
-  const { shareDeliveryDays, shareTypeVariations } = usePlanningAxes({
-    year,
-    week: delivery_week,
-    shareOption,
-    requireStations: true,
-    needTours: false,
-  });
+  const { shareDeliveryDays, shareTypeVariations, daysLoading, variationsLoading } =
+    usePlanningAxes({
+      year,
+      week: delivery_week,
+      shareOption,
+      requireStations: true,
+      needTours: false,
+    });
+  // Read-only until the days and sizes are in, as the amounts belong to them.
+  const permissions = useMemo(
+    () =>
+      gatedByPermissionOnlyEdit(isOffice && !daysLoading && !variationsLoading),
+    [isOffice, daysLoading, variationsLoading],
+  );
 
   // Build the editable row ONCE per open (keyed on the backup's id), not on
   // every dependency change. `data` is a frozen snapshot from the parent
@@ -98,7 +100,9 @@ export default function BackupModal({
   // the save invalidates them), and re-running this effect on those refetches
   // would overwrite the just-saved edit with the stale `data`. Guarding on
   // data.id keeps the in-table (onDataChange) values authoritative until the
-  // modal is actually reopened.
+  // modal is actually reopened. The axes load on their own, though, so an
+  // amount whose day and size arrive after the row was built is filled in
+  // from `data` then, leaving the amounts the row already holds alone.
   const builtForIdRef = useRef<Key | null>(null);
   useEffect(() => {
     if (!visible) {
@@ -106,18 +110,8 @@ export default function BackupModal({
       return;
     }
     if (!data) return;
-    if (builtForIdRef.current === (data.id as Key)) return;
-    builtForIdRef.current = data.id as Key;
 
-    const row: BackupDataRecord = {
-      id: data.id,
-      key: data.id as Key,
-      backup_share_article: data.backup_share_article,
-      backup_share_article_name: data.backup_share_article_name,
-      backup_unit: data.backup_unit,
-      backup_size: data.backup_size,
-    };
-
+    const amounts: Record<string, unknown> = {};
     shareDeliveryDays.forEach((deliveryDay) => {
       shareTypeVariations.forEach((variation) => {
         const backupKey = dayVariationKey({
@@ -125,11 +119,31 @@ export default function BackupModal({
           variationId: variation.id!,
           prefix: "backup_",
         });
-        row[backupKey] = data[backupKey] || 0;
+        amounts[backupKey] = data[backupKey] || 0;
       });
     });
 
-    setBackupData([row]);
+    if (builtForIdRef.current === (data.id as Key)) {
+      setBackupData((rows) =>
+        rows?.some((row) => Object.keys(amounts).some((key) => !(key in row)))
+          ? rows.map((row) => ({ ...amounts, ...row }))
+          : rows,
+      );
+      return;
+    }
+    builtForIdRef.current = data.id as Key;
+
+    setBackupData([
+      {
+        id: data.id,
+        key: data.id as Key,
+        backup_share_article: data.backup_share_article,
+        backup_share_article_name: data.backup_share_article_name,
+        backup_unit: data.backup_unit,
+        backup_size: data.backup_size,
+        ...amounts,
+      },
+    ]);
   }, [visible, data, shareDeliveryDays, shareTypeVariations]);
 
   const handleDataChange = useCallback((newData: TableRecord[]) => {
@@ -263,32 +277,39 @@ export default function BackupModal({
     showDaysTogether,
   ]);
 
-  const customSave = useCallback((transformedData: Record<string, unknown>) => {
-    const payload: Record<string, unknown> = {};
+  const customSave = useCallback(
+    (transformedData: Record<string, unknown>, record: TableRecord) => {
+      const payload: Record<string, unknown> = {};
 
-    Object.keys(transformedData).forEach((key) => {
-      const parsed = parseDayVariationKey(key);
-      if (parsed?.prefix === "backup_") {
-        // Rebuild WITHOUT the "backup_" prefix so the backend gets the plain
-        // "day_{id}_variation_{id}" (+ tour/station tier) key it stores under.
-        const strippedKey = dayVariationKey({
-          dayId: parsed.dayId,
-          variationId: parsed.variationId,
-          tour: parsed.tour,
-          station: parsed.station,
-        });
-        payload[strippedKey] = transformedData[key] || 0;
-      } else if (
-        key === "backup_share_article" ||
-        key === "backup_unit" ||
-        key === "backup_size"
-      ) {
-        payload[key] = transformedData[key];
-      }
-    });
+      Object.keys(transformedData).forEach((key) => {
+        const parsed = parseDayVariationKey(key);
+        if (parsed?.prefix === "backup_") {
+          // Rebuild WITHOUT the "backup_" prefix so the backend gets the plain
+          // "day_{id}_variation_{id}" (+ tour/station tier) key it stores under.
+          const strippedKey = dayVariationKey({
+            dayId: parsed.dayId,
+            variationId: parsed.variationId,
+            tour: parsed.tour,
+            station: parsed.station,
+          });
+          // An amount the form never held — its column came after the edit
+          // began — keeps the row's; a cleared one is 0.
+          const amount =
+            transformedData[key] === undefined ? record[key] : transformedData[key];
+          payload[strippedKey] = amount || 0;
+        } else if (
+          key === "backup_share_article" ||
+          key === "backup_unit" ||
+          key === "backup_size"
+        ) {
+          payload[key] = transformedData[key];
+        }
+      });
 
-    return payload;
-  }, []);
+      return payload;
+    },
+    [],
+  );
 
   const apiFunctions = useMemo<ApiFunctions>(
     () =>
