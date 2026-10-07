@@ -7,7 +7,9 @@ import pytest
 from apps.commissioning.errors import CompositeIdInvalid
 from apps.commissioning.utils.composite_id_utils import (
     build_composite_id,
+    compose_slot_id,
     parse_composite_id,
+    parse_slot_id,
 )
 
 CODE = "stock.invalid_composite_id"
@@ -109,3 +111,61 @@ class TestBuildCompositeId:
         assert parsed["year"] == 2026
         assert parsed["delivery_week"] == 52
         assert parsed["day_number"] == 4
+
+
+# ---------------------------------------------------------------------------
+# compose_slot_id / parse_slot_id  (pure functions — no DB needed)
+# ---------------------------------------------------------------------------
+SLOT_FIELDS = [
+    ("year", int),
+    ("delivery_week", int),
+    ("share_article", str),
+    ("unit", str),
+    ("size", str),
+]
+SLOT_CODE = "share_content.invalid_pk"
+
+
+class TestSlotId:
+    def test_the_share_option_comes_last(self):
+        assert (
+            compose_slot_id(2026, 20, "abc", "KG", "M", share_option="HARVEST_SHARE")
+            == "2026_20_abc_KG_M_HARVEST_SHARE"
+        )
+
+    def test_a_slot_of_every_option_has_none(self):
+        assert compose_slot_id(2026, 20, "abc", "KG", "M") == "2026_20_abc_KG_M"
+
+    def test_an_option_with_underscores_round_trips(self):
+        """``HARVEST_SHARE_FRUIT`` holds two underscores of its own."""
+        slot_id = compose_slot_id(
+            2026, 20, "abc", "KG", "M", share_option="HARVEST_SHARE_FRUIT"
+        )
+        assert parse_slot_id(slot_id, fields=SLOT_FIELDS, code=SLOT_CODE) == {
+            "year": 2026,
+            "delivery_week": 20,
+            "share_article": "abc",
+            "unit": "KG",
+            "size": "M",
+            "share_option": "HARVEST_SHARE_FRUIT",
+        }
+
+    def test_an_id_without_the_option_names_every_option(self):
+        parsed = parse_slot_id("2026_20_abc_KG_M", fields=SLOT_FIELDS, code=SLOT_CODE)
+        assert parsed["size"] == "M"
+        assert parsed["share_option"] is None
+
+    @pytest.mark.parametrize(
+        "slot_id",
+        [
+            "2026_20_abc_KG_M_NO_SUCH_OPTION",
+            "2026_20_abc_KG",
+            "x_20_abc_KG_M_HARVEST_SHARE",
+            "",
+            None,
+        ],
+    )
+    def test_a_malformed_id_is_refused_with_the_given_code(self, slot_id):
+        with pytest.raises(CompositeIdInvalid) as excinfo:
+            parse_slot_id(slot_id, fields=SLOT_FIELDS, code=SLOT_CODE)
+        assert excinfo.value.code == SLOT_CODE

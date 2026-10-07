@@ -18,9 +18,11 @@ from ..models import (
     Forecast,
     ShareArticle,
     ShareContent,
+    ShareTypeVariation,
 )
 from ..models.choices import UnitOptions
 from ..utils import sort_share_articles
+from ..utils.composite_id_utils import compose_slot_id
 from ..utils.iso_week_utils import (
     previous_day_stock_coordinates,
     previous_monday,
@@ -45,6 +47,7 @@ class ShareContentFrontendData(ShareContentStock):
         all_share_contents = list(share_content_queryset)
 
         forecast_by_key = self._prefetch_forecasts_by_group_key(all_share_contents)
+        option_by_variation = self._prefetch_share_options(all_share_contents)
         tour_number_lookup = self._prefetch_tour_numbers(all_share_contents)
         stock_by_week = self._prefetch_stock_by_week(all_share_contents)
         # One aggregated query for the whole set instead of 2-3 per week.
@@ -54,17 +57,21 @@ class ShareContentFrontendData(ShareContentStock):
         grouped_data: dict[tuple, dict[str, Any]] = {}
         for share_content in all_share_contents:
             share = share_content.share
-            group_key = (
+            slot_key = (
                 share.year,
                 share.delivery_week,
                 share_content.share_article_id,
                 share_content.unit,
                 share_content.size,
             )
+            # A row is one share option's slot: an article can belong to three.
+            share_option = option_by_variation[share.share_type_variation_id]
+            group_key = (*slot_key, share_option)
             if group_key not in grouped_data:
                 grouped_data[group_key] = self._init_frontend_group_row(
                     share_content,
-                    forecast=forecast_by_key.get(group_key),
+                    share_option=share_option,
+                    forecast=forecast_by_key.get(slot_key),
                     stock_by_week=stock_by_week,
                     pricing_cache=pricing_cache,
                 )
@@ -124,6 +131,23 @@ class ShareContentFrontendData(ShareContentStock):
                 )
             ] = forecast
         return forecast_by_key
+
+    @staticmethod
+    def _prefetch_share_options(
+        all_share_contents: list[ShareContent],
+    ) -> dict[str, str | None]:
+        """The share option of every variation the contents are planned for —
+        one query instead of one per group; None for a share type without
+        one."""
+        variation_ids = {
+            share_content.share.share_type_variation_id
+            for share_content in all_share_contents
+        }
+        return dict(
+            ShareTypeVariation.objects.filter(id__in=variation_ids).values_list(
+                "id", "share_type__share_option"
+            )
+        )
 
     @staticmethod
     def _prefetch_tour_numbers(
@@ -199,6 +223,7 @@ class ShareContentFrontendData(ShareContentStock):
         self,
         share_content: ShareContent,
         *,
+        share_option: str | None,
         forecast: Forecast | None,
         stock_by_week: dict[tuple[int, int], dict[tuple, dict]],
         pricing_cache: dict[tuple, object],
@@ -225,7 +250,14 @@ class ShareContentFrontendData(ShareContentStock):
 
         share_article = share_content.share_article
         return {
-            "id": f"{share.year}_{share.delivery_week}_{share_article.id}_{share_content.unit}_{share_content.size}",
+            "id": compose_slot_id(
+                share.year,
+                share.delivery_week,
+                share_article.id,
+                share_content.unit,
+                share_content.size,
+                share_option=share_option,
+            ),
             "year": share.year,
             "delivery_week": share.delivery_week,
             "share_article": share_article.id,
@@ -415,8 +447,9 @@ class ShareContentFrontendData(ShareContentStock):
         blind to e.g. 12 KG of potatoes still in the storage when the
         forecast didn't include potatoes this week. The synthetic rows
         flow through the standard frontend colour ladder (current_stock
-        > 0 → blue) and can be edited like any other row — saving
-        creates a real ShareContent via the CREATE path.
+        > 0 → blue) and can be edited like any other row — saving one
+        updates its slot, which has no rows yet, so real ShareContent
+        is created.
         """
         manager = ShareContent.active.for_period(is_past=is_past)
 
@@ -546,8 +579,8 @@ class ShareContentFrontendData(ShareContentStock):
         that have stock at the start of the week but no ``ShareContent``
         (no forecast, no manual plan). The frontend renders them via
         the same colour ladder as forecast/plan rows — stock > 0 lights
-        the row blue — and saving an amount creates a real
-        ``ShareContent`` via the CREATE path.
+        the row blue — and saving an amount updates the row's slot of
+        ``share_option``, creating its first ``ShareContent``.
 
         Stock is fetched at the same "Sunday of the preceding ISO week"
         cutoff that ``get_share_content_as_frontend_data`` uses for
@@ -631,7 +664,14 @@ class ShareContentFrontendData(ShareContentStock):
                 stock_note = "errechnet"
             rows.append(
                 {
-                    "id": f"{year}_{delivery_week}_{share_article.id}_{unit}_{size}",
+                    "id": compose_slot_id(
+                        year,
+                        delivery_week,
+                        share_article.id,
+                        unit,
+                        size,
+                        share_option=share_option,
+                    ),
                     "year": year,
                     "delivery_week": delivery_week,
                     "share_article": share_article.id,

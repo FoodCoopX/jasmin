@@ -41,8 +41,8 @@ from ..services.finalization_quota import (
     FinalizationReservation,
     reserve_finalizations,
 )
+from ..services.planning_slots import PlanningSlot
 from ..utils import get_finalizable_objects
-from ..utils.composite_id_utils import parse_composite_pk
 from ..utils.validation_utils import parse_bulk_ids
 
 
@@ -369,24 +369,11 @@ class BulkUnfinalizeView(APIViewRolePermissionsMixin, APIView):
         )
 
 
-_SHARE_CONTENT_PK_FIELDS = [
-    ("share__year", int),
-    ("share__delivery_week", int),
-    ("share_article_id", str),
-    ("unit", str),
-    ("size", str),
-]
-
-
-def _parse_share_content_composite_id(composite_id: str) -> dict[str, Any]:
-    """Parse a share content composite id (year_week_shareArticleId_unit_size)
-    into ORM filter kwargs. Raises ``CompositeIdInvalid`` (400) on a malformed
-    id; the bulk callers catch it to collect a per-item error."""
-    return parse_composite_pk(
-        composite_id,
-        fields=_SHARE_CONTENT_PK_FIELDS,
-        code="share_content.invalid_composite_id",
-    )
+def _parse_planning_slot(composite_id: str) -> PlanningSlot:
+    """The planning slot a composite id names (see ``PlanningSlot``). Raises
+    ``CompositeIdInvalid`` (400) on a malformed id; the bulk callers catch it
+    to collect a per-item error."""
+    return PlanningSlot.parse(composite_id, code="share_content.invalid_composite_id")
 
 
 def _get_share_contents_for_composite_ids(
@@ -404,8 +391,7 @@ def _get_share_contents_for_composite_ids(
 
     for composite_id in composite_ids:
         try:
-            params = _parse_share_content_composite_id(composite_id)
-            q_filter |= Q(**params)
+            q_filter |= _parse_planning_slot(composite_id).share_contents_q()
         except CompositeIdInvalid as e:
             errors.append({"id": composite_id, "error": str(e)})
 
@@ -416,59 +402,66 @@ def _get_share_contents_for_composite_ids(
     return objects, errors
 
 
+# A slot's share contents grouped by its fields, in ``PlanningSlot.key`` order.
+_SLOT_GROUP_FIELDS = (
+    "share__year",
+    "share__delivery_week",
+    "share_article_id",
+    "unit",
+    "size",
+    "share__share_type_variation__share_type__share_option",
+)
+
+
 def _get_finalization_status(composite_ids: list[str]) -> dict[str, bool]:
     """Check finalization status for each composite ID.
 
-    Returns a dict of composite_id → bool where True means the group has at
-    least one row AND every ShareContent row in it is finalized.
+    Returns a dict of composite_id → bool where True means the slot has at
+    least one row AND every ShareContent row in it is finalized; a malformed
+    id is False.
 
     Runs a SINGLE grouped aggregation rather than two count() queries per ID
-    (an N+1 over the composite IDs).
+    (an N+1 over the composite IDs). Each id is looked up by its parsed slot,
+    so two strings naming one slot ("2026_07_…" and "2026_7_…") both get its
+    verdict.
     """
     from django.db.models import Count, Q
 
-    group_fields = [field for field, _caster in _SHARE_CONTENT_PK_FIELDS]
-
-    # Every requested ID defaults to False; a malformed ID stays False, and a
-    # well-formed ID whose group has zero rows never appears in the aggregation
-    # below (so it also stays False — the empty-group case, made explicit by the
-    # ``total > 0`` guard rather than relying on an early return).
     result: dict[str, bool] = {}
-    q_filter = Q()
-    # Parse each ID to its group-by key. Keyed per INPUT id (a list per key) so
-    # two distinct id strings that parse to the SAME key (e.g. "2026_07_…" vs
-    # "2026_7_…") both receive the group's verdict instead of one silently
-    # shadowing the other.
-    ids_by_key: dict[tuple, list[str]] = {}
+    slot_by_id: dict[str, PlanningSlot] = {}
     for composite_id in composite_ids:
         try:
-            params = _parse_share_content_composite_id(composite_id)
+            slot_by_id[composite_id] = _parse_planning_slot(composite_id)
         except CompositeIdInvalid:
             result[composite_id] = False
-            continue
-        result.setdefault(composite_id, False)
-        q_filter |= Q(**params)
-        ids_by_key.setdefault(
-            tuple(params[field] for field in group_fields), []
-        ).append(composite_id)
 
-    if not ids_by_key:
+    if not slot_by_id:
         return result
 
+    q_filter = Q()
+    for slot in slot_by_id.values():
+        q_filter |= slot.share_contents_q()
     rows = (
         ShareContent.objects.filter(q_filter)
-        .values(*group_fields)
+        .values(*_SLOT_GROUP_FIELDS)
         .annotate(
             total=Count("id"),
             finalized=Count("id", filter=Q(is_finalized=True)),
         )
     )
+    # Counted per slot of one share option, and summed under a ``None`` option
+    # for the slot of every option, which an id without the option names. A
+    # set, as a share type without an option has its rows there already.
+    counts: dict[tuple[Any, ...], tuple[int, int]] = {}
     for row in rows:
-        key = tuple(row[field] for field in group_fields)
-        is_finalized = row["total"] > 0 and row["finalized"] == row["total"]
-        for composite_id in ids_by_key.get(key, ()):
-            result[composite_id] = is_finalized
+        slot_key = tuple(row[field] for field in _SLOT_GROUP_FIELDS)
+        for key in {slot_key, (*slot_key[:-1], None)}:
+            total, finalized = counts.get(key, (0, 0))
+            counts[key] = (total + row["total"], finalized + row["finalized"])
 
+    for composite_id, slot in slot_by_id.items():
+        total, finalized = counts.get(slot.key, (0, 0))
+        result[composite_id] = total > 0 and finalized == total
     return result
 
 
@@ -482,13 +475,16 @@ class BulkFinalizeShareContentView(APIViewRolePermissionsMixin, APIView):
         summary="Bulk Finalize Share Content",
         description="""
         Finalize all ShareContent objects matching the given composite IDs.
-        
-        Each composite ID has the format: year_week_shareArticleId_unit_size
-        (e.g., 2026_14_SCKgsTKB9pSP_PCS_M).
-        
+
+        Each composite ID has the format:
+        year_week_shareArticleId_unit_size_shareOption
+        (e.g., 2026_14_SCKgsTKB9pSP_PCS_M_HARVEST_SHARE).
+
         This resolves to ALL ShareContent rows with matching
-        share__year, share__delivery_week, share_article, unit, and size.
-        
+        share__year, share__delivery_week, share_article, unit and size
+        whose variation belongs to the share option; an id without the
+        share option matches the slot in every option.
+
         Returns finalization counts and a per-ID finalization status map.
         """,
         request=BulkIdsRequestSerializer,
@@ -556,8 +552,10 @@ class BulkUnfinalizeShareContentView(APIViewRolePermissionsMixin, APIView):
         summary="Bulk Unfinalize Share Content",
         description="""
         Unfinalize all ShareContent objects matching the given composite IDs.
-        
-        Each composite ID has the format: year_week_shareArticleId_unit_size.
+
+        Each composite ID has the format:
+        year_week_shareArticleId_unit_size_shareOption; an id without the
+        share option matches the slot in every option.
         Only processes objects that are currently finalized.
         
         Returns unfinalization count and a per-ID finalization status map.

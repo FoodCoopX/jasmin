@@ -775,7 +775,6 @@ export default function PlanningShareContentBase({
     });
   }, [queryClient, listParams]);
 
-  // Add this useMemo to check if data contains forecast_note or stock_note
   const dataHasNotes = useMemo(() => {
     return {
       hasForecastNote: data.some(
@@ -1173,7 +1172,8 @@ export default function PlanningShareContentBase({
 
       {showGrid ? (
         <EditableTable
-          key={`${selectedYear}-${selectedWeek}`}
+          // The route keeps this page mounted across share options.
+          key={`${shareOption}-${selectedYear}-${selectedWeek}`}
           columns={columns}
           apiFunctions={apiFunctions}
           focusIndex="share_article_name"

@@ -7,6 +7,7 @@ from django.apps import apps
 from django.db.models import Model, QuerySet
 
 from ..errors import CompositeIdInvalid
+from ..models.choices import ShareOptions
 from ..models.mixin import FinalizableMixin
 
 
@@ -44,6 +45,33 @@ def parse_composite_pk(
     return result
 
 
+def compose_slot_id(*parts: object, share_option: str | None = None) -> str:
+    """A planning slot's id: its ``parts`` joined by ``_``, then its share
+    option. The option comes last because its values contain underscores; a
+    slot read across every option has none."""
+    tail = (share_option,) if share_option else ()
+    return "_".join(str(part) for part in (*parts, *tail))
+
+
+def parse_slot_id(
+    raw: str | None,
+    *,
+    fields: list[tuple[str, Callable[[str], Any]]],
+    code: str,
+) -> dict[str, Any]:
+    """Parse a planning slot id (see :func:`compose_slot_id`) into ``fields``
+    plus ``share_option`` — ``None`` for an id without one, which names the
+    slot in every share option. Raises ``CompositeIdInvalid`` as
+    :func:`parse_composite_pk` does, for a missing id, and for an option that
+    isn't one."""
+    parts = raw.split("_", len(fields)) if raw else []
+    share_option = parts.pop() if len(parts) > len(fields) else None
+    if share_option is not None and share_option not in ShareOptions.values:
+        raise CompositeIdInvalid(f"Invalid share option in id {raw!r}.", code=code)
+    parsed = parse_composite_pk("_".join(parts), fields=fields, code=code)
+    return {**parsed, "share_option": share_option}
+
+
 def parse_composite_id(composite_id: str, *, code: str) -> dict[str, Any]:
     """Parse the 7-part CurrentStock composite id into a dict.
 
@@ -51,7 +79,7 @@ def parse_composite_id(composite_id: str, *, code: str) -> dict[str, Any]:
     ``CompositeIdInvalid`` (400, with the given ``code``) on a wrong part count
     or a bad year/week/day cast.
 
-    (The 5-part planning ids use :func:`parse_composite_pk`; this variant stays
+    (The planning slot ids use :func:`parse_slot_id`; this variant stays
     separate because it decodes the CurrentStock ``"None"`` sentinel for the
     optional article/unit/size/storage parts.)
 

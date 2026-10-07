@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from apps.commissioning.models import ShareContent
+from apps.commissioning.services.planning_slots import PlanningSlot
 from apps.commissioning.services.share_content_service import ShareContentService
 from apps.commissioning.tests.factories import (
     DeliveryStationDayFactory,
@@ -341,11 +342,13 @@ class TestReplaceSharePlanningEmptyClear:
         # Empty data == every cell on this slot was cleared on the
         # frontend.
         result = svc.replace_share_planning(
-            year=2026,
-            delivery_week=15,
-            share_article_id=str(article.pk),
-            unit="KG",
-            size="M",
+            slot=PlanningSlot(
+                year=2026,
+                delivery_week=15,
+                share_article_id=str(article.pk),
+                unit="KG",
+                size="M",
+            ),
             data={},
         )
 
@@ -403,11 +406,13 @@ class TestReplaceSharePlanningEmptyClear:
 
         svc = ShareContentService()
         svc.replace_share_planning(
-            year=2026,
-            delivery_week=15,
-            share_article_id=str(article.pk),
-            unit="KG",
-            size="M",
+            slot=PlanningSlot(
+                year=2026,
+                delivery_week=15,
+                share_article_id=str(article.pk),
+                unit="KG",
+                size="M",
+            ),
             data={},
         )
 
@@ -460,11 +465,13 @@ class TestReplaceSharePlanningEmptyClear:
         svc = ShareContentService()
         # Must NOT raise (Decimal(str(None)) → InvalidOperation).
         result = svc.replace_share_planning(
-            year=2026,
-            delivery_week=15,
-            share_article_id=str(article.pk),
-            unit="KG",
-            size="M",
+            slot=PlanningSlot(
+                year=2026,
+                delivery_week=15,
+                share_article_id=str(article.pk),
+                unit="KG",
+                size="M",
+            ),
             data={},
         )
 
@@ -525,11 +532,13 @@ class TestReplaceSharePlanningPreservesBackup:
         # Edit the MAIN amount (10 -> 20) for THIS station — the wipe-and-rebuild
         # must keep the backup on the rebuilt (share, station) row.
         ShareContentService().replace_share_planning(
-            year=2026,
-            delivery_week=15,
-            share_article_id=str(article.pk),
-            unit="KG",
-            size="M",
+            slot=PlanningSlot(
+                year=2026,
+                delivery_week=15,
+                share_article_id=str(article.pk),
+                unit="KG",
+                size="M",
+            ),
             data={
                 # year/delivery_week ride along in the real frontend payload
                 "year": 2026,
@@ -578,11 +587,13 @@ class TestUpdateBackupFields:
     @staticmethod
     def _update(row, data):
         return ShareContentService().update_backup_fields(
-            year=2026,
-            delivery_week=15,
-            share_article_id=str(row.share_article_id),
-            unit="KG",
-            size="M",
+            slot=PlanningSlot(
+                year=2026,
+                delivery_week=15,
+                share_article_id=str(row.share_article_id),
+                unit="KG",
+                size="M",
+            ),
             data=data,
         )
 

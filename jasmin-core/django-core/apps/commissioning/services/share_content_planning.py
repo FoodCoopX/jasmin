@@ -33,6 +33,7 @@ from ..models import (
 from ..models.choices import VegetableSizeOptions
 from ..utils.dynamic_keys import DAY_VARIATION_RE, parse_amount_cell
 from ..utils.iso_week_utils import saturday_of_iso_week
+from .planning_slots import PlanningSlot
 from .share_content_stock import ShareContentStock
 
 # Row-level attributes a planning payload carries once for the whole slot. The
@@ -442,17 +443,14 @@ class ShareContentPlanning(ShareContentStock):
     def replace_share_planning(
         self,
         *,
-        year: int,
-        delivery_week: int,
-        share_article_id: str,
-        unit: str,
-        size: str,
+        slot: PlanningSlot,
         data: dict[str, Any],
         carry_over_unset_fields: bool = False,
     ) -> list[ShareContent]:
-        """Replace existing ShareContent rows for the (year, week, article, unit, size)
-        slot with freshly-created rows from `data`, then cascade snapshots for any
-        movements affected by the deletion.
+        """Replace the slot's existing ShareContent rows with freshly-created
+        rows from `data`, then cascade snapshots for any movements affected by
+        the deletion. Cells for another share option's variations are refused
+        before anything is deleted.
 
         With ``carry_over_unset_fields`` (the PATCH path) a slot-level field the
         payload omits — washing, cleaning, packing_station, note, seller,
@@ -480,21 +478,14 @@ class ShareContentPlanning(ShareContentStock):
         # would rebuild into a different week than the one the wipe cleared.
         data = {
             **data,
-            "year": year,
-            "delivery_week": delivery_week,
-            "share_article": share_article_id,
-            "unit": unit,
-            "size": size,
+            "year": slot.year,
+            "delivery_week": slot.delivery_week,
+            "share_article": slot.share_article_id,
+            "unit": slot.unit,
+            "size": slot.size,
         }
 
-        existing_shares = Share.objects.filter(year=year, delivery_week=delivery_week)
-        slot_filter = {
-            "share__in": existing_shares,
-            "share_article__id": share_article_id,
-            "size": size,
-            "unit": unit,
-        }
-        old_share_contents = ShareContent.objects.filter(**slot_filter)
+        old_share_contents = slot.share_contents()
 
         if carry_over_unset_fields:
             data = _merge_stored_slot_fields(data, old_share_contents)
@@ -510,6 +501,7 @@ class ShareContentPlanning(ShareContentStock):
         )
 
         day_variations = self._extract_day_variations(data)
+        slot.refuse_cells_outside(day_variations)
 
         # Accumulate every movement the replace touches (the rebuild's new
         # movements, re-derived corrections, AND the captured old set) and
@@ -552,7 +544,7 @@ class ShareContentPlanning(ShareContentStock):
                 SnapshotService.cascade_for_movements(deferred_movements)
             # Re-fetch what survived so the response shows the cleared
             # forecast scaffold to the frontend.
-            return list(ShareContent.objects.filter(**slot_filter))
+            return list(slot.share_contents())
 
         # Preserve the backup plan across the wipe-and-rebuild. It lives on
         # ShareContent (backup_share_article/unit/size + backup_amount), but the
@@ -614,29 +606,15 @@ class ShareContentPlanning(ShareContentStock):
         return share_contents
 
     @transaction.atomic
-    def delete_share_planning(
-        self,
-        *,
-        year: int,
-        delivery_week: int,
-        share_article_id: str,
-        unit: str,
-        size: str,
-    ) -> int:
-        """Delete ShareContent rows matching the slot and cascade snapshots.
+    def delete_share_planning(self, *, slot: PlanningSlot) -> int:
+        """Delete the slot's ShareContent rows and cascade snapshots.
 
         Returns the number of deleted rows. Raises `ShareContentNotFound` if no
         rows match.
         """
         from .snapshot_service import SnapshotService
 
-        existing_shares = Share.objects.filter(year=year, delivery_week=delivery_week)
-        share_contents = ShareContent.objects.filter(
-            share__in=existing_shares,
-            share_article__id=share_article_id,
-            unit=unit,
-            size=size,
-        )
+        share_contents = slot.share_contents()
 
         if not share_contents.exists():
             raise ShareContentNotFound(
@@ -674,29 +652,16 @@ class ShareContentPlanning(ShareContentStock):
 
     @transaction.atomic
     def update_backup_fields(
-        self,
-        *,
-        year: int,
-        delivery_week: int,
-        share_article_id: str,
-        unit: str,
-        size: str,
-        data: dict[str, Any],
+        self, *, slot: PlanningSlot, data: dict[str, Any]
     ) -> QuerySet[ShareContent]:
-        """Update backup_* fields on ShareContent rows for the given slot.
+        """Update backup_* fields on the slot's ShareContent rows.
 
         `data` may contain `backup_share_article`, `backup_unit`, `backup_size`,
         and `day_{day_id}_variation_{var_id}` per-row backup amounts.
         Raises `ShareContentNotFound` if no rows match, or `ShareArticleNotFound`
         if the backup share article is invalid.
         """
-        existing_shares = Share.objects.filter(year=year, delivery_week=delivery_week)
-        share_contents = ShareContent.objects.filter(
-            share__in=existing_shares,
-            share_article__id=share_article_id,
-            unit=unit,
-            size=size,
-        ).select_related("share")
+        share_contents = slot.share_contents().select_related("share")
 
         if not share_contents.exists():
             raise ShareContentNotFound(

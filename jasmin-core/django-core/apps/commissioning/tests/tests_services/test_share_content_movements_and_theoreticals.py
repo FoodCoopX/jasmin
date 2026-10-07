@@ -26,6 +26,7 @@ from apps.commissioning.models import (
     TheoreticalPurchase,
     TheoreticalWashAmount,
 )
+from apps.commissioning.services.planning_slots import PlanningSlot
 from apps.commissioning.services.share_content_service import ShareContentService
 from apps.commissioning.tests.factories import (
     DeliveryStationDayFactory,
@@ -609,11 +610,13 @@ class TestRecomputeSinglePassCascade:
             # Empty payload → clear-all branch: nested recompute_shares +
             # old-movement handling must still collapse to one cascade.
             svc.replace_share_planning(
-                year=sc.share.year,
-                delivery_week=sc.share.delivery_week,
-                share_article_id=str(sc.share_article_id),
-                unit=sc.unit,
-                size=sc.size,
+                slot=PlanningSlot(
+                    year=sc.share.year,
+                    delivery_week=sc.share.delivery_week,
+                    share_article_id=str(sc.share_article_id),
+                    unit=sc.unit,
+                    size=sc.size,
+                ),
                 data={},
             )
 

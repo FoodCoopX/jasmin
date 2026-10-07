@@ -1540,13 +1540,16 @@ export const useCommissioningBulkFinalizeDocumentsCreate = <TError = ErrorRespon
     /**
  * 
         Finalize all ShareContent objects matching the given composite IDs.
-        
-        Each composite ID has the format: year_week_shareArticleId_unit_size
-        (e.g., 2026_14_SCKgsTKB9pSP_PCS_M).
-        
+
+        Each composite ID has the format:
+        year_week_shareArticleId_unit_size_shareOption
+        (e.g., 2026_14_SCKgsTKB9pSP_PCS_M_HARVEST_SHARE).
+
         This resolves to ALL ShareContent rows with matching
-        share__year, share__delivery_week, share_article, unit, and size.
-        
+        share__year, share__delivery_week, share_article, unit and size
+        whose variation belongs to the share option; an id without the
+        share option matches the slot in every option.
+
         Returns finalization counts and a per-ID finalization status map.
         
  * @summary Bulk Finalize Share Content
@@ -1952,8 +1955,10 @@ export const useCommissioningBulkUnfinalizeCreate = <TError = ErrorResponse,
     /**
  * 
         Unfinalize all ShareContent objects matching the given composite IDs.
-        
-        Each composite ID has the format: year_week_shareArticleId_unit_size.
+
+        Each composite ID has the format:
+        year_week_shareArticleId_unit_size_shareOption; an id without the
+        share option matches the slot in every option.
         Only processes objects that are currently finalized.
         
         Returns unfinalization count and a per-ID finalization status map.
@@ -7107,7 +7112,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Delete a SINGLE default-share-content slot. Despite the ``bulk_delete`` route name this is not a bulk operation: each call targets exactly one composite slot identified by ``year_shareArticleId_unit_size`` (``deleted_count`` counts the per-variation rows composing that slot).
+ * Delete a SINGLE default-share-content slot. Despite the ``bulk_delete`` route name this is not a bulk operation: each call targets exactly one composite slot identified by ``year_shareArticleId_unit_size_shareOption`` (``deleted_count`` counts the per-variation rows composing that slot).
  */
 export const commissioningDefaultShareContentsBulkDeleteDestroy = (
     compositeId: string,
@@ -7255,7 +7260,7 @@ export function useCommissioningDefaultShareContentsBulkListList<TData = Awaited
 
 
 /**
- * Update a SINGLE default-share-content slot. Despite the ``bulk_update`` route name this is not a bulk operation: each call rewrites exactly one composite slot identified by ``year_shareArticleId_unit_size``.
+ * Update a SINGLE default-share-content slot. Despite the ``bulk_update`` route name this is not a bulk operation: each call rewrites exactly one composite slot identified by ``year_shareArticleId_unit_size_shareOption``.
  */
 export const commissioningDefaultShareContentsBulkUpdateUpdate = (
     compositeId: string,
@@ -7316,7 +7321,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Update a SINGLE default-share-content slot. Despite the ``bulk_update`` route name this is not a bulk operation: each call rewrites exactly one composite slot identified by ``year_shareArticleId_unit_size``.
+ * Update a SINGLE default-share-content slot. Despite the ``bulk_update`` route name this is not a bulk operation: each call rewrites exactly one composite slot identified by ``year_shareArticleId_unit_size_shareOption``.
  */
 export const commissioningDefaultShareContentsBulkUpdatePartialUpdate = (
     compositeId: string,
@@ -12309,7 +12314,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Update share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}
+ * Update share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option}; an id without the share option names the slot in every option.
  */
 export const commissioningHarvestSharePlanningUpdate = (
     id: string,
@@ -12370,7 +12375,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Partially update share content: the slot is rebuilt from the cells in the body, and a row-level field the body omits (washing, cleaning, packing_station, note, seller, kg_per_piece, price_per_unit) keeps its stored value. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}
+ * Partially update share content: the slot is rebuilt from the cells in the body, and a row-level field the body omits (washing, cleaning, packing_station, note, seller, kg_per_piece, price_per_unit) keeps its stored value. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option}; an id without the share option names the slot in every option.
  */
 export const commissioningHarvestSharePlanningPartialUpdate = (
     id: string,
@@ -12431,7 +12436,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Delete share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}
+ * Delete share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option}; an id without the share option names the slot in every option.
  */
 export const commissioningHarvestSharePlanningDestroy = (
     id: string,
@@ -12489,7 +12494,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Update backup fields on existing ShareContent rows. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}. Payload: backup_share_article, backup_unit, backup_size, and day_{day_id}_variation_{var_id} amounts.
+ * Update backup fields on existing ShareContent rows. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option}; an id without the share option names the slot in every option. Payload: backup_share_article, backup_unit, backup_size, and day_{day_id}_variation_{var_id} amounts.
  */
 export const commissioningHarvestSharePlanningBackupUpdate = (
     id: string,

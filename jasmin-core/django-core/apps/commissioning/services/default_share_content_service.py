@@ -31,11 +31,13 @@ from ..models import (
     Subscription,
     VirtualVariationComponent,
 )
+from ..utils.composite_id_utils import compose_slot_id
 from ..utils.dynamic_keys import (
     SCAFFOLD_VALUES,
     extract_amounts_from_keys,
     parse_amount_cell,
 )
+from .planning_slots import in_share_option, refuse_variations_outside
 
 # Share lookup key: (year, delivery_week, delivery_day_id, share_type_variation_id)
 _ShareKey = tuple[int, int, int, str]
@@ -345,15 +347,15 @@ class DefaultShareContentService:
         total = Decimal(0)
         if subscriber_counts is not None:
             # Fast path: counts precomputed once for the whole request (see
-            # ``get_default_share_content_list``) — no per-variation query. A
-            # var_id absent from the map contributes 0, matching the legacy
-            # path's skip of an unknown variation.
+            # ``_slot_rows``) — no per-variation query. A var_id absent from the
+            # map contributes 0, matching the other path's skip of an unknown
+            # variation.
             for var_id, amount in variation_amounts.items():
                 current_subscribers = subscriber_counts.get(var_id, Decimal(0))
                 total += amount * current_subscribers * num_weeks
         else:
-            # Legacy path (singular ``get_default_share_content``): resolve and
-            # count each variation individually.
+            # Without precomputed counts: resolve and count each variation
+            # individually.
             snapshot_date = timezone.localdate()
             variations = {
                 str(v.id): v
@@ -846,96 +848,52 @@ class DefaultShareContentService:
         share_article_id: str,
         unit: str,
         size: str,
+        share_option: str | None = None,
     ) -> dict[str, Any] | None:
-        """Get DefaultShareContent data for a specific year/share_article/unit/size."""
+        """The planning row of one year/share_article/unit/size slot: of
+        ``share_option``'s contents, or of every option's for ``None``."""
         if not ShareArticle.objects.filter(id=share_article_id).exists():
             raise ShareArticleNotFound(
                 f"ShareArticle with id {share_article_id} does not exist",
                 details={"share_article_id": share_article_id},
             )
 
-        contents: QuerySet[DefaultShareContent] = (
+        rows = DefaultShareContentService._slot_rows(
             DefaultShareContent.objects.filter(
                 year=year, share_article_id=share_article_id, unit=unit, size=size
-            )
-            .select_related(
-                "share_type_variation", "share_type_variation__share_type", "seller"
-            )
-            .order_by("delivery_week")
+            ),
+            year,
+            share_option,
         )
-
-        first = contents.first()
-        if first is None:
-            return None
-
-        weeks = list(contents.values_list("delivery_week", flat=True))
-        range_1 = min(weeks)
-        range_2 = max(weeks)
-
-        (
-            only_odd,
-            only_even,
-            only_every_three,
-        ) = DefaultShareContentService._detect_week_pattern(weeks, range_1, range_2)
-
-        # Group amounts by share_type_variation
-        amounts_dict: dict[str, str] = {}
-        share_option: str | None = None
-
-        for content in contents:
-            variation_id = str(content.share_type_variation_id)
-            amount_key = f"amount_{variation_id}"
-
-            if amount_key not in amounts_dict:
-                amounts_dict[amount_key] = str(content.amount)
-
-            if share_option is None:
-                share_option = content.share_type_variation.share_type.share_option
-
-        needed_amount = DefaultShareContentService._calculate_needed_amount(
-            year, range_1, range_2, only_odd, only_even, only_every_three, amounts_dict
-        )
-
-        result: dict[str, Any] = {
-            "id": f"{year}_{share_article_id}_{unit}_{size}",
-            "year": year,
-            "share_article": share_article_id,
-            "share_option": share_option,
-            "range_1": range_1,
-            "range_2": range_2,
-            "unit": unit,
-            "size": size,
-            "note": first.note,
-            "only_odd_weeks": only_odd,
-            "only_even_weeks": only_even,
-            "only_every_three_weeks": only_every_three,
-            "needed_amount": needed_amount,
-            "seller": str(first.seller_id) if first.seller_id else None,
-            "seller_name": str(first.seller) if first.seller_id else None,
-        }
-        result.update(amounts_dict)
-        return result
+        return rows[0] if rows else None
 
     @staticmethod
     def get_default_share_content_list(
-        year: int,
-        share_article_id: str | None = None,
-        unit: str | None = None,
-        size: str | None = None,
+        year: int, share_option: str | None = None
     ) -> list[dict[str, Any]]:
-        """Get a list of DefaultShareContent grouped by year/share_article/unit/size."""
-        if share_article_id and unit and size:
-            result = DefaultShareContentService.get_default_share_content(
-                year, share_article_id, unit, size
-            )
-            return [result] if result else []
+        """The year's planning rows, one per share_article/unit/size slot: of
+        ``share_option``'s contents, or grouped across every option for
+        ``None``."""
+        return DefaultShareContentService._slot_rows(
+            DefaultShareContent.objects.filter(year=year), year, share_option
+        )
 
-        # Batch-fetch all contents for the year in one query.
-        # ``share_article`` covers the per-row name/unit lookups the
-        # serializer touches; without it the response fans out to one
-        # query per group on a 100s-row page.
-        all_contents = (
-            DefaultShareContent.objects.filter(year=year)
+    @staticmethod
+    def _slot_rows(
+        contents: QuerySet[DefaultShareContent], year: int, share_option: str | None
+    ) -> list[dict[str, Any]]:
+        """The planning rows of ``contents``, one per share_article/unit/size.
+
+        With ``share_option`` only that option's contents count, and a row's
+        id names the slot with its option; an article can belong to three.
+        """
+        # One query for every content. ``share_article`` covers the per-row
+        # name/unit lookups the serializer touches; without it the response
+        # fans out to one query per group on a 100s-row page.
+        grouped: dict[tuple, list[DefaultShareContent]] = {}
+        variation_ids: set[str] = set()
+        for content in (
+            in_share_option(contents, share_option, variation="share_type_variation")
             .select_related(
                 "share_type_variation",
                 "share_type_variation__share_type",
@@ -943,12 +901,7 @@ class DefaultShareContentService:
                 "seller",
             )
             .order_by("share_article_id", "unit", "size", "delivery_week")
-        )
-
-        # Group by (share_article_id, unit, size)
-        grouped: dict[tuple, list[DefaultShareContent]] = {}
-        variation_ids: set[str] = set()
-        for content in all_contents:
+        ):
             key = (content.share_article_id, content.unit, content.size)
             grouped.setdefault(key, []).append(content)
             variation_ids.add(str(content.share_type_variation_id))
@@ -956,9 +909,8 @@ class DefaultShareContentService:
         # Precompute active-subscriber counts ONCE for every variation on the
         # page. ``_calculate_needed_amount`` would otherwise re-query per group
         # per variation even though the snapshot date is identical per request.
-        snapshot_date = timezone.localdate()
         subscriber_counts = DefaultShareContentService._subscriber_counts_by_variation(
-            variation_ids, snapshot_date
+            variation_ids, timezone.localdate()
         )
 
         results: list[dict[str, Any]] = []
@@ -975,15 +927,10 @@ class DefaultShareContentService:
             ) = DefaultShareContentService._detect_week_pattern(weeks, range_1, range_2)
 
             amounts_dict: dict[str, str] = {}
-            share_option: str | None = None
-
             for content in contents_list:
-                variation_id = str(content.share_type_variation_id)
-                amount_key = f"amount_{variation_id}"
+                amount_key = f"amount_{content.share_type_variation_id}"
                 if amount_key not in amounts_dict:
                     amounts_dict[amount_key] = str(content.amount)
-                if share_option is None:
-                    share_option = content.share_type_variation.share_type.share_option
 
             needed_amount = DefaultShareContentService._calculate_needed_amount(
                 year,
@@ -997,10 +944,12 @@ class DefaultShareContentService:
             )
 
             row: dict[str, Any] = {
-                "id": f"{year}_{sa_id}_{unit_val}_{size_val}",
+                "id": compose_slot_id(
+                    year, sa_id, unit_val, size_val, share_option=share_option
+                ),
                 "year": year,
                 "share_article": sa_id,
-                "share_option": share_option,
+                "share_option": first.share_type_variation.share_type.share_option,
                 "range_1": range_1,
                 "range_2": range_2,
                 "unit": unit_val,
@@ -1024,8 +973,10 @@ class DefaultShareContentService:
         year: int,
         share_article_id: str,
         validated_data: dict[str, Any],
+        share_option: str | None = None,
     ) -> list[DefaultShareContent]:
-        """Update DefaultShareContent: deletes existing and creates new from validated_data."""
+        """Update DefaultShareContent: deletes the slot's rows — only
+        ``share_option``'s, when given — and creates new from validated_data."""
         try:
             share_article = ShareArticle.objects.get(id=share_article_id)
         except ShareArticle.DoesNotExist as exc:
@@ -1045,8 +996,15 @@ class DefaultShareContentService:
             week for week in week_range if Week(year, week).monday() >= current_date
         ]
 
-        DefaultShareContent.objects.filter(
-            year=year, share_article=share_article, unit=unit, size=size
+        refuse_variations_outside(
+            share_option, extract_amounts_from_keys(validated_data, "amount_")
+        )
+        in_share_option(
+            DefaultShareContent.objects.filter(
+                year=year, share_article=share_article, unit=unit, size=size
+            ),
+            share_option,
+            variation="share_type_variation",
         ).delete()
 
         # Capture what the ShareContent deletion will cascade away BEFORE it
@@ -1057,12 +1015,16 @@ class DefaultShareContentService:
         affected_movements: list[MovementShareArticle] = []
         emptied_share_ids: set[Any] = set()
         if future_weeks:
-            share_contents_to_delete = ShareContent.objects.filter(
-                share__year=year,
-                share__delivery_week__in=future_weeks,
-                share_article=share_article,
-                unit=unit,
-                size=size,
+            share_contents_to_delete = in_share_option(
+                ShareContent.objects.filter(
+                    share__year=year,
+                    share__delivery_week__in=future_weeks,
+                    share_article=share_article,
+                    unit=unit,
+                    size=size,
+                ),
+                share_option,
+                variation="share__share_type_variation",
             )
             emptied_share_ids = set(
                 share_contents_to_delete.values_list("share_id", flat=True)
@@ -1118,9 +1080,11 @@ class DefaultShareContentService:
         share_article: ShareArticle | None = None,
         unit: str | None = None,
         size: str | None = None,
+        share_option: str | None = None,
     ) -> int:
-        """Delete multiple DefaultShareContent objects by criteria, and cascade
-        the deletion to the future ShareContent they materialised.
+        """Delete multiple DefaultShareContent objects by criteria — only
+        ``share_option``'s, when given — and cascade the deletion to the future
+        ShareContent they materialised.
 
         ShareContent from **current ISO week + 2** onward is removed; the next
         two weeks are already in the packing pipeline, so those slots (and all
@@ -1129,7 +1093,11 @@ class DefaultShareContentService:
         deleting, then recompute the emptied Shares and cascade stock snapshots
         so downstream balances stay correct.
         """
-        queryset = DefaultShareContent.objects.filter(year=year)
+        queryset = in_share_option(
+            DefaultShareContent.objects.filter(year=year),
+            share_option,
+            variation="share_type_variation",
+        )
 
         if share_article:
             queryset = queryset.filter(share_article=share_article)
@@ -1158,8 +1126,12 @@ class DefaultShareContentService:
         cutoff_year, cutoff_week = cutoff.year, cutoff.week
 
         if share_article is not None and year >= cutoff_year:
-            share_contents_to_delete = ShareContent.objects.filter(
-                share__year=year, share_article=share_article
+            share_contents_to_delete = in_share_option(
+                ShareContent.objects.filter(
+                    share__year=year, share_article=share_article
+                ),
+                share_option,
+                variation="share__share_type_variation",
             )
             if unit:
                 share_contents_to_delete = share_contents_to_delete.filter(unit=unit)

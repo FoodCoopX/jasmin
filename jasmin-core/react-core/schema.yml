@@ -2134,11 +2134,13 @@ paths:
     post:
       operationId: commissioning_bulk_finalize_share_content_create
       description: "\n        Finalize all ShareContent objects matching the given
-        composite IDs.\n        \n        Each composite ID has the format: year_week_shareArticleId_unit_size\n
-        \       (e.g., 2026_14_SCKgsTKB9pSP_PCS_M).\n        \n        This resolves
-        to ALL ShareContent rows with matching\n        share__year, share__delivery_week,
-        share_article, unit, and size.\n        \n        Returns finalization counts
-        and a per-ID finalization status map.\n        "
+        composite IDs.\n\n        Each composite ID has the format:\n        year_week_shareArticleId_unit_size_shareOption\n
+        \       (e.g., 2026_14_SCKgsTKB9pSP_PCS_M_HARVEST_SHARE).\n\n        This
+        resolves to ALL ShareContent rows with matching\n        share__year, share__delivery_week,
+        share_article, unit and size\n        whose variation belongs to the share
+        option; an id without the\n        share option matches the slot in every
+        option.\n\n        Returns finalization counts and a per-ID finalization status
+        map.\n        "
       summary: Bulk Finalize Share Content
       tags:
       - commissioning
@@ -2464,7 +2466,8 @@ paths:
     post:
       operationId: commissioning_bulk_unfinalize_share_content_create
       description: "\n        Unfinalize all ShareContent objects matching the given
-        composite IDs.\n        \n        Each composite ID has the format: year_week_shareArticleId_unit_size.\n
+        composite IDs.\n\n        Each composite ID has the format:\n        year_week_shareArticleId_unit_size_shareOption;
+        an id without the\n        share option matches the slot in every option.\n
         \       Only processes objects that are currently finalized.\n        \n        Returns
         unfinalization count and a per-ID finalization status map.\n        "
       summary: Bulk Unfinalize Share Content
@@ -6347,8 +6350,8 @@ paths:
       operationId: commissioning_default_share_contents_bulk_delete_destroy
       description: 'Delete a SINGLE default-share-content slot. Despite the ``bulk_delete``
         route name this is not a bulk operation: each call targets exactly one composite
-        slot identified by ``year_shareArticleId_unit_size`` (``deleted_count`` counts
-        the per-variation rows composing that slot).'
+        slot identified by ``year_shareArticleId_unit_size_shareOption`` (``deleted_count``
+        counts the per-variation rows composing that slot).'
       parameters:
       - in: path
         name: composite_id
@@ -6454,7 +6457,7 @@ paths:
       operationId: commissioning_default_share_contents_bulk_update_update
       description: 'Update a SINGLE default-share-content slot. Despite the ``bulk_update``
         route name this is not a bulk operation: each call rewrites exactly one composite
-        slot identified by ``year_shareArticleId_unit_size``.'
+        slot identified by ``year_shareArticleId_unit_size_shareOption``.'
       parameters:
       - in: path
         name: composite_id
@@ -6512,7 +6515,7 @@ paths:
       operationId: commissioning_default_share_contents_bulk_update_partial_update
       description: 'Update a SINGLE default-share-content slot. Despite the ``bulk_update``
         route name this is not a bulk operation: each call rewrites exactly one composite
-        slot identified by ``year_shareArticleId_unit_size``.'
+        slot identified by ``year_shareArticleId_unit_size_shareOption``.'
       parameters:
       - in: path
         name: composite_id
@@ -10045,7 +10048,8 @@ paths:
   /api/commissioning/harvest_share_planning/{id}/:
     put:
       operationId: commissioning_harvest_share_planning_update
-      description: 'Update share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}'
+      description: 'Update share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option};
+        an id without the share option names the slot in every option.'
       parameters:
       - in: path
         name: id
@@ -10103,7 +10107,8 @@ paths:
       description: 'Partially update share content: the slot is rebuilt from the cells
         in the body, and a row-level field the body omits (washing, cleaning, packing_station,
         note, seller, kg_per_piece, price_per_unit) keeps its stored value. PK format:
-        {year}_{delivery_week}_{share_article}_{unit}_{size}'
+        {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option}; an id
+        without the share option names the slot in every option.'
       parameters:
       - in: path
         name: id
@@ -10158,7 +10163,8 @@ paths:
           description: Error response.
     delete:
       operationId: commissioning_harvest_share_planning_destroy
-      description: 'Delete share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}'
+      description: 'Delete share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option};
+        an id without the share option names the slot in every option.'
       parameters:
       - in: path
         name: id
@@ -10198,7 +10204,8 @@ paths:
     put:
       operationId: commissioning_harvest_share_planning_backup_update
       description: 'Update backup fields on existing ShareContent rows. PK format:
-        {year}_{delivery_week}_{share_article}_{unit}_{size}. Payload: backup_share_article,
+        {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option}; an id
+        without the share option names the slot in every option. Payload: backup_share_article,
         backup_unit, backup_size, and day_{day_id}_variation_{var_id} amounts.'
       parameters:
       - in: path

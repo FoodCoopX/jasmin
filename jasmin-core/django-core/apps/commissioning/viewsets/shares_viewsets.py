@@ -112,7 +112,7 @@ from ..services import (
     SharesDayChangeService,
 )
 from ..services.share_delivery_service import JokerScope
-from ..utils.composite_id_utils import parse_composite_pk
+from ..utils.composite_id_utils import parse_slot_id
 from ..utils.iso_week_utils import week_day_to_date
 from ..utils.lookup import get_or_404
 from ..utils.query_params import validate_query_params
@@ -1523,8 +1523,8 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
 
 # Composite id schema for a default-share-content slot:
-# ``{year}_{share_article}_{unit}_{size}``.
-_DEFAULT_SHARE_CONTENT_ID_FIELDS = [
+# ``{year}_{share_article}_{unit}_{size}_{share_option}`` (see ``parse_slot_id``).
+_DEFAULT_SHARE_CONTENT_ID_FIELDS: list[tuple[str, Any]] = [
     ("year", int),
     ("share_article", str),
     ("unit", str),
@@ -1563,14 +1563,9 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
     @action(detail=False, methods=["get"])
     def bulk_list(self, request: Request) -> Response:
         params = validate_query_params(request, required=["year", "share_option"])
-        year = params["year"]
-        share_option = params["share_option"]
-
-        results = DefaultShareContentService.get_default_share_content_list(year)
-
-        # Filter to the requested share type
-        results = [r for r in results if r.get("share_option") == share_option]
-
+        results = DefaultShareContentService.get_default_share_content_list(
+            params["year"], share_option=params["share_option"]
+        )
         return Response(results, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -1638,6 +1633,7 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
             validated.get("share_article"),
             validated.get("unit"),
             validated.get("size"),
+            share_option=validated.get("share_option"),
         )
 
         return Response(result_data, status=status.HTTP_200_OK)
@@ -1647,7 +1643,7 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
             "Update a SINGLE default-share-content slot. Despite the "
             "``bulk_update`` route name this is not a bulk operation: each "
             "call rewrites exactly one composite slot identified by "
-            "``year_shareArticleId_unit_size``."
+            "``year_shareArticleId_unit_size_shareOption``."
         ),
         request=DefaultShareContentRequestSerializer,
         responses={200: DefaultShareContentResponseSerializer},
@@ -1660,13 +1656,13 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
     def bulk_update(
         self, request: Request, composite_id: str | None = None
     ) -> Response:
-        """Update ONE ``(year, share_article, unit, size)`` slot.
+        """Update ONE ``(year, share_article, unit, size, share_option)`` slot.
 
         Not a bulk endpoint — the ``bulk_update`` route name is historical.
         The composite id pins a single slot; the body carries the new
         per-variation amounts for that slot.
         """
-        parsed = parse_composite_pk(
+        parsed = parse_slot_id(
             composite_id,
             fields=_DEFAULT_SHARE_CONTENT_ID_FIELDS,
             code="default_share_content.invalid_composite_id",
@@ -1690,11 +1686,14 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
 
         DefaultShareContentService.update_default_share_content(
-            year, share_article_id, serializer.validated_data
+            year,
+            share_article_id,
+            serializer.validated_data,
+            share_option=parsed["share_option"],
         )
 
         result_data = DefaultShareContentService.get_default_share_content(
-            year, share_article_id, unit, size
+            year, share_article_id, unit, size, share_option=parsed["share_option"]
         )
         return Response(result_data, status=status.HTTP_200_OK)
 
@@ -1703,8 +1702,8 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
             "Delete a SINGLE default-share-content slot. Despite the "
             "``bulk_delete`` route name this is not a bulk operation: each "
             "call targets exactly one composite slot identified by "
-            "``year_shareArticleId_unit_size`` (``deleted_count`` counts the "
-            "per-variation rows composing that slot)."
+            "``year_shareArticleId_unit_size_shareOption`` (``deleted_count`` "
+            "counts the per-variation rows composing that slot)."
         ),
         responses={
             200: inline_serializer(
@@ -1729,14 +1728,14 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
     def bulk_delete(
         self, request: Request, composite_id: str | None = None
     ) -> Response:
-        """Delete ONE ``(year, share_article, unit, size)`` slot.
+        """Delete ONE ``(year, share_article, unit, size, share_option)`` slot.
 
         Not a bulk endpoint — the ``bulk_delete`` route name is historical.
         The composite id pins a single slot; the service removes every
         per-variation row composing it (hence ``deleted_count``) and
         cascades to the future ShareContent the slot materialised.
         """
-        parsed = parse_composite_pk(
+        parsed = parse_slot_id(
             composite_id,
             fields=_DEFAULT_SHARE_CONTENT_ID_FIELDS,
             code="default_share_content.invalid_composite_id",
@@ -1753,7 +1752,7 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
         )
 
         deleted_count = DefaultShareContentService.delete_default_share_content_bulk(
-            year, share_article, unit, size
+            year, share_article, unit, size, share_option=parsed["share_option"]
         )
 
         return Response(

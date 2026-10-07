@@ -2,7 +2,7 @@
 # Managed by scripts/ruff_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/ruff_baseline.py freeze
-# 192 finding(s).
+# 190 finding(s).
 
 apps/accounts/backends.py: N806 Variable `UserModel` in function should be lowercase
 apps/accounts/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
@@ -94,8 +94,6 @@ apps/commissioning/services/share_content_frontend.py: C901 `_build_stock_only_r
 apps/commissioning/services/share_content_planning.py: C901 `_extract_day_variations` is too complex (12 > 10)
 apps/commissioning/services/share_content_planning.py: C901 `process_share_planning_data` is too complex (13 > 10)
 apps/commissioning/services/share_content_planning.py: C901 `replace_share_planning` is too complex (14 > 10)
-apps/commissioning/services/share_content_planning.py: PLR0913 Too many arguments in function definition (6 > 5)
-apps/commissioning/services/share_content_planning.py: PLR0913 Too many arguments in function definition (7 > 5)
 apps/commissioning/services/share_content_planning.py: PLR0915 Too many statements (61 > 50)
 apps/commissioning/services/share_demand_service.py: C901 `aggregated_rows` is too complex (11 > 10)
 apps/commissioning/services/share_demand_service.py: C901 `aggregated_rows` is too complex (14 > 10)

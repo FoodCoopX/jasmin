@@ -21,6 +21,7 @@ from apps.commissioning.models import (
     TheoreticalHarvest,
 )
 from apps.commissioning.models.choices import MovementTypeOptions
+from apps.commissioning.services.planning_slots import PlanningSlot
 from apps.commissioning.services.recompute import recompute_shares
 from apps.commissioning.services.share_content_service import ShareContentService
 from apps.commissioning.tests.factories import (
@@ -117,11 +118,13 @@ class TestDeletePathsRecompute:
 
         with patch(_RECALC) as recalc, patch(_CASCADE) as cascade:
             ShareContentService().delete_share_planning(
-                year=YEAR,
-                delivery_week=WEEK,
-                share_article_id=str(article.id),
-                unit="KG",
-                size="M",
+                slot=PlanningSlot(
+                    year=YEAR,
+                    delivery_week=WEEK,
+                    share_article_id=str(article.id),
+                    unit="KG",
+                    size="M",
+                ),
             )
 
         cascade.assert_called_once()
@@ -146,11 +149,13 @@ class TestDeletePathsRecompute:
         manager = Mock()
         with patch(_RECALC, manager.recalc), patch(_CASCADE, manager.cascade):
             ShareContentService().delete_share_planning(
-                year=YEAR,
-                delivery_week=WEEK,
-                share_article_id=str(article.id),
-                unit="KG",
-                size="M",
+                slot=PlanningSlot(
+                    year=YEAR,
+                    delivery_week=WEEK,
+                    share_article_id=str(article.id),
+                    unit="KG",
+                    size="M",
+                ),
             )
 
         called = [c[0] for c in manager.mock_calls]
@@ -195,11 +200,13 @@ class TestDeletePathsRecompute:
 
         with patch(_RECALC) as recalc, patch(_CASCADE) as cascade:
             ShareContentService().replace_share_planning(
-                year=YEAR,
-                delivery_week=WEEK,
-                share_article_id=str(article.id),
-                unit="KG",
-                size="M",
+                slot=PlanningSlot(
+                    year=YEAR,
+                    delivery_week=WEEK,
+                    share_article_id=str(article.id),
+                    unit="KG",
+                    size="M",
+                ),
                 data=data,
             )
 
@@ -223,11 +230,13 @@ class TestDeletePathsRecompute:
 
         with patch(_RECALC) as recalc, patch(_CASCADE) as cascade:
             ShareContentService().replace_share_planning(
-                year=YEAR,
-                delivery_week=WEEK,
-                share_article_id=str(article.id),
-                unit="KG",
-                size="M",
+                slot=PlanningSlot(
+                    year=YEAR,
+                    delivery_week=WEEK,
+                    share_article_id=str(article.id),
+                    unit="KG",
+                    size="M",
+                ),
                 data=data,
             )
 

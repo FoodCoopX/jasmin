@@ -176,7 +176,8 @@
     "invalid_composite_id": "Invalid share content id.",
     "invalid_pk": "Invalid share content id.",
     "missing_required": "Missing required fields: year, delivery week, or share article.",
-    "washing_cleaning_mutually_exclusive": "Washing and cleaning are mutually exclusive — please pick only one."
+    "washing_cleaning_mutually_exclusive": "Washing and cleaning are mutually exclusive — please pick only one.",
+    "variation_outside_share_option": "The input holds amounts for variations of another share option — please reload the page."
   },
   "delivery_note": {
     "finalize_failed": "Could not finalize the delivery note before creating the invoice.",

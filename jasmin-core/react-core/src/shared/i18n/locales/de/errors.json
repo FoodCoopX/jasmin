@@ -176,7 +176,8 @@
     "invalid_composite_id": "Ungültige Kennung für den Anteilsinhalt.",
     "invalid_pk": "Ungültige Kennung für den Anteilsinhalt.",
     "missing_required": "Pflichtfelder fehlen: Jahr, Lieferwoche oder Anteilsartikel.",
-    "washing_cleaning_mutually_exclusive": "Waschen und Putzen schließen sich gegenseitig aus — bitte nur eines von beiden wählen."
+    "washing_cleaning_mutually_exclusive": "Waschen und Putzen schließen sich gegenseitig aus — bitte nur eines von beiden wählen.",
+    "variation_outside_share_option": "Die Eingabe enthält Mengen für Varianten einer anderen Anteilsoption — bitte die Seite neu laden."
   },
   "delivery_note": {
     "finalize_failed": "Lieferschein konnte vor der Rechnungserstellung nicht finalisiert werden.",

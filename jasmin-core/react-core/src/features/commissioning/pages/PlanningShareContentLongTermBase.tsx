@@ -700,7 +700,8 @@ export default function PlanningShareContentLongTermBase({
       </div>
 
       <EditableTable
-        key={`${selectedYear}-${effectiveMode}`}
+        // The route keeps this page mounted across share options.
+        key={`${shareOption}-${selectedYear}-${effectiveMode}`}
         columns={columns}
         apiFunctions={apiFunctions}
         focusIndex="share_article_name"

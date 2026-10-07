@@ -45,20 +45,16 @@ from ..services import (
     PackingListService,
     ShareContentService,
 )
-from ..utils.composite_id_utils import parse_composite_pk
+from ..services.planning_slots import PlanningSlot
 from ..utils.query_params import validate_query_params
 
 logger = logging.getLogger(__name__)
 
-# Composite pk schema for a harvest-share-planning slot:
-# ``{year}_{delivery_week}_{share_article}_{unit}_{size}``.
-_PLANNING_PK_FIELDS = [
-    ("year", int),
-    ("delivery_week", int),
-    ("share_article", str),
-    ("unit", str),
-    ("size", str),
-]
+# How the planning grid names a row, documented on every action that takes one.
+_PLANNING_PK_FORMAT = (
+    "PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}_{share_option}; "
+    "an id without the share option names the slot in every option."
+)
 
 
 class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
@@ -144,19 +140,12 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
     @extend_schema(
         request=HarvestSharePlanningUpdateRequestSerializer,
         responses={200: HarvestSharePlanningRowSerializer},
-        description="Update share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}",
+        description=f"Update share content. {_PLANNING_PK_FORMAT}",
     )
     def update(
         self, request: Request, pk: str | None = None, *, partial: bool = False
     ) -> Response:
-        parsed = parse_composite_pk(
-            pk, fields=_PLANNING_PK_FIELDS, code="share_content.invalid_pk"
-        )
-        year = parsed["year"]
-        delivery_week = parsed["delivery_week"]
-        share_article = parsed["share_article"]
-        unit = parsed["unit"]
-        size = parsed["size"]
+        slot = PlanningSlot.parse(pk, code="share_content.invalid_pk")
         serializer = HarvestSharePlanningUpdateRequestSerializer(
             data=request.data, partial=partial
         )
@@ -171,11 +160,7 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
         # recreated row, so a field the caller never sent must come from the
         # stored rows rather than the column default. A PUT replaces them.
         share_contents = self.service.replace_share_planning(
-            year=year,
-            delivery_week=delivery_week,
-            share_article_id=share_article,
-            unit=unit,
-            size=size,
+            slot=slot,
             data=serializer.validated_data,
             carry_over_unset_fields=partial,
         )
@@ -190,11 +175,11 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
             # handler) will drop the row entirely.
             group_data = {
                 "id": pk,
-                "year": year,
-                "delivery_week": delivery_week,
-                "share_article": share_article,
-                "unit": unit,
-                "size": size,
+                "year": slot.year,
+                "delivery_week": slot.delivery_week,
+                "share_article": slot.share_article_id,
+                "unit": slot.unit,
+                "size": slot.size,
                 "variations": {},
                 "basic_variations": {},
                 "tour_variations": {},
@@ -208,8 +193,7 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
             "Partially update share content: the slot is rebuilt from the cells "
             "in the body, and a row-level field the body omits (washing, "
             "cleaning, packing_station, note, seller, kg_per_piece, "
-            "price_per_unit) keeps its stored value. "
-            "PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}"
+            f"price_per_unit) keeps its stored value. {_PLANNING_PK_FORMAT}"
         ),
     )
     def partial_update(self, request: Request, pk: str | None = None) -> Response:
@@ -223,26 +207,13 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
                 fields={"message": drf_serializers.CharField()},
             )
         },
-        description="Delete share content. PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}",
+        description=f"Delete share content. {_PLANNING_PK_FORMAT}",
     )
     def destroy(self, request: Request, pk: str | None = None) -> Response:
-        parsed = parse_composite_pk(
-            pk, fields=_PLANNING_PK_FIELDS, code="share_content.invalid_pk"
-        )
-        year = parsed["year"]
-        delivery_week = parsed["delivery_week"]
-        share_article = parsed["share_article"]
-        unit = parsed["unit"]
-        size = parsed["size"]
+        slot = PlanningSlot.parse(pk, code="share_content.invalid_pk")
         # ``delete_share_planning`` raises ``ShareContentNotFound`` (404) when no
         # rows match; the central exception handler maps it to the canonical body.
-        deleted_count = self.service.delete_share_planning(
-            year=year,
-            delivery_week=delivery_week,
-            share_article_id=share_article,
-            unit=unit,
-            size=size,
-        )
+        deleted_count = self.service.delete_share_planning(slot=slot)
         return Response(
             {
                 "message": f"Successfully deleted {deleted_count} share content entries",
@@ -254,21 +225,14 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
         responses={200: HarvestSharePlanningRowSerializer},
         description=(
             "Update backup fields on existing ShareContent rows. "
-            "PK format: {year}_{delivery_week}_{share_article}_{unit}_{size}. "
+            f"{_PLANNING_PK_FORMAT} "
             "Payload: backup_share_article, backup_unit, backup_size, "
             "and day_{day_id}_variation_{var_id} amounts."
         ),
     )
     @action(detail=True, methods=["put"], url_path="backup")
     def backup(self, request: Request, pk: str | None = None) -> Response:
-        parsed = parse_composite_pk(
-            pk, fields=_PLANNING_PK_FIELDS, code="share_content.invalid_pk"
-        )
-        year = parsed["year"]
-        delivery_week = parsed["delivery_week"]
-        share_article_id = parsed["share_article"]
-        unit = parsed["unit"]
-        size = parsed["size"]
+        slot = PlanningSlot.parse(pk, code="share_content.invalid_pk")
         serializer = HarvestSharePlanningBackupRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # ``update_backup_fields`` raises typed errors — ``ShareContentNotFound``
@@ -277,12 +241,7 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
         # ``validated_data`` carries the dynamic ``day_<id>_variation_<id>`` backup
         # amounts (merged by ``DynamicAmountKeysMixin``).
         share_contents = self.service.update_backup_fields(
-            year=year,
-            delivery_week=delivery_week,
-            share_article_id=share_article_id,
-            unit=unit,
-            size=size,
-            data=serializer.validated_data,
+            slot=slot, data=serializer.validated_data
         )
         return Response(self.service.get_group_data(share_contents))
 
