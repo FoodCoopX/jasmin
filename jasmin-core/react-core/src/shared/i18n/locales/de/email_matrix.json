@@ -10,7 +10,8 @@
         "application_received": "Antrag erhalten",
         "application_approved": "Mitglied eingetragen",
         "application_rejected": "Antrag abgelehnt",
-        "welcome_user": "Willkommen"
+        "welcome_user": "Willkommen",
+        "email_verification_code": "Bestätigungscode"
     },
     "commissioning": {
         "trial_converted": "Probe → Mitglied",
@@ -27,7 +28,15 @@
     "gdpr": {
         "deletion_confirm": "Lösch-Bestätigung",
         "deletion_approved": "Löschung freigegeben",
-        "deletion_rejected": "Löschung abgelehnt"
+        "deletion_rejected": "Löschung abgelehnt",
+        "deletion_pending_admin_office": "Löschantrag (Hinweis ans Büro)"
+    },
+    "purposes": {
+        "invoice_reseller": "Rechnung an Wiederverkäufer",
+        "invoice_accounting": "Rechnung an Buchhaltung",
+        "delivery_note_reseller": "Lieferschein an Wiederverkäufer",
+        "test_send": "Test-Versand: {{template}}",
+        "test_smtp": "Test-Versand: SMTP-Verbindung"
     },
     "status": {
         "pending": "Ausstehend",

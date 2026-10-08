@@ -10,7 +10,8 @@
         "application_received": "Application received",
         "application_approved": "Application approved",
         "application_rejected": "Application rejected",
-        "welcome_user": "Welcome"
+        "welcome_user": "Welcome",
+        "email_verification_code": "Verification code"
     },
     "commissioning": {
         "trial_converted": "Trial → member",
@@ -27,7 +28,15 @@
     "gdpr": {
         "deletion_confirm": "Deletion confirm",
         "deletion_approved": "Deletion approved",
-        "deletion_rejected": "Deletion rejected"
+        "deletion_rejected": "Deletion rejected",
+        "deletion_pending_admin_office": "Deletion request (office notice)"
+    },
+    "purposes": {
+        "invoice_reseller": "Invoice to reseller",
+        "invoice_accounting": "Invoice to accounting",
+        "delivery_note_reseller": "Delivery note to reseller",
+        "test_send": "Test send: {{template}}",
+        "test_smtp": "Test send: SMTP connection"
     },
     "status": {
         "pending": "Pending",

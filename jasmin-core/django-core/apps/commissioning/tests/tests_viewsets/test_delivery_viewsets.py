@@ -169,6 +169,52 @@ class TestDeliveryStationDayViewSet:
         assert resp.status_code == status.HTTP_200_OK
         assert len(resp.data) >= 1
 
+    def test_flags_a_station_day_that_is_on_no_tour(self, api_client, tenant):
+        day = SharesDeliveryDayFactory(day_number=2)
+        on_tour = DeliveryStationDayFactory(
+            delivery_day=day, tour_number=2, stop_order=1
+        )
+        off_tour = DeliveryStationDayFactory(delivery_day=day, stop_order=None)
+
+        resp = api_client.get(self.URL, {"delivery_day": str(day.id)})
+
+        assert resp.status_code == status.HTTP_200_OK
+        missing = {row["id"]: row["tour_assignment_missing"] for row in resp.data}
+        assert missing == {str(on_tour.id): False, str(off_tour.id): True}
+
+    def test_a_station_day_taken_off_its_tour_reads_as_missing(
+        self, api_client, tenant
+    ):
+        day = SharesDeliveryDayFactory(day_number=2)
+        kept = DeliveryStationDayFactory(delivery_day=day, tour_number=1, stop_order=1)
+        dropped = DeliveryStationDayFactory(
+            delivery_day=day, tour_number=1, stop_order=2
+        )
+
+        resp = api_client.post(
+            reverse("delivery_tours-update-tours"),
+            {
+                "delivery_day": str(day.id),
+                "tours": [
+                    {
+                        "tour_number": 1,
+                        "positions": [
+                            {
+                                "position": 1,
+                                "delivery_station_id": str(kept.delivery_station_id),
+                            }
+                        ],
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK
+
+        resp = api_client.get(self.URL, {"delivery_day": str(day.id)})
+        missing = {row["id"]: row["tour_assignment_missing"] for row in resp.data}
+        assert missing == {str(kept.id): False, str(dropped.id): True}
+
     def test_filter_by_member_returns_only_assigned_station_days(
         self, api_client, tenant
     ):

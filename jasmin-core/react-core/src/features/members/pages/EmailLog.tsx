@@ -9,9 +9,13 @@ import type {
   NotificationsEmailLogsListParams,
   NotificationsEmailLogsListStatus,
 } from "@shared/api/generated/models";
-import { useNotificationsEmailLogsList } from "@shared/api/generated/notifications/notifications";
+import {
+  useNotificationsEmailLogsList,
+  useNotificationsEmailLogsPurposes,
+} from "@shared/api/generated/notifications/notifications";
 import { useTimeFormat } from "@hooks/index";
 import EmailStatusTag from "../components/EmailStatusTag";
+import { useEmailPurposeLabel } from "../hooks/useEmailPurposeLabel";
 
 // The API closes this set: typing the list against the generated enum keeps a
 // status the server no longer accepts from lingering in the filter.
@@ -23,31 +27,10 @@ const ALL_STATUSES: readonly NotificationsEmailLogsListStatus[] = [
   "rate_limited",
 ] as const;
 
-const ALL_PURPOSES = [
-  "accounts.invitation",
-  "accounts.password_reset",
-  "accounts.application_received",
-  "accounts.application_approved",
-  "accounts.application_rejected",
-  "accounts.welcome_user",
-  "commissioning.trial_converted",
-  "commissioning.member_cancelled",
-  "commissioning.offer",
-  "commissioning.invoice",
-  "commissioning.delivery_note",
-  "commissioning.invoice_reminder",
-  "commissioning.waiting_list_offer",
-  "commissioning.member_self_cancelled_office",
-  "commissioning.consent_withdrawn_office",
-  "commissioning.subscription_renewal_failures_office",
-  "gdpr.deletion_confirm",
-  "gdpr.deletion_approved",
-  "gdpr.deletion_rejected",
-] as const;
-
 export default function EmailLog() {
   const { t } = useTranslation();
   const { formatDateTime } = useTimeFormat();
+  const purposeLabel = useEmailPurposeLabel();
 
   const [recipientFilter, setRecipientFilter] = useState("");
   const [purposeFilter, setPurposeFilter] = useState<string | undefined>(
@@ -74,6 +57,17 @@ export default function EmailLog() {
   const rows = useMemo<EmailLog[]>(
     () => (Array.isArray(data) ? data : []),
     [data],
+  );
+
+  // The purposes the log holds: most sends log their template slug, some a
+  // purpose of their own (``invoice:reseller``, ``test:smtp``, …).
+  const { data: loggedPurposes } = useNotificationsEmailLogsPurposes();
+  const purposeOptions = useMemo(
+    () =>
+      (loggedPurposes?.purposes ?? [])
+        .map((purpose) => ({ value: purpose, label: purposeLabel(purpose) }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [loggedPurposes, purposeLabel],
   );
 
   const columns = useMemo<ColumnsType<EmailLog>>(
@@ -104,7 +98,7 @@ export default function EmailLog() {
         title: t("email_matrix.purpose"),
         dataIndex: "purpose",
         key: "purpose",
-        render: (value: string) => t(`email_matrix.${value}`),
+        render: (value: string) => purposeLabel(value),
       },
       {
         title: t("email_matrix.status_col"),
@@ -121,7 +115,7 @@ export default function EmailLog() {
         render: (value: string | null) => (value ? formatDateTime(value) : "—"),
       },
     ],
-    [t, formatDateTime],
+    [t, formatDateTime, purposeLabel],
   );
 
   return (
@@ -143,10 +137,7 @@ export default function EmailLog() {
           onChange={setPurposeFilter}
           allowClear
           style={{ width: 220 }}
-          options={ALL_PURPOSES.map((p) => ({
-            value: p,
-            label: t(`email_matrix.${p}`),
-          }))}
+          options={purposeOptions}
         />
         <Select
           placeholder={t("email_matrix.status_col")}

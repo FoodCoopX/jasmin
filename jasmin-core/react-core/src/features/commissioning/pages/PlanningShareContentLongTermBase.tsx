@@ -19,6 +19,7 @@ import {
   commissioningDefaultShareContentsBulkDeleteDestroy,
   commissioningDefaultShareContentsBulkUpdatePartialUpdate,
   getCommissioningDefaultShareContentsBulkListListQueryKey,
+  getCommissioningShareArticlesListQueryKey,
   useCommissioningDefaultShareContentsBulkListList,
   useCommissioningDefaultShareContentsSubscriberCountsRetrieve,
 } from "@shared/api/generated/commissioning/commissioning";
@@ -51,7 +52,81 @@ import {
   type VariationWeightCount,
 } from "../utils/planningWeightSplit";
 
-const currentYear = dayjs().year();
+/** Pieces and bunches may be planned in fractions (the amount input takes two
+ *  decimals): show as many decimals as the amount has, so a whole count stays
+ *  "4" and half a kohlrabi reads "1,5" rather than "2". */
+const pieceDecimals = (amount: number): number => {
+  const hundredths = Math.round(amount * 100);
+  if (hundredths % 100 === 0) return 0;
+  return hundredths % 10 === 0 ? 1 : 2;
+};
+
+/** A row's delivery weeks as blocks on a line of the year's weeks. */
+function DeliveryWeeksTimeline({ record }: { record: TableRecord }) {
+  if (!record.range_1 || !record.range_2) return null;
+
+  const startWeek = parseInt(String(record.range_1));
+  const endWeek = parseInt(String(record.range_2));
+
+  if (isNaN(startWeek) || isNaN(endWeek)) return null;
+
+  // Calculate which weeks will actually have deliveries
+  const actualWeeks = [];
+  for (let week = startWeek; week <= endWeek; week++) {
+    let include = true;
+
+    if (record.only_odd_weeks && week % 2 === 0) {
+      include = false;
+    }
+    if (record.only_even_weeks && week % 2 !== 0) {
+      include = false;
+    }
+    if (record.only_every_three_weeks) {
+      const position = week - startWeek;
+      if (position % 3 !== 0) {
+        include = false;
+      }
+    }
+
+    if (include) {
+      actualWeeks.push(week);
+    }
+  }
+
+  const weekWidth = 10;
+  const padding = 4;
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        height: "10px",
+        backgroundColor: "var(--color-bg-hover)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "2px",
+        margin: "0 auto",
+      }}
+    >
+      {actualWeeks.map((week) => {
+        const position = (week - 1) * weekWidth + padding / 2;
+        return (
+          <div
+            key={week}
+            style={{
+              position: "absolute",
+              left: `${position}px`,
+              width: `${weekWidth}px`,
+              height: "8px",
+              top: "1px",
+              backgroundColor: "var(--color-success)",
+              borderRadius: "1px",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
 /** Long-term planning input direction: enter the per-share amount and read the
  *  total (``per_share``, the classic view), or enter a target total + weeks and
@@ -85,7 +160,7 @@ export default function PlanningShareContentLongTermBase({
   genericArticleColumn = false,
   allowTotalMode = false,
 }: PlanningShareContentLongTermBaseProps) {
-  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedYear, setSelectedYear] = useState(() => dayjs().year());
   const [mode, setMode] = useState<PlanningMode>("per_share");
   // The toggle can be hidden (simple share types); force per-share then, so a
   // stale "total" can never leak the reverse columns when it's not offered.
@@ -102,29 +177,7 @@ export default function PlanningShareContentLongTermBase({
   );
   const { getUnitLabel } = useUnitOptions();
 
-  const { shareArticleColumn, handleUnitChange } = useShareArticleColumn({
-    // Restrict selectable articles to those assigned to this share option.
-    filters: { ...shareArticleFilters, share_option: shareOption },
-    showFruitsAndVegs: !genericArticleColumn,
-    tooltip: false,
-    // Seed only the unit on article select — no crate / amount_per_pu, which
-    // would otherwise leak into the default-content payload (the backend reads
-    // every ``amount_*`` key as a share_type_variation id).
-    autofillContext: "longtermplanning",
-  });
-
-  const { amountUnitSizeColumns } = useAmountUnitSizeColumns({
-    showAmount: false,
-    // A saved row's unit and size belong to its slot, as its article does: the
-    // backend reads them from the slot id, so another unit is another row.
-    overrides: {
-      unit: { onFieldChange: handleUnitChange, disabled: editableOnlyOnCreate },
-      size: { disabled: editableOnlyOnCreate },
-    },
-  });
-
-  const { shareArticles, refetch: refetchShareArticles } =
-    useShareArticles(shareArticleFilters);
+  const { shareArticles } = useShareArticles(shareArticleFilters);
   const { noteColumn } = useNoteColumn();
   // The seller only applies to purchased articles, so the column is editable
   // only when the row's currently-selected share_article is_purchased.
@@ -173,6 +226,14 @@ export default function PlanningShareContentLongTermBase({
   // Stop reorder-on-save — see ``useInvalidateAfterTableMutation``.
   const { onSaveSuccess, onDeleteSuccess } =
     useInvalidateAfterTableMutation(invalidateData);
+
+  // The article column reads its own list, filtered by share option, so every
+  // share-article list is refreshed for a new article to be offered there.
+  const invalidateShareArticles = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: getCommissioningShareArticlesListQueryKey(),
+    });
+  }, [queryClient]);
 
   const customSave = useCallback(
     (transformedData: Record<string, unknown>) => {
@@ -293,6 +354,37 @@ export default function PlanningShareContentLongTermBase({
     [variationWeightCounts],
   );
 
+  // Picking an article seeds its unit, and the unit sets the rounding step of
+  // the split, so the target total is split again whenever either changes.
+  const splitAgainForUnit = useCallback(
+    (_articleId: string, _unit: string, form: unknown) => {
+      if (effectiveMode === "total") recomputeSuggestion(form as FormInstance);
+    },
+    [effectiveMode, recomputeSuggestion],
+  );
+
+  const { shareArticleColumn, handleUnitChange } = useShareArticleColumn({
+    // Restrict selectable articles to those assigned to this share option.
+    filters: { ...shareArticleFilters, share_option: shareOption },
+    showFruitsAndVegs: !genericArticleColumn,
+    tooltip: false,
+    // Seed only the unit on article select — no crate / amount_per_pu, which
+    // would otherwise leak into the default-content payload (the backend reads
+    // every ``amount_*`` key as a share_type_variation id).
+    autofillContext: "longtermplanning",
+    onDefaultsApplied: splitAgainForUnit,
+  });
+
+  const { amountUnitSizeColumns } = useAmountUnitSizeColumns({
+    showAmount: false,
+    // A saved row's unit and size belong to its slot, as its article does: the
+    // backend reads them from the slot id, so another unit is another row.
+    overrides: {
+      unit: { onFieldChange: handleUnitChange, disabled: editableOnlyOnCreate },
+      size: { disabled: editableOnlyOnCreate },
+    },
+  });
+
   const shareTypeVariationColumns: EditableColumnConfig<TableRecord>[] =
     useMemo(() => {
       return shareTypeVariations.map(
@@ -316,7 +408,10 @@ export default function PlanningShareContentLongTermBase({
             if (isNaN(numValue)) return String(value);
 
             const unit = record.unit as string;
-            const decimals = unit === "PCS" || unit === "BUNCH" ? 0 : 3;
+            const decimals =
+              unit === "PCS" || unit === "BUNCH"
+                ? pieceDecimals(numValue)
+                : 3;
 
             return format(numValue, decimals);
           },
@@ -566,71 +661,9 @@ export default function PlanningShareContentLongTermBase({
         width: "40em",
         disabled: true,
         readOnly: true,
-        render: (_: unknown, record: TableRecord) => {
-          if (!record.range_1 || !record.range_2) return null;
-
-          const startWeek = parseInt(String(record.range_1));
-          const endWeek = parseInt(String(record.range_2));
-
-          if (isNaN(startWeek) || isNaN(endWeek)) return null;
-
-          // Calculate which weeks will actually have deliveries
-          const actualWeeks = [];
-          for (let week = startWeek; week <= endWeek; week++) {
-            let include = true;
-
-            if (record.only_odd_weeks && week % 2 === 0) {
-              include = false;
-            }
-            if (record.only_even_weeks && week % 2 !== 0) {
-              include = false;
-            }
-            if (record.only_every_three_weeks) {
-              const position = week - startWeek;
-              if (position % 3 !== 0) {
-                include = false;
-              }
-            }
-
-            if (include) {
-              actualWeeks.push(week);
-            }
-          }
-
-          const weekWidth = 10;
-          const padding = 4;
-
-          return (
-            <div
-              style={{
-                position: "relative",
-                height: "10px",
-                backgroundColor: "var(--color-bg-hover)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "2px",
-                margin: "0 auto",
-              }}
-            >
-              {actualWeeks.map((week) => {
-                const position = (week - 1) * weekWidth + padding / 2;
-                return (
-                  <div
-                    key={week}
-                    style={{
-                      position: "absolute",
-                      left: `${position}px`,
-                      width: `${weekWidth}px`,
-                      height: "8px",
-                      top: "1px",
-                      backgroundColor: "var(--color-success)",
-                      borderRadius: "1px",
-                    }}
-                  />
-                );
-              })}
-            </div>
-          );
-        },
+        render: (_: unknown, record: TableRecord) => (
+          <DeliveryWeeksTimeline record={record} />
+        ),
       },
       {
         ...noteColumn,
@@ -722,7 +755,7 @@ export default function PlanningShareContentLongTermBase({
       <AddShareArticleEntry
         disabled={isPast}
         defaultValues={{ is_purchased: true }}
-        onSuccess={() => refetchShareArticles()}
+        onSuccess={invalidateShareArticles}
       />
 
       <ExplainerText title={t("common.info")}>{t(explainerKey)}</ExplainerText>

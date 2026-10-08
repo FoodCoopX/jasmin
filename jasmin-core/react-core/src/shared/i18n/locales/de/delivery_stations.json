@@ -14,6 +14,8 @@
     "position": "Pos.", 
     "short_name": "Kürzel", 
     "tour_assignment_missing": "Tour-Zuweisung", 
+    "tour_assigned": "In einer Tour – Touren öffnen",
+    "tour_not_assigned": "Keiner Tour zugewiesen – Touren öffnen",
     "active_delivery_days": "aktive Liefertage", 
     "phone": "Telefon",
     "email": "Email",

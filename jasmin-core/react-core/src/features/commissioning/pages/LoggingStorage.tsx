@@ -34,7 +34,6 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const { RangePicker } = DatePicker;
-const currentYear = dayjs().year();
 
 /** One row of the internal-workflow table — whichever theoretical model the
  *  selected source tab queried. */
@@ -55,7 +54,7 @@ export default function LoggingStorage() {
   );
 
   // Workflow State
-  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedYear, setSelectedYear] = useState(() => dayjs().year());
   const [selectedWorkflowShareArticle, setSelectedWorkflowShareArticle] =
     useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState("HARVEST");
@@ -178,7 +177,7 @@ export default function LoggingStorage() {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case "STOCK_COUNT":
+      case "INVENTORY":
         return "blue";
       case "HARVEST":
         return "green";
@@ -201,8 +200,6 @@ export default function LoggingStorage() {
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case "STOCK_COUNT":
-        return t("common.stock_count");
       case "HARVEST":
         return t("common.harvest");
       case "PURCHASE":
@@ -265,7 +262,7 @@ export default function LoggingStorage() {
         </Tag>
       ),
       filters: [
-        { text: t("common.stock_count"), value: "STOCK_COUNT" },
+        { text: t("common.inventory"), value: "INVENTORY" },
         { text: t("common.harvest"), value: "HARVEST" },
         { text: t("common.purchase"), value: "PURCHASE" },
         { text: t("common.share_content"), value: "SHARECONTENT" },
@@ -288,17 +285,12 @@ export default function LoggingStorage() {
       key: "amount",
       width: "7em",
       align: "right",
-      render: (amount: number, record: StorageLoggingEntry) => {
-        if (record.type === "STOCK_COUNT") {
-          return <span style={{ fontWeight: "bold" }}>{format(amount, 2)}</span>;
-        }
-        return (
-          <span className={amount < 0 ? "text-error" : "text-success"}>
-            {amount > 0 ? "+" : ""}
-            {format(amount, 2)}
-          </span>
-        );
-      },
+      render: (amount: number) => (
+        <span className={amount < 0 ? "text-error" : "text-success"}>
+          {amount > 0 ? "+" : ""}
+          {format(amount, 2)}
+        </span>
+      ),
     },
     {
       title: t("commissioning.balance"),

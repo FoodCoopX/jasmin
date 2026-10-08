@@ -1,4 +1,3 @@
-import { EditOutlined } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, Flex, Modal, Spin } from "antd";
 import ModalCloseFooter from "@shared/modals/ModalCloseFooter";
@@ -19,6 +18,7 @@ import {
   useActiveStatusColumn,
   useDateFormat,
   useTimeBoundColumns,
+  useTimeFormat,
 } from "@hooks/index";
 import {
   capacityFloorParams,
@@ -31,6 +31,7 @@ import {
   useShareDeliveryDays,
   useStationDayTakeover,
 } from "@features/commissioning/hooks";
+import StationDayPickupInfoCell from "@features/commissioning/components/StationDayPickupInfoCell";
 import { useStationDayEarlierStart } from "@features/commissioning/hooks/useStationDayEarlierStart";
 import type { ShareDeliveryDayOption } from "@features/commissioning/hooks/useShareDeliveryDays";
 import { getStatusColor, notify } from "@shared/utils";
@@ -91,6 +92,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
 
   const navigate = useNavigate();
   const { formatDate } = useDateFormat();
+  const { formatTimeOfDay } = useTimeFormat();
   const { shareDeliveryDays } = useShareDeliveryDays();
 
   const weekdayChoices = useMemo(() => getWeekdayChoices(t), [t]);
@@ -167,105 +169,18 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
     });
   }, [queryClient, listParams]);
 
-  const deliveryDayOptions = useMemo(() => {
-    const dayNumberMap = new Map<number, ShareDeliveryDayOption>();
-
-    shareDeliveryDays.forEach((day) => {
-      const dayNum = day.day_number as number;
-      if (!dayNumberMap.has(dayNum)) {
-        dayNumberMap.set(dayNum, day);
-      }
-    });
-
-    return Array.from(dayNumberMap.keys())
-      .sort((a, b) => a - b)
-      .map((dayNumber) => {
-        const day = dayNumberMap.get(dayNumber)!;
-        const dayName =
-          (weekdayChoices.find((c) => c.value === dayNumber)
-            ?.label as string) || `Day ${dayNumber}`;
-        const validFrom = formatDate(day.valid_from as string);
-        const validUntil = formatDate(day.valid_until as string);
-        const statusColor = getStatusColor(
-          day.valid_from as string,
-          day.valid_until as string,
-        );
-
-        let datePart = "";
-        if (validFrom) {
-          datePart = `${t("commissioning.valid_from")} ${validFrom}`;
-        }
-        if (validUntil) {
-          datePart += ` ${t("commissioning.valid_until")} ${validUntil}`;
-        }
-
-        return {
-          value: day.id as string,
-          dayNumber,
-          label: (
-            <Flex align="center" component="span">
-              {statusColor && (
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: "10px",
-                    height: "10px",
-                    backgroundColor: statusColor,
-                    marginRight: "8px",
-                    borderRadius: "2px",
-                  }}
-                />
-              )}
-              <strong>{dayName}</strong>
-              {datePart && (
-                <span
-                  style={{
-                    color: "var(--color-text-muted)",
-                    fontSize: "0.85em",
-                    marginLeft: "8px",
-                  }}
-                >
-                  {datePart}
-                </span>
-              )}
-            </Flex>
-          ),
-        };
-      });
-  }, [shareDeliveryDays, t, formatDate, weekdayChoices]);
-
-  const activeStatusColumn = useActiveStatusColumn({
-    defaultSortOrder: "descend",
-  });
-
-  // Every delivery day is offered, also one this station already serves: a
-  // new station day starting later takes the open one over, once the office
-  // agrees; the table refuses one that would overlap it.
-  const { confirmTakeover, confirmHolder } = useStationDayTakeover(
-    data,
-    shareDeliveryDays,
-  );
-
-  const [descriptionModalVisible, setDescriptionModalVisible] = useState(false);
-  const [selectedDescriptionRecord, setSelectedDescriptionRecord] =
-    useState<StationDayRecord | null>(null);
-
-  const renderWeekday = useCallback(
-    (value: unknown) => {
-      if (!value) return "-";
-
-      const shareDay = shareDeliveryDays.find((d) => d.id === value);
-      if (!shareDay) return value as string;
-
+  // A delivery day as its weekday, validity and status colour.
+  const deliveryDayLabel = useCallback(
+    (day: ShareDeliveryDayOption) => {
       const dayName =
-        (weekdayChoices.find((c) => c.value === (shareDay.day_number as number))
-          ?.label as string) || `Day ${shareDay.day_number}`;
+        (weekdayChoices.find((c) => c.value === (day.day_number as number))
+          ?.label as string) || `Day ${day.day_number}`;
+      const validFrom = formatDate(day.valid_from as string);
+      const validUntil = formatDate(day.valid_until as string);
       const statusColor = getStatusColor(
-        shareDay.valid_from as string,
-        shareDay.valid_until as string,
+        day.valid_from as string,
+        day.valid_until as string,
       );
-      const validFrom = formatDate(shareDay.valid_from as string);
-      const validUntil = formatDate(shareDay.valid_until as string);
 
       let datePart = "";
       if (validFrom) {
@@ -304,7 +219,54 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
         </Flex>
       );
     },
-    [shareDeliveryDays, t, formatDate, weekdayChoices],
+    [t, formatDate, weekdayChoices],
+  );
+
+  const deliveryDayOptions = useMemo(() => {
+    const dayNumberMap = new Map<number, ShareDeliveryDayOption>();
+
+    shareDeliveryDays.forEach((day) => {
+      const dayNum = day.day_number as number;
+      if (!dayNumberMap.has(dayNum)) {
+        dayNumberMap.set(dayNum, day);
+      }
+    });
+
+    return Array.from(dayNumberMap.keys())
+      .sort((a, b) => a - b)
+      .map((dayNumber) => {
+        const day = dayNumberMap.get(dayNumber)!;
+        return {
+          value: day.id as string,
+          dayNumber,
+          label: deliveryDayLabel(day),
+        };
+      });
+  }, [shareDeliveryDays, deliveryDayLabel]);
+
+  const activeStatusColumn = useActiveStatusColumn({
+    defaultSortOrder: "descend",
+  });
+
+  // Every delivery day is offered, also one this station already serves: a
+  // new station day starting later takes the open one over, once the office
+  // agrees; the table refuses one that would overlap it.
+  const { confirmTakeover, confirmHolder } = useStationDayTakeover(
+    data,
+    shareDeliveryDays,
+  );
+
+  const [descriptionModalVisible, setDescriptionModalVisible] = useState(false);
+  const [selectedDescriptionRecord, setSelectedDescriptionRecord] =
+    useState<StationDayRecord | null>(null);
+
+  const renderWeekday = useCallback(
+    (value: unknown) => {
+      if (!value) return "-";
+      const shareDay = shareDeliveryDays.find((d) => d.id === value);
+      return shareDay ? deliveryDayLabel(shareDay) : (value as string);
+    },
+    [shareDeliveryDays, deliveryDayLabel],
   );
 
   const handleOpenDescriptionModal = useCallback((record: StationDayRecord) => {
@@ -357,11 +319,16 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
           align: "center",
           width: "3em",
           render: (_: unknown, record: StationDayRecord) => {
-            const variant = record.tour_assignment_missing ? "not_ok" : "ok";
+            const missing = record.tour_assignment_missing === true;
             return (
               <StatusButton
-                variant={variant}
-                tooltip=""
+                variant={missing ? "not_ok" : "ok"}
+                tooltip={t(
+                  missing
+                    ? "delivery_stations.tour_not_assigned"
+                    : "delivery_stations.tour_assigned",
+                )}
+                showTooltip
                 onClick={() => navigate("/commissioning/delivery-tours")}
               />
             );
@@ -417,7 +384,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
             const peak = peakByStationDayId.get(String(record.id));
             if (!peak || peak.peakOccupied <= 0) return "0";
             return peak.peakWeekKey
-              ? `${peak.peakOccupied} (KW ${formatWeekKey(peak.peakWeekKey)})`
+              ? `${peak.peakOccupied} (${t("commissioning.KW")} ${formatWeekKey(peak.peakWeekKey)})`
               : String(peak.peakOccupied);
           },
         },
@@ -428,8 +395,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
           inputType: "time",
           width: "6em",
           align: "center",
-          render: (value: unknown) =>
-            value ? (value as string).slice(0, 5) : "-",
+          render: (value: unknown) => formatTimeOfDay(value),
         },
         {
           title: t("delivery.pickup_time_end"),
@@ -438,8 +404,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
           inputType: "time",
           width: "6em",
           align: "center",
-          render: (value: unknown) =>
-            value ? (value as string).slice(0, 5) : "-",
+          render: (value: unknown) => formatTimeOfDay(value),
         },
         {
           title: (
@@ -463,15 +428,13 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
           width: "6em",
           align: "center",
           render: (_: unknown, record: StationDayRecord) => (
-            <>
-              <Button
-                type="link"
-                size="small"
-                icon={<EditOutlined />}
-                aria-label={t("table.edit")}
-                onClick={() => handleOpenDescriptionModal(record)}
-              />
-            </>
+            <StationDayPickupInfoCell
+              html={record.special_instructions}
+              title={`${t("commissioning.special_instructions")} ${deliveryStation?.short_name ?? ""}`}
+              canEdit={isOffice}
+              onEdit={() => handleOpenDescriptionModal(record)}
+              zIndex={1100}
+            />
           ),
         },
       ] as EditableColumnConfig[],
@@ -485,6 +448,9 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
       handleOpenDescriptionModal,
       renderWeekday,
       peakByStationDayId,
+      formatTimeOfDay,
+      isOffice,
+      deliveryStation?.short_name,
     ],
   );
 

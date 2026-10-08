@@ -18,10 +18,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  DeliveryStationDay,
-  SharesDeliveryDay,
-} from "@shared/api/generated/models";
+import type { DeliveryStationDay } from "@shared/api/generated/models";
 import i18n from "@shared/i18n";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
@@ -124,88 +121,18 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
 });
 
 import DeliveryStationDetailModal from "../DeliveryStationDetailModal";
+import {
+  NOW,
+  type Station,
+  STATION,
+  DELIVERY_DAYS,
+  stationDay,
+  TUESDAY_2025,
+  TUESDAY,
+  THURSDAY,
+} from "./deliveryStationDetailModal.fixtures";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
-
-const NOW = new Date(2026, 9, 6, 12, 0);
-
-type Station = { id: string; short_name?: string; contact?: { name?: string } };
-
-const STATION: Station = {
-  id: "station-mill",
-  short_name: "Mill",
-  contact: { name: "Old Mill" },
-};
-
-const deliveryDay = (
-  id: string,
-  day_number: SharesDeliveryDay["day_number"],
-  valid_from: string,
-): SharesDeliveryDay => ({ id, day_number, valid_from, valid_until: null });
-
-// The farm delivers on Tuesdays and Thursdays and adds Saturdays in November.
-const DELIVERY_DAYS = [
-  deliveryDay("sdd-tue", 1, "2025-01-06"),
-  deliveryDay("sdd-thu", 3, "2026-01-12"),
-  deliveryDay("sdd-sat", 5, "2026-11-02"),
-];
-
-function stationDay(
-  overrides: Partial<DeliveryStationDay> & { id: string },
-): DeliveryStationDay {
-  return {
-    delivery_station: STATION.id,
-    delivery_day: "sdd-tue",
-    valid_from: "2025-12-29",
-    valid_until: null,
-    capacity: 20,
-    capacity_by_week: {},
-    pickup_time_begin: "14:00:00",
-    pickup_time_end: "18:30:00",
-    additional_pickup_days: 0,
-    special_instructions: "",
-    can_be_deleted: true,
-    ...overrides,
-  };
-}
-
-// The station's Tuesday as it ran last year, closed.
-const TUESDAY_2025 = stationDay({
-  id: "sd-tue-2025",
-  valid_from: "2025-01-06",
-  valid_until: "2025-12-28",
-  capacity: 18,
-  pickup_time_begin: "15:00:00",
-  pickup_time_end: "18:00:00",
-  can_be_deleted: false,
-});
-// The station's current Tuesday, booked into December; week 40 is already over.
-const TUESDAY = stationDay({
-  id: "sd-tue",
-  capacity: 20,
-  capacity_by_week: {
-    "2026-40": { occupied: 19, free: 1 },
-    "2026-41": { occupied: 12, free: 8 },
-    "2026-43": { occupied: 14, free: 6 },
-    "2026-50": { occupied: 9, free: 11 },
-  },
-  additional_pickup_days: 1,
-  special_instructions: "<p>Key in the mailbox.</p>",
-  can_be_deleted: false,
-});
-// A Thursday that ends this month and has nothing booked.
-const THURSDAY = stationDay({
-  id: "sd-thu",
-  delivery_day: "sdd-thu",
-  valid_from: "2026-01-19",
-  valid_until: "2026-10-25",
-  capacity: 10,
-  capacity_by_week: null,
-  pickup_time_begin: null,
-  pickup_time_end: null,
-  additional_pickup_days: null,
-  special_instructions: null,
-});
 
 // What the server currently holds; the list request answers from it.
 let serverDays: DeliveryStationDay[] = [];
@@ -387,14 +314,12 @@ async function save() {
 const editorText = () => screen.queryByRole("textbox", { name: "Text" });
 
 /** Opens a row's special instructions; resolves to the editor dialog. */
-async function openInstructions(row: HTMLElement): Promise<HTMLElement> {
-  await userEvent.click(
-    within(cellOf(row, HEADER.instructions)).getByRole("button", {
-      name: "table.edit",
-    }),
-  );
+// The office edits the pickup info ("table.edit"); the other roles read it
+// ("common.view").
+async function openInstructions(row: HTMLElement, button = "table.edit"): Promise<HTMLElement> {
+  await userEvent.click(within(cellOf(row, HEADER.instructions)).getByRole("button", { name: button }));
   // Under test AntD gives every modal title the same id, so the two dialogs
-  // share an accessible name; the editor is the one with its title.
+  // share an accessible name; the instructions are the one with their title.
   return waitFor(() => {
     const editor = screen
       .getAllByRole("dialog")
@@ -541,8 +466,8 @@ describe("DeliveryStationDetailModal station days", () => {
     await renderLoaded();
 
     // Week 40 had 19 bookings but is over; 14 in week 43 are the most to come.
-    expect(textOf(rowStarting("29.12.2025"), HEADER.peak)).toMatch(
-      /^14 \(\S+ 43\/2026\)$/,
+    expect(textOf(rowStarting("29.12.2025"), HEADER.peak)).toBe(
+      "14 (commissioning.KW 43/2026)",
     );
     expect(textOf(rowStarting("19.01.2026"), HEADER.peak)).toBe("0");
     expect(textOf(rowStarting("06.01.2025"), HEADER.peak)).toBe("0");
@@ -559,6 +484,35 @@ describe("DeliveryStationDetailModal station days", () => {
       ),
     ).toBeInTheDocument();
     expect(textOf(rowStarting("01/19/2026"), HEADER.validUntil)).toBe("10/25/2026");
+  });
+
+  it("shows the pickup times in the tenant's own time format", async () => {
+    tenantSettings.values = { time_format: "hh:mm A" };
+    await renderLoaded();
+
+    const tuesday = rowStarting("29.12.2025");
+    expect(textOf(tuesday, HEADER.pickupBegin)).toBe("02:00 PM");
+    expect(textOf(tuesday, HEADER.pickupEnd)).toBe("06:30 PM");
+    expect(textOf(rowStarting("19.01.2026"), HEADER.pickupBegin)).toBe("-");
+  });
+
+  it("says for each station day whether it is on a delivery tour", async () => {
+    serverDays = [
+      { ...TUESDAY, tour_assignment_missing: false },
+      { ...THURSDAY, tour_assignment_missing: true },
+    ];
+    await renderLoaded();
+
+    expect(
+      within(cellOf(rowStarting("29.12.2025"), HEADER.tour)).getByRole("button", {
+        name: "delivery_stations.tour_assigned",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(cellOf(rowStarting("19.01.2026"), HEADER.tour)).getByRole("button", {
+        name: "delivery_stations.tour_not_assigned",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("lists upcoming station days first, then active, then ended ones, each marked", async () => {
@@ -982,6 +936,24 @@ describe("DeliveryStationDetailModal for read-only roles", () => {
 
       expect(screen.queryByLabelText(CAPACITY)).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "table.save" })).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([{ roles: ["staff"] }, { roles: ["gardener"] }, { roles: ["management"] }])(
+    "lets $roles read the pickup info but not edit it",
+    async ({ roles }) => {
+      auth.roles = roles;
+      await renderLoaded();
+
+      expect(screen.queryByRole("button", { name: "table.edit" })).not.toBeInTheDocument();
+      // Only the Tuesday has pickup info; the other days offer nothing to open.
+      expect(screen.getAllByRole("button", { name: "common.view" })).toHaveLength(1);
+
+      const info = await openInstructions(rowStarting("29.12.2025"), "common.view");
+      expect(within(info).getByText("commissioning.special_instructions Mill")).toBeInTheDocument();
+      expect(within(info).getByText("Key in the mailbox.")).toBeInTheDocument();
+      expect(within(info).queryByRole("textbox")).not.toBeInTheDocument();
+      expect(within(info).queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
     },
   );
 });

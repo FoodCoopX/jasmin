@@ -13,6 +13,8 @@
   "position": "Pos.",
   "short_name": "Abbreviation",
   "tour_assignment_missing": "Tour assignment",
+  "tour_assigned": "On a delivery tour — open the tours",
+  "tour_not_assigned": "Not on any delivery tour — open the tours",
   "active_delivery_days": "Active delivery days",
   "phone": "Phone",
   "email": "Email",

@@ -30,14 +30,7 @@ import type {
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 import { makeUseTenantMock, type UseTenantMockShape } from "@/test/tenantMock";
 
-// The page reads the current year once, when its module loads, so the clock is
-// frozen before the import as well as around every test.
-const NOW = vi.hoisted(() => {
-  const now = new Date(2026, 9, 5, 12, 0);
-  vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(now);
-  return now;
-});
+const NOW = new Date(2026, 9, 5, 12, 0);
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -609,6 +602,37 @@ describe("LoggingStorage storage ledger", () => {
     await waitFor(() => expect(ledgerRows()).toEqual([CELLAR_ROWS.harvest]));
   });
 
+  it("offers every kind the ledger carries as a filter, the stock counts among them", async () => {
+    renderPage();
+    await cellarLedgerShown();
+
+    await userEvent.click(within(ledgerTable()).getByRole("button", { name: "filter" }));
+    const offered = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+    expect(offered).toEqual([
+      "common.inventory",
+      "common.harvest",
+      "common.purchase",
+      "common.share_content",
+      "common.order_content",
+      "common.waste",
+      "common.washing",
+      "commissioning.cleaned",
+    ]);
+
+    await userEvent.click(screen.getByRole("menuitem", { name: "common.inventory" }));
+    await userEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    await waitFor(() => expect(ledgerRows()).toEqual([CELLAR_ROWS.count]));
+  });
+
+  it("colours the stock counts' tag like every other kind", async () => {
+    renderPage();
+    await cellarLedgerShown();
+
+    const tag = within(ledgerTable()).getByText("common.inventory");
+    expect(tag).toHaveClass("ant-tag-blue");
+  });
+
   it("shows the ledger of the storage the user switches to", async () => {
     renderPage();
     await cellarLedgerShown();
@@ -801,6 +825,17 @@ describe("LoggingStorage internal workflow", () => {
       "aria-pressed",
       "true",
     );
+  });
+
+  it("opens on the year of the day the page is opened, not the day the app was loaded", async () => {
+    vi.setSystemTime(new Date(2027, 0, 4, 12, 0));
+    renderPage();
+
+    await waitFor(() =>
+      expect(workflowRows()).toEqual([["11.01.2027", "", "Leek", "12,00", PCS]]),
+    );
+    expect(api.harvests).toHaveBeenCalledWith({ year: 2027 });
+    expect(api.harvests).not.toHaveBeenCalledWith({ year: 2026 });
   });
 
   it("follows the year the user steps to", async () => {

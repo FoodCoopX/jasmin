@@ -195,12 +195,14 @@ test_delivery_station_query_count.py (1 test)
 ─────────────────────────────────────────────
   (module-level)                           1   delivery-station list is scale-invariant
 
-test_delivery_viewsets.py (49 tests)
+test_delivery_viewsets.py (51 tests)
 ────────────────────────────────────
   TestDeliveryStationViewSet               8   list, is_active filter, retrieve, can_be_deleted, filter by
                                                member (confirmed subscriptions only), member-role read
-  TestDeliveryStationDayViewSet           16   list, filter by station / day / member, capacity by week,
-                                               a member cannot query another member's station-days
+  TestDeliveryStationDayViewSet           18   list, filter by station / day / member, capacity by week,
+                                               a member cannot query another member's station-days,
+                                               tour_assignment_missing for a station day on no tour,
+                                               also once update_tours takes it off
   TestDeliveryStationDayValidFromMove      7   moving valid_from later past existing deliveries → 409 in
                                                both modes and the row is untouched; into a past week →
                                                400 unless onboarding mode is on; before its own delivery

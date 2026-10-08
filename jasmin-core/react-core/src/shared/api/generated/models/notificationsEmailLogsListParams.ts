@@ -19,7 +19,7 @@ limit?: number;
  */
 offset?: number;
 /**
- * Exact purpose slug (e.g. commissioning.invoice).
+ * Exact purpose as logged: the template slug for most sends (e.g. commissioning.offer), a purpose of the send's own for others (e.g. invoice:reseller, test:smtp). The purposes endpoint lists those the log holds.
  */
 purpose?: string;
 /**

@@ -122,7 +122,8 @@ _ANONYMOUS_SURFACE: dict[str, frozenset[str]] = {
         }
     ),
     # WILDCARD over DeliveryStationDay. Route logistics —
-    # special_instructions / tour_number / stop_order — are masked for
+    # special_instructions / tour_number / stop_order / tour_assignment_missing
+    # — are masked for
     # anonymous callers, not absent from the serializer.
     "DeliveryStationDayViewSet": frozenset(
         {
@@ -148,6 +149,7 @@ _ANONYMOUS_SURFACE: dict[str, frozenset[str]] = {
             "pickup_time_end",
             "special_instructions",
             "stop_order",
+            "tour_assignment_missing",
             "tour_number",
             "valid_from",
             "valid_until",
@@ -264,17 +266,22 @@ class TestAnonymousReadSurface:
     def test_route_logistics_stay_masked_for_anonymous_callers(self, tenant):
         """The declaration half above cannot see this.
 
-        ``special_instructions`` / ``tour_number`` / ``stop_order`` ARE on the
-        serializer and are removed per-response by
-        ``mask_capacity_for_anonymous``. Delete that call and the registry stays
+        ``special_instructions`` / ``tour_number`` / ``stop_order`` /
+        ``tour_assignment_missing`` ARE on the serializer and are removed
+        per-response by ``mask_capacity_for_anonymous``. Delete that call and the registry stays
         green while the fields start shipping, so assert the behaviour.
         """
         response = APIClient().get(reverse("delivery_station_day-list"))
 
         assert response.status_code == 200, response.content[:200]
         for row in response.json():
-            for field in ("special_instructions", "tour_number", "stop_order"):
-                assert not row.get(field), (
+            for field in (
+                "special_instructions",
+                "tour_number",
+                "stop_order",
+                "tour_assignment_missing",
+            ):
+                assert field not in row, (
                     f"{field} reached an unauthenticated caller — the "
                     f"mask_capacity_for_anonymous call has been lost"
                 )

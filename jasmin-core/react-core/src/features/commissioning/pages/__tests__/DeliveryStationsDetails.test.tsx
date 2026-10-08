@@ -25,12 +25,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   DeliveryStation,
   PackingBoxesMatrix,
-  PackingBoxesMatrixAddOn,
-  PackingBoxesMatrixColumn,
-  PackingBoxesMatrixRow,
   SharesDeliveryDay,
   StationMemberMatrix,
-  StationMemberMatrixRow,
 } from "@shared/api/generated/models";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
@@ -173,147 +169,31 @@ import { commissioningRoutes } from "@app/routing/routes/commissioning";
 // Loaded up front so the route's lazy import resolves at once rather than
 // inside the first test's time budget.
 import "../DeliveryStationsDetails";
+import {
+  TUESDAY,
+  FRIDAY,
+  deliveryDay,
+  FARM_SHOP,
+  MARKET,
+  SCHOOL,
+  CHURCH_HALL,
+  HONEY_M,
+  BREAD_L,
+  BREAD_ONLY,
+  SMALL,
+  MEDIUM_WITH_HONEY,
+  FARM_SHOP_TUESDAY,
+  MARKET_TUESDAY,
+  MARKET_FRIDAY,
+  SCHOOL_FRIDAY,
+  FARM_SHOP_FRIDAY,
+  FARM_SHOP_NEXT_TUESDAY,
+  CARROTS,
+  FARM_SHOP_TAKE,
+  CARROTS_ON_THE_SHEET,
+} from "./deliveryStationsDetails.fixtures";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
-
-// Backend day numbers: 0 = Monday … 6 = Sunday.
-const TUESDAY = 1;
-const FRIDAY = 4;
-
-const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => ({
-  id,
-  day_number: dayNumber as SharesDeliveryDay["day_number"],
-  valid_from: "2026-01-05",
-  valid_until: null,
-});
-
-const station = (id: string, shortName: string): DeliveryStation => ({
-  id,
-  short_name: shortName,
-  is_active: true,
-});
-
-const FARM_SHOP = station("st-farm-shop", "Farm shop");
-const MARKET = station("st-market", "Market");
-const SCHOOL = station("st-school", "School");
-const CHURCH_HALL = station("st-church-hall", "Church hall");
-
-const HONEY_M: PackingBoxesMatrixAddOn = {
-  variation_id: "var-honey-m",
-  size: "M",
-  sort_order: 2,
-  share_type_id: "st-honey",
-  share_type_short_name: "Honey",
-  share_type_sort_index: 0,
-};
-const BREAD_L: PackingBoxesMatrixAddOn = {
-  variation_id: "var-bread-l",
-  size: "L",
-  sort_order: 3,
-  share_type_id: "st-bread",
-  share_type_short_name: "Bread",
-  share_type_sort_index: 1,
-};
-
-/** A vegetable box of one size with the add-ons packed into it. */
-const vegetableBox = (
-  size: "S" | "M",
-  count: number,
-  addOns: PackingBoxesMatrixAddOn[] = [],
-): PackingBoxesMatrixColumn => {
-  const variation = `var-veg-${size.toLowerCase()}`;
-  return {
-    key: `combo_${variation}|${addOns.map((addOn) => addOn.variation_id).join("-")}`,
-    base_variation_id: variation,
-    base_size: size,
-    base_sort_order: size === "S" ? 1 : 2,
-    base_share_type_id: "st-veg",
-    base_share_type_name: "Vegetables",
-    base_share_type_short_name: "Veg",
-    base_share_type_sort_index: 0,
-    add_ons: addOns,
-    count,
-  };
-};
-
-/** Bread ordered without a vegetable box: a box with no base. */
-const BREAD_ONLY: PackingBoxesMatrixColumn = {
-  key: `combo_none|${BREAD_L.variation_id}`,
-  base_variation_id: null,
-  base_size: "",
-  base_sort_order: 0,
-  base_share_type_id: null,
-  base_share_type_name: "",
-  base_share_type_short_name: "",
-  base_share_type_sort_index: 1,
-  add_ons: [BREAD_L],
-  count: 1,
-};
-
-/** One member's row: how many boxes of each combination they collect. */
-const member = (
-  id: string,
-  name: string,
-  boxes: [PackingBoxesMatrixColumn, number][],
-): StationMemberMatrixRow =>
-  ({
-    id,
-    name,
-    ...Object.fromEntries(boxes.map(([column, count]) => [column.key, count])),
-  }) as StationMemberMatrixRow;
-
-/** A station whose members each collect one box of the same kind. */
-const oneBoxEach = (
-  column: PackingBoxesMatrixColumn,
-  ...members: [id: string, name: string][]
-): StationMemberMatrix => ({
-  columns: [column],
-  rows: members.map(([id, name]) => member(id, name, [[column, 1]])),
-});
-
-const SMALL = vegetableBox("S", 2);
-const MEDIUM_WITH_HONEY = vegetableBox("M", 2, [HONEY_M]);
-
-const FARM_SHOP_TUESDAY: StationMemberMatrix = {
-  columns: [SMALL, MEDIUM_WITH_HONEY, BREAD_ONLY],
-  rows: [
-    member("m-ana", "Ana Example", [[SMALL, 1]]),
-    member("m-ben", "Ben Sample", [[MEDIUM_WITH_HONEY, 2]]),
-    member("m-dora", "Dora Muster", [
-      [SMALL, 1],
-      [BREAD_ONLY, 1],
-    ]),
-  ],
-};
-const MARKET_TUESDAY = oneBoxEach(vegetableBox("M", 1), ["m-cleo", "Cleo Muster"]);
-const MARKET_FRIDAY = oneBoxEach(vegetableBox("S", 1), ["m-emil", "Emil Probe"]);
-const SCHOOL_FRIDAY = oneBoxEach(vegetableBox("S", 1), ["m-finn", "Finn Beispiel"]);
-const FARM_SHOP_FRIDAY = oneBoxEach(vegetableBox("M", 1), ["m-gina", "Gina Test"]);
-const FARM_SHOP_NEXT_TUESDAY = oneBoxEach(vegetableBox("S", 1), [
-  "m-ana",
-  "Ana Example",
-]);
-
-/** "What you may take": the amount of each article per box. */
-const CARROTS = {
-  id: "row-carrots",
-  share_article_id: "sa-carrots",
-  share_article_name: "Carrots",
-  unit: "KG",
-  size: "M",
-  note: "",
-  [SMALL.key]: 0.5,
-  [MEDIUM_WITH_HONEY.key]: 1,
-} as PackingBoxesMatrixRow;
-const FARM_SHOP_TAKE: PackingBoxesMatrix = {
-  columns: [SMALL, MEDIUM_WITH_HONEY],
-  rows: [CARROTS],
-};
-const CARROTS_ON_THE_SHEET = {
-  ...CARROTS,
-  unit_label: "commissioning.units.kg",
-  size_label: "commissioning.medium",
-};
 
 type ListParams = {
   year: number;
@@ -810,6 +690,75 @@ describe("DeliveryStationsDetails downloads", () => {
     await waitFor(() => expect(download(DAY_PDF)).toBeEnabled());
   });
 
+  it("offers the day's and the week's PDFs when nobody collects at the station on screen", async () => {
+    // Every member of the farm shop took a joker this Tuesday.
+    farm.pickups[listOf(41, TUESDAY, FARM_SHOP)] = { columns: [], rows: [] };
+    renderPage();
+    await screen.findByText("commissioning.packing_list_no_columns");
+
+    await waitFor(() => expect(download(DAY_PDF)).toBeEnabled());
+    await waitFor(() => expect(download(WEEK_PDF)).toBeEnabled());
+    expect(download(STATION_PDF)).toBeDisabled();
+
+    await userEvent.click(download(DAY_PDF));
+
+    await waitFor(() => expect(printed.documents).toHaveLength(1));
+    expect(
+      (printedDocument().pages as { stationName: string }[]).map((page) => page.stationName),
+    ).toEqual(["Market"]);
+  });
+
+  it("offers the day's and the week's PDFs when the station on screen fails to load", async () => {
+    api.pickups.mockImplementation((params: ListParams) =>
+      listAskedFor(params) === listOf(41, TUESDAY, FARM_SHOP)
+        ? Promise.reject(new Error("Network Error"))
+        : answerPickups(params),
+    );
+    renderPage();
+    await screen.findByText("common.error_loading_data");
+
+    await waitFor(() => expect(download(DAY_PDF)).toBeEnabled());
+    await waitFor(() => expect(download(WEEK_PDF)).toBeEnabled());
+    expect(download(STATION_PDF)).toBeDisabled();
+  });
+
+  it("offers the station's PDF only once its take-home amounts are in", async () => {
+    const amounts = pending<PackingBoxesMatrix>();
+    api.memberAmounts.mockImplementation((params: ListParams) =>
+      listAskedFor(params) === listOf(41, TUESDAY, FARM_SHOP)
+        ? amounts.promise
+        : Promise.resolve({ columns: [], rows: [] }),
+    );
+    renderPage();
+    await screen.findByText("Ana Example");
+    await settle();
+
+    expect(download(STATION_PDF)).toBeDisabled();
+
+    amounts.answer(FARM_SHOP_TAKE);
+
+    await waitFor(() => expect(download(STATION_PDF)).toBeEnabled());
+    await userEvent.click(download(STATION_PDF));
+    await waitFor(() => expect(printed.documents).toHaveLength(1));
+    expect(printedDocument().pages).toEqual([
+      expect.objectContaining({ memberRows: [CARROTS_ON_THE_SHEET] }),
+    ]);
+  });
+
+  it("offers no station PDF when its take-home amounts fail to load", async () => {
+    api.memberAmounts.mockImplementation((params: ListParams) =>
+      listAskedFor(params) === listOf(41, TUESDAY, FARM_SHOP)
+        ? Promise.reject(new Error("Network Error"))
+        : Promise.resolve({ columns: [], rows: [] }),
+    );
+    renderPage();
+    await screen.findByText("Ana Example");
+    await waitFor(() => expect(download(WEEK_PDF)).toBeEnabled());
+    await settle();
+
+    expect(download(STATION_PDF)).toBeDisabled();
+  });
+
   it("prints every delivery day's stations with pickups for the whole week, each page named after its day", async () => {
     // Both delivery days serve the same two stations; nobody collects at the
     // market on Tuesday.
@@ -882,12 +831,17 @@ describe("DeliveryStationsDetails when a list cannot be loaded", () => {
 
     await waitFor(() => expect(tableIsBusy()).toBe(false));
     expect(bodyRows()).toHaveLength(0);
+    expect(screen.getByText("common.error_loading_data")).toBeInTheDocument();
+    expect(
+      screen.queryByText("commissioning.packing_list_no_columns"),
+    ).not.toBeInTheDocument();
     expect(download(STATION_PDF)).toBeDisabled();
 
     await choose(STATION, "Market");
 
     expect(await screen.findByText("Cleo Muster")).toBeInTheDocument();
-    expect(download(STATION_PDF)).toBeEnabled();
+    expect(screen.queryByText("common.error_loading_data")).not.toBeInTheDocument();
+    await waitFor(() => expect(download(STATION_PDF)).toBeEnabled());
   });
 });
 

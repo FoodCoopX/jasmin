@@ -7,9 +7,9 @@
  * an in-memory farm. The PDF library, the PDF templates and the browser
  * download are stubbed, so no real PDF is rendered.
  *
- * The clock is frozen on Tuesday 6 October 2026 (ISO week 41). The page and
- * the week state read "today" once when their modules load, so the clock is
- * set before the imports run as well as before every test.
+ * The clock is frozen on Tuesday 6 October 2026 (ISO week 41). The week state
+ * reads "today" once when its module loads, so the clock is set before the
+ * imports run as well as before every test.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -565,6 +565,30 @@ describe("PackingListBulk choosing the week, day and station", () => {
     expect(lastListRequest()).toMatchObject({ day_number: MONDAY, delivery_station: MARKET.id });
   });
 
+  it("opens on the delivery day of the day the page is opened, not the day it was loaded", async () => {
+    vi.setSystemTime(new Date(2026, 9, 9, 12, 0));
+    renderPage();
+
+    expect(await screen.findByText("Pumpkins")).toBeInTheDocument();
+    expect(selectedIn(DAY)).toBe(fridayLabel);
+    expect(lastListRequest()).toMatchObject({ day_number: FRIDAY, delivery_station: SCHOOL.id });
+  });
+
+  it("asks for a station and loads no list on a day without stations", async () => {
+    farm.stationsByDeliveryDay = { "day-tue": [FARM_SHOP, MARKET], "day-fri": [] };
+    renderPage();
+    await screen.findByText("Carrots");
+
+    await choose(DAY, fridayLabel);
+
+    expect(
+      await screen.findByText("commissioning.please_select_delivery_station"),
+    ).toBeInTheDocument();
+    expect(api.stations).toHaveBeenLastCalledWith({ is_active: true, delivery_day: "day-fri" });
+    expect(selectedIn(STATION)).toBe("");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
   it("lists another station's articles when the station changes", async () => {
     renderPage();
     await screen.findByText("Carrots");
@@ -648,6 +672,24 @@ describe("PackingListBulk packing day", () => {
     await screen.findByText("Carrots");
 
     await waitFor(() => expect(packingDay()).toHaveTextContent("Monday, 05.10.2026"));
+  });
+
+  it("dates the packing day by the chosen delivery when one packing day serves two", async () => {
+    farm.deliveryDays = [deliveryDay("day-mon", MONDAY), deliveryDay("day-sat", SATURDAY)];
+    farm.stationsByDeliveryDay = { "day-mon": [MARKET], "day-sat": [MARKET] };
+    farm.shares = [share("share-mon", MONDAY, FRIDAY), share("share-sat", SATURDAY, FRIDAY)];
+    farm.bulkRows = {
+      [dayAndStation(MONDAY, MARKET.id)]: [POTATOES],
+      [dayAndStation(SATURDAY, MARKET.id)]: [BEETROOT],
+    };
+    renderPage();
+    await screen.findByText("Potatoes");
+    await waitFor(() => expect(packingDay()).toHaveTextContent("Friday, 02.10.2026"));
+
+    await choose(DAY, "commissioning.delivery_day Saturday, 10.10.2026");
+
+    await screen.findByText("Beetroot");
+    await waitFor(() => expect(packingDay()).toHaveTextContent("Friday, 09.10.2026"));
   });
 
   it("dates a packing weekday after the delivery's weekday in the week before", async () => {

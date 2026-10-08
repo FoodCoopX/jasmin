@@ -30,6 +30,7 @@ export interface DeliveryStationDay {
   readonly coords_lon?: string | null;
   /** @nullable */
   readonly capacity_by_week?: DeliveryStationDayCapacityByWeek;
+  readonly tour_assignment_missing?: boolean;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;

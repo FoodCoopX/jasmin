@@ -296,6 +296,7 @@ export * from './documentTypeEnum';
 export * from './documentationAggregationItem';
 export * from './documentationSummaryRow';
 export * from './emailLog';
+export * from './emailLogPurposes';
 export * from './emailLogStatusEnum';
 export * from './emailTemplateDetail';
 export * from './emailTemplateListItem';

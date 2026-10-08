@@ -19,21 +19,31 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  ShareTypeEnum,
-  type DefaultShareContentResponse,
-  type Reseller,
-  type ShareArticle,
-  type ShareType,
-  type ShareTypeVariation,
-  type UnitEnum,
-} from "@shared/api/generated/models";
+import type { ShareType } from "@shared/api/generated/models";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
+
+import {
+  APPLES,
+  ARTICLES,
+  article,
+  CARROTS,
+  CARROTS_2025,
+  HARVEST,
+  HARVEST_SHARE_TYPE,
+  HONEY,
+  HONEY_SHARE_TYPE,
+  KOHLRABI,
+  planRow,
+  type PlanRow,
+  SELLERS,
+  SUBSCRIBERS,
+  VARIATIONS,
+} from "./planningShareContentLongTerm.fixtures";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -98,6 +108,8 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
       useListQuery("share_type_variations", params, api.variations, options),
     useCommissioningShareArticlesList: (params: unknown) =>
       useListQuery("share_articles", params, api.shareArticles),
+    getCommissioningShareArticlesListQueryKey: (params?: unknown) =>
+      listKey("share_articles", params),
     useCommissioningResellersList: (params: unknown) =>
       useListQuery("resellers", params, api.sellers),
     getCommissioningDefaultShareContentsBulkListListQueryKey: (params?: unknown) =>
@@ -114,7 +126,11 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
 });
 
 // The props the new-article dialog received on its last render.
-type ArticleDialogProps = { isOpen: boolean; defaultValues?: Record<string, unknown> };
+type ArticleDialogProps = {
+  isOpen: boolean;
+  defaultValues?: Record<string, unknown>;
+  onSuccess: (saved: Record<string, unknown>) => void;
+};
 const articleDialog = vi.hoisted(() => ({ props: null as ArticleDialogProps | null }));
 vi.mock("@features/commissioning/modals", () => ({
   ShareArticleModal: (props: ArticleDialogProps) => {
@@ -127,103 +143,14 @@ vi.mock("../PlanningShareContentBase", () => ({
   default: () => <div data-testid="per-week-planner" />,
 }));
 
-// The page reads the current year when its module loads, so it is imported
-// under the frozen clock (in beforeAll below).
+// Imported under the frozen clock (in beforeAll below), so nothing the page or
+// its imports read from the clock while loading depends on the real date.
 type PlanningPage = (typeof import("../PlanningShareContentPage"))["default"];
 let PlanningShareContentPage: PlanningPage;
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
 const NOW = new Date(2026, 9, 5, 12, 0);
-const HARVEST = ShareTypeEnum.HARVEST_SHARE;
-const HONEY = ShareTypeEnum.HONEY_SHARE;
-
-const shareType = (option: ShareTypeEnum, fields: Partial<ShareType>): ShareType => ({
-  id: `st-${option}`, share_option: option, valid_from: "2026-01-05", valid_until: null, ...fields,
-});
-const HARVEST_SHARE_TYPE = shareType(HARVEST, { needs_complex_planning: true });
-const HONEY_SHARE_TYPE = shareType(HONEY, { needs_complex_planning: false, is_additional_share_type: true });
-
-// The two physical share sizes, their average weights and active subscribers.
-const VARIATIONS: ShareTypeVariation[] = [
-  { id: "var-small", size: "S", average_weight: "2.00", share_type: "st-HARVEST_SHARE", valid_from: "2026-01-05" },
-  { id: "var-large", size: "L", average_weight: "4.00", share_type: "st-HARVEST_SHARE", valid_from: "2026-01-05" },
-];
-const SUBSCRIBERS: Record<string, number> = { "var-small": 20, "var-large": 10 };
-
-const article = (id: string, name: string, unit: UnitEnum, extra: Partial<ShareArticle> = {}): ShareArticle => ({
-  id, name, default_movement_unit: unit, is_active: true, is_purchased: false,
-  share_option_list: [HARVEST], ...extra,
-});
-const ARTICLES: ShareArticle[] = [
-  article("art-carrot", "Carrots", "KG"),
-  article("art-apple", "Apples", "KG", { is_purchased: true }),
-  article("art-kohlrabi", "Kohlrabi", "PCS"),
-  article("art-beet", "Beetroot", "KG"),
-  article("art-pear", "Pears", "KG", { is_purchased: true }),
-  article("art-lettuce", "Lettuce", "PCS"),
-  article("art-honey", "Forest honey", "PCS", { is_purchased: true, share_option_list: [HONEY] }),
-];
-const SELLERS: Reseller[] = [
-  { id: "seller-orchard", company_name: "Orchard Co", address: "Hill 1", zip_code: "3400", city: "Krems" },
-];
-
-type PlanRow = DefaultShareContentResponse & Record<`amount_${string}`, string>;
-
-/** The backend's total: subscribers × per-share amount × delivery weeks. */
-function neededAmount(row: Record<string, unknown>): string {
-  const first = Number(row.range_1);
-  let weeks = 0;
-  for (let week = first; week <= Number(row.range_2); week++) {
-    if (row.only_odd_weeks && week % 2 === 0) continue;
-    if (row.only_even_weeks && week % 2 === 1) continue;
-    if (row.only_every_three_weeks && (week - first) % 3 !== 0) continue;
-    weeks += 1;
-  }
-  const total = Object.entries(SUBSCRIBERS).reduce(
-    (sum, [id, count]) => sum + count * Number(row[`amount_${id}`] ?? 0) * weeks,
-    0,
-  );
-  return total.toFixed(2);
-}
-
-function planRow(
-  fields: Partial<PlanRow> & Pick<PlanRow, "share_article" | "range_1" | "range_2">,
-): PlanRow {
-  const row = {
-    year: 2026, share_option: HARVEST, unit: "KG", size: "M", note: null, seller: null,
-    only_odd_weeks: false, only_even_weeks: false, only_every_three_weeks: false,
-    ...fields,
-  };
-  return {
-    ...row,
-    id: `${row.year}_${row.share_article}_${row.unit}_${row.size}`,
-    seller_name: SELLERS.find((seller) => seller.id === row.seller)?.company_name ?? null,
-    needed_amount: neededAmount(row),
-  } as PlanRow;
-}
-
-// 20 × 3 kg + 10 × 5.5 kg a week for ten weeks: 1,150 kg.
-const CARROTS = planRow({
-  share_article: "art-carrot", range_1: 20, range_2: 29, note: "Sow under fleece",
-  "amount_var-small": "3.000", "amount_var-large": "5.500",
-});
-// Bought in from the orchard, in the even weeks 36 to 44 only: 300 kg.
-const APPLES = planRow({
-  share_article: "art-apple", range_1: 36, range_2: 44, only_even_weeks: true,
-  seller: "seller-orchard", "amount_var-small": "1.500", "amount_var-large": "3.000",
-});
-// Counted in pieces, every third week from 24: weeks 24, 27, 30 and 33.
-const KOHLRABI = planRow({
-  share_article: "art-kohlrabi", unit: "PCS", range_1: 24, range_2: 35, only_every_three_weeks: true,
-  "amount_var-small": "4.000", "amount_var-large": "6.000",
-});
-// Thirteen weeks of 20 × 2 kg + 10 × 4 kg: 1,040 kg.
-const CARROTS_2025 = planRow({
-  year: 2025, share_article: "art-carrot", range_1: 18, range_2: 30,
-  "amount_var-small": "2.000", "amount_var-large": "4.000",
-});
-
 // What the server currently holds; the requests answer from it.
 let serverPlans: PlanRow[] = [];
 let serverShareTypes: ShareType[] = [];
@@ -479,6 +406,34 @@ describe("PlanningShareContentLongTermBase plan", () => {
     expect(within(kohlrabi).getByText("560 commissioning.units.pcs")).toBeInTheDocument();
   });
 
+  it("shows a fractional piece amount as planned", async () => {
+    // Twelve weeks of 20 × 1.5 + 10 × 2 lettuces: 600 pieces.
+    serverPlans = [
+      CARROTS,
+      planRow({
+        share_article: "art-lettuce", unit: "PCS", range_1: 20, range_2: 31,
+        "amount_var-small": "1.500", "amount_var-large": "2.000",
+      }),
+    ];
+    renderPlanner();
+    await loaded();
+
+    const lettuce = rowOf("Lettuce");
+    expect(within(lettuce).getByText("1,5")).toBeInTheDocument();
+    expect(within(lettuce).getByText("2")).toBeInTheDocument();
+    expect(within(lettuce).getByText("600 commissioning.units.pcs")).toBeInTheDocument();
+  });
+
+  it("opens on the year of the day the page is opened, not the day it was loaded", async () => {
+    vi.setSystemTime(new Date(2027, 0, 4, 12, 0));
+    serverPlans = [{ ...CARROTS, year: 2027 } as PlanRow];
+    renderPlanner();
+    await loaded();
+
+    expect(api.planList).toHaveBeenCalledWith({ year: 2027, share_option: HARVEST });
+    expect(api.planList).not.toHaveBeenCalledWith({ year: 2026, share_option: HARVEST });
+  });
+
   it("names the seller of a bought-in article", async () => {
     renderPlanner();
     await loaded();
@@ -661,6 +616,24 @@ describe("PlanningShareContentLongTermBase new row", () => {
       expect.arrayContaining(["Apples", "Kohlrabi", "Beetroot", "Pears", "Lettuce"]),
     );
     expect(offered).not.toContain("Forest honey");
+  });
+
+  it("offers an article added from the new-article dialog right away", async () => {
+    renderPlanner();
+    await loaded();
+    const fennel = article("art-fennel", "Fennel", "KG");
+    api.shareArticles.mockImplementation(async ({ share_option }: { share_option?: string }) =>
+      [...ARTICLES, fennel].filter(
+        (item) => !share_option || item.share_option_list?.includes(share_option),
+      ),
+    );
+
+    await userEvent.click(button(ADD_ARTICLE));
+    act(() => articleDialog.props?.onSuccess({ id: "art-fennel", name: "Fennel" }));
+    await userEvent.click(button(ADD_ROW));
+    await pickArticle("Fennel");
+
+    expect(within(editingRow()).getAllByText("Fennel")).not.toHaveLength(0);
   });
 
   it("takes a seller only for a bought-in article", async () => {
@@ -930,6 +903,18 @@ describe("PlanningShareContentLongTermBase target total", () => {
     expect(field(SMALL)).toHaveValue("4,9");
     expect(field(LARGE)).toHaveValue("9,9");
     expect(within(editingRow()).getByText("985 commissioning.units.kg")).toBeInTheDocument();
+  });
+
+  it("splits the target again when another article changes the unit to pieces", async () => {
+    await targetTotalRow("Beetroot");
+    await typeInto(TARGET, "1000");
+    expect(field(SMALL)).toHaveValue("2,5");
+
+    await pickArticle("Lettuce");
+
+    expect(field(SMALL)).toHaveValue("2");
+    expect(field(LARGE)).toHaveValue("5");
+    expect(within(editingRow()).getByText("900 commissioning.units.pcs")).toBeInTheDocument();
   });
 
   it("suggests whole pieces for an article counted in pieces", async () => {

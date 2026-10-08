@@ -269,10 +269,16 @@ class DeliveryStationDaySerializer(
         allow_null=True,
     )
     capacity_by_week = serializers.SerializerMethodField()
+    # The delivery tours list only the station days that hold a stop; saving
+    # the tours clears the stop of every station day left off them.
+    tour_assignment_missing = serializers.SerializerMethodField()
 
     class Meta:
         model = DeliveryStationDay
         fields = "__all__"
+
+    def get_tour_assignment_missing(self, obj) -> bool:
+        return obj.stop_order is None
 
     def validate_capacity(self, value):
         """Floor a capacity edit at the busiest upcoming week's occupancy.
@@ -381,7 +387,12 @@ class DeliveryStationDaySerializer(
         mask_capacity_for_anonymous(
             ret,
             self.context.get("request"),
-            internal_fields=("special_instructions", "tour_number", "stop_order"),
+            internal_fields=(
+                "special_instructions",
+                "tour_number",
+                "stop_order",
+                "tour_assignment_missing",
+            ),
         )
         return ret
 

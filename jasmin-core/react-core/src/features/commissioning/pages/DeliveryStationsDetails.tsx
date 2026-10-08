@@ -74,6 +74,44 @@ function useWeekStationSlots(
   );
 }
 
+type StationQuery = { data?: unknown; isLoading: boolean };
+
+/**
+ * One PDF page per named station that has pickups, the pickup matrix and the
+ * take-home amounts read from the queries at the same index. Null while any
+ * of them loads, or when no station has pickups.
+ */
+function buildStationPages(
+  stationNames: string[],
+  matrixQueries: StationQuery[],
+  memberQueries: StationQuery[],
+  buildMemberMatrix: (
+    matrix: PackingBoxesMatrix | undefined,
+  ) => Omit<StationPageData, "stationName" | "columns" | "rows">,
+): StationPageData[] | null {
+  if (
+    stationNames.length === 0 ||
+    matrixQueries.some((query) => query.isLoading) ||
+    memberQueries.some((query) => query.isLoading)
+  )
+    return null;
+  const pages = stationNames.flatMap((stationName, index) => {
+    const matrix = matrixQueries[index]?.data as StationMemberMatrix | undefined;
+    const rows = (matrix?.rows ?? []) as unknown as StationPageData["rows"];
+    if (rows.length === 0) return [];
+    const member = memberQueries[index]?.data as PackingBoxesMatrix | undefined;
+    return [
+      {
+        stationName,
+        columns: matrix?.columns ?? [],
+        rows,
+        ...buildMemberMatrix(member),
+      },
+    ];
+  });
+  return pages.length > 0 ? pages : null;
+}
+
 export default function DeliveryStationsDetails() {
   const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
     useYearWeekState();
@@ -148,8 +186,11 @@ export default function DeliveryStationsDetails() {
       }),
       [selectedYear, selectedWeek, selectedDeliveryDay, selectedDeliveryStation],
     );
-  const { data: matrix, isFetching: matrixFetching } =
-    useCommissioningShareDeliveryDetailsMatrixRetrieve(matrixParams, {
+  const {
+    data: matrix,
+    isFetching: matrixFetching,
+    isError: matrixError,
+  } = useCommissioningShareDeliveryDetailsMatrixRetrieve(matrixParams, {
       query: { enabled: isQueryEnabled },
     });
   const matrixColumns = useMemo<PackingBoxesMatrixColumn[]>(
@@ -163,6 +204,8 @@ export default function DeliveryStationsDetails() {
   );
   const comboColumns = useBoxCombinationColumns(matrixColumns);
   const loading = isQueryEnabled && matrixFetching;
+  // A failed load is shown as such, never as a station nobody collects at.
+  const matrixFailed = isQueryEnabled && !loading && matrixError;
 
   // "Was ihr nehmen könnt" (member per-share amounts, is_packed_bulk portion —
   // same as PackingListBulk) for the CURRENT station. Appended after the
@@ -199,14 +242,13 @@ export default function DeliveryStationsDetails() {
     selectedDeliveryDayId ? { delivery_day: selectedDeliveryDayId } : {},
   );
 
-  // Bulk fetch: the combination matrix for every station on the selected day
-  // (fired once the current view has data). Each result carries that station's
-  // own columns + member rows.
+  // Bulk fetch: the combination matrix for every station on the selected day,
+  // fired once the day's stations are known — independent of the station on
+  // screen, which may have nobody collecting. Each result carries that
+  // station's own columns + member rows.
   const allStationsDayQueries = useQueries({
     queries:
-      matrixRows.length > 0 &&
-      selectedDeliveryDay !== null &&
-      deliveryStations.length > 0
+      selectedDeliveryDay !== null && deliveryStations.length > 0
         ? deliveryStations.map((station) =>
             getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
               year: selectedYear,
@@ -222,9 +264,7 @@ export default function DeliveryStationsDetails() {
   // mirrors allStationsDayQueries so each pickup page can carry its member page.
   const allStationsDayMemberQueries = useQueries({
     queries:
-      matrixRows.length > 0 &&
-      selectedDeliveryDay !== null &&
-      deliveryStations.length > 0
+      selectedDeliveryDay !== null && deliveryStations.length > 0
         ? deliveryStations.map((station) =>
             getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
               year: selectedYear,
@@ -242,38 +282,39 @@ export default function DeliveryStationsDetails() {
   // Bulk fetch: the combination matrix for every station on every day of the
   // week it serves.
   const allStationsWeekQueries = useQueries({
-    queries:
-      matrixRows.length > 0
-        ? weekSlots.map(({ dayNum, station }) =>
-            getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
-              year: selectedYear,
-              delivery_week: selectedWeek!,
-              day_number: dayNum,
-              delivery_station: station.value,
-            }),
-          )
-        : [],
+    queries: weekSlots.map(({ dayNum, station }) =>
+      getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
+        year: selectedYear,
+        delivery_week: selectedWeek!,
+        day_number: dayNum,
+        delivery_station: station.value,
+      }),
+    ),
   });
 
   // Parallel member-amounts per station and day — mirrors allStationsWeekQueries.
   const allStationsWeekMemberQueries = useQueries({
-    queries:
-      matrixRows.length > 0
-        ? weekSlots.map(({ dayNum, station }) =>
-            getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
-              year: selectedYear,
-              delivery_week: selectedWeek!,
-              day_number: dayNum,
-              delivery_station: station.value,
-              is_packed_bulk: true,
-            }),
-          )
-        : [],
+    queries: weekSlots.map(({ dayNum, station }) =>
+      getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
+        year: selectedYear,
+        delivery_week: selectedWeek!,
+        day_number: dayNum,
+        delivery_station: station.value,
+        is_packed_bulk: true,
+      }),
+    ),
   });
 
-  // Build PDF pages for the current station — reuses the already-fetched matrix.
+  // Build PDF pages for the current station — reuses the already-fetched
+  // matrix. Waits for the take-home amounts too, so the sheet never prints
+  // without them.
   const currentStationPages = useMemo<StationPageData[] | null>(() => {
-    if (!selectedDeliveryStation || matrixRows.length === 0) return null;
+    if (
+      !selectedDeliveryStation ||
+      matrixRows.length === 0 ||
+      !currentMemberMatrix
+    )
+      return null;
     const station = deliveryStations.find(
       (s) => s.value === selectedDeliveryStation,
     );
@@ -295,74 +336,41 @@ export default function DeliveryStationsDetails() {
   ]);
 
   // Build PDF pages for all stations on the selected day.
-  const allStationsDayPages = useMemo<StationPageData[] | null>(() => {
-    if (
-      allStationsDayQueries.some((q) => q.isLoading) ||
-      allStationsDayMemberQueries.some((q) => q.isLoading) ||
-      deliveryStations.length === 0
-    )
-      return null;
-    const pages = deliveryStations
-      .map((station, idx): StationPageData => {
-        const stationMatrix = allStationsDayQueries[idx]?.data as
-          | StationMemberMatrix
-          | undefined;
-        return {
-          stationName: station.label,
-          columns: stationMatrix?.columns ?? [],
-          rows: (stationMatrix?.rows ??
-            []) as unknown as StationPageData["rows"],
-          ...buildMemberMatrix(
-            allStationsDayMemberQueries[idx]?.data as
-              | PackingBoxesMatrix
-              | undefined,
-          ),
-        };
-      })
-      .filter((page) => page.rows.length > 0);
-    return pages.length > 0 ? pages : null;
-  }, [
-    allStationsDayQueries,
-    allStationsDayMemberQueries,
-    deliveryStations,
-    buildMemberMatrix,
-  ]);
+  const allStationsDayPages = useMemo(
+    () =>
+      buildStationPages(
+        deliveryStations.map((station) => station.label),
+        allStationsDayQueries,
+        allStationsDayMemberQueries,
+        buildMemberMatrix,
+      ),
+    [
+      allStationsDayQueries,
+      allStationsDayMemberQueries,
+      deliveryStations,
+      buildMemberMatrix,
+    ],
+  );
 
   // Build PDF pages for all stations across all days in the week.
-  const allStationsWeekPages = useMemo<StationPageData[] | null>(() => {
-    if (
-      allStationsWeekQueries.some((q) => q.isLoading) ||
-      allStationsWeekMemberQueries.some((q) => q.isLoading) ||
-      weekSlots.length === 0
-    )
-      return null;
-    const pages = weekSlots.flatMap(({ dayNum, station }, index) => {
-      const stationMatrix = allStationsWeekQueries[index]?.data as
-        | StationMemberMatrix
-        | undefined;
-      const rows = (stationMatrix?.rows ?? []) as unknown as StationPageData["rows"];
-      if (rows.length === 0) return [];
-      return [
-        {
-          stationName: `${station.label} — ${getDayName(dayNum, t)}`,
-          columns: stationMatrix?.columns ?? [],
-          rows,
-          ...buildMemberMatrix(
-            allStationsWeekMemberQueries[index]?.data as
-              | PackingBoxesMatrix
-              | undefined,
-          ),
-        },
-      ];
-    });
-    return pages.length > 0 ? pages : null;
-  }, [
-    allStationsWeekQueries,
-    allStationsWeekMemberQueries,
-    weekSlots,
-    t,
-    buildMemberMatrix,
-  ]);
+  const allStationsWeekPages = useMemo(
+    () =>
+      buildStationPages(
+        weekSlots.map(
+          ({ dayNum, station }) => `${station.label} — ${getDayName(dayNum, t)}`,
+        ),
+        allStationsWeekQueries,
+        allStationsWeekMemberQueries,
+        buildMemberMatrix,
+      ),
+    [
+      allStationsWeekQueries,
+      allStationsWeekMemberQueries,
+      weekSlots,
+      t,
+      buildMemberMatrix,
+    ],
+  );
 
   const selectedDayName =
     selectedDeliveryDay !== null ? getDayName(selectedDeliveryDay, t) : "";
@@ -522,7 +530,10 @@ export default function DeliveryStationsDetails() {
         />
       </div>
 
-      {isQueryEnabled && !loading && matrixColumns.length === 0 ? (
+      {isQueryEnabled &&
+      !loading &&
+      !matrixFailed &&
+      matrixColumns.length === 0 ? (
         <PastWarningMessage>
           {t("commissioning.packing_list_no_columns")}
         </PastWarningMessage>
@@ -540,9 +551,11 @@ export default function DeliveryStationsDetails() {
           locale={{
             emptyText: (
               <div style={{ height: "4em" }}>
-                {selectedDeliveryStation
-                  ? t("table.no_data")
-                  : t("commissioning.select_delivery_station")}
+                {matrixFailed
+                  ? t("common.error_loading_data")
+                  : selectedDeliveryStation
+                    ? t("table.no_data")
+                    : t("commissioning.select_delivery_station")}
               </div>
             ),
           }}

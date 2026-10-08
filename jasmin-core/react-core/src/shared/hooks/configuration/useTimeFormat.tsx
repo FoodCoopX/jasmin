@@ -1,5 +1,6 @@
 import dayjs, { type ConfigType } from "dayjs";
 import { useCallback } from "react";
+import { toValidDayjs } from "@shared/utils/dayjsParse";
 import { useTenant } from "./useTenant";
 
 /**
@@ -9,12 +10,15 @@ import { useTenant } from "./useTenant";
  * ``"hh:mm A"``) so every UI surface that prints a time-of-day stays
  * in the same shape per tenant.
  *
- * Three helpers:
+ * Helpers:
  *
  * * ``formatTime(value)`` — pure formatter; returns ``null`` for empty
  *   input (matches ``useDateFormat.formatDate``).
  * * ``formatTimeWithFallback(value, fallback="-")`` — for read-only UI
  *   where ``null`` would render as the literal word "null".
+ * * ``formatTimeOfDay(value, fallback="-")`` — for a bare time-of-day
+ *   as the API sends a ``TimeField`` (``"HH:mm:ss"`` / ``"HH:mm"``), which
+ *   ``dayjs(value)`` alone cannot parse.
  * * ``formatDateTime(value, dateOnlyFormat?)`` — convenience for
  *   timestamps shown as ``<date> <time>``. Uses
  *   ``TenantSettings.date_format`` for the date half by default; pass
@@ -45,6 +49,13 @@ export const useTimeFormat = () => {
       if (!value) return fallback;
       return dayjs(value).format(customFormat || timeFormat);
     },
+    [timeFormat],
+  );
+
+  const formatTimeOfDay = useCallback(
+    (value: unknown, fallback = "-") =>
+      toValidDayjs(value, ["HH:mm:ss", "HH:mm"])?.format(timeFormat) ??
+      fallback,
     [timeFormat],
   );
 
@@ -85,6 +96,7 @@ export const useTimeFormat = () => {
     dateFormat,
     formatTime,
     formatTimeWithFallback,
+    formatTimeOfDay,
     formatDateTime,
     formatDateTimeWithFallback,
   };

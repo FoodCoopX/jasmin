@@ -9,6 +9,7 @@ import { useCommissioningMembersEmailsList } from "@shared/api/generated/commiss
 import type { MemberEmailLog } from "@shared/api/generated/models";
 import { useTimeFormat } from "@hooks/index";
 import EmailStatusTag from "../components/EmailStatusTag";
+import { useEmailPurposeLabel } from "../hooks/useEmailPurposeLabel";
 
 interface MemberEmailsModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ const MemberEmailsModal: FC<MemberEmailsModalProps> = ({
   memberName,
 }) => {
   const { t } = useTranslation();
+  const purposeLabel = useEmailPurposeLabel();
   const { formatDateTime } = useTimeFormat();
 
   // Skip the query until the modal opens. Once the office user opens
@@ -61,7 +63,7 @@ const MemberEmailsModal: FC<MemberEmailsModalProps> = ({
         sorter: (a, b) => a.purpose.localeCompare(b.purpose),
         render: (value: string) => (
           <Tooltip title={value}>
-            <span>{t(`email_matrix.${value}`)}</span>
+            <span>{purposeLabel(value)}</span>
           </Tooltip>
         ),
       },
@@ -86,7 +88,7 @@ const MemberEmailsModal: FC<MemberEmailsModalProps> = ({
         render: (value: string | null) => (value ? formatDateTime(value) : "—"),
       },
     ],
-    [t, formatDateTime],
+    [t, formatDateTime, purposeLabel],
   );
 
   return (

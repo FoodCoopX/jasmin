@@ -58,6 +58,7 @@ from .registry import (
 )
 from .serializers import (
     BackgroundJobSerializer,
+    EmailLogPurposesSerializer,
     EmailLogSerializer,
     EmailTemplateDetailSerializer,
     EmailTemplateListItemSerializer,
@@ -444,7 +445,10 @@ class EmailLogViewSet(RolePermissionsMixin, viewsets.ReadOnlyModelViewSet):
 
     Supports filter params:
       * ``recipient`` — case-insensitive partial match
-      * ``purpose``   — exact slug (e.g. ``commissioning.invoice``)
+      * ``purpose``   — exact purpose as logged: the template slug for most
+        sends (e.g. ``commissioning.offer``), a purpose of the send's own for
+        others (e.g. ``invoice:reseller``, ``test:smtp``); ``purposes/`` lists
+        those the log holds
       * ``status``    — exact status choice (sent, failed, suppressed, …)
     """
 
@@ -464,7 +468,12 @@ class EmailLogViewSet(RolePermissionsMixin, viewsets.ReadOnlyModelViewSet):
             catalogue_parameter(
                 "purpose",
                 PARAM_CATALOGUE,
-                description="Exact purpose slug (e.g. commissioning.invoice).",
+                description=(
+                    "Exact purpose as logged: the template slug for most sends "
+                    "(e.g. commissioning.offer), a purpose of the send's own for "
+                    "others (e.g. invoice:reseller, test:smtp). The purposes "
+                    "endpoint lists those the log holds."
+                ),
             ),
             catalogue_parameter(
                 "status",
@@ -476,6 +485,26 @@ class EmailLogViewSet(RolePermissionsMixin, viewsets.ReadOnlyModelViewSet):
     )
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="notifications_email_logs_purposes",
+        tags=["notifications"],
+        responses={
+            200: EmailLogPurposesSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+        },
+    )
+    @action(detail=False, methods=["get"], url_path="purposes")
+    def purposes(self, request: Request) -> Response:
+        """Every purpose the log holds — what the purpose filter can find."""
+        purposes = (
+            EmailLog.objects.exclude(purpose="")
+            .order_by("purpose")
+            .values_list("purpose", flat=True)
+            .distinct()
+        )
+        return Response(EmailLogPurposesSerializer({"purposes": list(purposes)}).data)
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):

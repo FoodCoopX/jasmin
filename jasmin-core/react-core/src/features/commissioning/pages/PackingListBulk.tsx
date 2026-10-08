@@ -73,8 +73,6 @@ const widthShareArticle = "30%";
 const widthAmountUnitSize = "10%";
 const widthTotalAmount = "10%";
 
-const currentDay = dayjs().isoWeekday();
-
 /** A row's total in the tenant's number format, at its unit's precision —
  *  the text the table, the phone card and the printed list all show. */
 const totalAmountText = (
@@ -92,6 +90,38 @@ type BulkParams = CommissioningPackingListBulkListParams & {
   delivery_station?: string;
   is_packed_bulk?: boolean;
 };
+
+/**
+ * The selected delivery station, kept to the stations of the delivery day:
+ * the day's first station once they are known, and none when the selected one
+ * isn't scheduled that day — including on a day whose station list came back
+ * empty. Only a loaded list counts: while the day or its stations are still
+ * loading the list is empty too, and the selection has to survive that.
+ */
+function useDeliveryStationOfDay(deliveryDayId: string | null) {
+  const [selectedDeliveryStation, setSelectedDeliveryStation] = useState<
+    string | null
+  >(null);
+  const { deliveryStations, loading } = useDeliveryStations({
+    delivery_day: deliveryDayId ?? undefined,
+  });
+
+  useEffect(() => {
+    if (deliveryDayId === null || loading) return;
+    if (selectedDeliveryStation === null) {
+      if (deliveryStations.length > 0) {
+        setSelectedDeliveryStation(deliveryStations[0].value);
+      }
+      return;
+    }
+    const stillValid = deliveryStations.some(
+      (station) => station.value === selectedDeliveryStation,
+    );
+    if (!stillValid) setSelectedDeliveryStation(null);
+  }, [deliveryDayId, loading, deliveryStations, selectedDeliveryStation]);
+
+  return [selectedDeliveryStation, setSelectedDeliveryStation] as const;
+}
 
 /**
  * Per-delivery-station bulk packing list. Answers "how much of each article
@@ -118,13 +148,10 @@ export default function PackingListBulk() {
 
   const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
     useYearWeekState();
+  // Backend day numbers run 0 = Monday … 6 = Sunday.
   const [selectedDeliveryDay, setSelectedDeliveryDay] = useState<number | null>(
-    currentDay - 1,
+    () => dayjs().isoWeekday() - 1,
   );
-  const [selectedDeliveryStation, setSelectedDeliveryStation] = useState<
-    string | null
-  >(null);
-
   const isPast = useMemo(
     () => isWeekInPast(selectedYear, selectedWeek),
     [selectedYear, selectedWeek],
@@ -183,18 +210,18 @@ export default function PackingListBulk() {
     return getRelatedDays.getPackingDaysForDelivery(selectedDeliveryDay);
   }, [isLoaded, getRelatedDays, selectedDeliveryDay]);
 
+  // A packing weekday later than the selected delivery's weekday packs for it
+  // in the week before. One packing day can serve several delivery days, so
+  // the comparison is with the selected one.
   const calculatePackingDate = useCallback(
     (packingDayNum: number | null) => {
       if (packingDayNum === null) return "";
-      const deliveryDays =
-        getRelatedDays.getDeliveryDaysForPacking(packingDayNum);
-      const deliveryDay = deliveryDays[0];
       let date = dateForWeekDayNumber(
         selectedYear,
         selectedWeek ?? currentWeek,
         packingDayNum,
       );
-      if (deliveryDay !== undefined && packingDayNum > deliveryDay) {
+      if (selectedDeliveryDay !== null && packingDayNum > selectedDeliveryDay) {
         date = date.subtract(1, "week");
       }
       return isMobile
@@ -204,7 +231,7 @@ export default function PackingListBulk() {
     [
       selectedYear,
       selectedWeek,
-      getRelatedDays,
+      selectedDeliveryDay,
       isMobile,
       dateFormat,
       mobileDateFormat,
@@ -217,26 +244,8 @@ export default function PackingListBulk() {
     [deliveryDayLabel, selectedYear, selectedWeek],
   );
 
-  // ----- Delivery-station auto-default -----------------------------------
-  const { deliveryStations } = useDeliveryStations({
-    delivery_day: getDeliveryDayId ?? undefined,
-  });
-
-  useEffect(() => {
-    if (selectedDeliveryStation !== null) return;
-    if (deliveryStations.length === 0) return;
-    setSelectedDeliveryStation(deliveryStations[0].value);
-  }, [selectedDeliveryStation, deliveryStations]);
-
-  // Drop a stale station when it's no longer scheduled (e.g. week change).
-  useEffect(() => {
-    if (selectedDeliveryStation === null) return;
-    if (deliveryStations.length === 0) return;
-    const stillValid = deliveryStations.some(
-      (s) => s.value === selectedDeliveryStation,
-    );
-    if (!stillValid) setSelectedDeliveryStation(null);
-  }, [selectedDeliveryStation, deliveryStations]);
+  const [selectedDeliveryStation, setSelectedDeliveryStation] =
+    useDeliveryStationOfDay(getDeliveryDayId);
 
   const generateFilename = useCallback(
     (prefix: string) =>

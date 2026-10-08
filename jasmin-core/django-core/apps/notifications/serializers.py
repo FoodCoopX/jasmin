@@ -98,6 +98,15 @@ class EmailLogSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class EmailLogPurposesSerializer(serializers.Serializer):
+    """Every purpose the email log holds, sorted. Most sends log their
+    template slug; some log one of their own (``invoice:reseller``,
+    ``invoice:accounting``, ``delivery_note:reseller``, ``test:<slug>``,
+    ``test:smtp``)."""
+
+    purposes = serializers.ListField(child=serializers.CharField())
+
+
 class EmailTemplateVariableSerializer(serializers.Serializer):
     name = serializers.CharField()
     label = serializers.CharField()
