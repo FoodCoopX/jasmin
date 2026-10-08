@@ -51,7 +51,8 @@ interface DeliveryStationInfoModalProps {
 
 /**
  * Per-row modal for the member-facing station info (pickup instructions, access
- * code, messenger link, contact, photo, self-service) plus coordinates. Coords
+ * code, messenger link, contact, photo and photo link, self-service) plus
+ * coordinates. Coords
  * persist to the linked ContactEntity via the normal station partial update.
  * Mirrors ResellerInvoiceSettingsModal.
  */
@@ -151,7 +152,11 @@ export const DeliveryStationInfoModal: FC<DeliveryStationInfoModalProps> = ({
       open={open}
       form={form}
       width={640}
-      title={`${t("delivery_stations.member_info_title")} — ${deliveryStation.short_name ?? ""}`}
+      title={
+        deliveryStation.short_name
+          ? `${t("delivery_stations.member_info_title")} — ${deliveryStation.short_name}`
+          : t("delivery_stations.member_info_title")
+      }
       description={
         <Paragraph type="secondary">
           {t("delivery_stations.member_info_intro")}
@@ -211,6 +216,15 @@ export const DeliveryStationInfoModal: FC<DeliveryStationInfoModalProps> = ({
           previewVariant="inline"
           accept={RASTER_PICTURE_ACCEPT}
         />
+      </Form.Item>
+      {/* Members see the uploaded picture, and this link only while there is
+          none — so an old link has to stay visible here to be cleared. */}
+      <Form.Item
+        name="photo_link"
+        label={t("delivery_stations.photo_link")}
+        extra={t("delivery_stations.photo_link_hint")}
+      >
+        <Input maxLength={512} />
       </Form.Item>
 
       <Form.Item

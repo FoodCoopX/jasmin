@@ -325,7 +325,8 @@ const flag = (row: HTMLElement, columnTitle: string) => within(cellOf(row, colum
 // button, so each is looked up in its own cell.
 const rowEditButton = (name: string) =>
   within(cellOf(rowOf(name), "table.actions")).getByRole("button", { name: "table.edit" });
-const daysButton = (row: HTMLElement) => within(cellOf(row, DAYS)).queryByRole("button", { name: "table.edit" });
+// Named after its column, so it doesn't read as the row's own edit button.
+const daysButton = (row: HTMLElement) => within(cellOf(row, DAYS)).queryByRole("button", { name: DAYS });
 const infoButton = (row: HTMLElement) =>
   within(row).queryByRole("button", { name: "delivery_stations.member_info_title" });
 const feeButton = (row: HTMLElement) => within(row).queryByRole("button", { name: "delivery_stations.fee_title" });
@@ -523,6 +524,7 @@ describe("ListDeliveryStations new station", () => {
     expect(editCheckbox(RESELLER)).not.toBeChecked();
     expect(infoButton(editingRow())).not.toBeInTheDocument();
     expect(feeButton(editingRow())).not.toBeInTheDocument();
+    expect(daysButton(editingRow())).not.toBeInTheDocument();
     await typeInto(user, NUMBER, "4");
     await typeInto(user, contact("company_name"), "Bahnhofcafé");
     await saveRow(user);
@@ -537,6 +539,7 @@ describe("ListDeliveryStations new station", () => {
       [NUMBER]: "4", [contact("company_name")]: "Bahnhofcafé", [contact("city")]: "Wels",
     });
     expect(flag(wels, ACTIVE)).toBeChecked();
+    expect(daysButton(wels)).toBeEnabled();
     expect(infoButton(wels)).toBeEnabled();
     expect(feeButton(wels)).toBeEnabled();
     expect(api.listStations).toHaveBeenCalledTimes(1);
@@ -619,6 +622,18 @@ describe("ListDeliveryStations number check", () => {
   it("refuses the number of an inactive station the list shows", async () => {
     const { user } = await renderLoaded();
     await toggleHideInactive(user);
+
+    await startNewStation(user, "Station Wels");
+    await typeInto(user, NUMBER, "7");
+    await saveRow(user);
+
+    expect(await screen.findByText(DUPLICATE)).toBeVisible();
+    expect(api.createStation).not.toHaveBeenCalled();
+  });
+
+  it("refuses the number of an inactive station the list hides", async () => {
+    const { user } = await renderLoaded();
+    expect(screen.queryByText("Old mill")).not.toBeInTheDocument();
 
     await startNewStation(user, "Station Wels");
     await typeInto(user, NUMBER, "7");
@@ -890,6 +905,17 @@ describe("ListDeliveryStations roles", () => {
       await user.click(daysButton(rowOf("School"))!);
 
       expect(dialog("Station days")).toHaveTextContent("Station days of School (st-school)");
+    },
+  );
+
+  it.each(["management", "staff", "gardener"])(
+    "offers no CSV upload to the %s, whom the import refuses",
+    async (role) => {
+      auth.roles = [role];
+      tenantSettings.values = { allow_upload_for_data_lists: true };
+      await renderLoaded();
+
+      expect(screen.queryByRole("button", { name: "csv_upload.open" })).not.toBeInTheDocument();
     },
   );
 });

@@ -146,7 +146,9 @@ export default function ListShareArticles() {
     setSelectedShareArticleName("");
   }, []);
 
-  const priceModalColumn = useShareArticlePriceColumn(handleOpenModal);
+  const priceColumn = useShareArticlePriceColumn(handleOpenModal);
+  // The prices are the office's to manage, so only the office gets the button.
+  const priceModalColumn = canManagePrices ? priceColumn : null;
 
   // The irrelevant side of the harvest/purchase split renders an empty cell
   // (disabled → grey background is the only cue; no "—" placeholder leaks into
@@ -210,25 +212,31 @@ export default function ListShareArticles() {
       form: { setFieldsValue: (values: Record<string, unknown>) => void },
     ) => {
       if (record.key === -1) {
+        // customSave turns every ticked per-option flag into share_option_list,
+        // so a new article ticks only an option whose column the office sees:
+        // the filtered one, or else the vegetable share (the common case)
+        // when the farm runs it.
+        const preselectedShareOption =
+          activeFilter !== "all"
+            ? activeFilter
+            : visibleShareOptions.some((opt) => opt.value === "HARVEST_SHARE")
+              ? "harvest_share"
+              : null;
         const defaultValues: Record<string, unknown> = {
           is_active: true,
-          // New articles default to the harvest-share option (the common
-          // case); customSave maps these per-option booleans into
-          // share_option_list. Office can untick / add other options.
-          harvest_share: true,
+          ...(preselectedShareOption && { [preselectedShareOption]: true }),
           percentage_added_to_bulk_packing_list: defaultPercentageBulk,
           is_sold_to_resellers: true,
           // For a certified-organic tenant, new articles are overwhelmingly
           // Bio — preselect that.
           ...(organicGateEnabled && { organic_status: "organic" }),
-          ...(activeFilter !== "all" && { [activeFilter]: true }),
         };
         form.setFieldsValue(defaultValues);
         return { ...record, ...defaultValues };
       }
       return record;
     },
-    [activeFilter, defaultPercentageBulk, organicGateEnabled],
+    [activeFilter, visibleShareOptions, defaultPercentageBulk, organicGateEnabled],
   );
 
   // Layer the share-option radio filter on top of the hook's hide-inactive
@@ -340,6 +348,7 @@ export default function ListShareArticles() {
         uniqueCheckMessage={t("validation.unique.list_share_articles")}
         focusIndex="name"
         initialData={filteredData}
+        uniqueCheckRows={list.data}
         loading={list.isLoading}
         onSaveSuccess={list.onSaveSuccess}
         onDeleteSuccess={list.onDeleteSuccess}

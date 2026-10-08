@@ -42,6 +42,7 @@ import validation from './validation.json';
 import about from './about.json';
 import statistics from './statistics.json';
 import impressum from './impressum.json';
+import platform from './platform.json';
 import button_library from './button_library.json';
 import support from './support.json';
 import onboarding from './onboarding.json';
@@ -94,4 +95,5 @@ export default {
   tenant,
   validation,
   impressum,
+  platform,
 };

@@ -199,19 +199,23 @@ export default function ListDeliveryStations() {
         required: false,
         disabled: true,
         width: "8em",
-        render: (_: unknown, record: TableRecord) => (
-          <div className="flex-center w-full gap-4">
-            <IconActionButton
-              icon={<EditOutlined />}
-              label={t("table.edit")}
-              className="long-squared-button"
-              onClick={() => {
-                setIsDeliveryStationDetailModalOpen(true);
-                setSelectedDeliveryStationDetailData(record);
-              }}
-            />
-          </div>
-        ),
+        render: (_: unknown, record: TableRecord) => {
+          // The unsaved new row (key === -1, no id) has no days to open yet.
+          if (record.key === -1 || !record.id) return null;
+          return (
+            <div className="flex-center w-full gap-4">
+              <IconActionButton
+                icon={<EditOutlined />}
+                label={t("delivery_stations.delivery_days")}
+                className="long-squared-button"
+                onClick={() => {
+                  setIsDeliveryStationDetailModalOpen(true);
+                  setSelectedDeliveryStationDetailData(record);
+                }}
+              />
+            </div>
+          );
+        },
       },
       {
         title: <>{t("delivery_stations.infos")}</>,
@@ -275,6 +279,7 @@ export default function ListDeliveryStations() {
         columns={columns}
         apiFunctions={list.apiFunctions}
         initialData={list.filteredData}
+        uniqueCheckRows={list.data}
         loading={list.isLoading}
         onSaveSuccess={list.onSaveSuccess}
         onDeleteSuccess={list.onDeleteSuccess}

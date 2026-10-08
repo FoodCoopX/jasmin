@@ -37,6 +37,7 @@
     "contact_name": "Ansprechperson",
     "contact_phone": "Telefon Ansprechperson",
     "photo_link": "Link zum Foto",
+    "photo_link_hint": "Die Mitglieder sehen den Link nur, solange kein Foto hochgeladen ist.",
     "self_service": "Selbstbedienung",
     "paste_maps_link": "Google-Maps-Link oder \"Breite, Länge\" einfügen",
     "paste_maps_link_placeholder": "https://maps.google.com/… oder 48.2082, 16.3738",

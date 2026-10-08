@@ -32,11 +32,13 @@ import {
   ToolTipIcon,
 } from "@shared/ui";
 import { AddShareArticleEntry } from "@features/commissioning/components";
+import { formatAmountForUnit } from "@shared/utils";
 
 import {
   currentWeek,
   useIsMobile,
   useNoteColumn,
+  useNumberFormat,
   useTableRowSelection,
 } from "@hooks/index";
 import {
@@ -62,6 +64,7 @@ export default function DocumentationHarvest() {
 
   const { finalColumn } = useFinalColumn();
   const { noteColumn } = useNoteColumn();
+  const { format } = useNumberFormat();
 
   const { shareArticleColumn } = useShareArticleColumn({
     filters: shareArticleFilters,
@@ -218,7 +221,13 @@ export default function DocumentationHarvest() {
                 const additional_amount =
                   (record.additional_theoretical_harvest_amount as number) || 0;
                 const totalAmount = theoretical_amount + additional_amount;
-                return totalAmount > 0 ? totalAmount : "";
+                return totalAmount > 0
+                  ? formatAmountForUnit(
+                      totalAmount,
+                      record.unit as string,
+                      format,
+                    )
+                  : "";
               },
             },
           ] as EditableColumnConfig<TableRecord>[])
@@ -233,9 +242,14 @@ export default function DocumentationHarvest() {
         align: "center",
         disabled: false,
         readOnly: false,
-        render: (_: unknown, record: Record<string, unknown>) => {
-          return record.harvest_amount as React.ReactNode;
-        },
+        render: (_: unknown, record: Record<string, unknown>) =>
+          record.harvest_amount == null || record.harvest_amount === ""
+            ? ""
+            : formatAmountForUnit(
+                Number(record.harvest_amount),
+                record.unit as string,
+                format,
+              ),
       },
       {
         ...noteColumn,
@@ -250,6 +264,7 @@ export default function DocumentationHarvest() {
       isLongTermStorage,
       t,
       noteColumn,
+      format,
     ],
   );
 

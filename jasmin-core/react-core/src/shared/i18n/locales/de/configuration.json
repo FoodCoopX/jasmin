@@ -36,6 +36,7 @@
     "currently_in_use": "derzeit in Verwendung",
     "default_get_current_stock_day": "Bestand erfassen", 
     "changed_delivery_day_shares": "geänderter Liefertag",
+    "share_days_week_begun": "Diese Woche hat bereits begonnen, ihre Anteilstage können nicht mehr geändert werden.",
     "time_manamagent_for_orders": "für Bestellungen",
     "time_management_for_shares": "für Anteile", 
     "default_last_possible_ordering_day": "Bestellung bis:", 

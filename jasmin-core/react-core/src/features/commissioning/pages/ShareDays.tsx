@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useCallback, useMemo, useState, type Key } from "react";
-import { isWeekInPast } from "@shared/utils";
+import { hasWeekBegun, isWeekInPast } from "@shared/utils";
 import { getWeekdayChoices } from "@shared/utils/weekdayChoices";
 import { useTranslation } from "react-i18next";
 import {
@@ -35,6 +35,12 @@ export default function ShareDays() {
   const [selectedWeek, setSelectedWeek] = useState(dayjs().isoWeek());
   const isPast = useMemo(
     () => isWeekInPast(selectedYear, selectedWeek),
+    [selectedYear, selectedWeek],
+  );
+  // The server refuses a change to a week whose Monday has come, so such a
+  // week is read-only here, not only one more than a week back.
+  const hasBegun = useMemo(
+    () => hasWeekBegun(selectedYear, selectedWeek),
     [selectedYear, selectedWeek],
   );
 
@@ -77,58 +83,56 @@ export default function ShareDays() {
     ): Promise<TableRecord> => {
       if (!key) return {} as TableRecord;
 
-      try {
-        // Convert key (id) back to delivery_day
-        // Since id = delivery_day + 1, delivery_day = id - 1
-        const deliveryDay = parseInt(String(key)) - 1;
+      // Convert key (id) back to delivery_day
+      // Since id = delivery_day + 1, delivery_day = id - 1
+      const deliveryDay = parseInt(String(key)) - 1;
 
-        // Prepare the data - remove undefined values and convert to null
-        const dataToSend = Object.keys(formData).reduce<
-          Record<string, unknown>
-        >((acc, fieldKey) => {
-          if (
-            formData[fieldKey] === "undefined" ||
-            formData[fieldKey] === undefined
-          ) {
-            acc[fieldKey] = null;
-          } else {
-            acc[fieldKey] = formData[fieldKey];
-          }
-          return acc;
-        }, {});
-
-        const response = await commissioningSharesBulkUpdateUpdate(
-          dataToSend as unknown as Share,
-          {
-            year: selectedYear,
-            delivery_week: selectedWeek,
-            day_number: deliveryDay,
-          },
-        );
-
-        // The response should be an array from get_days
-        // Find the specific day that was updated
-        const responseData = response as unknown as
-          | Record<string, unknown>[]
-          | Record<string, unknown>;
-        const updatedDayData = Array.isArray(responseData)
-          ? responseData.find((day) => day.delivery_day === deliveryDay)
-          : responseData;
-
-        if (!updatedDayData) {
-          console.error("Could not find updated day data in response");
-          return {} as TableRecord;
+      // A cleared day goes out as null: a moved delivery day then returns to
+      // its own day, a work day to the delivery day's usual one. The selects'
+      // blank option has the value "".
+      const dataToSend = Object.keys(formData).reduce<
+        Record<string, unknown>
+      >((acc, fieldKey) => {
+        if (
+          formData[fieldKey] === "" ||
+          formData[fieldKey] === "undefined" ||
+          formData[fieldKey] === undefined
+        ) {
+          acc[fieldKey] = null;
+        } else {
+          acc[fieldKey] = formData[fieldKey];
         }
+        return acc;
+      }, {});
 
-        // Make sure it has the correct structure with id field
-        return {
-          ...updatedDayData,
-          id: updatedDayData.id || (updatedDayData.delivery_day as number) + 1,
-        } as TableRecord;
-      } catch (error) {
-        console.error("Update failed:", error);
-        throw error;
+      const response = await commissioningSharesBulkUpdateUpdate(
+        dataToSend as unknown as Share,
+        {
+          year: selectedYear,
+          delivery_week: selectedWeek,
+          day_number: deliveryDay,
+        },
+      );
+
+      // The response should be an array from get_days
+      // Find the specific day that was updated
+      const responseData = response as unknown as
+        | Record<string, unknown>[]
+        | Record<string, unknown>;
+      const updatedDayData = Array.isArray(responseData)
+        ? responseData.find((day) => day.delivery_day === deliveryDay)
+        : responseData;
+
+      if (!updatedDayData) {
+        console.error("Could not find updated day data in response");
+        return {} as TableRecord;
       }
+
+      // Make sure it has the correct structure with id field
+      return {
+        ...updatedDayData,
+        id: updatedDayData.id || (updatedDayData.delivery_day as number) + 1,
+      } as TableRecord;
     },
     [selectedYear, selectedWeek],
   );
@@ -296,10 +300,10 @@ export default function ShareDays() {
     [t, weekdayChoices],
   );
 
-  // Share days are edit-only, and only while the week isn't in the past.
+  // Share days are edit-only, and only while the week hasn't begun.
   const permissions = useMemo(
-    () => gatedByPermissionOnlyEdit(!isPast && isOffice),
-    [isPast, isOffice],
+    () => gatedByPermissionOnlyEdit(!hasBegun && isOffice),
+    [hasBegun, isOffice],
   );
 
   return (
@@ -311,8 +315,14 @@ export default function ShareDays() {
         selectedWeek={selectedWeek}
         setSelectedWeek={(v) => v !== null && setSelectedWeek(v)}
       />
-      {isPast && (
+      {isPast ? (
         <PastWarningMessage>{t("table.past_week_readonly")}</PastWarningMessage>
+      ) : (
+        hasBegun && (
+          <PastWarningMessage>
+            {t("configuration.share_days_week_begun")}
+          </PastWarningMessage>
+        )
       )}
       {/* A row's id is its weekday, the same in every week, while the table
           remembers saved rows by id for as long as it is mounted: a new week

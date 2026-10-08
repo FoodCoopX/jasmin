@@ -8,8 +8,11 @@ import ListPDFGenerator from "./ListPDFGenerator";
 
 interface CommissioningListPackingPDFGeneratorProps {
   groups: CommissioningListPackingPDFProps["groups"] | null;
+  /** False while some of the groups' rows are still loading. */
+  isReady?: boolean;
   year: number;
   week: number | null;
+  dayName: string;
   showSize?: boolean;
   filename: string;
   buttonText: string;
@@ -18,8 +21,10 @@ interface CommissioningListPackingPDFGeneratorProps {
 
 export default function CommissioningListPackingPDFGenerator({
   groups,
+  isReady,
   year,
   week,
+  dayName,
   showSize,
   filename,
   buttonText,
@@ -30,10 +35,11 @@ export default function CommissioningListPackingPDFGenerator({
       // ``groups`` is already filtered to non-empty share options in the
       // page, so an empty array here means "nothing to export" — disabled.
       data={groups}
+      isReady={isReady}
       filename={filename}
       buttonText={buttonText}
       documentLoader={() => import("./CommissioningListPackingPDF")}
-      documentProps={{ groups: groups ?? [], year, week, showSize, t }}
+      documentProps={{ groups: groups ?? [], year, week, dayName, showSize, t }}
     />
   );
 }

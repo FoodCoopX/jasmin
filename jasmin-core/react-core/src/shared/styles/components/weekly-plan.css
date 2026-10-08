@@ -33,6 +33,10 @@
   font-size: 0.85em;
 }
 
+.weekly-plan-copy-select {
+  min-width: 8em;
+}
+
 .weekly-plan-layout {
   display: flex;
   gap: 20px;

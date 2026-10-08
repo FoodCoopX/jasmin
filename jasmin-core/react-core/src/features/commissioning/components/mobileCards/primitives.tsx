@@ -2,6 +2,7 @@ import { Flex, Tag } from "antd";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { EMPTY_DISPLAY } from "@shared/tables/BasicEditableTable/MobileCardList";
+import "./primitives.css";
 
 /**
  * Shared building blocks for mobile-card variants used by EditableTable's
@@ -9,7 +10,7 @@ import { EMPTY_DISPLAY } from "@shared/tables/BasicEditableTable/MobileCardList"
  * `*MobileCard` components in this folder.
  *
  * Conventions match the existing CSS classes in
- * `components/tables/BasicEditableTable/MobileCardList.css`
+ * `src/shared/tables/BasicEditableTable/MobileCardList.css`
  * (`mobile-card-item`, `mobile-card-content`, `mobile-card-title`, etc.) and
  * the global typography helpers (`text-hint`, `text-meta`, `text-muted-xs`,
  * `flex-baseline`, `text-secondary`).
@@ -36,6 +37,8 @@ export function MobileCard({
 }: MobileCardProps) {
   const classes = [
     "mobile-card-item",
+    "commissioning-mobile-card",
+    onClick ? "is-clickable" : "",
     finalized ? "mobile-card-finalized" : "",
     className ?? "",
   ]
@@ -60,12 +63,7 @@ export function MobileCard({
             }
           : undefined
       }
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        alignItems: "stretch",
-        position: "relative",
-        ...style,
-      }}
+      style={style}
     >
       {children}
     </div>
@@ -91,8 +89,9 @@ export function MobileCardTitle({
   const { t } = useTranslation();
   return (
     <div
-      className="mobile-card-title"
-      style={rightSlot ? { justifyContent: "space-between" } : undefined}
+      className={
+        rightSlot ? "mobile-card-title has-right-slot" : "mobile-card-title"
+      }
     >
       <Flex align="center" gap={6} component="span">
         {/* The finalized state is otherwise colour-only — role=img +
@@ -107,7 +106,9 @@ export function MobileCardTitle({
         {name}
         {sizeLabel && <span className="text-hint">{sizeLabel}</span>}
       </Flex>
-      {rightSlot && <span style={{ whiteSpace: "nowrap" }}>{rightSlot}</span>}
+      {rightSlot && (
+        <span className="mobile-card-title-right">{rightSlot}</span>
+      )}
     </div>
   );
 }
@@ -121,7 +122,7 @@ export function MobileCardMetricsRow({
   gap?: number;
 }) {
   return (
-    <Flex gap={gap} wrap style={{ marginTop: 6 }}>
+    <Flex gap={gap} wrap className="mobile-card-metrics-row">
       {children}
     </Flex>
   );
@@ -132,6 +133,7 @@ interface MobileCardMetricProps {
   value: ReactNode;
   unit?: string;
   emphasis?: "primary" | "secondary";
+  /** The value's colour: a design token, e.g. `var(--color-success-text)`. */
   color?: string;
   minWidth?: number;
 }
@@ -144,12 +146,30 @@ export function MobileCardMetric({
   color,
   minWidth,
 }: MobileCardMetricProps) {
-  const fontWeight = emphasis === "primary" ? 600 : 500;
+  const metricClasses = ["mobile-card-metric", minWidth ? "has-min-width" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const valueClasses = [
+    "mobile-card-metric-value",
+    emphasis === "secondary" ? "is-secondary" : "",
+    color ? "has-color" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  // The two per-call values travel as custom properties the CSS reads.
+  const metricStyle = minWidth
+    ? ({ "--mobile-card-metric-min-width": `${minWidth}px` } as CSSProperties)
+    : undefined;
+  const valueStyle = color
+    ? ({ "--mobile-card-metric-color": color } as CSSProperties)
+    : undefined;
   return (
-    <div style={minWidth ? { minWidth, textAlign: "center" } : undefined}>
+    <div className={metricClasses} style={metricStyle}>
       {label && <div className="text-muted-xs">{label}</div>}
       <div className="flex-baseline">
-        <span style={{ fontWeight, fontSize: "1.2em", color }}>{value}</span>
+        <span className={valueClasses} style={valueStyle}>
+          {value}
+        </span>
         {unit && <span className="text-secondary">{unit}</span>}
       </div>
     </div>
@@ -164,14 +184,7 @@ export function MobileCardNote({ note }: { note?: string | null }) {
 export function MobileCardTags({ tags }: { tags: string[] }) {
   if (tags.length === 0) return null;
   return (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 4,
-        marginTop: 6,
-      }}
-    >
+    <div className="mobile-card-tags">
       {tags.map((tag) => (
         <Tag key={tag} className="mobile-card-tag">
           {tag}

@@ -6,12 +6,14 @@ import {
   useAmountUnitSizeColumns,
   usePackingModeShareGroups,
   useShareArticleColumn,
+  useShareDeliveryDays,
 } from "@features/commissioning/hooks";
 import { CommissioningListPackingPDFGenerator } from "@features/commissioning/pdfs";
 import { SharesDeliveryDaySelector } from "@features/commissioning/selectors";
 import {
   currentWeek,
   useIsMobile,
+  useNumberFormat,
   useTenant,
   useUnitOptions,
   useVegetableSizeOptions,
@@ -31,9 +33,14 @@ import type {
 } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText, MobileStack } from "@shared/ui";
 import {
+  activeAtDateForWeek,
+  formatAmountForUnit,
+  formatDayLabel,
   formatWeekLabel,
   generatePdfFilename,
+  getDayName,
   getShareOptionLabel,
+  isWeekInPast,
 } from "@shared/utils";
 
 const shareArticleFilters = {
@@ -72,9 +79,12 @@ function buildRows(
     // Spoilage buffer: the picker grabs `pct`% extra so ~pct% bad items still
     // leave enough good ones. Rounded UP to a whole unit — it's an actionable
     // pick list ("grab N"), and the buffer's intent is "have at least enough".
+    // The product is cut to a few decimals first: in binary floating point
+    // 100 × 1.1 is 110.00000000000001, which would round up to 111.
     const pct =
       Number(row.percentage_added_to_commissioning_list_packing) || 0;
-    const amount = Math.ceil(baseAmount * (1 + pct / 100));
+    const withBuffer = (baseAmount * (100 + pct)) / 100;
+    const amount = Math.ceil(Number(withBuffer.toFixed(6)));
     const id = String(row.id);
     result.push({
       key: id,
@@ -98,8 +108,9 @@ interface ShareOptionPackingTableProps {
   week: number | null;
   deliveryDayId: string | null;
   /** Reports this option's resolved rows up to the parent so they can be
-   *  collected into the PDF (each table owns its own fetch). */
-  onRowsChange?: (shareOption: string, rows: PackingRow[]) => void;
+   *  collected into the PDF (each table owns its own fetch) — `null` while
+   *  they are loading. */
+  onRowsChange?: (shareOption: string, rows: PackingRow[] | null) => void;
 }
 
 /**
@@ -126,7 +137,9 @@ function ShareOptionPackingTable({
       delivery_week: week ?? currentWeek,
       // shareOption prop is a string; the list param is the generated enum.
       share_option: shareOption as ShareTypeEnum,
-      is_past: false,
+      // A week further back is read from the stored rows, as the planning
+      // page reads it.
+      is_past: isWeekInPast(year, week),
     }),
     [year, week, shareOption],
   );
@@ -142,8 +155,8 @@ function ShareOptionPackingTable({
   );
 
   useEffect(() => {
-    onRowsChange?.(shareOption, rows);
-  }, [shareOption, rows, onRowsChange]);
+    onRowsChange?.(shareOption, isFetching ? null : rows);
+  }, [shareOption, rows, isFetching, onRowsChange]);
 
   return (
     <section className="commissioning-list-packing-section">
@@ -178,13 +191,32 @@ export default function CommissioningListPacking() {
   // One table per ACTIVE share option — this list is the total of everything
   // needed for packing AND bulk, so it covers every option (bulk or boxed),
   // not just the bulk-packed ones.
-  const { bulkShareOptions, boxesShareOptions } = usePackingModeShareGroups();
-
   const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
     useYearWeekState();
   const [selectedDeliveryDayId, setSelectedDeliveryDayId] = useState<
     string | null
   >(null);
+
+  // The share options and delivery days of the chosen week, not of today.
+  const activeAtDate = activeAtDateForWeek(selectedYear, selectedWeek);
+  const {
+    bulkShareOptions,
+    boxesShareOptions,
+    loading: shareOptionsLoading,
+  } = usePackingModeShareGroups(activeAtDate);
+
+  // The same list the day selector reads, to name the chosen day.
+  const { shareDeliveryDays } = useShareDeliveryDays({
+    active_at_date: activeAtDate,
+  });
+  const selectedDayNumber = useMemo<number | null>(() => {
+    const day = shareDeliveryDays.find(
+      (deliveryDay) => deliveryDay.id === selectedDeliveryDayId,
+    );
+    return day ? Number(day.day_number) : null;
+  }, [shareDeliveryDays, selectedDeliveryDayId]);
+  const dayName =
+    selectedDayNumber !== null ? getDayName(selectedDayNumber, t) : "";
 
   // Same column hooks the other harvest lists use, so the article / unit /
   // size cells render and align identically. Everything is read-only here
@@ -203,6 +235,8 @@ export default function CommissioningListPacking() {
     showAmount: false,
   });
 
+  const { format } = useNumberFormat();
+
   const columns = useMemo<EditableColumnConfig<TableRecord>[]>(() => {
     const totalAmountColumn: EditableColumnConfig<TableRecord> = {
       title: t("commissioning.total_amount"),
@@ -212,10 +246,10 @@ export default function CommissioningListPacking() {
       align: "right",
       width: "10em",
       disabled: true,
-      render: (value: unknown) => {
+      render: (value: unknown, record: TableRecord) => {
         const numeric = Number(value);
         if (!Number.isFinite(numeric)) return "";
-        return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2);
+        return formatAmountForUnit(numeric, record.unit as string | null, format);
       },
     };
 
@@ -227,7 +261,7 @@ export default function CommissioningListPacking() {
       ...amountUnitSizeColumns,
       totalAmountColumn,
     ];
-  }, [t, shareArticleColumn, amountUnitSizeColumns]);
+  }, [t, shareArticleColumn, amountUnitSizeColumns, format]);
 
   // Every active share option (bulk or boxed), sorted for a stable render
   // order — the packing list totals what's needed across all of them.
@@ -248,9 +282,9 @@ export default function CommissioningListPacking() {
   // unless the tenant's ``show_size_column`` setting is truthy.
   const showSize = Boolean(getSetting("show_size_column"));
   const [rowsByOption, setRowsByOption] = useState<
-    Record<string, PackingRow[]>
+    Record<string, PackingRow[] | null>
   >({});
-  const handleRowsChange = useCallback((shareOption: string, rows: PackingRow[]) => {
+  const handleRowsChange = useCallback((shareOption: string, rows: PackingRow[] | null) => {
     setRowsByOption((prev) =>
       prev[shareOption] === rows ? prev : { ...prev, [shareOption]: rows },
     );
@@ -269,14 +303,28 @@ export default function CommissioningListPacking() {
               row.size && row.size !== "M"
                 ? getVegetableSizeLabel(row.size)
                 : "",
-            total_amount_text: Number.isInteger(row.total_amount)
-              ? String(row.total_amount)
-              : row.total_amount.toFixed(2),
+            total_amount_text: formatAmountForUnit(
+              row.total_amount,
+              row.unit,
+              format,
+            ),
           })),
         }))
         .filter((group) => group.rows.length > 0),
-    [shareOptionValues, rowsByOption, t, getUnitLabel, getVegetableSizeLabel],
+    [
+      shareOptionValues,
+      rowsByOption,
+      t,
+      getUnitLabel,
+      getVegetableSizeLabel,
+      format,
+    ],
   );
+
+  // The PDF covers every share option, so it waits for all of their rows.
+  const allRowsLoaded =
+    !shareOptionsLoading &&
+    shareOptionValues.every((value) => Array.isArray(rowsByOption[value]));
 
   const generateFilename = useMemo(
     () =>
@@ -284,8 +332,9 @@ export default function CommissioningListPacking() {
         t("commissioning.commissioning_list_packing"),
         selectedYear,
         formatWeekLabel(selectedWeek, t),
+        formatDayLabel(selectedDayNumber, t),
       ]),
-    [selectedYear, selectedWeek, t],
+    [selectedYear, selectedWeek, selectedDayNumber, t],
   );
 
   return (
@@ -310,8 +359,10 @@ export default function CommissioningListPacking() {
         <div className="section-divider">
           <CommissioningListPackingPDFGenerator
             groups={pdfGroups}
+            isReady={allRowsLoaded}
             year={selectedYear}
             week={selectedWeek}
+            dayName={dayName}
             showSize={showSize}
             filename={generateFilename}
             buttonText={t("download.commissioning_list_packing")}

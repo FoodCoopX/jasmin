@@ -50,8 +50,7 @@ export async function downloadRecordsZip<T>({
     ids.map(async (id) => {
       try {
         return await retrieve(id);
-      } catch (err) {
-        console.error(`Failed to load record ${id} for bulk ZIP:`, err);
+      } catch {
         return null;
       }
     }),
@@ -72,8 +71,7 @@ export async function downloadRecordsZip<T>({
         continue;
       }
       entries.push(entry);
-    } catch (err) {
-      console.error("Failed to build ZIP entry for a record:", err);
+    } catch {
       skipped += 1;
     }
   }

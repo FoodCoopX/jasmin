@@ -317,7 +317,6 @@ export default function ConfigurationApp() {
       // overlay keys flow back into ``getSetting(...)`` correctly.
       await refreshTenant();
     } catch (error) {
-      console.error("Failed to save data:", error);
       notify.error(t("common.error_saving_data"));
       // Re-throw so useAutoSave keeps the change dirty instead of flipping the
       // indicator to "saved" over a change that didn't persist.

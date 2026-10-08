@@ -34,6 +34,20 @@ export function isWeekInPast(
 }
 
 /**
+ * Has the selected ISO week begun — is its Monday today or earlier?
+ *
+ * Stricter than ``isWeekInPast``: the share days endpoint refuses a change to
+ * such a week unless it is forced. A ``null`` week has not begun.
+ */
+export function hasWeekBegun(
+  selectedYear: number | null | undefined,
+  selectedWeek: number | null | undefined,
+): boolean {
+  if (!selectedYear || !selectedWeek) return false;
+  return !mondayOfIsoWeek(selectedYear, selectedWeek).isAfter(dayjs(), "day");
+}
+
+/**
  * Is the selected year before the current year?
  */
 export function isYearInPast(

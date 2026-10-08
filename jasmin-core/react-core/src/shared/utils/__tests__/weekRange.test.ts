@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activeAtDateForWeek,
   dateForWeekDayNumber,
+  hasWeekBegun,
   isWeekInPast,
   mondayOfIsoWeek,
 } from "../weekRange";
@@ -53,6 +54,31 @@ describe("isWeekInPast", () => {
     expect(isWeekInPast(2027, 1)).toBe(false);
     expect(isWeekInPast(2026, 52)).toBe(false);
     expect(isWeekInPast(2026, 51)).toBe(true);
+  });
+});
+
+describe("hasWeekBegun", () => {
+  it("counts a week as begun from its Monday on", () => {
+    at("2026-10-11"); // a Sunday, the last day of week 41
+
+    expect(hasWeekBegun(2026, 41)).toBe(true);
+    expect(hasWeekBegun(2026, 42)).toBe(false);
+
+    at("2026-10-12"); // the Monday of week 42
+
+    expect(hasWeekBegun(2026, 42)).toBe(true);
+    expect(hasWeekBegun(2026, 43)).toBe(false);
+  });
+
+  it("finds the week across New Year", () => {
+    at("2027-01-01"); // week 53 of 2026
+
+    expect(hasWeekBegun(2026, 53)).toBe(true);
+    expect(hasWeekBegun(2027, 1)).toBe(false);
+  });
+
+  it("does not count a missing week as begun", () => {
+    expect(hasWeekBegun(2026, null)).toBe(false);
   });
 });
 

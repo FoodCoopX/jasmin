@@ -32,6 +32,7 @@
   "currently_in_use": "Currently in use",
   "default_get_current_stock_day": "Get current stock",
   "changed_delivery_day_shares": "Changed delivery day",
+  "share_days_week_begun": "This week has already begun, so its share days can no longer be changed.",
   "time_manamagent_for_orders": "For orders",
   "time_management_for_shares": "For shares",
   "default_last_possible_ordering_day": "Ordering until",

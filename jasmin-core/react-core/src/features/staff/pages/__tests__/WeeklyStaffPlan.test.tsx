@@ -5,7 +5,11 @@
 // drag-and-drop kit stays real; its click "pick up, then place" path stands in
 // for a mouse drag.
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  MutationCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import type { UseMutationOptions } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -194,6 +198,11 @@ function renderPlan() {
       queries: { retry: false, gcTime: 0 },
       mutations: { retry: false },
     },
+    mutationCache: new MutationCache({
+      onError: (error, _variables, _context, mutation) => {
+        if (!mutation.meta?.silent) appToast(error);
+      },
+    }),
   });
   render(
     <QueryClientProvider client={queryClient}>
@@ -260,11 +269,15 @@ function sortedAssignments(...assignments: WeeklyPlanAssignment[]) {
 // document body.
 const noToast = () => undefined as never;
 
+// The app's toast for a failed mutation, unless it sets `meta: { silent: true }`.
+const appToast = vi.fn();
+
 beforeEach(() => {
   // A Monday in ISO week 41 of 2026; the page opens on "now".
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 9, 5, 12));
   auth.roles = ["office"];
+  appToast.mockReset();
   staffApi.fetchGrid
     .mockReset()
     .mockImplementation(async (params: StaffWeeklyPlanGridRetrieveParams) =>
@@ -608,7 +621,9 @@ describe("WeeklyStaffPlan editing by the office", () => {
     await user.click(paletteChip("Anna"));
     await user.click(cellButton("Harvest", 2, MONDAY));
 
-    expect(warning).toHaveBeenCalledWith("staff.already_in_category_that_day");
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({ content: "staff.already_in_category_that_day" }),
+    );
     expect(cellButton("Harvest", 2, MONDAY)).not.toHaveTextContent("Anna");
     await flushMicrotasks();
     expect(staffApi.replaceWeek).not.toHaveBeenCalled();
@@ -637,7 +652,9 @@ describe("WeeklyStaffPlan editing by the office", () => {
     await user.click(cellButton("Harvest", 2, TUESDAY));
     await user.click(cellButton("Harvest", 2, MONDAY));
 
-    expect(warning).toHaveBeenCalledWith("staff.already_in_category_that_day");
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({ content: "staff.already_in_category_that_day" }),
+    );
     expect(cellButton("Harvest", 2, TUESDAY)).toHaveTextContent("Anna");
     expect(cellButton("Harvest", 2, MONDAY)).not.toHaveTextContent("Anna");
     await flushMicrotasks();
@@ -715,7 +732,9 @@ describe("WeeklyStaffPlan editing by the office", () => {
 
     await waitFor(() =>
       expect(error).toHaveBeenCalledWith(
-        deErrors.staff.invalid_weekly_plan_assignment,
+        expect.objectContaining({
+          content: deErrors.staff.invalid_weekly_plan_assignment,
+        }),
       ),
     );
     await waitFor(() => expect(staffApi.fetchGrid).toHaveBeenCalledTimes(2));
@@ -729,6 +748,26 @@ describe("WeeklyStaffPlan editing by the office", () => {
         "staff.drop_employee_here",
       ),
     );
+  });
+
+  it("tells the office once, and says the week is not saved", async () => {
+    const error = vi.spyOn(message, "error").mockImplementation(noToast);
+    staffApi.replaceWeek.mockRejectedValue(
+      apiError(400, {
+        code: "staff.invalid_weekly_plan_assignment",
+        message: "Category 'Harvest' is deactivated.",
+        field: "category_id",
+      }),
+    );
+    const { user } = renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+
+    await user.click(removeButton("Harvest", 1, MONDAY));
+
+    expect(await screen.findByText("common.error_saving")).toBeInTheDocument();
+    expect(screen.queryByText("settings.saved")).not.toBeInTheDocument();
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(appToast).not.toHaveBeenCalled();
   });
 });
 
@@ -768,7 +807,9 @@ describe("WeeklyStaffPlan copying a week", () => {
         to_week: 41,
       }),
     );
-    expect(success).toHaveBeenCalledWith("staff.weekly_plan_copied_success");
+    expect(success).toHaveBeenCalledWith(
+      expect.objectContaining({ content: "staff.weekly_plan_copied_success" }),
+    );
     await waitFor(() =>
       expect(cellButton("Harvest", 1, MONDAY)).toHaveTextContent("Anna"),
     );
@@ -864,9 +905,13 @@ describe("WeeklyStaffPlan copying a week", () => {
 
     await waitFor(() =>
       expect(error).toHaveBeenCalledWith(
-        deErrors.staff.weekly_plan_copy_target_not_empty,
+        expect.objectContaining({
+          content: deErrors.staff.weekly_plan_copy_target_not_empty,
+        }),
       ),
     );
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(appToast).not.toHaveBeenCalled();
     expect(staffApi.fetchGrid).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole("button", { name: "staff.copy_into_this_week" }),

@@ -213,7 +213,7 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
             type="primary"
             htmlType="submit"
             loading={isPending}
-            style={{ background: "var(--color-primary-hover)" }}
+            className="primary-hover-shade-button"
           >
             {t("common.save")}
           </Button>

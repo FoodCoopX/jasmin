@@ -12,7 +12,15 @@
  */
 export interface HarvestBulkSetAsExpectedItem {
   id: string;
+  /**
+   * @minimum 1900
+   * @maximum 2100
+   */
   year: number;
+  /**
+   * @minimum 1
+   * @maximum 53
+   */
   delivery_week: number;
   day_number: number;
   /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */

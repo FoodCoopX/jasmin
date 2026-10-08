@@ -176,7 +176,6 @@ export function useCustomerOrderMutations({
           return;
         }
         hadError = true;
-        console.error("Save failed:", result.reason);
         if (getErrorCode(result.reason) === "order_content.insufficient_stock") {
           const details = getErrorDetails(result.reason);
           nextStockErrors[offerId] = {

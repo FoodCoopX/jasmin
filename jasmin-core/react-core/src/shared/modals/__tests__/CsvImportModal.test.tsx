@@ -1,13 +1,13 @@
 /**
  * The list pages' CSV import affordance.
  *
- * What matters here: the button is gated on the tenant setting, and the modal
- * offers a DRY RUN, so an office user learns about a bad file before importing
- * it.
+ * What matters here: the button is gated on the tenant setting and on the
+ * office, the only role the import endpoint takes, and the modal offers a DRY
+ * RUN, so an office user learns about a bad file before importing it.
  */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import api from "@shared/services/api";
 import { CsvImportButton } from "../CsvImportModal";
@@ -23,6 +23,16 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("@shared/services/api", () => ({ default: { post: vi.fn() } }));
+
+// ``useRoles`` is real; it reads the signed-in user's roles from here.
+const auth = vi.hoisted(() => ({ roles: ["office"] as string[] }));
+vi.mock("@shared/contexts/AuthContext", () => ({
+  useAuth: () => ({ user: { roles: auth.roles } }),
+}));
+
+beforeEach(() => {
+  auth.roles = ["office"];
+});
 
 const COLUMNS = [
   { dataIndex: "name", title: "Name", required: true },
@@ -52,6 +62,23 @@ describe("CsvImportButton", () => {
   it("renders nothing when the tenant disallows uploads", () => {
     const { container } = renderButton({ uploadAllowed: false });
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it.each(["gardener", "staff", "management", "member"])(
+    "renders nothing for the %s, whom the import endpoint refuses",
+    (role) => {
+      auth.roles = [role];
+      const { container } = renderButton();
+      expect(container).toBeEmptyDOMElement();
+    },
+  );
+
+  it.each(["office", "admin"])("offers the import to the %s", (role) => {
+    auth.roles = [role];
+    renderButton();
+    expect(
+      screen.getByRole("button", { name: "csv_upload.open" }),
+    ).toBeInTheDocument();
   });
 
   it("opens a modal offering template, dry run AND import", async () => {

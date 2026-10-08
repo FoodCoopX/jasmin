@@ -55,6 +55,7 @@ describe("WashingMobileCard contents", () => {
       card().querySelector(".mobile-card-content")!.children,
     ).map((line) => line.textContent);
     expect(lines).toEqual(["Leeks", "12,50 kg", "Trim the roots"]);
+    expect(screen.getByText("12,50 kg")).toHaveClass("washing-card-amount");
     expect(screen.getByText("Trim the roots")).toHaveClass("text-meta");
   });
 
@@ -106,11 +107,13 @@ describe("WashingMobileCard actions", () => {
     const { unmount } = renderCard();
     expect(screen.getByRole("button")).toBe(card());
     expect(card()).toHaveAttribute("tabindex", "0");
+    expect(card()).toHaveClass("is-clickable");
     unmount();
 
     renderCard(washRow(), false);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(card()).not.toHaveAttribute("tabindex");
+    expect(card()).not.toHaveClass("is-clickable");
     await user.click(screen.getByText("Leeks"));
     expect(onEdit).not.toHaveBeenCalled();
   });

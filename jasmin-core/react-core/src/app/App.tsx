@@ -15,6 +15,7 @@ import { StepUpProvider } from "@shared/auth/StepUpProvider";
 import { LiveAnnouncer, NewVersionBanner, OfflineBanner } from "@shared/ui";
 const SuperAdminApp = lazy(() => import("./SuperAdminApp"));
 const JasminApp = lazy(() => import("./JasminApp"));
+import i18n from "@shared/i18n";
 import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 
@@ -58,13 +59,13 @@ const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error, query) => {
       if (!shouldSurfaceError(error, query.meta)) return;
-      notify.error(getErrorMessage(error, "Failed to load data"));
+      notify.error(getErrorMessage(error, i18n.t("common.error_loading_data")));
     },
   }),
   mutationCache: new MutationCache({
     onError: (error, _vars, _ctx, mutation) => {
       if (!shouldSurfaceError(error, mutation.meta)) return;
-      notify.error(getErrorMessage(error, "Action failed"));
+      notify.error(getErrorMessage(error, i18n.t("common.action_failed")));
     },
   }),
 });

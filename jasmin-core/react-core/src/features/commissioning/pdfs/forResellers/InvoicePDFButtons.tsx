@@ -42,8 +42,7 @@ export default function InvoicePDFButtons({
         return;
       }
       openStoredPdf(invoice.file);
-    } catch (err) {
-      console.error("Failed to load invoice for PDF download:", err);
+    } catch {
       notify.error(t("common.error_loading_data"));
     } finally {
       setBusy("none");
@@ -72,8 +71,7 @@ export default function InvoicePDFButtons({
         storedXmlUrl,
         invoicePdfFilename(t, invoice.prefix, invoice.number, invoice.document_type),
       );
-    } catch (err) {
-      console.error("Failed to build ZUGFeRD download:", err);
+    } catch {
       notify.error(t("common.error_loading_data"));
     } finally {
       setBusy("none");

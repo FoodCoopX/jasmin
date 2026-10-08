@@ -40,7 +40,8 @@ interface UnitOptionLite {
 
 interface UseShareArticleListColumnsArgs {
   isActiveColumn: Record<string, unknown>;
-  priceModalColumn: Record<string, unknown>;
+  /** The prices button column; null leaves it out. */
+  priceModalColumn: Record<string, unknown> | null;
   unitOptions: UnitOptionLite[];
   crates: CrateOption[];
   visibleShareOptions: ShareOptionLite[];
@@ -102,7 +103,7 @@ export function useShareArticleListColumns({
           sortable: true,
           disabled: isFieldDisabled,
         },
-        priceModalColumn,
+        ...(priceModalColumn ? [priceModalColumn] : []),
         {
           title: (
             <>

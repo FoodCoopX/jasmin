@@ -89,6 +89,12 @@ the matching section of Part 1.
 
 - **Use modern, state-of-the-art approaches** — current Django/React best
   practices, no legacy patterns.
+- **Follow the codebase's established patterns.** Before writing something
+  new, look at how the neighbouring code already does it — the sibling page, the
+  parallel viewset, the existing test file — and match its structure, naming,
+  idioms and comment density, so the code reads as if one person wrote it. When
+  the local code follows a pattern this rulebook calls legacy or wrong, don't
+  copy it and don't rewrite it unasked: flag it and ask how to proceed.
 - **English only for anything new.** No German in new code, names, or anywhere
   else. The German names already shipped stay as they are — renaming them would
   break stored columns, bookmarked URLs and in-flight clients: `rabatt` /

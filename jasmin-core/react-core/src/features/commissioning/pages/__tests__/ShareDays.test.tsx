@@ -207,6 +207,7 @@ const PACKING = "configuration.default_packing_day";
 const YEAR = "common.year";
 const WEEK = "common.week";
 const PAST_WEEK = "table.past_week_readonly";
+const WEEK_BEGUN = "configuration.share_days_week_begun";
 
 function renderPage() {
   const profiler = profileRenders();
@@ -609,6 +610,33 @@ describe("ShareDays changing a delivery day's plan", () => {
     expect(lastSave()[0]).toMatchObject({ washing_day: MONDAY, packing_day: WEDNESDAY });
   });
 
+  it("undoes a holiday move by clearing the day the delivery moved to", async () => {
+    renderPage();
+    await loaded();
+    await toNextWeek();
+
+    await pickOption(await openRow(FRIDAY, MOVED_TO), "");
+    await save();
+
+    await waitFor(() => expect(planOf(FRIDAY).movedTo).toBe("-"));
+    const [body, params] = lastSave();
+    expect(params).toEqual({ year: 2026, delivery_week: 42, day_number: FRIDAY });
+    expect(body.changed_day_number).toBeNull();
+    expect(highlightedIn(FRIDAY)).toEqual([WASHING, HARVESTING, PACKING]);
+  });
+
+  it("clears a work day with null, so it falls back to the usual one", async () => {
+    renderPage();
+    await loaded();
+    await toNextWeek();
+
+    await pickOption(await openRow(FRIDAY, WASHING), "");
+    await save();
+
+    await waitFor(() => expect(planOf(FRIDAY).washing).toBe(shown(THURSDAY)));
+    expect(lastSave()[0].washing_day).toBeNull();
+  });
+
   it("keeps the row open and shows why when the server refuses the change", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const reason = "You do not have permission to perform this action.";
@@ -637,6 +665,27 @@ describe("ShareDays changing a delivery day's plan", () => {
 // ── Past weeks and roles ────────────────────────────────────────────────────
 
 describe("ShareDays read-only plans", () => {
+  it("shows this week read-only, since the server refuses a week that has begun", async () => {
+    renderPage();
+    await loaded();
+
+    expect(screen.getByText(WEEK_BEGUN)).toBeInTheDocument();
+    expect(screen.queryByText(PAST_WEEK)).not.toBeInTheDocument();
+    expect(planOf(FRIDAY).harvesting).toBe(shown(WEDNESDAY));
+    await expectReadOnly();
+  });
+
+  it("shows last week read-only too", async () => {
+    renderPage();
+    await loaded();
+
+    await userEvent.click(arrow("common.previous"));
+    await loaded(40);
+
+    expect(screen.getByText(WEEK_BEGUN)).toBeInTheDocument();
+    await expectReadOnly();
+  });
+
   it("shows a week more than a week back read-only, with a note", async () => {
     renderPage();
     await loaded();
@@ -646,6 +695,7 @@ describe("ShareDays read-only plans", () => {
     await loaded(39);
 
     expect(screen.getByText(PAST_WEEK)).toBeInTheDocument();
+    expect(screen.queryByText(WEEK_BEGUN)).not.toBeInTheDocument();
     expect(planOf(FRIDAY).movedTo).toBe(shown(SATURDAY));
     await expectReadOnly();
   });
@@ -673,6 +723,7 @@ describe("ShareDays read-only plans", () => {
       await toNextWeek();
 
       expect(screen.queryByText(PAST_WEEK)).not.toBeInTheDocument();
+      expect(screen.queryByText(WEEK_BEGUN)).not.toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: "table.edit" })).toHaveLength(2);
       expect(screen.queryByRole("button", { name: "table.delete" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "table.add_plus_icon" })).not.toBeInTheDocument();

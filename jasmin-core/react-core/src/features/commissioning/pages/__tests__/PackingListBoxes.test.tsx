@@ -176,6 +176,15 @@ import {
   TUESDAY_MEMBER_AMOUNTS,
   WASH,
 } from "./packingListBoxes.fixtures";
+import {
+  arrow,
+  choose,
+  openDropdown,
+  optionsOf,
+  pending,
+  selectNamed,
+  shownIn,
+} from "./packingListBoxes.helpers";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -235,6 +244,7 @@ const STATION = "placeholder.delivery_station_selector";
 const WEEK = "common.week";
 const DOWNLOAD = /download\.packing_list$/;
 const NO_DELIVERIES = "commissioning.packing_list_no_columns";
+const LOAD_FAILED = "table.load_failed_title";
 const TUESDAY_LABEL = "commissioning.delivery_day Tuesday, 06.10.2026";
 const FRIDAY_LABEL = "commissioning.delivery_day Friday, 09.10.2026";
 const TOUR_1 = "commissioning.tour_number 1";
@@ -247,51 +257,12 @@ const BUNCH = "commissioning.units.bunch";
 const PIECES = "commissioning.units.pcs";
 const KILOS = "commissioning.units.kg";
 
-function selectNamed(name: string): HTMLElement {
-  const select = screen.getByRole("combobox", { name }).closest<HTMLElement>(".ant-select");
-  if (!select) throw new Error(`No select named ${name}`);
-  return select;
-}
-
 /** The tour picker has no accessible name; it is the select showing a tour. */
 const tourPicker = () =>
   screen.queryByText(/^commissioning\.tour_number \d$/)?.closest<HTMLElement>(".ant-select") ??
   null;
 
 const stationPicker = () => screen.queryByRole("combobox", { name: STATION });
-
-/** The label a select shows for its current value. */
-const shownIn = (select: HTMLElement) =>
-  select.querySelector(".ant-select-selection-item")?.textContent ?? "";
-
-function openDropdown(): HTMLElement {
-  const open = Array.from(
-    document.querySelectorAll<HTMLElement>(".ant-select-dropdown"),
-  ).filter((dropdown) => !dropdown.classList.contains("ant-select-dropdown-hidden"));
-  const dropdown = open[open.length - 1];
-  if (!dropdown) throw new Error("No select dropdown is open");
-  return dropdown;
-}
-
-async function optionsOf(select: HTMLElement): Promise<string[]> {
-  await userEvent.click(within(select).getByRole("combobox"));
-  return Array.from(
-    openDropdown().querySelectorAll(".ant-select-item-option-content"),
-    (option) => option.textContent ?? "",
-  );
-}
-
-async function choose(select: HTMLElement, option: string) {
-  await userEvent.click(within(select).getByRole("combobox"));
-  await userEvent.click(within(openDropdown()).getByText(option));
-}
-
-/** The previous / next arrow beside a stepped selector. */
-function arrow(name: string, direction: "common.previous" | "common.next") {
-  const stepper = screen.getByRole("combobox", { name }).closest<HTMLElement>(".ant-space");
-  if (!stepper) throw new Error(`No stepper around ${name}`);
-  return within(stepper).getByRole("button", { name: direction });
-}
 
 function rowOf(text: string): HTMLElement {
   const row = screen.getByText(text).closest("tr");
@@ -341,17 +312,6 @@ const tableIsBusy = () => {
 };
 
 const downloadButton = () => screen.getByRole("button", { name: DOWNLOAD });
-
-/** A request that answers or fails only when the test says so. */
-function pending<T>() {
-  let answer!: (value: T) => void;
-  let fail!: (error: Error) => void;
-  const promise = new Promise<T>((resolve, reject) => {
-    answer = resolve;
-    fail = reject;
-  });
-  return { promise, answer, fail };
-}
 
 const lastBoxesRequest = () => api.boxesMatrix.mock.lastCall?.[0];
 const lastMemberAmountsRequest = () => api.memberAmounts.mock.lastCall?.[0];
@@ -687,6 +647,17 @@ describe("PackingListBoxes when the amounts differ between tours", () => {
     expect(lastBoxesRequest()).toEqual(requestFor(FRIDAY, { tour: 2 }));
   });
 
+  it("asks only for a tour of the day, never for the whole day, whose amounts the tours don't share", async () => {
+    renderPage();
+    await screen.findByText("Carrots");
+
+    await choose(selectNamed(DAY), FRIDAY_LABEL);
+
+    expect(await screen.findByText("Pumpkins")).toBeInTheDocument();
+    expect(api.boxesMatrix).not.toHaveBeenCalledWith(requestFor(FRIDAY));
+    expect(api.boxesMatrix).toHaveBeenCalledTimes(2);
+  });
+
   it("offers no tour on a day served by a single tour", async () => {
     farm.granularityByDay = { [TUESDAY]: ALIKE_PER_TOUR };
     renderPage();
@@ -752,6 +723,23 @@ describe("PackingListBoxes when the amounts differ between stations", () => {
     expect(tourPicker()).toBeNull();
     expect(lastBoxesRequest()).toEqual(requestFor(FRIDAY, { delivery_station: MARKET.id }));
   });
+
+  it("drops the station on a day it doesn't deliver on and asks for none of its boxes there", async () => {
+    renderPage();
+    await waitFor(() => expect(api.stations).toHaveBeenCalled());
+    await choose(selectNamed(STATION), "Farm shop");
+    await screen.findByText("Carrots");
+
+    await choose(selectNamed(DAY), FRIDAY_LABEL);
+
+    await waitFor(() => expect(shownIn(selectNamed(STATION))).toBe(""));
+    expect(await optionsOf(selectNamed(STATION))).toEqual(["School", "Market"]);
+    expect(api.boxesMatrix).not.toHaveBeenCalledWith(
+      requestFor(FRIDAY, { delivery_station: FARM_SHOP.id }),
+    );
+    expect(screen.queryByText(NO_DELIVERIES)).not.toBeInTheDocument();
+    expect(screen.queryByText("Carrots")).not.toBeInTheDocument();
+  });
 });
 
 // ── Week ────────────────────────────────────────────────────────────────────
@@ -813,6 +801,20 @@ describe("PackingListBoxes when the boxes cannot be loaded", () => {
     await choose(selectNamed(DAY), TUESDAY_LABEL);
 
     expect(await screen.findByText("Carrots")).toBeInTheDocument();
+  });
+
+  it("says the boxes could not be loaded, not that there are no deliveries, and loads them on retry", async () => {
+    api.boxesMatrix.mockRejectedValueOnce(new Error("Network Error"));
+    renderPage();
+
+    expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
+    expect(screen.queryByText(NO_DELIVERIES)).not.toBeInTheDocument();
+    expect(downloadButton()).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "table.retry" }));
+
+    expect(await screen.findByText("Carrots")).toBeInTheDocument();
+    expect(screen.queryByText(LOAD_FAILED)).not.toBeInTheDocument();
   });
 });
 

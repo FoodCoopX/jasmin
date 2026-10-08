@@ -537,6 +537,19 @@ describe("ListCrates new crate", () => {
     expect(screen.queryByText(DUPLICATE_NAME)).not.toBeInTheDocument();
   });
 
+  it("refuses the name of a crate no longer used, though the list hides it", async () => {
+    const { user } = await renderLoaded();
+    expect(screen.queryByText("Wooden crate")).not.toBeInTheDocument();
+
+    await startNewRow(user);
+    await typeInto(user, NAME, "Wooden crate");
+    await typeInto(user, SHORT_NAME, "W2");
+    await saveRow(user);
+
+    expect(await screen.findByText(DUPLICATE_NAME)).toBeVisible();
+    expect(api.createCrate).not.toHaveBeenCalled();
+  });
+
   it("opens a new row with the + key", async () => {
     const { user } = await renderLoaded();
 

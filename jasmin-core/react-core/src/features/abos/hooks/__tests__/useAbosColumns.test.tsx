@@ -4,11 +4,14 @@
  * office only, so while the mode is on any Monday may be the start date.
  *
  * Boundary mocked: react-i18next, every hook the column factory reads and the
- * shared column / UI modules. The term hook records the options it receives.
+ * shared column / UI modules except the real ``LinkButton``. The term hook
+ * records the options it receives.
  */
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { render, renderHook, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -77,11 +80,12 @@ vi.mock("../columns/useSharedAboColumns", () => ({
 vi.mock("@shared/tables", () => ({
   adminConfirmationColumn: () => ({ key: "admin_confirmed" }),
 }));
-vi.mock("@shared/ui", () => ({
-  LinkButton: () => null,
-  StatusButton: () => null,
-  ToolTipIcon: () => null,
-}));
+vi.mock("@shared/ui", async () => {
+  const { LinkButton } = await vi.importActual<
+    typeof import("@shared/ui/ButtonLibrary")
+  >("@shared/ui/ButtonLibrary");
+  return { LinkButton, StatusButton: () => null, ToolTipIcon: () => null };
+});
 
 import { useAbosColumns } from "../columns/useAbosColumns";
 
@@ -155,5 +159,51 @@ describe("useAbosColumns payment cycle", () => {
     expect(disabled({ key: "abo-1", admin_confirmed: false })).toBe(false);
     expect(disabled({ key: "abo-1", admin_confirmed: true })).toBe(true);
     expect(disabled({ key: -1 })).toBe(false);
+  });
+});
+
+describe("useAbosColumns member link", () => {
+  function renderLinkCell(record: Record<string, unknown>) {
+    const column = renderColumns().result.current.columns.find(
+      (candidate: { key?: unknown }) => candidate.key === "link",
+    );
+    const renderCell = column?.render as (
+      value: unknown,
+      record: Record<string, unknown>,
+    ) => React.ReactNode;
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/abos"]}>
+        <Routes>
+          <Route path="/abos" element={<>{renderCell(undefined, record)}</>} />
+          <Route path="/members/members/:id" element={<p>Member page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    return { user };
+  }
+
+  it("opens the member of a saved abo", async () => {
+    const { user } = renderLinkCell({ key: "abo-1", member: "m-1" });
+
+    const link = screen.getByRole("link", { name: "members.view_details" });
+    expect(link).toHaveAttribute("href", "/members/members/m-1");
+    await user.click(link);
+
+    expect(screen.getByText("Member page")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["the new row", { key: -1, member: "m-1" }],
+    ["a row in edit", { key: "abo-1", member: "m-1", isEditing: true }],
+  ])("goes nowhere from %s", async (_, record) => {
+    const { user } = renderLinkCell(record);
+
+    const link = screen.getByText((__, element) => element?.tagName === "A");
+    expect(link).not.toHaveAttribute("href");
+    expect(link).toHaveAttribute("aria-disabled", "true");
+    await user.click(link);
+
+    expect(screen.queryByText("Member page")).not.toBeInTheDocument();
   });
 });

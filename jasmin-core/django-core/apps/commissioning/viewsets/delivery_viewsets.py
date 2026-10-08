@@ -215,7 +215,11 @@ class DeliveryStationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(is_active=is_active)
 
         if delivery_day is not None:
-            queryset = queryset.filter(deliverystationday__delivery_day=delivery_day)
+            # A superseded station day and its successor share the delivery
+            # day, so the join yields the station once per row.
+            queryset = queryset.filter(
+                deliverystationday__delivery_day=delivery_day
+            ).distinct()
 
         # Scope to the stations the member is subscribed to.
         if member is not None:

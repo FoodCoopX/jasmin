@@ -18,7 +18,7 @@ apps/commissioning/services/invoice_service.py: 1111
 apps/commissioning/services/offer_service.py: 1081
 apps/commissioning/services/order_content_service.py: 1121
 apps/commissioning/views/reseller_views.py: 1729
-apps/commissioning/views/stock_views.py: 1347
+apps/commissioning/views/stock_views.py: 1311
 apps/commissioning/viewsets/members_viewsets.py: 1850
 apps/commissioning/viewsets/resellers_viewsets.py: 1855
 apps/commissioning/viewsets/shares_viewsets.py: 2286

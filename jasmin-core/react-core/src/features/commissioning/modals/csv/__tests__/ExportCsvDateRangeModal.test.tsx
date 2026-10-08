@@ -308,7 +308,6 @@ describe("ExportCsvDateRangeModal", () => {
   });
 
   it("saves nothing and stays open with the range when the server refuses", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
     fetchCsv.mockRejectedValue(serverError());
     const { user, onClose } = renderPage();
     await openExport(user);
@@ -326,8 +325,7 @@ describe("ExportCsvDateRangeModal", () => {
     ]);
   });
 
-  it.skip("tells the office why the server refused the export", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("tells the office why the server refused the export", async () => {
     fetchCsv.mockRejectedValue(serverError());
     const { user } = renderPage();
     await openExport(user);

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { Button, Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,7 +14,7 @@ import {
   HistoryOutlined,
   StopOutlined,
 } from "@ant-design/icons";
-import { Link } from "react-router-dom";
+import { useHref, useLinkClickHandler } from "react-router-dom";
 
 type ButtonType = "default" | "primary" | "dashed" | "text" | "link";
 type ButtonSize = "small" | "middle" | "large";
@@ -246,18 +246,26 @@ interface LinkButtonProps {
   tooltip?: string;
   disabled?: boolean;
   showTooltip?: boolean;
+  onClick?: (event: MouseEvent<HTMLElement>) => void;
   [key: string]: unknown;
 }
 
+/** An icon-only link with the look of the library's buttons: AntD renders a
+ *  Button with an ``href`` as a single ``<a>``, which the router's click
+ *  handler turns into in-app navigation. Nesting a Button inside a router
+ *  ``Link`` would put interactive content inside interactive content. */
 export const LinkButton = ({
   variant = "view",
   to,
   tooltip,
   disabled = false,
   showTooltip = false,
+  onClick,
   ...props
 }: LinkButtonProps) => {
   const { t } = useTranslation();
+  const href = useHref(to);
+  const navigateOnClick = useLinkClickHandler<HTMLElement>(to);
   const config = BUTTON_CONFIGS[variant];
   if (!config) {
     console.warn(`Unknown link button variant: ${variant}`);
@@ -267,24 +275,25 @@ export const LinkButton = ({
   const { labelKey, ...buttonConfig } = config;
   const configLabel = t(labelKey);
 
-  // Icon-only button → give it an accessible name (see StatusButton).
-  const label = tooltip ?? configLabel;
+  // Icon-only → the link needs an accessible name (see StatusButton). An
+  // empty tooltip still falls back to the variant's label.
+  const label = tooltip || configLabel;
   const button = (
-    <Link to={to}>
-      <Button
-        {...buttonConfig}
-        disabled={disabled}
-        aria-label={label}
-        {...props}
-      />
-    </Link>
+    <Button
+      {...buttonConfig}
+      href={href}
+      disabled={disabled}
+      aria-label={label}
+      onClick={(event: MouseEvent<HTMLElement>) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) navigateOnClick(event);
+      }}
+      {...props}
+    />
   );
 
-  return showTooltip && (tooltip || configLabel) ? (
-    <Tooltip
-      title={tooltip || configLabel}
-      classNames={{ root: "custom-tooltip" }}
-    >
+  return showTooltip && label ? (
+    <Tooltip title={label} classNames={{ root: "custom-tooltip" }}>
       {button}
     </Tooltip>
   ) : (

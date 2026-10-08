@@ -189,10 +189,13 @@ export default function BackupModal({
       },
     ];
 
-    const renderBackupCell = (value: unknown) => {
+    // The amounts are counted in the backup's unit; a backup without its own
+    // unit takes the planned one.
+    const renderBackupCell = (value: unknown, record: TableRecord) => {
       const numValue = Number(value);
       if (isNaN(numValue) || numValue === 0) return "";
-      return formatAmountForUnit(numValue, data?.unit, format);
+      const unit = (record.backup_unit as string | null | undefined) || data?.unit;
+      return formatAmountForUnit(numValue, unit, format);
     };
     // Match the base table's size label (the dynamic commissioning.<size> key).
     const variationTitle = (variation: ShareTypeVariationOption): ReactNode =>

@@ -13,6 +13,7 @@ import datetime
 from decimal import Decimal
 
 import pytest
+import time_machine
 from django.db.models import Q, Sum
 from django.urls import reverse
 from rest_framework import status
@@ -36,6 +37,17 @@ from apps.commissioning.tests.factories import (
 from apps.commissioning.utils.iso_week_utils import make_noon_datetime
 
 YEAR, WEEK = 2026, 15
+
+
+@pytest.fixture(autouse=True)
+def _frozen_clock():
+    # The writes go to week 15 of 2026, which the documentation and stock
+    # count endpoints refuse once it lies more than a week back; on Monday of
+    # week 15 it is the current week.
+    with time_machine.travel(datetime.datetime(2026, 4, 6, 12, 0), tick=False):
+        yield
+
+
 PURCHASE_NOON = make_noon_datetime(YEAR, WEEK, PURCHASE_DAY)
 MONDAY_NOON = make_noon_datetime(YEAR, WEEK, 0)
 PURCHASE_URL = reverse("purchase-list")

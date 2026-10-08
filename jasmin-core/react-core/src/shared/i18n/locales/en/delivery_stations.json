@@ -36,6 +36,7 @@
   "contact_name": "Contact person",
   "contact_phone": "Contact phone",
   "photo_link": "Photo link",
+  "photo_link_hint": "Members see this link only while no photo is uploaded.",
   "self_service": "Self-service",
   "paste_maps_link": "Paste a Google Maps link or \"lat, lng\"",
   "paste_maps_link_placeholder": "https://maps.google.com/… or 48.2082, 16.3738",

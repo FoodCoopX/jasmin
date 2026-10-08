@@ -1,4 +1,4 @@
-import { Button, Select, message } from "antd";
+import { Button, Select } from "antd";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +25,7 @@ import {
   usePastelColorMap,
 } from "@shared/ui";
 import type { DndDragPayload, GridPos } from "@shared/ui";
+import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 
 dayjs.extend(isoWeek);
@@ -170,10 +171,17 @@ export default function WeeklyStaffPlan() {
     return map;
   }, [flatRows]);
 
-  const { mutate: save, isPending: isSaving } = useStaffWeeklyPlanCreate({
+  // The page reports a refused save itself, so the app-wide mutation toast
+  // stays silent.
+  const {
+    mutate: save,
+    isPending: isSaving,
+    isError: saveFailed,
+  } = useStaffWeeklyPlanCreate({
     mutation: {
+      meta: { silent: true },
       onError: (error) => {
-        message.error(getErrorMessage(error, t("staff.save_failed")));
+        notify.error(getErrorMessage(error, t("staff.save_failed")));
       },
     },
   });
@@ -246,7 +254,7 @@ export default function WeeklyStaffPlan() {
       // Enforce the one-per-category-per-day rule client-side: reject the drop
       // (leave the grid untouched) rather than create a duplicate.
       if (hasCategoryDayDuplicate(next)) {
-        message.warning(t("staff.already_in_category_that_day"));
+        notify.warning(t("staff.already_in_category_that_day"));
         return;
       }
 
@@ -294,15 +302,16 @@ export default function WeeklyStaffPlan() {
   const { mutate: copyWeek, isPending: isCopying } =
     useStaffWeeklyPlanCopyCreate({
       mutation: {
+        meta: { silent: true },
         onSuccess: () => {
-          message.success(t("staff.weekly_plan_copied_success"));
+          notify.success(t("staff.weekly_plan_copied_success"));
           queryClient.invalidateQueries({
             queryKey: getStaffWeeklyPlanGridRetrieveQueryKey(listParams),
           });
           gridRegionRef.current?.focus();
         },
         onError: (error) => {
-          message.error(
+          notify.error(
             getErrorMessage(error, t("staff.copy_target_not_empty")),
           );
         },
@@ -325,7 +334,11 @@ export default function WeeklyStaffPlan() {
   return (
     <>
       <h1>{t("staff.weekly_staff_plan")}</h1>
-      <AutoSaveIndicator saving={isSaving} hasChanges={false} />
+      <AutoSaveIndicator
+        saving={isSaving}
+        hasChanges={false}
+        failed={saveFailed}
+      />
       <WeekSelector
         selectedYear={selectedYear}
         setSelectedYear={setSelectedYear}
@@ -342,7 +355,7 @@ export default function WeeklyStaffPlan() {
                 size="small"
                 showSearch
                 optionFilterProp="label"
-                style={{ minWidth: "8em" }}
+                className="weekly-plan-copy-select"
                 placeholder={t("staff.copy_source_week")}
                 value={effectiveFromWeek ?? undefined}
                 onChange={(value) => setCopyFromWeek(value)}

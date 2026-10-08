@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { useVegetableSizeOptions, useUnitOptions } from "@hooks/index";
+import { useNumberFormat, useVegetableSizeOptions, useUnitOptions } from "@hooks/index";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
+import { formatAmountForUnit } from "@shared/utils";
 import {
   MOBILE_CARD_PLACEHOLDER,
   MobileCard,
@@ -10,6 +11,7 @@ import {
 } from "./primitives";
 import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
+import "./DocumentationMobileCard.css";
 
 interface DocumentationHarvestMobileCardProps {
   record: TableRecord;
@@ -26,11 +28,14 @@ export function DocumentationHarvestMobileCard({
   const { t } = useTranslation();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { getUnitLabel } = useUnitOptions();
+  const { format } = useNumberFormat();
 
   const articleName = recordText(record, "share_article_name");
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
   const unitLabel = getUnitLabel(record.unit as string);
-  const actualAmount = record.harvest_amount as number | null | undefined;
+  const unit = record.unit as string | undefined;
+  // A decimal string on the wire ("14.500").
+  const actualAmount = record.harvest_amount as string | number | null | undefined;
   const noteText = recordText(record, "note");
   const isFinalized = !!record.is_finalized;
 
@@ -49,14 +54,14 @@ export function DocumentationHarvestMobileCard({
           sizeLabel={sizeLabel}
           finalized={isFinalized}
         />
-        <div style={{ display: "flex", gap: 24, marginTop: 6 }}>
+        <div className="documentation-card-figures">
           {!isLongTermStorage && (
             <div>
               <div className="text-muted-xs">{t("commissioning.expected")}</div>
               <div className="flex-baseline">
-                <span style={{ fontWeight: 500, fontSize: "1.2em" }}>
+                <span className="documentation-card-amount">
                   {theoreticalAmount > 0
-                    ? theoreticalAmount
+                    ? formatAmountForUnit(theoreticalAmount, unit, format)
                     : MOBILE_CARD_PLACEHOLDER}
                 </span>
                 {unitLabel && <span className="text-secondary">{unitLabel}</span>}
@@ -67,16 +72,13 @@ export function DocumentationHarvestMobileCard({
             <div className="text-muted-xs">{t("commissioning.actual")}</div>
             <div className="flex-baseline">
               <span
-                style={{
-                  fontWeight: 600,
-                  fontSize: "1.2em",
-                  color:
-                    actualAmount != null && (actualAmount as number) > 0
-                      ? "var(--color-success-text)"
-                      : "var(--color-text-muted)",
-                }}
+                className={`documentation-card-amount is-actual${
+                  actualAmount != null && Number(actualAmount) > 0 ? " has-amount" : ""
+                }`}
               >
-                {actualAmount ?? MOBILE_CARD_PLACEHOLDER}
+                {actualAmount == null || actualAmount === ""
+                  ? MOBILE_CARD_PLACEHOLDER
+                  : formatAmountForUnit(Number(actualAmount), unit, format)}
               </span>
               {unitLabel && showActualUnit && (
                 <span className="text-secondary">{unitLabel}</span>

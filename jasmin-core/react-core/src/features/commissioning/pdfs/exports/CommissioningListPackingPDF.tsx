@@ -56,6 +56,8 @@ export interface CommissioningListPackingPDFProps {
   groups: PackingListGroup[];
   year: number;
   week: number | null;
+  /** The delivery day the list packs for, e.g. "Dienstag". */
+  dayName: string;
   /** Hide the size column when the tenant's ``show_size_column`` is off. */
   showSize?: boolean;
   t: TFunction;
@@ -96,6 +98,7 @@ const CommissioningListPackingPDF = ({
   groups,
   year,
   week,
+  dayName,
   showSize = true,
   t,
 }: CommissioningListPackingPDFProps) => {
@@ -107,6 +110,7 @@ const CommissioningListPackingPDF = ({
         <ListPDFHeader pill={t("commissioning.commissioning_list_packing")}>
           <Text style={listStyles.title}>
             {t("commissioning.KW")} {week}/{year}
+            {dayName && ` · ${dayName}`}
           </Text>
         </ListPDFHeader>
 

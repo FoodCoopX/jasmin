@@ -558,6 +558,55 @@ describe("BackupModal contents", () => {
     });
   });
 
+  it("shows a backup by the kilo for a row planned in pieces at the kilo's precision", async () => {
+    const kohlrabi = planningRow({
+      share_article: "art-kohlrabi",
+      unit: "PCS",
+      size: "L",
+      backup_share_article: "art-carrot",
+      backup_share_article_name: "Carrots",
+      backup_unit: "KG",
+      backup_size: "M",
+      [backupKey("sdd-tue", "var-small")]: "0.750",
+      [backupKey("sdd-tue", "var-large")]: "1.250",
+    });
+    await renderOpen(kohlrabi);
+
+    expect(amountCell(TUE, SMALL)).toHaveTextContent(/^0,75$/);
+    expect(amountCell(TUE, LARGE)).toHaveTextContent(/^1,25$/);
+  });
+
+  it("shows a backup in pieces for a row planned by the kilo at the pieces' precision", async () => {
+    const carrots = planningRow({
+      share_article: "art-carrot",
+      unit: "KG",
+      size: "M",
+      backup_share_article: "art-lettuce",
+      backup_share_article_name: "Lettuce",
+      backup_unit: "PCS",
+      backup_size: "M",
+      [backupKey("sdd-tue", "var-small")]: "2.000",
+    });
+    await renderOpen(carrots);
+
+    expect(amountCell(TUE, SMALL)).toHaveTextContent(/^2,0$/);
+  });
+
+  it("shows a backup without its own unit in the planned unit", async () => {
+    const kohlrabi = planningRow({
+      share_article: "art-kohlrabi",
+      unit: "PCS",
+      size: "L",
+      backup_share_article: "art-lettuce",
+      backup_share_article_name: "Lettuce",
+      backup_unit: null,
+      [backupKey("sdd-tue", "var-small")]: "1.500",
+    });
+    await renderOpen(kohlrabi);
+
+    expect(amountCell(TUE, SMALL)).toHaveTextContent(/^1,5$/);
+  });
+
   it("settles after opening instead of re-rendering in a loop", async () => {
     const { profiler } = await renderOpen();
     await act(() => flushMicrotasks());

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useVegetableSizeOptions, useUnitOptions } from "@hooks/index";
+import { useNumberFormat, useVegetableSizeOptions, useUnitOptions } from "@hooks/index";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
 import {
   MOBILE_CARD_PLACEHOLDER,
@@ -11,6 +11,7 @@ import {
 } from "./primitives";
 import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
+import "./DocumentationMobileCard.css";
 
 interface DocumentationCurrentStockMobileCardProps {
   record: TableRecord;
@@ -25,6 +26,12 @@ export function DocumentationCurrentStockMobileCard({
   const { t } = useTranslation();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { getUnitLabel } = useUnitOptions();
+  const { format } = useNumberFormat();
+  // Whole units, as the current-stock table shows them.
+  const stockText = (value: number | string | null | undefined) =>
+    value == null || value === ""
+      ? MOBILE_CARD_PLACEHOLDER
+      : format(Number(value), 0);
 
   const articleName = recordText(record, "share_article_name");
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
@@ -52,12 +59,12 @@ export function DocumentationCurrentStockMobileCard({
           sizeLabel={sizeLabel}
           finalized={isFinalized}
         />
-        <div style={{ display: "flex", gap: 24, marginTop: 6 }}>
+        <div className="documentation-card-figures">
           <div>
             <div className="text-muted-xs">{t("commissioning.expected")}</div>
             <div className="flex-baseline">
-              <span style={{ fontWeight: 500, fontSize: "1.2em" }}>
-                {expectedStock ?? MOBILE_CARD_PLACEHOLDER}
+              <span className="documentation-card-amount">
+                {stockText(expectedStock)}
               </span>
               {unitLabel && <span className="text-secondary">{unitLabel}</span>}
             </div>
@@ -66,16 +73,11 @@ export function DocumentationCurrentStockMobileCard({
             <div className="text-muted-xs">{t("commissioning.actual")}</div>
             <div className="flex-baseline">
               <span
-                style={{
-                  fontWeight: 600,
-                  fontSize: "1.2em",
-                  color:
-                    actualStock != null && actualStock > 0
-                      ? "var(--color-success-text)"
-                      : "var(--color-text-muted)",
-                }}
+                className={`documentation-card-amount is-actual${
+                  actualStock != null && actualStock > 0 ? " has-amount" : ""
+                }`}
               >
-                {actualStock ?? MOBILE_CARD_PLACEHOLDER}
+                {stockText(actualStock)}
               </span>
               {unitLabel && showActualUnit && (
                 <span className="text-secondary">{unitLabel}</span>

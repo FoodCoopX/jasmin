@@ -797,6 +797,14 @@ describe("PackingListBulk downloads", () => {
         "var-small": 0.5,
       }),
     ]);
+    // Each share size's amount prints at its unit's precision in the farm's
+    // number format, as the box list prints its cells; no amount stays blank.
+    const cellText = props.cellText as (value: unknown, item: Record<string, unknown>) => string;
+    const [carrots] = props.data as Record<string, unknown>[];
+    expect(cellText(carrots["var-small"], carrots)).toBe("0,50");
+    expect(cellText(3, { ...carrots, unit: "PCS" })).toBe("3,0");
+    expect(cellText(0, carrots)).toBe("");
+    expect(cellText(null, carrots)).toBe("");
   });
 
   it("says there is nothing to pack and keeps both downloads disabled", async () => {

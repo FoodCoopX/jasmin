@@ -1,0 +1,6 @@
+/* The amount to wash, under the article title of a washing phone card. */
+.washing-card-amount {
+  font-size: 0.9em;
+  margin-top: 2px;
+  font-weight: 600;
+}

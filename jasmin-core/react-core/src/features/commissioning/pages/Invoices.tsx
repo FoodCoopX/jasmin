@@ -35,6 +35,7 @@ import StornoInvoiceModal from "@features/commissioning/modals/StornoInvoiceModa
 // PDF chunk out of Invoices.tsx's eager bundle.
 import { InvoicePDFButtons } from "@features/commissioning/pdfs";
 import { generateAndUploadInvoicePDF } from "@features/commissioning/pdfs/forResellers/generateInvoicePDF";
+import { uploadPdfsWarningOnFailure } from "@features/commissioning/pdfs/forResellers/uploadPdfsWarningOnFailure";
 import DeliveryNotePDFButtons from "@features/commissioning/pdfs/forResellers/DeliveryNotePDFButtons";
 import { ResellerSelector, YearSelector } from "@shared/selectors";
 import { generatePdfFilename, notify } from "@shared/utils";
@@ -168,23 +169,20 @@ export default function Invoices() {
         return;
       }
 
-      for (const id of invoiceIds) {
-        try {
-          await generateAndUploadInvoicePDF(
-            id,
-            t,
-            tenant as Record<string, unknown>,
-            getSetting,
-            logoUrl,
-            bioLogoUrl,
-          );
-        } catch (err) {
-          console.error(
-            `[FINALIZE] PDF generation FAILED for invoice ${id}:`,
-            err,
-          );
-        }
-      }
+      await uploadPdfsWarningOnFailure(
+        invoiceIds.map(
+          (id) => () =>
+            generateAndUploadInvoicePDF(
+              id,
+              t,
+              tenant as Record<string, unknown>,
+              getSetting,
+              logoUrl,
+              bioLogoUrl,
+            ),
+        ),
+        t,
+      );
 
       invalidateData();
     },
@@ -336,11 +334,10 @@ export default function Invoices() {
               logoUrl,
               bioLogoUrl,
             );
-          } catch (err) {
+          } catch {
             // The storno itself was created + finalized (legal cancellation
             // is done) — only the PDF/e-invoice generation failed. Tell the
             // office so they can regenerate it rather than assume it's there.
-            console.error("Failed to generate storno PDF:", err);
             notify.warning(t("commissioning.storno_pdf_failed"));
           }
         }
@@ -349,7 +346,6 @@ export default function Invoices() {
       } catch (err) {
         // Surface the backend's domain error (e.g. "invoice cannot be
         // cancelled") instead of failing silently with the modal still open.
-        console.error("Failed to create storno:", err);
         notify.error(getErrorMessage(err, t("commissioning.storno_failed")));
       }
     },

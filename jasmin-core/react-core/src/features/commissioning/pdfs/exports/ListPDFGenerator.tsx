@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { ComponentType } from "react";
 import { Button } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
-import { downloadBlob } from "@shared/utils";
+import { useTranslation } from "react-i18next";
+import { downloadBlob, notify } from "@shared/utils";
 
 /**
  * Click-to-load list-PDF download button.
@@ -49,6 +50,7 @@ export default function ListPDFGenerator<T, DocProps extends object>({
   documentLoader,
   documentProps,
 }: ListPDFGeneratorProps<T, DocProps>) {
+  const { t } = useTranslation();
   const [generating, setGenerating] = useState(false);
 
   // Disable the button when there's nothing to export. ``data`` is the
@@ -71,8 +73,8 @@ export default function ListPDFGenerator<T, DocProps extends object>({
       const blob = await pdf(<Document {...documentProps} />).toBlob();
 
       downloadBlob(blob, `${filename}.pdf`);
-    } catch (error) {
-      console.error("PDF generation error:", error);
+    } catch {
+      notify.error(t("common.error_exporting"));
     } finally {
       setGenerating(false);
     }

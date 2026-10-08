@@ -247,6 +247,7 @@ vi.mock("@shared/tables", async () => {
   };
 });
 
+import { generateAndUploadInvoicePDF } from "@features/commissioning/pdfs/forResellers/generateInvoicePDF";
 import Invoices from "../Invoices";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -406,6 +407,40 @@ describe("bulk send by email", () => {
   });
 });
 
+describe("bulk finalize", () => {
+  it("says how many invoice PDFs could not be generated", async () => {
+    ordersOverviewHookMock.mockReturnValue({
+      data: [
+        makeRow({ has_finalized_invoice: false, invoice_is_finalized: false }),
+      ],
+      refetch: vi.fn(),
+    });
+    bulkFinalizeMock.mockResolvedValue({
+      results: [
+        { success: true, invoice_id: "inv-42" },
+        { success: true, invoice_id: "inv-43" },
+      ],
+    });
+    vi.mocked(generateAndUploadInvoicePDF).mockClear();
+    vi.mocked(generateAndUploadInvoicePDF).mockRejectedValueOnce(
+      new Error("render failed"),
+    );
+    renderPage();
+
+    await userEvent.click(screen.getByText("select-all"));
+    await userEvent.click(
+      screen.getByTestId("bulk-commissioning.finalize_invoices"),
+    );
+
+    await waitFor(() => {
+      expect(notifyMock.warning).toHaveBeenCalledWith(
+        "commissioning.pdf_generation_failed",
+      );
+    });
+    expect(generateAndUploadInvoicePDF).toHaveBeenCalledTimes(2);
+  });
+});
+
 // ── Storno happy path ───────────────────────────────────────────────────────
 
 describe("storno flow", () => {
@@ -480,10 +515,6 @@ describe("storno flow", () => {
         data: { code: "CircularStornoChain", message: "circular reference" },
       },
     });
-    // The catch path uses console.error — silence it so the test output
-    // stays clean.
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     renderPage();
     await userEvent.click(
       within(screen.getByTestId("row-actions")).getByText("commissioning.create_storno"),
@@ -504,7 +535,5 @@ describe("storno flow", () => {
     await waitFor(() => {
       expect(notifyMock.error).toHaveBeenCalled();
     });
-
-    consoleSpy.mockRestore();
   });
 });

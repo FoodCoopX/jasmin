@@ -1,6 +1,6 @@
 Viewset Tests Overview
 ======================
-1166 tests | 209 test classes | 38 files
+1192 tests | 229 test classes | 41 files
 Run: poetry run pytest apps/commissioning/tests/tests_viewsets/ --no-header --tb=short -q
 
 Counts are collected cases, so a parametrized method counts once per case.
@@ -81,7 +81,7 @@ test_consents_viewsets.py (55 tests) — DSGVO-critical access matrix
                                                sha unchanged; unchanged values → 200; draft edit → 200 +
                                                stored PDF re-rendered
 
-test_coop_share_amount_and_confirmed_lock.py (17 tests) — coop-share amount rule, confirmed-share edit lock, kept share value
+test_coop_share_amount_and_confirmed_lock.py (19 tests) — coop-share amount rule, confirmed-share edit lock, kept share value
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   TestOfficeCoopShareAmount                6   office create -2 / 0 / 2.5 → 400 coop_share.invalid_amount;
                                                whole amount 201; PATCH to a fractional amount → 400;
@@ -94,6 +94,8 @@ test_coop_share_amount_and_confirmed_lock.py (17 tests) — coop-share amount ru
                                                committed after load still locks (row re-read under lock)
   TestCoopShareUpdateBoundsLock            2   update takes the per-member coop_share_bounds advisory lock;
                                                reassignment locks both members in sorted order
+  TestDepartedMemberShares                 2   a departed member's cancelled shares stay editable for the
+                                               payback date and note through the same grid
 
 test_coop_share_transfer.py (50 tests) — office coop share transfer between members as ledger rows, and undoing one (frozen clock)
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -191,14 +193,19 @@ test_delivery_station_pii_exposure.py (4 tests)
   TestDeliveryStationMemberExposure        4   neither a member nor staff ever receives a station's IBAN; a
                                                member reads the door code of their own station only
 
+test_delivery_station_photo_link.py (3 tests)
+─────────────────────────────────────────────
+  TestDeliveryStationPhotoLink             3   the office sets a photo link and clears it with "" or null
+
 test_delivery_station_query_count.py (1 test)
 ─────────────────────────────────────────────
   (module-level)                           1   delivery-station list is scale-invariant
 
-test_delivery_viewsets.py (51 tests)
+test_delivery_viewsets.py (52 tests)
 ────────────────────────────────────
-  TestDeliveryStationViewSet               8   list, is_active filter, retrieve, can_be_deleted, filter by
-                                               member (confirmed subscriptions only), member-role read
+  TestDeliveryStationViewSet               9   list, is_active filter, retrieve, can_be_deleted, filter by
+                                               member (confirmed subscriptions only), filter by delivery
+                                               day lists a superseded station once, member-role read
   TestDeliveryStationDayViewSet           18   list, filter by station / day / member, capacity by week,
                                                a member cannot query another member's station-days,
                                                tour_assignment_missing for a station day on no tour,
@@ -219,6 +226,17 @@ test_delivery_viewsets.py (51 tests)
                                                needs a fresh step-up claim (a linked reseller shares the
                                                ContactEntity); resending the stored IBAN, other edits and no or a
                                                blank IBAN prompt for nothing
+
+test_documentation_past_week_guard.py (15 tests)
+────────────────────────────────────────────────
+  Clock frozen on Monday of week 41/2026: week 39 is read-only, week 40 the grace week.
+  TestHarvestPastWeek                      7   create / update / delete / bulk set-as-expected in a read-only
+                                               week → 409 commissioning.past_week, writes nothing; moving a
+                                               row into one is refused; the grace week still creates and updates
+  TestPurchasePastWeek                     5   create / update / delete / bulk set-as-expected in a read-only
+                                               week → 409; the grace week still creates
+  TestAdditionalTheoreticalPastWeek        3   add in a read-only week → 409, in the grace week → 201; an
+                                               update of an entry in a read-only week → 409
 
 test_documentation_viewsets.py (67 tests)
 ─────────────────────────────────────────
@@ -436,6 +454,15 @@ test_picture_upload_validation.py (37 tests) — picture uploads must be raster 
                                                unconverted keeps it; EXIF orientation applied + EXIF dropped;
                                                P-mode PNG/GIF transparency kept; 16-bit PNG kept
 
+test_planning_share_option_scope.py (13 tests) — a planning row is one share option's slot (frozen clock)
+──────────────────────────────────────────────────────────────────────────────────────────────────────
+  TestWeeklyPlanning                       8   saving, clearing, deleting, backing up and finalizing one
+                                               option's row leaves the same article's row in another
+                                               option untouched; a save carrying another option's amounts
+                                               is refused; legacy ids still accepted
+  TestStockOnlyRows                        1   a stock-only row names its share option
+  TestLongTermPlanning                     4   each option's long-term plan is listed and saved on its own
+
 test_query_param_contract.py (19 tests) — documented required vs. what the server needs
 ───────────────────────────────────────────────────────────────────────────────────────
   TestDocumentedQueryParamContract        17   the six scoped operations (orders_overview, default share
@@ -532,17 +559,24 @@ test_server_owned_field_locks.py (34 tests) — generic writes cannot set server
                                                (SharesDayChangeService owns them); create still sets every
                                                weekday
 
+test_share_day_bulk_update_rules.py (4 tests) — share days bulk_update (frozen clock)
+───────────────────────────────────────────────────────────────────────────────────
+  TestClearingAShareDay                    3   a cleared moved delivery day (null or "") undoes the move; a
+                                               blank work day falls back to the delivery day's default
+  TestWeekBegunInLocalTime                 1   a week is refused from local midnight on its Monday, while UTC
+                                               still reads Sunday
+
 test_shares_delivery_day_query_count.py (1 test)
 ────────────────────────────────────────────────
   (module-level)                           1   list can_be_deleted matches the per-instance answer
 
-test_shares_viewsets.py (144 tests)
+test_shares_viewsets.py (145 tests)
 ───────────────────────────────────
   TestShareTypeViewSet                    16   list, include_future (current + upcoming, not past), variation
                                                sizes and validity bounds, deletability, filter share_option
                                                (any casing), create/update uppercase, invalid 400, non-string
                                                share_option 400 on create and update
-  TestShareTypeVariationViewSet           17   list, active trial price, subscription validity bounds,
+  TestShareTypeVariationViewSet           18   list, active trial price, subscription validity bounds,
                                                include_future, create inside / outside the share type's range,
                                                filters (share_type, physical, internal_name)
   TestShareTypeVariationGrossPriceViewSet  4   list, filter by variation, not deletable when subscribed

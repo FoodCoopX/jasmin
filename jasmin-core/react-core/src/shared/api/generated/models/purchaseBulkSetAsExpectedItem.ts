@@ -8,7 +8,15 @@
 
 export interface PurchaseBulkSetAsExpectedItem {
   id: string;
+  /**
+   * @minimum 1900
+   * @maximum 2100
+   */
   year: number;
+  /**
+   * @minimum 1
+   * @maximum 53
+   */
   delivery_week: number;
   /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */
   theoretical_purchase_amount: string;

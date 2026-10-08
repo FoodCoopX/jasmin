@@ -3,11 +3,11 @@
   padding: 8px 12px;
   margin-top: 12px;
   margin-bottom: 4px;
-  background-color: #eaf6dc;
+  background-color: var(--color-plot-header-bg);
   border-radius: 6px;
   font-weight: 600;
   font-size: 0.95em;
-  color: #3a5a1c;
+  color: var(--color-plot-header-text);
 }
 
 /* Bed number badge in the top-right corner of a harvest card. */

@@ -69,4 +69,22 @@ describe("AutoSaveIndicator", () => {
     rerender(<AutoSaveIndicator saving={false} hasChanges={true} />);
     expect(screen.queryByText("settings.saved")).not.toBeInTheDocument();
   });
+
+  it("says the save failed instead of 'Saved', until the next save starts", () => {
+    const { rerender } = render(
+      <AutoSaveIndicator saving={true} hasChanges={false} />,
+    );
+    rerender(<AutoSaveIndicator saving={false} hasChanges={false} failed />);
+    expect(screen.getByText("common.error_saving")).toBeInTheDocument();
+    expect(screen.queryByText("settings.saved")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.getByText("common.error_saving")).toBeInTheDocument();
+
+    rerender(<AutoSaveIndicator saving={true} hasChanges={false} />);
+    expect(screen.queryByText("common.error_saving")).not.toBeInTheDocument();
+    expect(screen.getByText("settings.saving")).toBeInTheDocument();
+  });
 });

@@ -13,7 +13,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ActiveShareOptions, Crate, ShareArticle, ShareOptionItem } from "@shared/api/generated/models";
+import type { ShareArticle } from "@shared/api/generated/models";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
@@ -139,94 +139,15 @@ vi.mock("@shared/ui/DownloadCsvTemplateButton", () => ({
 }));
 
 import ListShareArticles from "../ListShareArticles";
+import {
+  ACTIVE_SHARE_OPTIONS, APPLES, article, asListed, BLANK_ARTICLE, CARROTS, CRATES, EURO_CRATE, FOREST_HONEY,
+  HARVEST_BIN, httpError, LEMONS, LEMONS_NAME, optionFields, PURCHASED_SUFFIX, RADISHES, SHARE_OPTIONS,
+} from "./listShareArticles.fixtures";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-const SHARE_OPTION_VALUES = [
-  "HARVEST_SHARE", "HARVEST_SHARE_FRUIT", "CHICKEN_SHARE", "HONEY_SHARE", "OIL_SHARE", "GRAIN_SHARE", "BREAD_SHARE",
-];
-const SHARE_OPTIONS: ShareOptionItem[] = SHARE_OPTION_VALUES.map((value) => ({ value, label: value }));
-// The farm runs vegetable and honey shares, no fruit share and none of the rest.
-const ACTIVE_SHARE_OPTIONS: ActiveShareOptions = {
-  HARVEST_SHARE: true, HARVEST_SHARE_FRUIT: false, CHICKEN_SHARE: false, HONEY_SHARE: true,
-  OIL_SHARE: false, GRAIN_SHARE: false, BREAD_SHARE: false, fruit_and_veg_shares_are_separate: false,
-};
-
-const EURO_CRATE: Crate = { id: "crate-e2", name: "Euro crate E2", short_name: "E2", is_active: true };
-// Without a short name, so it goes by its full name.
-const HARVEST_BIN: Crate = { id: "crate-bin", name: "Harvest bin", short_name: null, is_active: true };
-const CRATES = [EURO_CRATE, HARVEST_BIN];
-
-const optionFields = (options: string[]) => ({
-  share_option: options[0] ?? null, share_option2: options[1] ?? null, share_option3: options[2] ?? null,
-});
-
-/** An article as the data list carries it: one flag per share option, and the
- *  short names of its crates. */
-function asListed(fields: Row): ShareArticle {
-  const options = [fields.share_option, fields.share_option2, fields.share_option3];
-  const shortName = (id: unknown) => CRATES.find((crate) => crate.id === id)?.short_name ?? null;
-  return {
-    ...fields,
-    ...Object.fromEntries(SHARE_OPTION_VALUES.map((value) => [value.toLowerCase(), options.includes(value)])),
-    default_crate_harvest_name: shortName(fields.default_crate_harvest),
-    default_crate_reseller_name: shortName(fields.default_crate_reseller),
-  } as ShareArticle;
-}
-
-const BLANK_ARTICLE: Row = {
-  is_active: true, is_extra: false, article_number: null, description: null, is_purchased: false,
-  is_sold_to_resellers: false, for_markets: false, organic_status: "conventional", default_movement_unit: "KG",
-  default_commissioning_unit: null, kg_per_piece_S: null, kg_per_piece_M: null, kg_per_piece_L: null,
-  pieces_per_kg_S: null, pieces_per_kg_M: null, pieces_per_kg_L: null, default_packing_station: null,
-  percentage_added_to_bulk_packing_list: null, percentage_added_to_commissioning_list_packing: 0,
-  default_kg_per_pu_harvest: null, default_pieces_per_pu_harvest: null, default_bunches_per_pu_harvest: null,
-  default_kg_per_pu_reseller: null, default_pieces_per_pu_reseller: null, default_bunches_per_pu_reseller: null,
-  default_kg_per_pu_purchase: null, default_pieces_per_pu_purchase: null, default_bunches_per_pu_purchase: null,
-  default_crate_harvest: null, default_crate_reseller: null, can_be_deleted: true,
-};
-
-const article = (id: string, name: string, options: string[], fields: Row = {}) =>
-  asListed({ ...BLANK_ARTICLE, id, name, ...optionFields(options), ...fields });
-
-// What the page appends to the name of an article the farm buys in.
-const PURCHASED_SUFFIX = "commissioning.purchased_name_suffix";
-const LEMONS_NAME = `Lemons ${PURCHASED_SUFFIX}`;
-
-// In the vegetable share and in the fruit share, which the farm doesn't run now.
-const APPLES = article("article-apples", "Apples", ["HARVEST_SHARE", "HARVEST_SHARE_FRUIT"], {
-  kg_per_piece_M: "0.200",
-});
-// Planned into shares already, so the backend protects it.
-const CARROTS = article("article-carrots", "Carrots", ["HARVEST_SHARE"], {
-  article_number: "A-100", description: "Washed, with greens", organic_status: "organic",
-  is_sold_to_resellers: true, for_markets: true, can_be_deleted: false,
-  kg_per_piece_S: "0.080", kg_per_piece_M: "0.150", kg_per_piece_L: "0.250", pieces_per_kg_M: "7.000",
-  default_packing_station: 2, percentage_added_to_bulk_packing_list: 10,
-  percentage_added_to_commissioning_list_packing: 5, default_kg_per_pu_harvest: "12.500",
-  default_crate_harvest: EURO_CRATE.id, default_commissioning_unit: "KG",
-  default_kg_per_pu_reseller: "10.000", default_crate_reseller: HARVEST_BIN.id,
-});
-const FOREST_HONEY = article("article-honey", "Forest honey", ["HONEY_SHARE"], {
-  default_movement_unit: "PCS", is_sold_to_resellers: true,
-});
-// Bought in; still carries the harvest values from before it was.
-const LEMONS = article("article-lemons", LEMONS_NAME, ["HARVEST_SHARE"], {
-  is_purchased: true, organic_status: "in_conversion", default_kg_per_pu_purchase: "15.000",
-  default_pieces_per_pu_purchase: "80.000", default_kg_per_pu_harvest: "9.000",
-  default_crate_harvest: EURO_CRATE.id,
-});
-// No longer grown.
-const RADISHES = article("article-radishes", "Radishes", ["HARVEST_SHARE"], {
-  default_movement_unit: "BUNCH", is_active: false,
-});
-
 // What the server currently holds; the list requests answer from it.
 let serverArticles: ShareArticle[] = [];
-
-/** A rejected request as axios hands it over, carrying the server's body. */
-const httpError = (status: number, data: Row) =>
-  Object.assign(new Error(`Request failed with status ${status}`), { isAxiosError: true, response: { status, data } });
 
 beforeEach(() => {
   auth.roles = ["office"];
@@ -629,8 +550,32 @@ describe("ListShareArticles new article", () => {
     await saveRow(user);
 
     await createdOnce();
-    expect(created()?.share_option_list).toContain("HONEY_SHARE");
+    expect(created()?.share_option_list).toEqual(["HONEY_SHARE"]);
     expect(flag(await waitFor(() => rowOf("Acacia honey")), HONEY_SHARE)).toBeChecked();
+  });
+
+  it("puts a new article into no share option on a farm without a vegetable share", async () => {
+    api.activeShareOptions.mockImplementation(async () => ({ ...ACTIVE_SHARE_OPTIONS, HARVEST_SHARE: false }));
+    const { user } = await renderLoaded();
+
+    await startNewArticle(user, "Acacia honey", PIECES);
+    expect(editCheckbox(VEG_SHARE)).not.toBeInTheDocument();
+    expect(editCheckbox(HONEY_SHARE)).not.toBeChecked();
+    await saveRow(user);
+
+    await createdOnce();
+    expect(created()?.share_option_list).toEqual([]);
+  });
+
+  it("refuses a new article repeating one hidden as inactive", async () => {
+    const { user } = await renderLoaded();
+    expect(screen.queryByText("Radishes")).not.toBeInTheDocument();
+
+    await startNewArticle(user, "Radishes", "commissioning.units.bunch");
+    await saveRow(user);
+
+    expect(await screen.findByText(DUPLICATE)).toBeVisible();
+    expect(api.createArticle).not.toHaveBeenCalled();
   });
 
   it("starts a new article with the farm's surcharge for the bulk packing list", async () => {
@@ -805,17 +750,12 @@ describe("ListShareArticles prices", () => {
     expect(screen.getByRole("dialog", { name: "Prices" })).toHaveTextContent(lemonPrices);
   });
 
-  it.each(["gardener", "staff", "management"])("opens no prices for the %s, who doesn't manage them", async (role) => {
+  it.each(["gardener", "staff", "management"])("offers no prices to the %s, who doesn't manage them", async (role) => {
     auth.roles = [role];
-    const { user } = await renderLoaded();
+    await renderLoaded();
 
-    // Whether these roles see the button at all is the page's call; no price
-    // editor may open for them either way.
-    const priceButton = within(rowOf("Carrots")).queryByRole("button", { name: "commissioning.prices" });
-    if (priceButton) await user.click(priceButton);
-
+    expect(screen.queryByRole("button", { name: "commissioning.prices" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Prices" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "table.save" })).not.toBeInTheDocument();
   });
 });
 

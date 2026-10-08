@@ -4,7 +4,8 @@ import type { Dayjs } from "dayjs";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, useDateRangePresets } from "@hooks/index";
-import { downloadCsvBlob, toApiDate } from "@shared/utils";
+import { downloadCsvBlob, notify, toApiDate } from "@shared/utils";
+import { getErrorMessage } from "@shared/utils/apiError";
 
 const { RangePicker } = DatePicker;
 
@@ -81,12 +82,12 @@ export default function ExportCsvDateRangeModal({
       downloadCsvBlob(csvData as BlobPart, filename);
       onClose();
     } catch (error) {
-      console.error("Export failed:", error);
+      // A plain call, not a mutation: the app-wide mutation toast never sees it.
+      notify.error(getErrorMessage(error, t("common.error_exporting")));
     } finally {
       setLoading(false);
     }
-  }, [dateRange, optionState, fetchCsv, filenamePrefix, options, onClose]);
-
+  }, [dateRange, optionState, fetchCsv, filenamePrefix, options, onClose, t]);
 
   const handleClose = useCallback(() => {
     setDateRange(null);

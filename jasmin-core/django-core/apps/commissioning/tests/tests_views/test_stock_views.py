@@ -6,6 +6,7 @@ import datetime
 from decimal import Decimal
 
 import pytest
+import time_machine
 from django.urls import reverse
 from rest_framework import status
 
@@ -25,6 +26,15 @@ URL_BULK_FINALIZE = reverse("bulk_finalize_current_stock")
 URL_BULK_EXPECTED = reverse("bulk_set_as_expected_current_stock")
 URL_BULK_ZERO = reverse("bulk_set_to_zero_current_stock")
 URL_STORAGE_LOGGING = reverse("storage_logging")
+
+
+@pytest.fixture(autouse=True)
+def _frozen_clock():
+    # The writes go to week 15 of 2026, which the documentation and stock
+    # count endpoints refuse once it lies more than a week back; on Monday of
+    # week 15 it is the current week.
+    with time_machine.travel(datetime.datetime(2026, 4, 6, 12, 0), tick=False):
+        yield
 
 
 def _make_composite_id(article, unit, size, storage, year=2026, week=15, day_number=1):

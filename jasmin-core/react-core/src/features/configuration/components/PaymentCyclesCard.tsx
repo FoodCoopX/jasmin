@@ -44,7 +44,6 @@ export default function PaymentCyclesCard() {
           queryKey: getCommissioningPaymentCyclesListQueryKey(),
         });
       } catch (error) {
-        console.error("Failed to update payment cycle:", error);
         notify.error(
           getErrorMessage(error, t("configuration.payment_cycle_toggle_error")),
         );

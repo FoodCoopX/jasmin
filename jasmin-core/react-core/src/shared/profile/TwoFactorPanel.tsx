@@ -16,7 +16,6 @@ import {
   Card,
   Form,
   Input,
-  message,
   Space,
   Spin,
   Steps,
@@ -32,6 +31,7 @@ import {
   authTwoFactorRecoveryCodesRegenerateCreate,
   useAuthTwoFactorStatusRetrieve,
 } from "@shared/api/generated/auth-—-two-factor/auth-—-two-factor";
+import { notify } from "@shared/utils";
 
 const { Paragraph, Text } = Typography;
 
@@ -68,7 +68,7 @@ export default function TwoFactorPanel() {
     }
     QRCode.toDataURL(provisioningUri, { width: 256, margin: 2 })
       .then(setQrDataUrl)
-      .catch(() => message.error(t("profile.two_factor.error_render_qr")));
+      .catch(() => notify.error(t("profile.two_factor.error_render_qr")));
   }, [provisioningUri, t]);
 
   // ----- Enrolment wizard ------------------------------------------------
@@ -83,7 +83,7 @@ export default function TwoFactorPanel() {
       setConfirmCode("");
       setRecoveryCodes(null);
     } catch {
-      message.error(t("profile.two_factor.error_enroll_start"));
+      notify.error(t("profile.two_factor.error_enroll_start"));
     }
   };
 
@@ -97,7 +97,7 @@ export default function TwoFactorPanel() {
       setEnrolStep(2);
       await refetchStatus();
     } catch {
-      message.error(t("profile.two_factor.error_enroll_confirm"));
+      notify.error(t("profile.two_factor.error_enroll_confirm"));
     }
   };
 
@@ -119,9 +119,9 @@ export default function TwoFactorPanel() {
       setActionCode("");
       setRecoveryCodes(null);
       await refetchStatus();
-      message.success(t("profile.two_factor.disabled"));
+      notify.success(t("profile.two_factor.disabled"));
     } catch {
-      message.error(t("profile.two_factor.error_disable"));
+      notify.error(t("profile.two_factor.error_disable"));
     }
   };
 
@@ -135,13 +135,13 @@ export default function TwoFactorPanel() {
       setActionCode("");
       await refetchStatus();
     } catch {
-      message.error(t("profile.two_factor.error_regenerate"));
+      notify.error(t("profile.two_factor.error_regenerate"));
     }
   };
 
   const copyToClipboard = (text: string) => {
     void navigator.clipboard.writeText(text);
-    message.success(t("common.copied"));
+    notify.success(t("common.copied"));
   };
 
   // ----- Render ---------------------------------------------------------

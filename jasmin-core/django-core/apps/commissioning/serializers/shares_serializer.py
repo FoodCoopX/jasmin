@@ -596,14 +596,14 @@ class ShareSerializer(ReadOnlyOnUpdateMixin, serializers.ModelSerializer):
 class _ShareDayNumberField(serializers.IntegerField):
     """A weekday slot on ``Share`` — Monday (0) … Sunday (6), or cleared.
 
-    Accepts the string ``"undefined"`` as a clear alongside ``null``: the office
-    grid has always sent that sentinel for a blanked cell and
-    ``SharesDayChangeService.apply`` still normalises it, so rejecting it would
-    break a browser running an older bundle.
+    Accepts ``"undefined"`` and ``""`` as a clear alongside ``null``: browsers
+    running an older bundle of the office grid send the first for a blanked
+    cell and the second for the select's blank option, and
+    ``SharesDayChangeService.apply`` normalises ``"undefined"`` too.
     """
 
     def validate_empty_values(self, data):
-        if data == "undefined":
+        if data in ("undefined", ""):
             return (True, None)
         return super().validate_empty_values(data)
 

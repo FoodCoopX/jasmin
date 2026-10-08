@@ -54,7 +54,6 @@ export function CreateBillingRunModal({
       onClose();
       onCreated();
     } catch (err: unknown) {
-      console.error(err);
       // Surface the backend's specific reason (getErrorMessage reads the Jasmin
       // {code, message} body; the i18n key is only the fallback).
       notify.error(getErrorMessage(err, t("abos.debits_run_create_error")));

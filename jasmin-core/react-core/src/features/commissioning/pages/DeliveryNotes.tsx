@@ -1,5 +1,5 @@
 import { CheckOutlined, SendOutlined } from "@ant-design/icons";
-import { Button, message } from "antd";
+import { Button } from "antd";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -12,8 +12,8 @@ import {
   commissioningDeliveryNotesSendToResellerCreate,
   useCommissioningOrdersOverviewList,
 } from "@shared/api/generated/commissioning/commissioning";
-import { generatePdfFilename } from "@shared/utils";
-import { getErrorMessage } from "@shared/utils/apiError";
+import { generatePdfFilename, notify } from "@shared/utils";
+import { getServerErrorMessage } from "@shared/utils/apiError";
 import type {
   BulkDocumentRequest,
   BulkOperationResponse,
@@ -104,13 +104,13 @@ export default function DeliveryNotes() {
         const data =
           await commissioningDeliveryNotesSendToResellerCreate(deliveryNoteId);
         if (data.sent) {
-          message.success(t("commissioning.delivery_note_sent_to_reseller"));
+          notify.success(t("commissioning.delivery_note_sent_to_reseller"));
           await refetchOrders();
         } else {
-          message.warning(t("commissioning.delivery_note_send_failed"));
+          notify.warning(t("commissioning.delivery_note_send_failed"));
         }
       } catch (err) {
-        message.error(getErrorMessage(err, t("common.error_loading_data")));
+        notify.error(getServerErrorMessage(err) ?? t("commissioning.delivery_note_send_failed"));
       } finally {
         setSendingDeliveryNoteId(null);
       }

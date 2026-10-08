@@ -3,7 +3,7 @@ import { PackingListBulkMobileCard } from "@features/commissioning/components/mo
 import {
   useAmountUnitSizeColumns,
   useCurrentDays,
-  useDeliveryStations,
+  useDeliveryStationOfDay,
   useShareArticleColumn,
   useShareDeliveryDays,
 } from "@features/commissioning/hooks";
@@ -52,6 +52,7 @@ import { ExplainerText, MobileStack, PastWarningMessage } from "@shared/ui";
 import {
   activeAtDateForWeek,
   dateForWeekDayNumber,
+  amountCellText,
   formatAmountForUnit,
   formatDayLabel,
   formatWeekLabel,
@@ -90,38 +91,6 @@ type BulkParams = CommissioningPackingListBulkListParams & {
   delivery_station?: string;
   is_packed_bulk?: boolean;
 };
-
-/**
- * The selected delivery station, kept to the stations of the delivery day:
- * the day's first station once they are known, and none when the selected one
- * isn't scheduled that day — including on a day whose station list came back
- * empty. Only a loaded list counts: while the day or its stations are still
- * loading the list is empty too, and the selection has to survive that.
- */
-function useDeliveryStationOfDay(deliveryDayId: string | null) {
-  const [selectedDeliveryStation, setSelectedDeliveryStation] = useState<
-    string | null
-  >(null);
-  const { deliveryStations, loading } = useDeliveryStations({
-    delivery_day: deliveryDayId ?? undefined,
-  });
-
-  useEffect(() => {
-    if (deliveryDayId === null || loading) return;
-    if (selectedDeliveryStation === null) {
-      if (deliveryStations.length > 0) {
-        setSelectedDeliveryStation(deliveryStations[0].value);
-      }
-      return;
-    }
-    const stillValid = deliveryStations.some(
-      (station) => station.value === selectedDeliveryStation,
-    );
-    if (!stillValid) setSelectedDeliveryStation(null);
-  }, [deliveryDayId, loading, deliveryStations, selectedDeliveryStation]);
-
-  return [selectedDeliveryStation, setSelectedDeliveryStation] as const;
-}
 
 /**
  * Per-delivery-station bulk packing list. Answers "how much of each article
@@ -426,6 +395,14 @@ export default function PackingListBulk() {
     [memberMatrix, getUnitLabel, getVegetableSizeLabel],
   );
 
+  // A member's amount per share size, often a fraction: at its unit's
+  // precision in the tenant's number format, as the box list prints it.
+  const memberAmountText = useCallback(
+    (value: unknown, item: Record<string, unknown>) =>
+      amountCellText(value, item.unit as string | undefined, format),
+    [format],
+  );
+
   // Branded strip for the member-facing PDF (logo + tenant name).
   const tenantInfo = useMemo(
     () => ({
@@ -534,6 +511,7 @@ export default function PackingListBulk() {
             tenant={tenantInfo}
             pillKey="commissioning.packing_list_bulk_member"
             showCountRow={false}
+            cellText={memberAmountText}
             filename={memberFilename}
             buttonText={t("download.packing_list_bulk_member")}
             t={t}

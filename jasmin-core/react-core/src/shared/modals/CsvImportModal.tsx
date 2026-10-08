@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Modal, Space, Table, Typography } from "antd";
 import { useState, type ComponentProps, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useRoles } from "@shared/auth";
 import DownloadCsvTemplateButton from "@shared/ui/DownloadCsvTemplateButton";
 
 const { Paragraph, Text } = Typography;
@@ -151,6 +152,7 @@ export interface CsvImportButtonProps extends Omit<
 /**
  * The list-page trigger: one quiet button that opens {@link CsvImportModal}.
  * Drop-in replacement for a bare `DownloadCsvTemplateButton` on a list page.
+ * Offered to the office only, as the import endpoint takes no other role.
  */
 export function CsvImportButton({
   uploadAllowed,
@@ -159,9 +161,10 @@ export function CsvImportButton({
   ...modalProps
 }: CsvImportButtonProps) {
   const { t } = useTranslation();
+  const { isOffice } = useRoles();
   const [open, setOpen] = useState(false);
 
-  if (!uploadAllowed) return null;
+  if (!uploadAllowed || !isOffice) return null;
 
   return (
     <>

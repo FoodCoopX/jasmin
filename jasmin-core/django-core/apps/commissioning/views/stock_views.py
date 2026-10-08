@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from datetime import time as dt_time
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import DatabaseError, IntegrityError, transaction
@@ -22,7 +22,6 @@ from apps.shared.request_utils import body
 from core.serializers import ErrorResponseSerializer
 
 from ..errors import (
-    CommissioningError,
     CompositeIdInvalid,
     InventoryEntryFinalized,
     InventoryEntryNotFound,
@@ -54,6 +53,7 @@ from ..utils import (
 from ..utils.iso_week_utils import week_day_to_date
 from ..utils.lookup import get_or_404
 from ..utils.query_params import validate_query_params
+from ..utils.stock_count_input import parse_counted_amount, writable_composite_id
 from ..utils.validation_utils import parse_bulk_ids
 
 
@@ -88,42 +88,6 @@ def _validated_inventory_metadata(request: Request) -> dict:
     serializer = InventoryMetadataSerializer(data=body(request))
     serializer.is_valid(raise_exception=True)
     return serializer.validated_data
-
-
-def _parse_counted_amount(request: Request) -> Decimal | None:
-    """Parse the absolute counted value out of an INVENTORY PATCH body.
-
-    ``None`` means the body carries no ``amount`` at all — a metadata-only
-    PATCH, which leaves the stored count alone.
-    """
-    raw = body(request).get("amount")
-    if raw is None:
-        return None
-    try:
-        amount = Decimal(str(raw))
-    except (ValueError, TypeError, InvalidOperation) as exc:
-        raise CommissioningError(
-            "Amount must be a number",
-            field="amount",
-            code="stock.amount_not_number",
-        ) from exc
-    # ``Decimal("NaN")`` and ``Decimal("Infinity")`` construct without
-    # raising, so the parse above lets them through. Neither is a countable
-    # quantity, and comparing a NaN raises InvalidOperation — reject both as
-    # "not a number".
-    if not amount.is_finite():
-        raise CommissioningError(
-            "Amount must be a number",
-            field="amount",
-            code="stock.amount_not_number",
-        )
-    if amount < 0:
-        raise CommissioningError(
-            "Amount must be non-negative",
-            field="amount",
-            code="stock.amount_negative",
-        )
-    return amount
 
 
 class CurrentStockComparisonView(APIViewRolePermissionsMixin, APIView):
@@ -249,15 +213,15 @@ class CurrentStockComparisonView(APIViewRolePermissionsMixin, APIView):
             201: InventoryEntrySerializer,
             400: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
+            409: ErrorResponseSerializer,
         },
     )
     @transaction.atomic
     def patch(self, request: Request, composite_id: str) -> Response:
-        # CompositeIdInvalid (a canonical 400) propagates, no re-wrap.
-        parsed = parse_composite_id(composite_id, code="stock.invalid_composite_id")
+        parsed = writable_composite_id(composite_id)
 
         metadata = _validated_inventory_metadata(request)
-        amount = _parse_counted_amount(request)
+        amount = parse_counted_amount(request)
 
         share_article = get_or_404(
             ShareArticle,
@@ -483,12 +447,12 @@ class CurrentStockComparisonView(APIViewRolePermissionsMixin, APIView):
             204: OpenApiResponse(description="Inventory entry deleted successfully"),
             400: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
+            409: ErrorResponseSerializer,
         },
     )
     @transaction.atomic
     def delete(self, request: Request, composite_id: str) -> Response:
-        # CompositeIdInvalid (a canonical 400) propagates, no re-wrap.
-        parsed = parse_composite_id(composite_id, code="stock.invalid_composite_id")
+        parsed = writable_composite_id(composite_id)
 
         inventory_date = _ywd_to_datetime(
             parsed["year"], parsed["delivery_week"], parsed["day_number"]

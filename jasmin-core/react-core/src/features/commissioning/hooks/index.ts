@@ -4,6 +4,7 @@ export { useAggregatedVariationsTotals } from './useAggregatedVariationsTotals';
 export { useCrates } from './useCrates';
 export { useCurrentDays } from './useCurrentDays';
 export { useDeliveryStations, useDeliveryStationsPerDay } from './useDeliveryStations';
+export { useDeliveryStationOfDay } from './useDeliveryStationOfDay';
 export { useDocumentationSummaryPage } from './useDocumentationSummaryPage';
 export { useStorageDocumentationPage } from './useStorageDocumentationPage';
 export { useHarvestingListData } from './useHarvestingListData';

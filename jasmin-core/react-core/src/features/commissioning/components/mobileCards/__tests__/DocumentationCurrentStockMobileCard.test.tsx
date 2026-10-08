@@ -122,17 +122,19 @@ describe("DocumentationCurrentStockMobileCard contents", () => {
     renderCard(stockRow({ amount: null }));
 
     expect(figures()[1]).toEqual([ACTUAL, "–", ""]);
-    expect(actualAmount()).toHaveStyle({ color: "var(--color-text-muted)" });
+    expect(actualAmount()).toHaveClass("is-actual");
+    expect(actualAmount()).not.toHaveClass("has-amount");
   });
 
   it("colours a counted stock green and a count of zero muted", () => {
     const { unmount } = renderCard();
-    expect(actualAmount()).toHaveStyle({ color: "var(--color-success-text)" });
+    expect(actualAmount()).toHaveClass("is-actual", "has-amount");
     unmount();
 
     renderCard(stockRow({ amount: 0 }));
     expect(figures()[1][1]).toBe("0");
-    expect(actualAmount()).toHaveStyle({ color: "var(--color-text-muted)" });
+    expect(actualAmount()).toHaveClass("is-actual");
+    expect(actualAmount()).not.toHaveClass("has-amount");
   });
 
   it.each([
@@ -168,7 +170,7 @@ describe("DocumentationCurrentStockMobileCard contents", () => {
     expect(screen.getByRole("img", { name: "commissioning.finalized" })).toBeInTheDocument();
   });
 
-  it.skip.each([
+  it.each([
     ["de-DE", "1.235", "1.200"],
     ["en-US", "1,235", "1,200"],
   ])(

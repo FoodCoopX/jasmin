@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import datetime
 from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+import time_machine
 from django.urls import reverse
 from rest_framework import status
 
@@ -28,6 +30,15 @@ from apps.commissioning.tests.factories import (
     StorageFactory,
     WasteFactory,
 )
+
+
+@pytest.fixture(autouse=True)
+def _frozen_clock():
+    # The writes go to weeks 15, 16 and 28 of 2026, which the documentation
+    # endpoints refuse once they lie more than a week back; on Monday of week 15
+    # none of them does.
+    with time_machine.travel(datetime.datetime(2026, 4, 6, 12, 0), tick=False):
+        yield
 
 
 # ---------------------------------------------------------------------------

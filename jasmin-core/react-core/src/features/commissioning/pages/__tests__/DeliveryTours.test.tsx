@@ -12,7 +12,7 @@
  * requests carry.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { message } from "antd";
@@ -94,12 +94,13 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
     useCommissioningDeliveryStationsList: queryHook("delivery_stations", api.stations),
     useCommissioningDeliveryToursList: queryHook("delivery_tours", api.tours),
     useCommissioningDeliveryToursUpdateToursCreate: (options?: {
-      mutation?: { onError?: (error: unknown) => void };
+      mutation?: { onError?: (error: unknown) => void; meta?: Record<string, unknown> };
     }) =>
       useMutation({
         mutationKey: ["commissioningDeliveryToursUpdateToursCreate"],
         mutationFn: async ({ data }: { data: DeliveryToursUpdate }) => api.saveTours(data),
         onError: options?.mutation?.onError,
+        meta: options?.mutation?.meta,
       }),
   };
 });
@@ -125,6 +126,11 @@ const FRIDAY: Day = {
 const NEXT_FRIDAY: Day = {
   id: "day-fri-next", day_number: 4, valid_from: "2026-10-26", valid_until: null,
   number_of_tours: null,
+};
+// A Monday that ended in the spring; the day picker still offers it, first.
+const ENDED_MONDAY: Day = {
+  id: "day-mon-ended", day_number: 0, valid_from: "2025-01-06", valid_until: "2026-03-29",
+  number_of_tours: 1,
 };
 // An earlier Tuesday, ended in January; the day picker still offers it.
 const ENDED_TUESDAY: Day = {
@@ -236,11 +242,19 @@ const EMPTY_CELL = "commissioning.drop_station_here";
 // Stands in for antd's toast, which would otherwise render into the body.
 const noToast = () => undefined as never;
 
+// The app's toast for a failed mutation, unless it sets `meta: { silent: true }`.
+const appToast = vi.fn();
+
 function renderPage() {
   const user = userEvent.setup();
   const profiler = profileRenders();
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    mutationCache: new MutationCache({
+      onError: (error, _variables, _context, mutation) => {
+        if (!mutation.meta?.silent) appToast(error);
+      },
+    }),
   });
   render(
     <QueryClientProvider client={queryClient}>
@@ -372,6 +386,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(TODAY);
   auth.roles = ["office"];
+  appToast.mockReset();
   farm = {
     days: [TUESDAY, FRIDAY, NEXT_FRIDAY],
     stations: {
@@ -444,6 +459,35 @@ describe("DeliveryTours loading", () => {
       expect(paletteStations()).toEqual(["Town Hall", "Organic Shop Ltd"]);
       await settle();
       expect(api.saveTours).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["the day picker's list of every day", "the days starting later"] as const)(
+    "opens on today's first delivery day, never an ended one, when %s answers first",
+    async (first) => {
+      farm.days.push(ENDED_MONDAY);
+      const held: Partial<Record<"all" | "future" | "today", () => void>> = {};
+      api.deliveryDays.mockImplementation(
+        (params: CommissioningSharesDeliveryDaysListParams = {}) =>
+          new Promise((resolve) => {
+            const which = !params.active_at_date ? "all" : params.future ? "future" : "today";
+            held[which] = () => resolve(listedDays(params));
+          }),
+      );
+      renderPage();
+      await waitFor(() => expect(Object.keys(held)).toHaveLength(3));
+
+      await answer(held[first === "the days starting later" ? "future" : "all"]);
+      await answer(held[first === "the days starting later" ? "all" : "future"]);
+      await settle();
+      expect(api.stations).not.toHaveBeenCalled();
+      expect(api.tours).not.toHaveBeenCalled();
+      await answer(held.today);
+
+      await opened();
+      expect(selectedDay()).toBe(dayLabel(TUESDAY));
+      expect(api.stations.mock.calls).toEqual([[{ is_active: true, delivery_day: TUESDAY.id }]]);
+      expect(api.tours.mock.calls).toEqual([[{ delivery_day: TUESDAY.id }]]);
     },
   );
 
@@ -780,7 +824,9 @@ describe("DeliveryTours refused save", () => {
 
     await place(user, TOWN_HALL, { tour: 1, position: 3 });
 
-    await waitFor(() => expect(toast).toHaveBeenCalledWith(refusal));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ content: refusal })),
+    );
     await waitFor(() =>
       expect(shownTours()).toEqual([["1 Market Hall"], ["1 Village School", "2 Bakery Lindner"]]),
     );
@@ -791,11 +837,56 @@ describe("DeliveryTours refused save", () => {
     expect(paletteStations()).toEqual(["Town Hall", "Organic Shop Ltd"]);
     expect(api.saveTours).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the saved plan again when the server's plan has not changed", async () => {
+    vi.spyOn(message, "error").mockImplementation(noToast);
+    api.saveTours.mockRejectedValue(serverError("Town Hall is not served on this delivery day."));
+    const { user } = renderPage();
+    await opened();
+
+    await place(user, TOWN_HALL, { tour: 1, position: 3 });
+
+    await waitFor(() => expect(api.tours).toHaveBeenCalledTimes(2));
+    await settle();
+    expect(shownTours()).toEqual(TUESDAY_SHOWN);
+    expect(paletteStations()).toEqual(["Town Hall", "Organic Shop Ltd"]);
+    expect(api.saveTours).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the office once, and says the plan is not saved", async () => {
+    const toast = vi.spyOn(message, "error").mockImplementation(noToast);
+    api.saveTours.mockRejectedValue(serverError("Town Hall is not served on this delivery day."));
+    const { user } = renderPage();
+    await opened();
+
+    await place(user, TOWN_HALL, { tour: 1, position: 3 });
+
+    expect(await screen.findByText("common.error_saving")).toBeInTheDocument();
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(appToast).not.toHaveBeenCalled();
+  });
 });
 
 // ── The palette's empty states ──────────────────────────────────────────────
 
 describe("DeliveryTours palette messages", () => {
+  it("says the stations are loading, not that there are none, until they are in", async () => {
+    let respond: (() => void) | undefined;
+    api.stations.mockImplementation(
+      (params) => new Promise((resolve) => (respond = () => resolve(listedStations(params)))),
+    );
+    renderPage();
+
+    await waitFor(() => expect(respond).toBeDefined());
+    expect(within(paletteSection()).getByText("common.loading")).toBeInTheDocument();
+    expect(
+      within(paletteSection()).queryByText("commissioning.no_stations_available"),
+    ).not.toBeInTheDocument();
+
+    await answer(respond);
+    await opened();
+  });
+
   it("says no stations are available when the day serves none", async () => {
     farm.stations[TUESDAY.id] = [];
     farm.plans[TUESDAY.id] = [];

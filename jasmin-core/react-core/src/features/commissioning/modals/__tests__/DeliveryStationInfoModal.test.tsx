@@ -132,6 +132,7 @@ const MILL_AS_SHOWN = {
   messenger_group_link: "https://signal.group/#mill-pickup",
   contact_name: "Hanna Berger",
   contact_phone: "+43 660 1234567",
+  photo_link: "https://photos.example/mill",
   self_service: true,
   coords_lat: "48.2082000000",
   coords_lon: "16.3738000000",
@@ -142,6 +143,7 @@ const BAKERY_AS_SHOWN = {
   messenger_group_link: "",
   contact_name: "",
   contact_phone: "",
+  photo_link: "",
   self_service: false,
   coords_lat: null,
   coords_lon: null,
@@ -195,7 +197,7 @@ function StationList({
           type="button"
           onClick={() => setInfoStation(station)}
         >
-          {`Member info for ${station.short_name}`}
+          {`Member info for ${station.short_name ?? station.id}`}
         </button>
       ))}
       {profiler.wrap(
@@ -253,6 +255,7 @@ const ACCESS_CODE = "delivery_stations.access_code";
 const MESSENGER_LINK = "delivery_stations.messenger_group_link";
 const CONTACT_NAME = "delivery_stations.contact_name";
 const CONTACT_PHONE = "delivery_stations.contact_phone";
+const PHOTO_LINK = "delivery_stations.photo_link";
 const LAT = "delivery_stations.coords_lat";
 const LON = "delivery_stations.coords_lon";
 const INVALID_COORDINATE = "delivery_stations.invalid_coordinate";
@@ -350,7 +353,18 @@ describe("DeliveryStationInfoModal contents", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the station's note, access code, messenger group, contact, self-service and coordinates", async () => {
+  it("is titled without a trailing dash for a station without a short name", async () => {
+    serverStations = [{ ...BAKERY, id: "station-unnamed", short_name: null }];
+    renderList();
+    await openStation("station-unnamed");
+
+    expect(
+      await screen.findAllByText("delivery_stations.member_info_title"),
+    ).not.toHaveLength(0);
+    expect(screen.queryByText(/ — $/)).not.toBeInTheDocument();
+  });
+
+  it("shows the station's note, access code, messenger group, contact, photo link, self-service and coordinates", async () => {
     await renderOpen();
 
     expect(field(INFO)).toHaveValue("The crates are in the barn behind the mill.");
@@ -358,6 +372,7 @@ describe("DeliveryStationInfoModal contents", () => {
     expect(field(MESSENGER_LINK)).toHaveValue("https://signal.group/#mill-pickup");
     expect(field(CONTACT_NAME)).toHaveValue("Hanna Berger");
     expect(field(CONTACT_PHONE)).toHaveValue("+43 660 1234567");
+    expect(field(PHOTO_LINK)).toHaveValue("https://photos.example/mill");
     expect(selfService()).toBeChecked();
     expect(field(LAT)).toHaveValue("48.2082000000");
     expect(field(LON)).toHaveValue("16.3738000000");
@@ -367,7 +382,7 @@ describe("DeliveryStationInfoModal contents", () => {
   it("shows empty fields and self-service off for a station without information", async () => {
     await renderOpen("Bakery");
 
-    for (const label of [INFO, ACCESS_CODE, MESSENGER_LINK, CONTACT_NAME, CONTACT_PHONE, LAT, LON]) {
+    for (const label of [INFO, ACCESS_CODE, MESSENGER_LINK, CONTACT_NAME, CONTACT_PHONE, PHOTO_LINK, LAT, LON]) {
       expect(field(label)).toHaveValue("");
     }
     expect(selfService()).not.toBeChecked();
@@ -409,6 +424,7 @@ describe("DeliveryStationInfoModal saving", () => {
     await retype(MESSENGER_LINK, "https://chat.whatsapp.com/MillPickup");
     await retype(CONTACT_NAME, "Jonas Wagner");
     await retype(CONTACT_PHONE, "+43 664 7654321");
+    await retype(PHOTO_LINK, "https://photos.example/mill-porch");
     await userEvent.click(selfService());
     await retype(LAT, "47.0707");
     await retype(LON, "15.4395");
@@ -422,6 +438,7 @@ describe("DeliveryStationInfoModal saving", () => {
       messenger_group_link: "https://chat.whatsapp.com/MillPickup",
       contact_name: "Jonas Wagner",
       contact_phone: "+43 664 7654321",
+      photo_link: "https://photos.example/mill-porch",
       self_service: false,
       coords_lat: "47.0707",
       coords_lon: "15.4395",
@@ -462,6 +479,19 @@ describe("DeliveryStationInfoModal saving", () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(api.update).toHaveBeenCalledWith("station-bakery", BAKERY_AS_SHOWN);
+  });
+
+  it("clears the photo link, so members no longer see that photo", async () => {
+    const { onClose } = await renderOpen();
+
+    await userEvent.clear(field(PHOTO_LINK));
+    await save();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(api.update).toHaveBeenCalledWith("station-mill", {
+      ...MILL_AS_SHOWN,
+      photo_link: "",
+    });
   });
 
   it("removes the coordinates when both fields are emptied", async () => {

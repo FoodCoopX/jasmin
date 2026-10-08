@@ -1,8 +1,7 @@
-import { message } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toApiDate } from "@shared/utils";
+import { notify, toApiDate } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 import {
   useCommissioningDeliveryToursList,
@@ -59,7 +58,9 @@ export default function DeliveryTours() {
   const deliveryStationsFilters = useMemo(() => {
     return selectedDay !== null ? { delivery_day: selectedDay } : {};
   }, [selectedDay]);
-  const { deliveryStations } = useDeliveryStations(deliveryStationsFilters);
+  const { deliveryStations, loading: stationsLoading } = useDeliveryStations(
+    deliveryStationsFilters,
+  );
 
   // Ref to avoid putting deliveryStations in the transform/handler deps (the
   // hook returns a new array ref every render).
@@ -97,6 +98,9 @@ export default function DeliveryTours() {
   // plan, so the grid takes edits only once it holds the selected day's.
   const [planDay, setPlanDay] = useState<string | null>(null);
   const canEdit = isOffice && planDay === selectedDay;
+  // Bumped by a refused save, so the grid reloads the saved plan even when
+  // the refetch returns the same data and the query keeps its object.
+  const [planReload, setPlanReload] = useState(0);
 
   // Another day starts from an empty grid, not the last day's plan.
   useEffect(() => {
@@ -147,12 +151,13 @@ export default function DeliveryTours() {
       [],
     );
 
-  const { shareDeliveryDays: currentlyActiveDeliveryDays } =
-    useShareDeliveryDays(shareDeliveryDaysParams);
+  const {
+    shareDeliveryDays: currentlyActiveDeliveryDays,
+    pending: currentlyActivePending,
+  } = useShareDeliveryDays(shareDeliveryDaysParams);
 
-  const { shareDeliveryDays: futureDeliveryDays } = useShareDeliveryDays(
-    futureShareDeliveryDaysParams,
-  );
+  const { shareDeliveryDays: futureDeliveryDays, pending: futurePending } =
+    useShareDeliveryDays(futureShareDeliveryDaysParams);
 
   const shareDeliveryDays = useMemo(() => {
     return [...currentlyActiveDeliveryDays, ...futureDeliveryDays];
@@ -183,11 +188,20 @@ export default function DeliveryTours() {
     return Array.from(dayNumberMap.values());
   }, [shareDeliveryDays]);
 
+  // The opening day is the first of today's days, else of the later ones,
+  // picked once both lists are in so the order they answer in can't change it.
+  const openingDaysPending = currentlyActivePending || futurePending;
   useEffect(() => {
-    if (distinctShareDeliveryDays.length > 0 && selectedDay === null) {
+    if (openingDaysPending || selectedDay !== null) return;
+    if (distinctShareDeliveryDays.length > 0) {
       setSelectedDay(distinctShareDeliveryDays[0].id ?? null);
     }
-  }, [distinctShareDeliveryDays, selectedDay]);
+  }, [openingDaysPending, distinctShareDeliveryDays, selectedDay]);
+
+  // The day picker lists every day, ended ones too, and falls back to the
+  // first of them; the page picks its own opening day instead, so only a day
+  // the user chooses (``onSharesDeliveryDayChange``) replaces it.
+  const ignorePickerFallback = useCallback(() => {}, []);
 
   // Filter out already assigned stations
   const availableStations = useMemo(() => {
@@ -231,22 +245,27 @@ export default function DeliveryTours() {
 
     setTourPlans(emptyTourPlans);
     setPlanDay(selectedDay);
-  }, [toursData, numberOfTours, stationKey, selectedDay]);
+  }, [toursData, numberOfTours, stationKey, selectedDay, planReload]);
 
   // Auto-save via TanStack mutation. The grid is optimistic local state; on a
-  // failure we surface it AND refetch so the UI can't keep showing a plan that
-  // wasn't persisted. The whole-day payload is a full replace, so last write wins.
-  const { mutate: saveTours, isPending: isSaving } =
-    useCommissioningDeliveryToursUpdateToursCreate({
-      mutation: {
-        onError: (error) => {
-          message.error(
-            getErrorMessage(error, t("commissioning.tour_save_failed")),
-          );
-          refetchTours();
-        },
+  // failure we surface it AND reload the saved plan so the UI can't keep
+  // showing a plan that wasn't persisted. The whole-day payload is a full
+  // replace, so last write wins. The page shows the error itself, so the
+  // app-wide mutation toast stays silent.
+  const {
+    mutate: saveTours,
+    isPending: isSaving,
+    isError: saveFailed,
+  } = useCommissioningDeliveryToursUpdateToursCreate({
+    mutation: {
+      meta: { silent: true },
+      onError: (error) => {
+        notify.error(getErrorMessage(error, t("commissioning.tour_save_failed")));
+        setPlanReload((count) => count + 1);
+        refetchTours();
       },
-    });
+    },
+  });
 
   // Only a genuine user edit (place / remove / move) should POST. The other
   // writers of tourPlans — padding the grid when the station or tour count
@@ -323,7 +342,7 @@ export default function DeliveryTours() {
 
         <SharesDeliveryDaySelector
           selectedSharesDeliveryDay={selectedDay}
-          setSelectedSharesDeliveryDay={setSelectedDay}
+          setSelectedSharesDeliveryDay={ignorePickerFallback}
           onSharesDeliveryDayChange={setSelectedDay}
         />
         <DateRangeStatusLegend />
@@ -335,9 +354,11 @@ export default function DeliveryTours() {
             <div className="delivery-tours-palette-box">
               {availableStations.length === 0 ? (
                 <p className="text-muted text-center">
-                  {deliveryStations.length === 0
-                    ? t("commissioning.no_stations_available")
-                    : t("commissioning.all_stations_assigned")}
+                  {stationsLoading || (selectedDay === null && openingDaysPending)
+                    ? t("common.loading")
+                    : deliveryStations.length === 0
+                      ? t("commissioning.no_stations_available")
+                      : t("commissioning.all_stations_assigned")}
                 </p>
               ) : (
                 availableStations.map((station) => (
@@ -359,7 +380,11 @@ export default function DeliveryTours() {
           <div className="flex-1">
             <div className="flex-between">
               <h3>{t("commissioning.tour_planning")}</h3>
-              <AutoSaveIndicator saving={isSaving} hasChanges={false} />
+              <AutoSaveIndicator
+                saving={isSaving}
+                hasChanges={false}
+                failed={saveFailed}
+              />
             </div>
 
             <table

@@ -41,7 +41,7 @@ const TourSelector = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filters), activeAtDate]);
 
-  const { shareDeliveryDays, loading, error } = useShareDeliveryDays(
+  const { shareDeliveryDays, loading } = useShareDeliveryDays(
     tourFilters as Parameters<typeof useShareDeliveryDays>[0],
   );
 
@@ -67,10 +67,6 @@ const TourSelector = ({
     }
     return tours;
   }, [numberOfTours, include_null_option, t]);
-
-  if (error) {
-    console.error("Error in TourSelector:", error);
-  }
 
   return (
     <BaseEntitySelector<number | "all">

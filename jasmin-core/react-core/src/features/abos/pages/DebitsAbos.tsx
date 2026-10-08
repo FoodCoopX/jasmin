@@ -52,7 +52,6 @@ export default function DebitsAbos() {
 
   useEffect(() => {
     if (error) {
-      console.error(error);
       notify.error(t("abos.debits_load_error"));
     }
   }, [error, t]);
@@ -74,7 +73,6 @@ export default function DebitsAbos() {
       notify.success(t("abos.debits_run_exported"));
       await invalidateRuns();
     } catch (err: unknown) {
-      console.error(err);
       // Surface the backend's specific reason (e.g. "tenant IBAN missing") —
       // getErrorMessage reads the Jasmin ``{code, message}`` body; the i18n key
       // is only the fallback when the error carries no message.
@@ -88,8 +86,7 @@ export default function DebitsAbos() {
       await paymentsBillingRunsDestroy(run.id);
       notify.success(t("abos.debits_run_deleted"));
       await invalidateRuns();
-    } catch (err) {
-      console.error(err);
+    } catch {
       notify.error(t("abos.debits_run_delete_error"));
     }
   };

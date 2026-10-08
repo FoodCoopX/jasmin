@@ -52,8 +52,7 @@ export default function DeliveryNotePDFButtons({
         return;
       }
       openStoredPdf(deliveryNote.file);
-    } catch (err) {
-      console.error("Failed to load delivery note for PDF download:", err);
+    } catch {
       notify.error(t("common.error_loading_data"));
     } finally {
       setLoading(false);

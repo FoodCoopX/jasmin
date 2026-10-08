@@ -81,6 +81,24 @@ function asAxiosError(
  *   catch (err) { notify.error(getErrorMessage(err, "Something failed")); }
  */
 export function getErrorMessage(err: unknown, fallback = "Request failed"): string {
+  const serverMessage = getServerErrorMessage(err);
+  if (serverMessage) return serverMessage;
+  const axiosErr = asAxiosError(err);
+  if (axiosErr?.message) return axiosErr.message;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
+/**
+ * The message the server gave for a failed request, or `undefined` when it
+ * gave none — an empty body, a network failure, a non-axios throw. Unlike
+ * `getErrorMessage` it never falls back to axios' or JS' own text ("Request
+ * failed with status code 503"), so a caller can show its own translated
+ * message instead:
+ *
+ *   notify.error(getServerErrorMessage(err) ?? t("users.resend_failed"));
+ */
+export function getServerErrorMessage(err: unknown): string | undefined {
   // First: try a frontend-side translation by stable error code. This covers
   // our custom JasminError subclasses (e.g. "commissioning.share_days_locked"),
   // which the backend does NOT translate — see `errors.json` for the keyed
@@ -89,24 +107,16 @@ export function getErrorMessage(err: unknown, fallback = "Request failed"): stri
   const translated = translateByCode(err);
   if (translated) return translated;
 
-  const axiosErr = asAxiosError(err);
-  if (axiosErr) {
-    const data = axiosErr.response?.data;
-    if (data) {
-      // Canonical Jasmin shape.
-      if (typeof data.message === "string" && data.message) return data.message;
-      // Legacy {"error": "..."} shape — still in use on un-migrated endpoints.
-      if (typeof data.error === "string" && data.error) return data.error;
-      // DRF default {"detail": "..."} shape (used by some 3rd-party DRF code paths).
-      if (typeof data.detail === "string" && data.detail) return data.detail;
-      // DRF serializer errors: {"field_name": ["err1", ...], ...}
-      const fieldMsg = firstFieldMessage(data);
-      if (fieldMsg) return fieldMsg;
-    }
-    if (axiosErr.message) return axiosErr.message;
-  }
-  if (err instanceof Error && err.message) return err.message;
-  return fallback;
+  const data = asAxiosError(err)?.response?.data;
+  if (!data || typeof data !== "object") return undefined;
+  // Canonical Jasmin shape.
+  if (typeof data.message === "string" && data.message) return data.message;
+  // Legacy {"error": "..."} shape — still in use on un-migrated endpoints.
+  if (typeof data.error === "string" && data.error) return data.error;
+  // DRF default {"detail": "..."} shape (used by some 3rd-party DRF code paths).
+  if (typeof data.detail === "string" && data.detail) return data.detail;
+  // DRF serializer errors: {"field_name": ["err1", ...], ...}
+  return firstFieldMessage(data);
 }
 
 /**

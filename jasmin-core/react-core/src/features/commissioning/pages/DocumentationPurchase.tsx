@@ -50,6 +50,7 @@ import {
   useShareArticles,
   useStorageDocumentationPage,
 } from "@features/commissioning/hooks";
+import { formatAmountForUnit } from "@shared/utils";
 import type { DocumentationSummaryRecord } from "@features/commissioning/hooks/useDocumentationSummaryPage";
 
 const shareArticleFilters = {
@@ -230,7 +231,9 @@ export default function DocumentationPurchase() {
           const additional_amount =
             (record.additional_theoretical_purchase_amount as number) || 0;
           const totalAmount = theoretical_amount + additional_amount;
-          return totalAmount > 0 ? format(totalAmount, 2) : "";
+          return totalAmount > 0
+            ? formatAmountForUnit(totalAmount, record.unit as string, format)
+            : "";
         },
       },
       {
@@ -245,7 +248,11 @@ export default function DocumentationPurchase() {
         readOnly: false,
         render: (_: unknown, record: Record<string, unknown>) => {
           return record.purchase_amount != null
-            ? format(Number(record.purchase_amount), 2)
+            ? formatAmountForUnit(
+                Number(record.purchase_amount),
+                record.unit as string,
+                format,
+              )
             : "";
         },
       },

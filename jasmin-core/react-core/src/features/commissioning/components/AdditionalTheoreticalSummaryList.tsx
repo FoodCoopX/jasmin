@@ -52,6 +52,8 @@ import {
   useShareArticleColumn,
 } from "@features/commissioning/hooks";
 import {
+  amountCellText,
+  formatAmountForUnit,
   formatDayLabel,
   formatWeekLabel,
   generatePdfFilename,
@@ -210,8 +212,11 @@ export default function AdditionalTheoreticalSummaryList(
       const toProcessAmount = Math.max(theoretical - stillInStockAmount, 0);
       const totalAmount = Math.max(toProcessAmount + additional, 0);
 
+      const unit = record.unit as string;
+      // Formatting at the unit's precision also drops float noise such as
+      // 0.1 + 0.3 = 0.4000000000000001.
       const totalAmountText = totalAmount
-        ? `${format(totalAmount, 0)} ${getUnitLabel(record.unit as string)}`
+        ? `${formatAmountForUnit(totalAmount, unit, format)} ${getUnitLabel(unit)}`
         : "";
 
       const sizeLabel =
@@ -238,6 +243,16 @@ export default function AdditionalTheoreticalSummaryList(
     getVegetableSizeLabel,
     format,
   ]);
+
+  // An amount cell at its unit's precision; a zero still shows, an absent
+  // amount stays blank.
+  const renderAmount = useMemo(
+    () => (value: unknown, record: TableRecord) =>
+      value == null || value === "" || !Number.isFinite(Number(value))
+        ? ""
+        : formatAmountForUnit(Number(value), record.unit as string, format),
+    [format],
+  );
 
   const customSave = useMemo(
     () => (transformedData: Record<string, unknown>) => ({
@@ -289,6 +304,7 @@ export default function AdditionalTheoreticalSummaryList(
         disabled: true,
         hideInModal: true,
         hidden: isMobile || isGardenerView,
+        render: renderAmount,
         pdf: { include: false },
       },
       {
@@ -303,6 +319,7 @@ export default function AdditionalTheoreticalSummaryList(
         hidden: isMobile || isGardenerView,
         readOnly: true,
         hideInModal: true,
+        render: renderAmount,
         pdf: { include: false },
       },
       {
@@ -316,6 +333,7 @@ export default function AdditionalTheoreticalSummaryList(
         disabled: true,
         hidden: isMobile || isGardenerView,
         readOnly: true,
+        render: renderAmount,
         pdf: { include: false },
       },
       {
@@ -332,9 +350,8 @@ export default function AdditionalTheoreticalSummaryList(
         align: "center",
         width: "8em",
         hidden: isMobile || isGardenerView,
-        render: (_: unknown, record: TableRecord) => (
-          <>{record[additionalField] ? String(record[additionalField]) : ""}</>
-        ),
+        render: (_: unknown, record: TableRecord) =>
+          amountCellText(record[additionalField], record.unit as string, format),
         pdf: { include: false },
       },
       {
@@ -380,6 +397,8 @@ export default function AdditionalTheoreticalSummaryList(
       additionalColumnTitleKey,
       additionalTooltipKey,
       amountColumnTitleKey,
+      renderAmount,
+      format,
     ],
   );
 

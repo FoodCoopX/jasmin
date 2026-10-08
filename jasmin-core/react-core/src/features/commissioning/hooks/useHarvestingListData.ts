@@ -14,7 +14,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { activeAtDateForWeek } from "@shared/utils";
+import { activeAtDateForWeek, formatAmountForUnit } from "@shared/utils";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -42,6 +42,15 @@ function parseNumber(value: unknown): number {
   const num = parseFloat(value as string);
   return isNaN(num) ? 0 : num;
 }
+
+// Trims the binary floating-point noise off a product or quotient of decimal
+// amounts, so 2.1 / 0.3 (7.000000000000001) counts as 7 full PUs rather than 8,
+// and 3 PUs of 0.1 make 0.3 rather than 0.30000000000000004.
+const withoutFloatNoise = (value: number): number => Number(value.toFixed(6));
+
+/** The full packaging units an amount fills, the last one partly. */
+const fullPuCount = (total: number, amountPerPu: number): number =>
+  Math.ceil(withoutFloatNoise(total / amountPerPu));
 
 // Variants of the same calculation: total / share_content / order_content.
 // Each variant has its own set of fields on the API record (suffixed) and
@@ -224,7 +233,9 @@ export function useHarvestingListData({
             ? Number((total / amountPerPu).toFixed(1))
             : 0;
 
-        const totalText = total ? `${format(total, 0)} ${unitLabel}` : "";
+        const totalText = total
+          ? `${formatAmountForUnit(total, record.unit as string, format)} ${unitLabel}`
+          : "";
         const amountPuText =
           amountPu > 0 ? `${format(amountPu, 1)} ${puLabel}` : "";
         const combined = [totalText, amountPuText].filter(Boolean).join(" - ");
@@ -284,13 +295,14 @@ export function useHarvestingListData({
       const amountPerPu = record.computed_amount_per_pu as number;
       if (!(amountPerPu > 0)) return record;
       const unitLabel = record.computed_unit_label as string;
+      const unit = record.unit as string;
       const updates: Record<string, unknown> = {};
       for (const suffix of ["", "_share_content", "_order_content"] as const) {
         const total = record[`computed_total_amount${suffix}`] as number;
         if (!(total > 0)) continue;
-        const roundedPu = Math.ceil(total / amountPerPu);
-        const roundedTotal = roundedPu * amountPerPu;
-        const totalText = `${format(roundedTotal, 0)} ${unitLabel}`;
+        const roundedPu = fullPuCount(total, amountPerPu);
+        const roundedTotal = withoutFloatNoise(roundedPu * amountPerPu);
+        const totalText = `${formatAmountForUnit(roundedTotal, unit, format)} ${unitLabel}`;
         const puText = `${format(roundedPu, 0)} ${puLabel}`;
         updates[`computed_total_amount${suffix}`] = roundedTotal;
         updates[`computed_amount_pu${suffix}`] = roundedPu;
@@ -372,9 +384,9 @@ export function useHarvestingListData({
         record.harvesting_crate_name &&
         record.harvesting_crate_name !== "-"
       ) {
-        const amountPu = Math.ceil(
-          (record.computed_total_amount as number) /
-            (record.computed_amount_per_pu as number),
+        const amountPu = fullPuCount(
+          record.computed_total_amount as number,
+          record.computed_amount_per_pu as number,
         );
         const crateName = record.harvesting_crate_name as string;
         crateMap.set(crateName, (crateMap.get(crateName) ?? 0) + amountPu);

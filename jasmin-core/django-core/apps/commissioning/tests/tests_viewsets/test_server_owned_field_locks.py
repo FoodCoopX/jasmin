@@ -338,6 +338,14 @@ class TestShareContentLocks:
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
 class TestDocumentationLocks:
+    @pytest.fixture(autouse=True)
+    def _frozen_clock(self):
+        # The harvests sit in week 15 of 2026, which the documentation endpoints
+        # refuse once it lies more than a week back; in week 16 it still is the
+        # grace week, and the theoretical list around "now" still holds it.
+        with time_machine.travel(datetime.datetime(2026, 4, 13, 12, 0), tick=False):
+            yield
+
     def test_harvest_patch_cannot_finalize_or_rewrite_authorship(
         self, api_client, tenant, user
     ):

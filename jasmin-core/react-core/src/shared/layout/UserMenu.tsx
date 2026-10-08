@@ -213,13 +213,7 @@ export default function UserMenu() {
           aria-label={t("profile.menu_aria")}
         >
           <Space>
-            <Avatar
-              size="small"
-              style={{
-                background: "var(--color-primary-hover)",
-                color: "var(--color-bg-base)",
-              }}
-            >
+            <Avatar size="small" className="user-menu-avatar">
               {initials}
             </Avatar>
             {!isMobile && (

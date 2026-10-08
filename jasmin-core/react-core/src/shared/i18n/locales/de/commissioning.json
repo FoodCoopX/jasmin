@@ -702,6 +702,7 @@
   "storno_reference": "Storno zu Rechnung: ",
   "storno_failed": "Storno konnte nicht erstellt werden.",
   "storno_pdf_failed": "Storno wurde erstellt, aber das PDF konnte nicht erzeugt werden. Bitte erneut versuchen.",
+  "pdf_generation_failed": "{{count}} PDF(s) konnten nicht erzeugt werden.",
   "default_kg_per_pu_purchase": "kg/VPE Zukauf",
   "default_pieces_per_pu_purchase": "Stk/VPE Zukauf",
   "default_bunches_per_pu_purchase": "Bund/VPE Zukauf",

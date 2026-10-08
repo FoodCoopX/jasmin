@@ -253,8 +253,8 @@ const ADD = /table\.add_plus_icon/;
 
 /**
  * The same number in either decimal notation, with or without trailing zeros:
- * amountText(12.5) matches "12.5", "12,5", "12.50" and "12,50". The harvest
- * columns print an amount as the API sends it.
+ * amountText(12.5) matches "12.5", "12,5", "12.50" and "12,50", whatever the
+ * unit's precision.
  */
 function amountText(value: number): RegExp {
   const [whole, fraction = ""] = String(value).split(".");
@@ -479,18 +479,25 @@ describe("DocumentationHarvest harvest rows", () => {
     expect(screen.queryByRole("columnheader", { name: "commissioning.size" })).not.toBeInTheDocument();
 
     expect(cellOf("Carrots", UNIT)).toHaveTextContent("commissioning.units.kg");
-    expect(cellOf("Carrots", EXPECTED)).toHaveTextContent(amountText(12.5));
-    expect(cellOf("Carrots", ACTUAL)).toHaveTextContent(amountText(11));
+    expect([cellOf("Carrots", EXPECTED).textContent, cellOf("Carrots", ACTUAL).textContent]).toEqual(["12,50", "11,00"]);
     expect(cellOf("Carrots", NOTE)).toHaveTextContent("Bed 3");
     expect(cellOf("Lettuce", UNIT)).toHaveTextContent("commissioning.units.pcs");
-    expect(cellOf("Lettuce", EXPECTED)).toHaveTextContent(amountText(40));
+    expect(cellOf("Lettuce", EXPECTED).textContent).toBe("40,0");
     expect(cellOf("Lettuce", ACTUAL)).toHaveTextContent(/^$/);
     expect(cellOf("Radishes", UNIT)).toHaveTextContent("commissioning.units.bunch");
     expect(cellOf("Radishes", EXPECTED)).toHaveTextContent(/^$/);
-    expect(cellOf("Radishes", ACTUAL)).toHaveTextContent(amountText(6));
+    expect(cellOf("Radishes", ACTUAL).textContent).toBe("6,0");
     for (const name of ["Carrots", "Lettuce", "Radishes"]) {
       expect(within(rowOf(name)).getByText("commissioning.not_finalized")).toBeInTheDocument();
     }
+  });
+
+  it("writes a summed expected harvest without float noise, in the tenant's number format", async () => {
+    tenantSettings.values = { number_locale: "en-US" }; // 0.1 + 0.2 is 0.30000000000000004 in floating point.
+    farm.harvests[dayKey(2026, 41, 1)] = [harvest("h-kale", KALE, COLD_STORE, { theoretical_harvest_amount: 0.1, additional_theoretical_harvest_amount: 0.2, harvest_amount: "1234.500" })];
+    renderPage();
+    await screen.findByText("Kale");
+    expect([cellOf("Kale", EXPECTED).textContent, cellOf("Kale", ACTUAL).textContent]).toEqual(["0.30", "1,234.50"]);
   });
 
   it("adds the size column when the farm shows sizes, and dates the day in the farm's format", async () => {

@@ -23,6 +23,16 @@ DB required: No
     - rejects non-numbers: abc / None / NaN / Infinity
 
 
+test_read_only_week.py
+----------------------
+Source: apps/commissioning/utils/read_only_week.py
+DB required: No
+
+  - a week turns read-only on the Monday two weeks after its own Monday,
+    not a day earlier (its own week and the grace week stay writable)
+  - the rule holds across the year boundary
+  - a future week is writable
+
 test_sort_order.py
 ------------------
 Source: apps/commissioning/utils/sort_order.py

@@ -98,3 +98,10 @@
 .language-menu-item__check {
   margin-left: auto;
 }
+
+/* The user menu's initials avatar. Doubled with .ant-avatar so it outranks
+   AntD's own avatar colours whatever order the styles load in. */
+.ant-avatar.user-menu-avatar {
+  background: var(--color-primary-hover);
+  color: var(--color-bg-base);
+}

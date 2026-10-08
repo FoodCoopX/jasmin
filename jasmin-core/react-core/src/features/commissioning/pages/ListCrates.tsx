@@ -161,6 +161,7 @@ export default function ListCrates() {
         apiFunctions={list.apiFunctions}
         focusIndex="number"
         initialData={list.filteredData}
+        uniqueCheckRows={list.data}
         loading={list.isLoading}
         onSaveSuccess={list.onSaveSuccess}
         onDeleteSuccess={list.onDeleteSuccess}

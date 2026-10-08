@@ -131,6 +131,26 @@ class TestDeliveryStationViewSet:
         ids = {s["id"] for s in resp.data}
         assert str(dsd.delivery_station.id) not in ids
 
+    def test_filter_by_delivery_day_lists_a_superseded_station_once(
+        self, api_client, tenant
+    ):
+        # A station day with a successor leaves two rows for one station on the
+        # same delivery day; the join must not repeat the station.
+        closed = DeliveryStationDayFactory(
+            valid_from=datetime.date(2026, 1, 5),
+            valid_until=datetime.date(2026, 3, 1),
+        )
+        DeliveryStationDayFactory(
+            delivery_station=closed.delivery_station,
+            delivery_day=closed.delivery_day,
+            valid_from=datetime.date(2026, 3, 2),
+        )
+
+        resp = api_client.get(self.URL, {"delivery_day": str(closed.delivery_day.id)})
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert [s["id"] for s in resp.data] == [str(closed.delivery_station.id)]
+
     def test_member_role_can_list(self, anon_client, member_user, tenant):
         # Members read the list too (their member-detail stations card).
         DeliveryStationFactory()

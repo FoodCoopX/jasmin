@@ -1,4 +1,4 @@
-import { Card, Table } from "antd";
+import { Alert, Button, Card, Spin, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
@@ -70,8 +70,12 @@ export default function CommissioningListResellers() {
     [selectedYear, selectedWeek],
   );
 
-  const { data: resellersData, isLoading: loadingResellers } =
-    useCommissioningCommissioningListsResellersList(listParams, {
+  const {
+    data: resellersData,
+    isLoading: loadingResellers,
+    isError: ordersFailed,
+    refetch: refetchOrders,
+  } = useCommissioningCommissioningListsResellersList(listParams, {
       query: {
         enabled: selectedWeek != null && selectedDay != null,
       },
@@ -86,7 +90,14 @@ export default function CommissioningListResellers() {
     },
   );
 
-  const resellers = resellersData ?? [];
+  // Only the resellers with something to pack get a card and a page.
+  const resellers = useMemo(
+    () =>
+      (resellersData ?? []).filter(
+        (reseller) => reseller.order.contents.length > 0,
+      ),
+    [resellersData],
+  );
   const daysWithOrders = daysData?.days ?? [];
 
   const { noteColumn } = useNoteColumn();
@@ -127,7 +138,7 @@ export default function CommissioningListResellers() {
         align: "left",
         render: (_, record) => (
           <>
-            {record.share_article_name} {record.sort}
+            {[record.share_article_name, record.sort].filter(Boolean).join(" ")}
             {record.size && record.size !== "M" && (
               <>, {getVegetableSizeLabel(record.size)}</>
             )}
@@ -199,149 +210,164 @@ export default function CommissioningListResellers() {
         style={{ marginTop: isMobile ? "1em" : "4em", marginBottom: "2em" }}
       ></div>
       <div>
-        {resellers.length === 0 && !loadingResellers ? (
+        {loadingResellers ? (
+          <div className="flex-center">
+            <Spin />
+          </div>
+        ) : ordersFailed ? (
+          // A failed load is shown as such, never as a day without orders.
+          <Alert
+            type="error"
+            showIcon
+            message={t("table.load_failed_title")}
+            description={t("table.load_failed_hint")}
+            action={
+              <Button size="small" onClick={() => refetchOrders()}>
+                {t("table.retry")}
+              </Button>
+            }
+            className="editable-table-banner"
+          />
+        ) : resellers.length === 0 ? (
           <PastWarningMessage>
             <div style={{ textAlign: "center", padding: "0em" }}>
               {t("commissioning.no_orders_title")}
             </div>
           </PastWarningMessage>
         ) : (
-          resellers
-            .filter((reseller) => reseller.order.contents.length > 0)
-            .map((reseller) => (
-              <Card
-                key={reseller.id}
-                style={{ width: "60%", marginBottom: 16 }}
-                // Trim Ant Design's Card chrome on both slots so the
-                // pink reseller-card-header chip starts at the same
-                // left edge as the table below it. Without this, the
-                // header sits inside .ant-card-head's default 24px
-                // horizontal padding while the body is at 8px — they
-                // look misaligned.
-                styles={{
-                  body: { padding: 8 },
-                  header: { padding: 8 },
-                }}
-                title={
-                  <div className="reseller-card-header">
-                    <span>{reseller.name}</span>
-                    {reseller.order.note && (
-                      <span className="reseller-card-header-note">
-                        — {reseller.order.note}
-                      </span>
-                    )}
-                  </div>
-                }
-              >
-                {isMobile ? (
-                  <div
-                    className="flex-col gap-8"
-                    style={{
-                      marginTop: -8,
-                    }}
-                  >
-                    {reseller.order.contents.map((item) => {
-                      const amount = Number(item.amount);
-                      const amountPerPu = Number(item.amount_per_pu);
-                      const puCount =
-                        !isNaN(amount) && !isNaN(amountPerPu) && amountPerPu > 0
-                          ? format(amount / amountPerPu, 1)
-                          : null;
-                      const formattedAmount = !isNaN(amount)
-                        ? format(amount, 1)
-                        : "-";
-                      const unitLabel = getUnitLabel(item.unit);
-                      const sizeLabel =
-                        item.size && item.size !== "M"
-                          ? getVegetableSizeLabel(item.size)
-                          : "";
+          resellers.map((reseller) => (
+            <Card
+              key={reseller.id}
+              style={{ width: "60%", marginBottom: 16 }}
+              // Trim Ant Design's Card chrome on both slots so the
+              // pink reseller-card-header chip starts at the same
+              // left edge as the table below it. Without this, the
+              // header sits inside .ant-card-head's default 24px
+              // horizontal padding while the body is at 8px — they
+              // look misaligned.
+              styles={{
+                body: { padding: 8 },
+                header: { padding: 8 },
+              }}
+              title={
+                <div className="reseller-card-header">
+                  <span>{reseller.name}</span>
+                  {reseller.order.note && (
+                    <span className="reseller-card-header-note">
+                      — {reseller.order.note}
+                    </span>
+                  )}
+                </div>
+              }
+            >
+              {isMobile ? (
+                <div
+                  className="flex-col gap-8"
+                  style={{
+                    marginTop: -8,
+                  }}
+                >
+                  {reseller.order.contents.map((item) => {
+                    const amount = Number(item.amount);
+                    const amountPerPu = Number(item.amount_per_pu);
+                    const puCount =
+                      !isNaN(amount) && !isNaN(amountPerPu) && amountPerPu > 0
+                        ? format(amount / amountPerPu, 1)
+                        : null;
+                    const formattedAmount = !isNaN(amount)
+                      ? format(amount, 1)
+                      : "-";
+                    const unitLabel = getUnitLabel(item.unit);
+                    const sizeLabel =
+                      item.size && item.size !== "M"
+                        ? getVegetableSizeLabel(item.size)
+                        : "";
 
-                      return (
-                        <div
-                          key={item.id}
-                          className="mobile-card-item"
-                          style={{ cursor: "default" }}
-                        >
-                          <div className="mobile-card-content flex-min">
-                            <div className="mobile-card-title">
-                              {item.share_article_name}
-                              {sizeLabel && (
-                                <span className="text-hint">{sizeLabel}</span>
-                              )}
+                    return (
+                      <div
+                        key={item.id}
+                        className="mobile-card-item"
+                        style={{ cursor: "default" }}
+                      >
+                        <div className="mobile-card-content flex-min">
+                          <div className="mobile-card-title">
+                            {item.share_article_name}
+                            {sizeLabel && (
+                              <span className="text-hint">{sizeLabel}</span>
+                            )}
+                          </div>
+                          <div
+                            style={{ display: "flex", gap: 24, marginTop: 6 }}
+                          >
+                            <div>
+                              <div className="text-muted-xs">
+                                {t("commissioning.amount")}
+                              </div>
+                              <div className="flex-baseline">
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    fontSize: "1.2em",
+                                  }}
+                                >
+                                  {formattedAmount}
+                                </span>
+                                {unitLabel && (
+                                  <span className="text-secondary">
+                                    {unitLabel}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div
-                              style={{ display: "flex", gap: 24, marginTop: 6 }}
-                            >
+                            {puCount && (
                               <div>
                                 <div className="text-muted-xs">
-                                  {t("commissioning.amount")}
+                                  {t("commissioning.pu")}
                                 </div>
                                 <div className="flex-baseline">
                                   <span
                                     style={{
-                                      fontWeight: 600,
+                                      fontWeight: 500,
                                       fontSize: "1.2em",
                                     }}
                                   >
-                                    {formattedAmount}
+                                    {puCount}
                                   </span>
-                                  {unitLabel && (
-                                    <span className="text-secondary">
-                                      {unitLabel}
-                                    </span>
-                                  )}
+                                  <span className="text-secondary">
+                                    ({format(Number(item.amount_per_pu), 2)}{" "}
+                                    {unitLabel}/{t("commissioning.pu")})
+                                  </span>
                                 </div>
                               </div>
-                              {puCount && (
-                                <div>
-                                  <div className="text-muted-xs">
-                                    {t("commissioning.pu")}
-                                  </div>
-                                  <div className="flex-baseline">
-                                    <span
-                                      style={{
-                                        fontWeight: 500,
-                                        fontSize: "1.2em",
-                                      }}
-                                    >
-                                      {puCount}
-                                    </span>
-                                    <span className="text-secondary">
-                                      ({format(Number(item.amount_per_pu), 2)}{" "}
-                                      {unitLabel}/{t("commissioning.pu")})
-                                    </span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            {item.note && (
-                              <div className="text-meta">{item.note}</div>
                             )}
                           </div>
+                          {item.note && (
+                            <div className="text-meta">{item.note}</div>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <Table
-                    className="custom-jasmin-table"
-                    columns={columns}
-                    dataSource={reseller.order.contents}
-                    rowKey="id"
-                    loading={loadingResellers}
-                    pagination={false}
-                    size="small"
-                    locale={{
-                      emptyText: (
-                        <div style={{ height: "4em" }}>
-                          {t("common.no_orders_available")}
-                        </div>
-                      ),
-                    }}
-                  />
-                )}
-              </Card>
-            ))
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Table
+                  className="custom-jasmin-table"
+                  columns={columns}
+                  dataSource={reseller.order.contents}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                  locale={{
+                    emptyText: (
+                      <div style={{ height: "4em" }}>
+                        {t("common.no_orders_available")}
+                      </div>
+                    ),
+                  }}
+                />
+              )}
+            </Card>
+          ))
         )}
       </div>
       {!isMobile && (

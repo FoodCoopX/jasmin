@@ -48,8 +48,9 @@ import {
   useUserInfoModal,
 } from "@hooks/index";
 import { useOfferGroups } from "@features/commissioning/hooks";
+import type { OfferGroupOption } from "@features/commissioning/hooks/useOfferGroups";
 import { isFieldDisabled, notify } from "@shared/utils";
-import { getErrorMessage } from "@shared/utils/apiError";
+import { getErrorMessage, getServerErrorMessage } from "@shared/utils/apiError";
 
 const RESELLER_LIST_PARAMS: CommissioningResellersListParams = {
   is_reseller: true,
@@ -68,9 +69,31 @@ const resellersResource: CrudResource<TableRecord> = {
   getListQueryKey: getCommissioningResellersListQueryKey,
 };
 
+/** A row added in the table but not yet saved: it has no orders and no
+ *  reseller to invite a login for. */
+const isUnsavedNewRow = (record: TableRecord): boolean =>
+  record.key === -1 || !record.id;
+
 /** The id of the login linked to a reseller row, if it has one. */
 const linkedUserIdOf = (record: Record<string, unknown>): string | undefined =>
   (record.linked_user_info as { id?: string } | null | undefined)?.id;
+
+/** The rows as the API sends them carry only the offer group's id; the table
+ *  resolves its name, so the CSV export gets it the same way. */
+function useRowsWithOfferGroupName(
+  rows: TableRecord[],
+  offerGroups: OfferGroupOption[],
+): TableRecord[] {
+  return useMemo(() => {
+    const offerGroupNames = new Map(
+      offerGroups.map((group) => [group.value, group.label]),
+    );
+    return rows.map((row) => ({
+      ...row,
+      offer_group_name: offerGroupNames.get(row.offer_group as string) ?? "",
+    }));
+  }, [rows, offerGroups]);
+}
 
 export default function ListResellers() {
   const { t } = useTranslation();
@@ -173,9 +196,8 @@ export default function ListResellers() {
         patchRowById((record as TableRecord).id, {
           linked_user_info: updatedUser,
         });
-      } catch (error) {
-        console.error("Operation failed:", error);
-        notify.error(t("users.resend_failed"));
+      } catch (err) {
+        notify.error(getServerErrorMessage(err) ?? t("users.resend_failed"));
       }
     },
     [t, handleCloseUserInfoModal, patchRowById],
@@ -262,13 +284,14 @@ export default function ListResellers() {
         align: "center",
         disabled: true,
         width: "4em",
-        render: (_: unknown, record: TableRecord) => (
-          <LinkButton
-            variant="view"
-            to={`/commissioning/customer-orders/${record.id}`}
-            tooltip={t("resellers.go_to_orders")}
-          />
-        ),
+        render: (_: unknown, record: TableRecord) =>
+          isUnsavedNewRow(record) ? null : (
+            <LinkButton
+              variant="view"
+              to={`/commissioning/customer-orders/${record.id}`}
+              tooltip={t("resellers.go_to_orders")}
+            />
+          ),
       },
       {
         // Per-row entry-point to ResellerInvoiceSettingsModal.
@@ -279,16 +302,12 @@ export default function ListResellers() {
         disabled: true,
         width: "10em",
         render: (_: unknown, record: TableRecord) => {
-          const isUnsavedNewRow = record.key === -1 || !record.id;
-          if (isUnsavedNewRow) return null;
+          if (isUnsavedNewRow(record)) return null;
           return (
             <Button
               size="small"
               type="primary"
-              style={{
-                backgroundColor: "var(--color-primary-hover)",
-                borderColor: "var(--color-primary-hover)",
-              }}
+              className="primary-hover-shade-button"
               onClick={() =>
                 setInvoiceDrawerReseller(record as unknown as Reseller)
               }
@@ -318,12 +337,11 @@ export default function ListResellers() {
         width: "4em",
         disabled: true,
         render: (_: unknown, record: TableRecord) => {
-          const status = getUserStatus(record);
+          if (isUnsavedNewRow(record)) return null;
           return (
             <StatusButton
-              variant={status.variant}
+              variant={getUserStatus(record).variant}
               onClick={() => handleOpenUserInfoModal(record)}
-              tooltip={t(`users.${status.key}`)}
             />
           );
         },
@@ -408,6 +426,8 @@ export default function ListResellers() {
     ],
   );
 
+  const exportRows = useRowsWithOfferGroupName(list.data, offerGroups);
+
   return (
     <div>
       <div className="flex-between">
@@ -484,7 +504,7 @@ export default function ListResellers() {
         columns={
           columns as unknown as Parameters<typeof ExportCsv>[0]["columns"]
         }
-        data={list.data}
+        data={exportRows}
         filename={t("resellers.list_resellers")}
       />
       <ExplainerText title={t("common.info")}>

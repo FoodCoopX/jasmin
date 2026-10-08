@@ -87,7 +87,6 @@ export default function SuperAdminDashboard() {
       });
     },
     onError: (error) => {
-      console.error("Operation failed:", error);
       notify.error(getErrorMessage(error, "Failed to start the backup"));
     },
   });

@@ -103,7 +103,6 @@ const LoginPage = () => {
       }
       // Navigation is handled by the auth context on the normal path.
     } catch (err: unknown) {
-      console.error("Login error:", err);
       setLocalError(getErrorMessage(err, "Login failed"));
     } finally {
       // The captcha token is spent either way; a retry needs a fresh one.
@@ -121,7 +120,6 @@ const LoginPage = () => {
       });
       // Navigation is handled by the auth context.
     } catch (err: unknown) {
-      console.error("2FA verify error:", err);
       setLocalError(getErrorMessage(err, t("auth.two_factor.error_verify")));
     }
   };

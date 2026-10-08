@@ -16,8 +16,9 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import { ToolTipIcon } from "@shared/ui";
-import { editableOnlyOnCreate } from "@shared/utils";
+import { amountCellText, editableOnlyOnCreate } from "@shared/utils";
 import { useCrates } from "../useCrates";
+import { useNumberFormat } from "@hooks/useNumberFormat";
 import { useVegetableSizeOptions } from "@hooks/useVegetableSizeOptions";
 import { useAmountUnitSizeColumns } from "./useAmountUnitSizeColumns";
 import { useNoteColumn } from "@hooks/columns/useNoteColumn";
@@ -58,6 +59,7 @@ export function useHarvestingListColumns({
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { crates } = useCrates();
   const { noteColumn } = useNoteColumn();
+  const { format } = useNumberFormat();
 
   const { shareArticleColumn, handleUnitChange } = useShareArticleColumn({
     filters: shareArticleFilters,
@@ -151,9 +153,9 @@ export function useHarvestingListColumns({
                 {renderText(record, dataIndex)}
               </span>
             )
-          : (value: unknown) => (
+          : (value: unknown, record: TableRecord) => (
               <span className={spanClassName}>
-                {value ? String(value) : ""}
+                {amountCellText(value, record.unit as string, format)}
               </span>
             );
 
@@ -183,7 +185,7 @@ export function useHarvestingListColumns({
         }),
       ];
     },
-    [isMobile, isGardenerView, titleShareContent, titleOrderContent],
+    [isMobile, isGardenerView, titleShareContent, titleOrderContent, format],
   );
 
   // Combined "amount + amount/PU" cell (used by both gardener flat and
@@ -298,42 +300,18 @@ export function useHarvestingListColumns({
         dataIndex: "amount",
         key: "amount",
         className: "column-group-start",
-        children: (
-          [
-            {
-              suffix: "_share_content" as const,
-              title: titleShareContent,
-              colorClassName: "text-share-content",
-              className: "column-group-start",
-            },
-            {
-              suffix: "_order_content" as const,
-              title: titleOrderContent,
-              colorClassName: "text-order-content",
-              className: undefined as string | undefined,
-            },
-          ] as const
-        ).map(({ suffix, title, colorClassName, className }) => ({
-          title,
+        // Edited as ``amount_share_content`` / ``amount_order_content``, shown
+        // from the matching ``additional_theoretical_harvest_amount_*``.
+        children: makeShareOrderChildren("amount", {
           inputType: "negative_integer",
-          dataIndex: `amount${suffix}`,
-          required: false,
-          align: "center",
-          width: "4.5em",
-          hidden: isMobile || isGardenerView,
-          ...(className ? { className } : {}),
-          render: (_: unknown, record: TableRecord) => {
-            const value = record[
-              `additional_theoretical_harvest_amount${suffix}`
-            ] as number | string | null | undefined;
-            return (
-              <span className={`${colorClassName} text-bold`}>
-                {value ? String(value) : ""}
-              </span>
-            );
-          },
-          pdf: { include: false },
-        })),
+          bold: true,
+          renderText: (record, key) =>
+            amountCellText(
+              record[key.replace("amount", "additional_theoretical_harvest_amount")],
+              record.unit as string,
+              format,
+            ),
+        }),
       },
       {
         title: <>{t("commissioning.amount_harvesting_list")}</>,
@@ -377,11 +355,10 @@ export function useHarvestingListColumns({
     [
       t,
       makeShareOrderChildren,
-      isMobile,
-      isGardenerView,
       titleShareContent,
       titleOrderContent,
       renderCombinedCell,
+      format,
     ],
   );
 

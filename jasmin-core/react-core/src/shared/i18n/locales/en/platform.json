@@ -1,0 +1,9 @@
+{
+  "ops_checklist": {
+    "marked_done": "Marked \"{{title}}\" as done.",
+    "mark_done_failed": "Could not mark the task as done.",
+    "rotation_failed": "Could not run the rotation.",
+    "secret_copied": "Secret copied to clipboard.",
+    "copy_failed": "Couldn't write to the clipboard. Select the text and copy it manually."
+  }
+}

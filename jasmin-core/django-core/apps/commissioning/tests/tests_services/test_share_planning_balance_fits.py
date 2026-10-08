@@ -21,6 +21,7 @@ import datetime
 from decimal import Decimal
 
 import pytest
+import time_machine
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -50,6 +51,16 @@ from apps.commissioning.tests.factories import (
 from apps.commissioning.utils.composite_id_utils import build_composite_id
 
 YEAR, WEEK = 2026, 20
+
+
+@pytest.fixture(autouse=True)
+def _frozen_clock():
+    # The count goes to week 20 of 2026, which the stock count refuses once it
+    # lies more than a week back; on Monday of week 20 it is the current week.
+    with time_machine.travel(datetime.datetime(2026, 5, 11, 12, 0), tick=False):
+        yield
+
+
 TUESDAY_DAY_NUMBER = 1  # Mon=0, Tue=1, Wed=2 — the harvest/count day for week 20
 
 

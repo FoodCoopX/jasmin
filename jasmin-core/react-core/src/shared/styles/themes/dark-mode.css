@@ -102,12 +102,6 @@
 /* The .order-info panel's surface/border/accent come from design tokens
    (info-card.css), which adapt to dark mode on their own — no override here. */
 
-/* --- Harvest cards --- */
-:root.dark .harvest-plot-header {
-  background-color: var(--color-success-bg);
-  color: var(--color-share-content);
-}
-
 /* --- Card headers --- */
 :root.dark .tenant-card-header .ant-card-head {
   background-color: #142a30;

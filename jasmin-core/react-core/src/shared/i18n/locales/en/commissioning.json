@@ -696,6 +696,7 @@
   "storno_reference": "Cancellation for invoice: ",
   "storno_failed": "Cancellation could not be created.",
   "storno_pdf_failed": "Cancellation was created, but the PDF could not be generated. Please try again.",
+  "pdf_generation_failed": "{{count}} PDF(s) could not be generated.",
   "default_kg_per_pu_purchase": "kg/PU purchase",
   "default_pieces_per_pu_purchase": "pcs/PU purchase",
   "default_bunches_per_pu_purchase": "bunch/PU purchase",

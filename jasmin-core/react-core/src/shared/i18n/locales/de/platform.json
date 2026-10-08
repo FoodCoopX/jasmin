@@ -1,0 +1,9 @@
+{
+  "ops_checklist": {
+    "marked_done": "„{{title}}“ als erledigt markiert.",
+    "mark_done_failed": "Die Aufgabe konnte nicht als erledigt markiert werden.",
+    "rotation_failed": "Die Rotation konnte nicht ausgeführt werden.",
+    "secret_copied": "Secret in die Zwischenablage kopiert.",
+    "copy_failed": "Die Zwischenablage ist nicht beschreibbar. Bitte den Text markieren und manuell kopieren."
+  }
+}

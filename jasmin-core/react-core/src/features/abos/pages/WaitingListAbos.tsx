@@ -166,8 +166,7 @@ export default function WaitingListAbos() {
             ),
           };
         }
-      } catch (error) {
-        console.error("Error validating cancelled date:", error);
+      } catch {
         return {
           isValid: false,
           message: t("validation.date_validation_error"),

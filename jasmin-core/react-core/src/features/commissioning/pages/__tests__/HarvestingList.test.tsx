@@ -499,6 +499,7 @@ describe("loading and rows", () => {
     expect(screen.getByRole("heading", { level: 1, name: "commissioning.harvesting_list" })).toBeInTheDocument();
     expect(lastListRequest()).toEqual(listRequest());
     expect(selectedIn(DAY)).toBe(`${HARVEST_DAY} Tuesday, 06.10.2026`);
+    expect(columnNames()).not.toContain(SIZE); // The farm doesn't use sizes.
     // Potatoes are planned at zero for the day.
     expect(articlesListed()).toEqual(["Carrots", "Lettuce", "Radishes", "Beetroot", "Leeks"]);
     expect(deliveryDaysShown()).toBe("commissioning.delivery_day_sharesWednesday, 07.10.2026 / Thursday, 08.10.2026");
@@ -524,37 +525,39 @@ describe("loading and rows", () => {
     expect(screen.getByRole("img", { name: "tooltip.additional_theoretical_harvest" })).toBeInTheDocument();
     expect(cellsOf(rowOf("Carrots"))).toMatchObject({
       [UNIT]: KG, [SIZE]: "commissioning.medium",
-      [under(PLANNED, SHARES)]: "30", [under(PLANNED, ORDERS)]: "20", [under(IN_STOCK, SHARES)]: "10", [under(IN_STOCK, ORDERS)]: "",
-      [under(TO_HARVEST, SHARES)]: "20", [under(TO_HARVEST, ORDERS)]: "20", [under(ADDED, SHARES)]: "5", [under(ADDED, ORDERS)]: "",
-      [under(TOTAL, SHARES)]: `25 ${KG} / 2,5 ${PU}`, [under(TOTAL, ORDERS)]: `20 ${KG} / 2,0 ${PU}`,
+      [under(PLANNED, SHARES)]: "30,00", [under(PLANNED, ORDERS)]: "20,00", [under(IN_STOCK, SHARES)]: "10,00", [under(IN_STOCK, ORDERS)]: "",
+      [under(TO_HARVEST, SHARES)]: "20,00", [under(TO_HARVEST, ORDERS)]: "20,00", [under(ADDED, SHARES)]: "5,00", [under(ADDED, ORDERS)]: "",
+      [under(TOTAL, SHARES)]: `25,00 ${KG} / 2,5 ${PU}`, [under(TOTAL, ORDERS)]: `20,00 ${KG} / 2,0 ${PU}`,
       [PER_PU]: `10,0 ${KG}/${PU}`, [CRATE]: "E2",
       [NOTE]: "Pull by hand, Early variety / commissioning.plot: Field A, commissioning.bed_number: 3",
     });
     expect(cellsOf(rowOf("Lettuce"))).toMatchObject({
-      [UNIT]: PCS, [SIZE]: "commissioning.large", [under(TOTAL, SHARES)]: `66 ${PCS} / 5,5 ${PU}`, [under(TOTAL, ORDERS)]: "",
+      [UNIT]: PCS, [SIZE]: "commissioning.large", [under(TOTAL, SHARES)]: `66,0 ${PCS} / 5,5 ${PU}`, [under(TOTAL, ORDERS)]: "",
       [CRATE]: "E1", [NOTE]: "commissioning.plot: Field A, commissioning.bed_number: 1",
     });
     // A negative stock counts as none; without a PU the amounts stay in bunches.
     expect(cellsOf(rowOf("Radishes"))).toMatchObject({
-      [UNIT]: BUNCHES, [under(IN_STOCK, ORDERS)]: "", [under(TO_HARVEST, ORDERS)]: "15", [under(ADDED, ORDERS)]: "5",
-      [under(TOTAL, ORDERS)]: `20 ${BUNCHES}`, [PER_PU]: "", [CRATE]: "-", [NOTE]: "For the farm shop / commissioning.plot: Greenhouse",
+      [UNIT]: BUNCHES, [under(IN_STOCK, ORDERS)]: "", [under(TO_HARVEST, ORDERS)]: "15,0", [under(ADDED, ORDERS)]: "5,0",
+      [under(TOTAL, ORDERS)]: `20,0 ${BUNCHES}`, [PER_PU]: "", [CRATE]: "-", [NOTE]: "For the farm shop / commissioning.plot: Greenhouse",
     });
     // The stock already covers the plan.
     expect(cellsOf(rowOf("Beetroot"))).toMatchObject({
-      [under(IN_STOCK, SHARES)]: "30", [under(TO_HARVEST, SHARES)]: "", [under(TOTAL, SHARES)]: "",
+      [under(IN_STOCK, SHARES)]: "30,00", [under(TO_HARVEST, SHARES)]: "", [under(TOTAL, SHARES)]: "",
     });
     // 66 lettuces at 12 fill 6 small crates; 45 kg carrots at 10 kg and 16 kg leeks at 8 kg fill 5 + 2 large ones.
     expect(cratesNeeded()).toEqual([["E1", "6"], ["E2", "7"]]);
   });
 
   it.each([
-    ["the default German format", {}, `1.250 ${PCS} / 156,3 ${PU}`, "8,0"],
-    ["the tenant's English format", { number_locale: "en-US" }, `1,250 ${PCS} / 156.3 ${PU}`, "8.0"],
-  ])("writes totals and PUs in %s", async (_format, settings, total, perPu) => {
-    tenantHas(settings);
-    farm.entries.push(entry("h-pumpkins", PUMPKINS, { shares: { planned: 1300, stock: 100, added: 50 }, perPu: 8 }));
+    ["the default German format", {}, `1.250,0 ${PCS} / 156,3 ${PU}`, "8,0", ["1.300,50", "0,30", "1.300,20"]],
+    ["the tenant's English format", { number_locale: "en-US" }, `1,250.0 ${PCS} / 156.3 ${PU}`, "8.0", ["1,300.50", "0.30", "1,300.20"]],
+  ])("writes amounts at the unit's precision, totals and PUs in %s", async (_format, settings, total, perPu, kilos) => {
+    tenantHas(settings); // The potatoes' stock is 0.1 + 0.2, which is 0.30000000000000004 in floating point.
+    farm.entries.push(entry("h-pumpkins", PUMPKINS, { shares: { planned: 1300, stock: 100, added: 50 }, perPu: 8 }),
+      entry("h-potatoes-fractions", POTATOES, { shares: { planned: 1300.5, stock: 0.1 + 0.2 } }));
     await openPage("Pumpkins");
     expect(cellsOf(rowOf("Pumpkins"))).toMatchObject({ [under(TOTAL, SHARES)]: total, [PER_PU]: `${perPu} ${PCS}/${PU}` });
+    expect([PLANNED, IN_STOCK, TO_HARVEST].map((group) => cellsOf(rowOf("Potatoes"))[under(group, SHARES)])).toEqual(kilos);
   });
 
   it("says there is nothing to harvest on a day without plans and keeps the download off", async () => {
@@ -616,7 +619,7 @@ describe("choosing the day and the week", () => {
     expect(Array.from(options, (option) => option.textContent)).toEqual(days.map((day) => `${HARVEST_DAY} ${day}.10.2026`));
     await userEvent.click(optionIn(openDropdown(), `${HARVEST_DAY} Wednesday, 07.10.2026`));
     await waitFor(() => expect(articlesListed()).toEqual(["Kohlrabi"]));
-    expect(totalOf("Kohlrabi")).toBe(`24 ${PCS} / 2,0 ${PU}`);
+    expect(totalOf("Kohlrabi")).toBe(`24,0 ${PCS} / 2,0 ${PU}`);
     expect(lastListRequest()).toEqual(listRequest({ day_number: WEDNESDAY }));
     expect(deliveryDaysShown()).toBe("commissioning.delivery_day_sharesFriday, 09.10.2026");
     await waitFor(() => expect(shareTotals()).toEqual(["Vegetables commissioning.M: 30"]));
@@ -651,7 +654,7 @@ describe("team view", () => {
     // Beetroot needs no harvest: its stock covers the plan.
     expect(articlesListed()).toEqual(["Lettuce (commissioning.large)", "Carrots", "Leeks", "Radishes"]);
     expect(cellsOf(rowOf("Carrots"))).toMatchObject({
-      [TEAM_SHARES]: `25 ${KG} / 2,5 ${PU}`, [TEAM_ORDERS]: `20 ${KG} / 2,0 ${PU}`, [PER_PU]: `10,0 ${KG}/${PU}`, [CRATE]: "E2",
+      [TEAM_SHARES]: `25,00 ${KG} / 2,5 ${PU}`, [TEAM_ORDERS]: `20,00 ${KG} / 2,0 ${PU}`, [PER_PU]: `10,0 ${KG}/${PU}`, [CRATE]: "E2",
       [NOTE]: "Pull by hand, Early variety / commissioning.plot: Field A, commissioning.bed_number: 3",
     });
     expect(screen.queryByRole("button", { name: ADD_ROW })).not.toBeInTheDocument();
@@ -690,15 +693,15 @@ describe("rounding up to full PUs", () => {
     expect(api.saveSettings).toHaveBeenLastCalledWith({ settings: { round_up_to_full_pu_harvesting: true } });
     await waitFor(() => expect(roundUpBox()).toBeChecked());
     expect([totalOf("Carrots"), totalOf("Carrots", ORDERS), totalOf("Lettuce")]).toEqual([
-      `30 ${KG} / 3 ${PU}`, `20 ${KG} / 2 ${PU}`, `72 ${PCS} / 6 ${PU}`,
+      `30,00 ${KG} / 3 ${PU}`, `20,00 ${KG} / 2 ${PU}`, `72,0 ${PCS} / 6 ${PU}`,
     ]);
     // Without a PU there is nothing to round.
-    expect(totalOf("Radishes", ORDERS)).toBe(`20 ${BUNCHES}`);
+    expect(totalOf("Radishes", ORDERS)).toBe(`20,0 ${BUNCHES}`);
     expect(cratesNeeded()).toEqual([["E1", "6"], ["E2", "7"]]);
 
     await userEvent.click(roundUpBox());
     expect(api.saveSettings).toHaveBeenLastCalledWith({ settings: { round_up_to_full_pu_harvesting: false } });
-    await waitFor(() => expect(totalOf("Carrots")).toBe(`25 ${KG} / 2,5 ${PU}`));
+    await waitFor(() => expect(totalOf("Carrots")).toBe(`25,00 ${KG} / 2,5 ${PU}`));
     expect(roundUpBox()).not.toBeChecked();
   });
 
@@ -707,12 +710,12 @@ describe("rounding up to full PUs", () => {
     api.saveSettings.mockRejectedValue(serverError("Settings cannot be changed right now."));
     await openPage();
     expect(roundUpBox()).toBeChecked();
-    expect(totalOf("Carrots")).toBe(`30 ${KG} / 3 ${PU}`);
+    expect(totalOf("Carrots")).toBe(`30,00 ${KG} / 3 ${PU}`);
 
     await userEvent.click(roundUpBox());
     expect(await screen.findByText("Settings cannot be changed right now.")).toBeInTheDocument();
     expect(roundUpBox()).toBeChecked();
-    expect(totalOf("Carrots")).toBe(`30 ${KG} / 3 ${PU}`);
+    expect(totalOf("Carrots")).toBe(`30,00 ${KG} / 3 ${PU}`);
   });
 });
 
@@ -720,7 +723,7 @@ describe("correcting the plan", () => {
   it("corrects the amounts added for the shares and the orders and recomputes the totals and crates", async () => {
     await openPage();
 
-    await userEvent.click(within(rowOf("Carrots")).getByText("5"));
+    await userEvent.click(within(rowOf("Carrots")).getByText("5,00"));
     // The article, its unit and its size stay as they are.
     for (const name of [ARTICLE, UNIT, SIZE]) expect(within(editingRow()).queryByRole("combobox", { name })).not.toBeInTheDocument();
     expect(field(SHARES)).toHaveValue("5");
@@ -730,8 +733,8 @@ describe("correcting the plan", () => {
     await save();
     await waitFor(() =>
       expect(cellsOf(rowOf("Carrots"))).toMatchObject({
-        [under(ADDED, SHARES)]: "12", [under(ADDED, ORDERS)]: "3",
-        [under(TOTAL, SHARES)]: `32 ${KG} / 3,2 ${PU}`, [under(TOTAL, ORDERS)]: `23 ${KG} / 2,3 ${PU}`,
+        [under(ADDED, SHARES)]: "12,00", [under(ADDED, ORDERS)]: "3,00",
+        [under(TOTAL, SHARES)]: `32,00 ${KG} / 3,2 ${PU}`, [under(TOTAL, ORDERS)]: `23,00 ${KG} / 2,3 ${PU}`,
       }),
     );
     expect(screen.queryByRole("button", { name: SAVE })).not.toBeInTheDocument();
@@ -758,7 +761,7 @@ describe("correcting the plan", () => {
     await save();
     await waitFor(() =>
       expect(cellsOf(rowOf("Carrots"))).toMatchObject({
-        [PER_PU]: `5,0 ${KG}/${PU}`, [CRATE]: "E1", [under(TOTAL, SHARES)]: `25 ${KG} / 5,0 ${PU}`,
+        [PER_PU]: `5,0 ${KG}/${PU}`, [CRATE]: "E1", [under(TOTAL, SHARES)]: `25,00 ${KG} / 5,0 ${PU}`,
         [NOTE]: "Leave the tops on, Early variety / commissioning.plot: Field A, commissioning.bed_number: 3",
       }),
     );
@@ -781,7 +784,7 @@ describe("correcting the plan", () => {
     await save();
     await waitFor(() =>
       expect(cellsOf(bodyRows()[0])).toMatchObject({
-        [ARTICLE]: "Kohlrabi", [under(ADDED, SHARES)]: "6", [CRATE]: "E1", [under(TOTAL, SHARES)]: `6 ${PCS} / 0,5 ${PU}`,
+        [ARTICLE]: "Kohlrabi", [under(ADDED, SHARES)]: "6,0", [CRATE]: "E1", [under(TOTAL, SHARES)]: `6,0 ${PCS} / 0,5 ${PU}`,
       }),
     );
     expect(bodyRows()).toHaveLength(6);
@@ -810,7 +813,7 @@ describe("correcting the plan", () => {
     api.update.mockRejectedValue(serverError(refusal));
     await openPage();
 
-    await userEvent.click(within(rowOf("Carrots")).getByText("5"));
+    await userEvent.click(within(rowOf("Carrots")).getByText("5,00"));
     await retype(SHARES, "9");
     await save();
     expect(await screen.findByText("table.save_failed_title")).toBeInTheDocument();
@@ -824,7 +827,7 @@ describe("past weeks and roles", () => {
     await openPage();
 
     await userEvent.click(arrow(WEEK, "common.previous"));
-    await waitFor(() => expect(totalOf("Celeriac")).toBe(`36 ${PCS}`));
+    await waitFor(() => expect(totalOf("Celeriac")).toBe(`36,0 ${PCS}`));
     expect(lastListRequest()).toEqual(listRequest({ delivery_week: 40 }));
     expect(screen.queryByText(PAST_WEEK)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: ADD_ROW })).toBeInTheDocument();
@@ -834,22 +837,22 @@ describe("past weeks and roles", () => {
     await userEvent.click(arrow(WEEK, "common.previous"));
     await waitFor(() => expect(lastListRequest()).toEqual(listRequest({ delivery_week: 39, is_past: true })));
     expect(await screen.findByText(PAST_WEEK)).toBeInTheDocument();
-    await waitFor(() => expect(totalOf("Celeriac")).toBe(`35 ${PCS}`));
-    await expectReadOnly("Celeriac", "2");
+    await waitFor(() => expect(totalOf("Celeriac")).toBe(`35,0 ${PCS}`));
+    await expectReadOnly("Celeriac", "2,0");
   });
 
   it.each(["gardener", "staff", "office", "admin"])("lets the %s role add rows and correct them", async (role) => {
     auth.roles = [role];
     await openPage();
     expect(screen.getByRole("button", { name: ADD_ROW })).toBeInTheDocument();
-    await userEvent.click(within(rowOf("Carrots")).getByText("5"));
+    await userEvent.click(within(rowOf("Carrots")).getByText("5,00"));
     expect(field(SHARES)).toHaveValue("5");
   });
 
   it("shows the list read-only to management", async () => {
     auth.roles = ["management"];
     await openPage();
-    await expectReadOnly("Carrots", "5");
+    await expectReadOnly("Carrots", "5,00");
     expect(downloadButton()).toBeEnabled();
   });
 });
@@ -878,13 +881,13 @@ describe("download", () => {
     expect(printedTable(props)).toEqual({
       header: [ARTICLE, SHARES, ORDERS, PER_PU, "commissioning.harvesting_crate_short", NOTE, "✓"],
       rows: [
-        ["Lettuce (commissioning.large)", `66 ${PCS} - 5,5 ${PU}`, "", `12,0 ${PCS}/${PU}`, "E1", plot("Field A", 1), "☐"],
+        ["Lettuce (commissioning.large)", `66,0 ${PCS} - 5,5 ${PU}`, "", `12,0 ${PCS}/${PU}`, "E1", plot("Field A", 1), "☐"],
         [
-          "Carrots", `25 ${KG} - 2,5 ${PU}`, `20 ${KG} - 2,0 ${PU}`, `10,0 ${KG}/${PU}`, "E2",
+          "Carrots", `25,00 ${KG} - 2,5 ${PU}`, `20,00 ${KG} - 2,0 ${PU}`, `10,0 ${KG}/${PU}`, "E2",
           `Pull by hand, Early variety\n${plot("Field A", 3)}`, "☐",
         ],
-        ["Leeks", `16 ${KG} - 2,0 ${PU}`, "", `8,0 ${KG}/${PU}`, "E2", plot("Field B", 2), "☐"],
-        ["Radishes", "", `20 ${BUNCHES}`, "", "", "For the farm shop\ncommissioning.plot: Greenhouse", "☐"],
+        ["Leeks", `16,00 ${KG} - 2,0 ${PU}`, "", `8,0 ${KG}/${PU}`, "E2", plot("Field B", 2), "☐"],
+        ["Radishes", "", `20,0 ${BUNCHES}`, "", "", "For the farm shop\ncommissioning.plot: Greenhouse", "☐"],
       ],
     });
   });
@@ -905,10 +908,10 @@ describe("on a phone", () => {
     expect(within(carrots).getByText("commissioning.bed_number: 3")).toBeInTheDocument();
     expect(within(carrots).getByText(`10,0 ${KG}/${PU}`)).toBeInTheDocument();
     expect(amountsOn(carrots)).toEqual([
-      [`${SHARES}:`, `25 ${KG}`, `2,5 ${PU}`], [`${ORDERS}:`, `20 ${KG}`, `2,0 ${PU}`], ["Σ", `45 ${KG}`, `4,5 ${PU}`],
+      [`${SHARES}:`, `25,00 ${KG}`, `2,5 ${PU}`], [`${ORDERS}:`, `20,00 ${KG}`, `2,0 ${PU}`], ["Σ", `45,00 ${KG}`, `4,5 ${PU}`],
     ]);
     expect(within(carrots).getByText("Pull by hand, Early variety")).toBeInTheDocument();
-    expect(amountsOn(cardOf("Radishes"))).toEqual([[`${ORDERS}:`, `20 ${BUNCHES}`, ""], ["Σ", `20 ${BUNCHES}`, ""]]);
+    expect(amountsOn(cardOf("Radishes"))).toEqual([[`${ORDERS}:`, `20,0 ${BUNCHES}`, ""], ["Σ", `20,0 ${BUNCHES}`, ""]]);
     expect(selectedIn(DAY)).toBe("Tu, 06.10.");
     expect(phoneCratesNeeded()).toEqual([["E1", "6"], ["E2", "7"]]);
     await waitFor(() => expect(shareTotals()).toHaveLength(3));

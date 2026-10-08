@@ -229,8 +229,10 @@ class DocumentationAggregationItemSerializer(serializers.Serializer):
 
 class PurchaseBulkSetAsExpectedItemSerializer(serializers.Serializer):
     id = serializers.CharField()
-    year = serializers.IntegerField()
-    delivery_week = serializers.IntegerField()
+    # The query-param catalogue's bounds: the week is checked against the
+    # read-only rule, which needs a real ISO week.
+    year = serializers.IntegerField(min_value=1900, max_value=2100)
+    delivery_week = serializers.IntegerField(min_value=1, max_value=53)
     # The amount lands on a 2dp ``DecimalField``; taking it as a Decimal keeps
     # the stored value off the binary-float path.
     theoretical_purchase_amount = serializers.DecimalField(
@@ -252,8 +254,10 @@ class HarvestBulkSetAsExpectedItemSerializer(serializers.Serializer):
     ``id`` is the share-article id of the summary row."""
 
     id = serializers.CharField()
-    year = serializers.IntegerField()
-    delivery_week = serializers.IntegerField()
+    # The query-param catalogue's bounds: the week is checked against the
+    # read-only rule, which needs a real ISO week.
+    year = serializers.IntegerField(min_value=1900, max_value=2100)
+    delivery_week = serializers.IntegerField(min_value=1, max_value=53)
     day_number = serializers.IntegerField()
     # The amount lands on a 2dp ``DecimalField``; taking it as a Decimal keeps
     # the stored value off the binary-float path.

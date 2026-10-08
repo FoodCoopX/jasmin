@@ -1,4 +1,8 @@
-import { CheckCircleOutlined, SyncOutlined } from "@ant-design/icons";
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  SyncOutlined,
+} from "@ant-design/icons";
 import { Space, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,11 +12,14 @@ const { Text } = Typography;
 interface AutoSaveIndicatorProps {
   saving: boolean;
   hasChanges: boolean;
+  /** The last save failed; shown until the next save starts. */
+  failed?: boolean;
 }
 
 export default function AutoSaveIndicator({
   saving,
   hasChanges,
+  failed = false,
 }: AutoSaveIndicatorProps) {
   const { t } = useTranslation();
   const [showSaved, setShowSaved] = useState(false);
@@ -43,6 +50,14 @@ export default function AutoSaveIndicator({
             style={{ color: "var(--color-future-blue)" }}
           />
           <Text type="secondary">{t("settings.saving")}</Text>
+        </Space>
+      ) : failed ? (
+        <Space size="small">
+          <CloseCircleOutlined
+            aria-hidden
+            style={{ color: "var(--color-error)" }}
+          />
+          <Text type="danger">{t("common.error_saving")}</Text>
         </Space>
       ) : showSaved && !hasChanges ? (
         <Space size="small">

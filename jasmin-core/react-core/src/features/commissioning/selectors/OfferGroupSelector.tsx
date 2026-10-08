@@ -20,7 +20,7 @@ const OfferGroupSelector = ({
   preserveSelection = true,
 }: OfferGroupSelectorProps) => {
   const { t } = useTranslation();
-  const { offerGroups, loading, error } = useOfferGroups();
+  const { offerGroups, loading } = useOfferGroups();
 
   const options = useMemo<SelectorOption<string>[]>(
     () =>
@@ -30,10 +30,6 @@ const OfferGroupSelector = ({
       })),
     [offerGroups, t],
   );
-
-  if (error) {
-    console.error("Error in OfferGroupSelector:", error);
-  }
 
   return (
     <BaseEntitySelector<string>

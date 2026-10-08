@@ -190,8 +190,7 @@ export default function ChargesAbos() {
         queryKey: getPaymentsChargeSchedulesListQueryKey(params),
       });
       refetch();
-    } catch (err) {
-      console.error(err);
+    } catch {
       notify.error(t("abos.charges_regenerate_error"));
     } finally {
       setRegenerating(false);

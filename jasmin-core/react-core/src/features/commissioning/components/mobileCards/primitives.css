@@ -1,0 +1,46 @@
+/* A commissioning phone card: its content fills the card's height, and the
+   absolutely placed badges (the harvest card's bed number) sit in its corner. */
+.mobile-card-item.commissioning-mobile-card {
+  align-items: stretch;
+  position: relative;
+  cursor: default;
+}
+
+.mobile-card-item.commissioning-mobile-card.is-clickable {
+  cursor: pointer;
+}
+
+/* A title row with content on its right: the name left, the content right. */
+.mobile-card-title.has-right-slot {
+  justify-content: space-between;
+}
+
+.mobile-card-title-right {
+  white-space: nowrap;
+}
+
+/* The "expected / actual / total" metric row. */
+.mobile-card-metrics-row {
+  margin-top: 6px;
+}
+
+/* A metric given a minimum width, set through --mobile-card-metric-min-width. */
+.mobile-card-metric.has-min-width {
+  min-width: var(--mobile-card-metric-min-width);
+  text-align: center;
+}
+
+.mobile-card-metric-value {
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.mobile-card-metric-value.is-secondary {
+  font-weight: 500;
+}
+
+/* A metric given a colour, set through --mobile-card-metric-color — a
+   design token such as var(--color-success-text). */
+.mobile-card-metric-value.has-color {
+  color: var(--mobile-card-metric-color);
+}

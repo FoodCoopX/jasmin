@@ -289,7 +289,7 @@ const WASHING: PageConfig = {
   additionalHeader: "commissioning.additional_theoretical_wash",
   additionalTooltip: "tooltip.additional_theoretical_wash_amount",
   amountHeader: "commissioning.amount_washing_list", download: "download.washing_list",
-  ownArticle: LEEKS, ownTotal: "8 commissioning.units.kg", otherArticle: CELERIAC,
+  ownArticle: LEEKS, ownTotal: "8,00 commissioning.units.kg", otherArticle: CELERIAC,
   editors: ["office", "admin"], readers: ["gardener", "staff", "management", "member"],
 };
 
@@ -301,7 +301,7 @@ const CLEANING: PageConfig = {
   additionalHeader: "commissioning.additional_theoretical_clean",
   additionalTooltip: "tooltip.additional_theoretical_clean_amount",
   amountHeader: "commissioning.amount_cleaning_list", download: "download.cleaning_list",
-  ownArticle: CELERIAC, ownTotal: "14 commissioning.units.pcs", otherArticle: LEEKS,
+  ownArticle: CELERIAC, ownTotal: "14,0 commissioning.units.pcs", otherArticle: LEEKS,
   editors: ["gardener", "staff", "office", "admin"], readers: ["management", "member"],
 };
 
@@ -501,6 +501,8 @@ describe.each(PAGES)("$name loading and rows", (page) => {
       "Carrots", "Lettuce", "Beetroot", "Radishes", page.ownArticle.name,
     ]);
     expect(screen.queryByText(page.otherArticle.name)).not.toBeInTheDocument();
+    // The farm doesn't use sizes.
+    expect(screen.queryByRole("columnheader", { name: SIZE })).not.toBeInTheDocument();
     expect(screen.getByText("common.info")).toBeInTheDocument();
     expect(screen.getByText(page.explainer)).toBeInTheDocument();
     expect(screen.queryByText(PAST_WEEK)).not.toBeInTheDocument();
@@ -520,37 +522,51 @@ describe.each(PAGES)("$name loading and rows", (page) => {
     expect(screen.getByRole("img", { name: page.additionalTooltip })).toBeInTheDocument();
     expect(cellsByHeader(rowOf("Carrots"))).toMatchObject({
       [UNIT]: "commissioning.units.kg", [SIZE]: "commissioning.medium",
-      [page.theoreticalHeader]: "40", [STILL_IN_STOCK]: "15", [page.toProcessHeader]: "25",
-      [page.additionalHeader]: "5", [page.amountHeader]: "30 commissioning.units.kg",
+      [page.theoreticalHeader]: "40,00", [STILL_IN_STOCK]: "15,00", [page.toProcessHeader]: "25,00",
+      [page.additionalHeader]: "5,00", [page.amountHeader]: "30,00 commissioning.units.kg",
       [NOTE]: "Scrub the soil off",
     });
     expect(cellsByHeader(rowOf("Lettuce"))).toMatchObject({
       [UNIT]: "commissioning.units.pcs", [SIZE]: "commissioning.large",
-      [page.theoreticalHeader]: "60", [STILL_IN_STOCK]: "0", [page.toProcessHeader]: "60",
-      [page.additionalHeader]: "", [page.amountHeader]: "60 commissioning.units.pcs",
+      [page.theoreticalHeader]: "60,0", [STILL_IN_STOCK]: "0,0", [page.toProcessHeader]: "60,0",
+      [page.additionalHeader]: "", [page.amountHeader]: "60,0 commissioning.units.pcs",
     });
     // A negative stock counts as none, and a negative additional amount lowers the total.
     expect(cellsByHeader(rowOf("Beetroot"))).toMatchObject({
-      [STILL_IN_STOCK]: "0", [page.toProcessHeader]: "20",
-      [page.additionalHeader]: "-5", [page.amountHeader]: "15 commissioning.units.kg",
+      [STILL_IN_STOCK]: "0,00", [page.toProcessHeader]: "20,00",
+      [page.additionalHeader]: "-5,00", [page.amountHeader]: "15,00 commissioning.units.kg",
     });
     // The stock already covers the plan.
     expect(cellsByHeader(rowOf("Radishes"))).toMatchObject({
-      [UNIT]: "commissioning.units.bunch", [STILL_IN_STOCK]: "30",
-      [page.toProcessHeader]: "0", [page.amountHeader]: "",
+      [UNIT]: "commissioning.units.bunch", [STILL_IN_STOCK]: "30,0",
+      [page.toProcessHeader]: "0,0", [page.amountHeader]: "",
     });
   });
 
   it.each([
-    ["the default German format", {}, "1.250 commissioning.units.pcs"],
-    ["the tenant's English format", { number_locale: "en-US" }, "1,250 commissioning.units.pcs"],
-  ])("writes a large total in %s", async (_format, settings, shown) => {
+    ["the default German format", {}, ["1.300,50", "0,25", "1.300,25", "0,15", "1.300,40", "0,40", "2,50"]],
+    ["the tenant's English format", { number_locale: "en-US" }, ["1,300.50", "0.25", "1,300.25", "0.15", "1,300.40", "0.40", "2.50"]],
+  ])("writes amounts at the unit's precision in %s, grouped and without float noise", async (_format, settings, shown) => {
     tenantSettings.values = settings;
-    farm.entries.push(entry(page.model, PUMPKINS, { theoretical: 1300, stock: 100, additional: 50 }));
+    farm.entries.push(
+      entry(page.model, PUMPKINS, { unit: "KG", theoretical: 1300.5, stock: 0.25, additional: 0.15 }),
+      // 0.1 + 0.3 is 0.4000000000000001 in floating point.
+      entry(page.model, KALE, { theoretical: 0.1, additional: 0.3 }),
+      entry(page.model, APPLES, { theoretical: 2.5 }),
+    );
     renderPage(page.Page);
     await loaded("Pumpkins");
 
-    expect(cellsByHeader(rowOf("Pumpkins"))[page.amountHeader]).toBe(shown);
+    const [theoretical, inStock, toProcess, additional, total, kaleTotal, applesTotal] = shown;
+    const kg = (amount: string) => `${amount} commissioning.units.kg`;
+    expect(cellsByHeader(rowOf("Pumpkins"))).toMatchObject({
+      [page.theoreticalHeader]: theoretical, [STILL_IN_STOCK]: inStock,
+      [page.toProcessHeader]: toProcess, [page.additionalHeader]: additional,
+      [page.amountHeader]: kg(total),
+    });
+    // A total under one unit is not rounded away, nor 2.5 up to 3.
+    expect(cellsByHeader(rowOf("Kale"))[page.amountHeader]).toBe(kg(kaleTotal));
+    expect(cellsByHeader(rowOf("Apples"))[page.amountHeader]).toBe(kg(applesTotal));
   });
 
   it("says there is nothing to do when the day needs nothing, and keeps the download off", async () => {
@@ -617,7 +633,7 @@ describe.each(PAGES)("$name choosing the day", (page) => {
     await userEvent.click(optionIn(openDropdown(), `${page.daySuffix} Wednesday, 07.10.2026`));
 
     expect(await within(tableBody()).findByText("Kohlrabi")).toBeInTheDocument();
-    expect(cellsByHeader(rowOf("Kohlrabi"))[page.amountHeader]).toBe("12 commissioning.units.pcs");
+    expect(cellsByHeader(rowOf("Kohlrabi"))[page.amountHeader]).toBe("12,0 commissioning.units.pcs");
     expect(within(tableBody()).queryByText("Carrots")).not.toBeInTheDocument();
     expect(lastListRequest()).toEqual({
       year: 2026, delivery_week: 41, day_number: WEDNESDAY, is_past: false, model: page.model,
@@ -671,7 +687,7 @@ describe.each(PAGES)("$name team view", (page) => {
       expect(screen.getByRole("columnheader", { name: header })).toBeInTheDocument();
     }
     expect(cellsByHeader(rowOf("Carrots"))).toMatchObject({
-      [page.amountHeader]: "30 commissioning.units.kg", [NOTE]: "Scrub the soil off",
+      [page.amountHeader]: "30,00 commissioning.units.kg", [NOTE]: "Scrub the soil off",
     });
     expect(screen.queryByRole("button", { name: ADD_ROW })).not.toBeInTheDocument();
     expect(downloadButton(page)).toBeEnabled();
@@ -694,7 +710,7 @@ describe.each(PAGES)("$name additional amounts", (page) => {
     renderPage(page.Page);
     await loaded();
 
-    await userEvent.click(within(rowOf("Carrots")).getByText("5"));
+    await userEvent.click(within(rowOf("Carrots")).getByText("5,00"));
     expect(additionalInput(page)).toHaveValue("5");
     // The article, its unit and its size stay as they are.
     expect(within(editingRow()).queryByRole("combobox")).not.toBeInTheDocument();
@@ -705,7 +721,7 @@ describe.each(PAGES)("$name additional amounts", (page) => {
 
     await waitFor(() =>
       expect(cellsByHeader(rowOf("Carrots"))).toMatchObject({
-        [page.additionalHeader]: "12", [page.amountHeader]: "37 commissioning.units.kg",
+        [page.additionalHeader]: "12,00", [page.amountHeader]: "37,00 commissioning.units.kg",
         [NOTE]: "Scrub twice",
       }),
     );
@@ -734,8 +750,8 @@ describe.each(PAGES)("$name additional amounts", (page) => {
 
     await waitFor(() =>
       expect(cellsByHeader(bodyRows()[0])).toMatchObject({
-        [ARTICLE]: "Kohlrabi", [page.additionalHeader]: "6",
-        [page.amountHeader]: "6 commissioning.units.pcs",
+        [ARTICLE]: "Kohlrabi", [page.additionalHeader]: "6,0",
+        [page.amountHeader]: "6,0 commissioning.units.pcs",
       }),
     );
     expect(bodyRows()).toHaveLength(6);
@@ -762,7 +778,7 @@ describe("entering additional amounts", () => {
 
     await waitFor(() =>
       expect(cellsByHeader(rowOf("Lettuce"))).toMatchObject({
-        [WASHING.additionalHeader]: "-25", [WASHING.amountHeader]: "35 commissioning.units.pcs",
+        [WASHING.additionalHeader]: "-25,0", [WASHING.amountHeader]: "35,0 commissioning.units.pcs",
       }),
     );
   });
@@ -803,7 +819,7 @@ describe("entering additional amounts", () => {
     renderPage(WashingList);
     await loaded();
 
-    await userEvent.click(within(rowOf("Carrots")).getByText("5"));
+    await userEvent.click(within(rowOf("Carrots")).getByText("5,00"));
     await typeAdditional(WASHING, "9");
     await save();
 
@@ -826,9 +842,9 @@ describe("past weeks", () => {
     await waitFor(() => expect(lastListRequest()).toMatchObject({ delivery_week: 39, is_past: true }));
     expect(await screen.findByText(PAST_WEEK)).toBeInTheDocument();
     await waitFor(() =>
-      expect(cellsByHeader(rowOf("Carrots"))[WASHING.amountHeader]).toBe("35 commissioning.units.kg"),
+      expect(cellsByHeader(rowOf("Carrots"))[WASHING.amountHeader]).toBe("35,00 commissioning.units.kg"),
     );
-    await expectReadOnly("Carrots", "2");
+    await expectReadOnly("Carrots", "2,00");
   });
 
   it("still lets last week's amounts be corrected", async () => {
@@ -838,7 +854,7 @@ describe("past weeks", () => {
     await userEvent.click(arrow(WEEK, "common.previous"));
 
     await waitFor(() =>
-      expect(cellsByHeader(rowOf("Carrots"))[WASHING.amountHeader]).toBe("36 commissioning.units.kg"),
+      expect(cellsByHeader(rowOf("Carrots"))[WASHING.amountHeader]).toBe("36,00 commissioning.units.kg"),
     );
     expect(lastListRequest()).toMatchObject({ delivery_week: 40, is_past: false });
     expect(screen.queryByText(PAST_WEEK)).not.toBeInTheDocument();
@@ -855,7 +871,7 @@ describe.each(PAGES)("$name roles", (page) => {
     await loaded();
 
     expect(screen.getByRole("button", { name: ADD_ROW })).toBeInTheDocument();
-    await userEvent.click(within(rowOf("Carrots")).getByText("5"));
+    await userEvent.click(within(rowOf("Carrots")).getByText("5,00"));
     expect(additionalInput(page)).toHaveValue("5");
   });
 
@@ -864,7 +880,7 @@ describe.each(PAGES)("$name roles", (page) => {
     renderPage(page.Page);
     await loaded();
 
-    await expectReadOnly("Carrots", "5");
+    await expectReadOnly("Carrots", "5,00");
   });
 });
 
@@ -881,9 +897,9 @@ describe.each(PAGES)("$name on a phone", (page) => {
 
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(document.querySelectorAll(".mobile-card-item")).toHaveLength(5);
-    expect(cardOf("Carrots")).toHaveTextContent("30 commissioning.units.kg");
+    expect(cardOf("Carrots")).toHaveTextContent("30,00 commissioning.units.kg");
     expect(cardOf("Carrots")).toHaveTextContent("Scrub the soil off");
-    expect(cardOf("Beetroot")).toHaveTextContent("15 commissioning.units.kg");
+    expect(cardOf("Beetroot")).toHaveTextContent("15,00 commissioning.units.kg");
     expect(cardOf(page.ownArticle.name)).toHaveTextContent(page.ownTotal);
     expect(screen.queryByText("Potatoes")).not.toBeInTheDocument();
     expect(selectedIn(DAY)).toBe("Tu, 06.10.");
@@ -905,7 +921,7 @@ describe("phone cards", () => {
     await loaded();
 
     expect(within(cardOf("Lettuce")).getByText("commissioning.large")).toBeInTheDocument();
-    expect(within(cardOf("Lettuce")).getByText("60 commissioning.units.pcs")).toBeInTheDocument();
+    expect(within(cardOf("Lettuce")).getByText("60,0 commissioning.units.pcs")).toBeInTheDocument();
     expect(within(cardOf("Carrots")).queryByText("commissioning.medium")).not.toBeInTheDocument();
     expect(cardOf("Radishes")).not.toHaveTextContent("commissioning.units");
   });
@@ -914,7 +930,7 @@ describe("phone cards", () => {
     renderPage(CleaningList);
     await loaded();
 
-    expect(cardOf("Carrots")).toHaveTextContent("commissioning.amount_cleaning_list: 30 commissioning.units.kg");
+    expect(cardOf("Carrots")).toHaveTextContent("commissioning.amount_cleaning_list: 30,00 commissioning.units.kg");
     expect(cardOf("Carrots")).toHaveTextContent("commissioning.note: Scrub the soil off");
     expect(cardOf("Radishes")).not.toHaveTextContent("commissioning.amount_cleaning_list");
   });
@@ -958,9 +974,9 @@ describe.each(PAGES)("$name worksheet download", (page) => {
     ]);
     expect(lines).toEqual(
       expect.arrayContaining([
-        ["Carrots", "30 commissioning.units.kg", "Scrub the soil off"],
-        ["Lettuce (commissioning.large)", "60 commissioning.units.pcs", ""],
-        ["Beetroot", "15 commissioning.units.kg", ""],
+        ["Carrots", "30,00 commissioning.units.kg", "Scrub the soil off"],
+        ["Lettuce (commissioning.large)", "60,0 commissioning.units.pcs", ""],
+        ["Beetroot", "15,00 commissioning.units.kg", ""],
         [page.ownArticle.name, page.ownTotal, ""],
       ]),
     );

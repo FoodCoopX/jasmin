@@ -5772,6 +5772,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
         '401':
           content:
             application/json:
@@ -5809,6 +5815,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
           content:
             application/json:
               schema:
@@ -31203,8 +31215,12 @@ components:
           type: string
         year:
           type: integer
+          maximum: 2100
+          minimum: 1900
         delivery_week:
           type: integer
+          maximum: 53
+          minimum: 1
         day_number:
           type: integer
         theoretical_harvest_amount:
@@ -34841,8 +34857,12 @@ components:
           type: string
         year:
           type: integer
+          maximum: 2100
+          minimum: 1900
         delivery_week:
           type: integer
+          maximum: 53
+          minimum: 1
         theoretical_purchase_amount:
           type: string
           format: decimal

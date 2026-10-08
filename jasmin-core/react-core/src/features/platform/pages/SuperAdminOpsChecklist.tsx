@@ -13,6 +13,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Button,
@@ -25,7 +26,6 @@ import {
   Tag,
   Tooltip,
   Typography,
-  message,
 } from "antd";
 import {
   CheckCircleOutlined,
@@ -33,6 +33,8 @@ import {
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import axiosService from "@shared/services/api";
+import { notify } from "@shared/utils";
+import { getServerErrorMessage } from "@shared/utils/apiError";
 import { SUPER_ADMIN_ENDPOINTS } from "@features/platform/services/superAdmin";
 
 // Kinds the backend's ``run-rotation`` endpoint will dispatch.
@@ -87,6 +89,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 export default function SuperAdminOpsChecklist() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeItem, setActiveItem] = useState<OpsChecklistItem | null>(null);
   const [notes, setNotes] = useState("");
@@ -150,8 +153,8 @@ export default function SuperAdminOpsChecklist() {
       );
       setRotationResult(res.data);
     } catch (err) {
-      message.error(
-        err instanceof Error ? err.message : "Failed to run rotation.",
+      notify.error(
+        getServerErrorMessage(err) ?? t("platform.ops_checklist.rotation_failed"),
       );
       setRotatingItem(null);
     } finally {
@@ -163,11 +166,9 @@ export default function SuperAdminOpsChecklist() {
     if (!rotationResult?.generated_secret) return;
     try {
       await navigator.clipboard.writeText(rotationResult.generated_secret);
-      message.success("Secret copied to clipboard.");
+      notify.success(t("platform.ops_checklist.secret_copied"));
     } catch {
-      message.error(
-        "Couldn't write to clipboard. Select the text and copy manually.",
-      );
+      notify.error(t("platform.ops_checklist.copy_failed"));
     }
   };
 
@@ -184,13 +185,16 @@ export default function SuperAdminOpsChecklist() {
       void queryClient.invalidateQueries({
         queryKey: ["super-admin", "ops-checklist"],
       });
-      message.success(`Marked "${item.title}" as done.`);
+      notify.success(
+        t("platform.ops_checklist.marked_done", { title: item.title }),
+      );
       setActiveItem(null);
       setNotes("");
     },
     onError: (err) => {
-      message.error(
-        err instanceof Error ? err.message : "Failed to mark item done.",
+      notify.error(
+        getServerErrorMessage(err) ??
+          t("platform.ops_checklist.mark_done_failed"),
       );
     },
   });

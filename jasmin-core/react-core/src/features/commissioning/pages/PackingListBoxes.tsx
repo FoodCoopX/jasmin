@@ -1,3 +1,4 @@
+import { Alert, Button } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -35,6 +36,7 @@ import type {
 import { PastWarningMessage } from "@shared/ui";
 import {
   useBoxCombinationColumns,
+  useDeliveryStationOfDay,
   usePackingBaseColumns,
   useShareContentGranularity,
   useShareDeliveryDays,
@@ -78,7 +80,71 @@ function usePackingMatrix(
     { query: { enabled: enabled && usesExternalDemand } },
   );
   const query = usesExternalDemand ? memberQuery : boxesQuery;
-  return { data: query.data, isFetching: query.isFetching };
+  return {
+    data: query.data,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Which part of the delivery day the list covers. The tenant's ShareContent
+ * granularity decides it — not scoped to a share type, since the matrix spans
+ * every share type: the whole day when every station gets the same amounts
+ * (days_ok); one of the day's tours when the amounts are tour- but not
+ * day-consistent and the day has several tours; and otherwise one of the
+ * day's stations, which is also asked for while the granularity is loading.
+ */
+function usePackingScope({
+  year,
+  week,
+  dayNumber,
+  dayRecord,
+}: {
+  year: number;
+  week: number | null;
+  dayNumber: number | null;
+  dayRecord: ShareDeliveryDayOption | undefined;
+}) {
+  const [selectedTour, setSelectedTour] = useState<number | "all">("all");
+  const { daysOk, toursOk } = useShareContentGranularity({
+    year,
+    delivery_week: week ?? undefined,
+    day_number: dayNumber ?? undefined,
+  });
+
+  const numberOfTours = dayRecord?.number_of_tours || 1;
+  const tourSelectorActive = !daysOk && Boolean(toursOk) && numberOfTours > 1;
+  const needsStation = !daysOk && !toursOk;
+
+  // The tour picker offers only the day's tours, so the list asks for one of
+  // them from the start: the first until another is picked, and the first
+  // again when the picked one isn't among the day's.
+  const effectiveTour = useMemo<number | undefined>(() => {
+    if (!tourSelectorActive) return undefined;
+    return selectedTour !== "all" && selectedTour <= numberOfTours
+      ? selectedTour
+      : 1;
+  }, [tourSelectorActive, selectedTour, numberOfTours]);
+
+  // The station is checked only while one is asked for, so a farm whose
+  // stations all get the same amounts loads no station list.
+  const [selectedDeliveryStation, setSelectedDeliveryStation, isStationOfDay] =
+    useDeliveryStationOfDay(needsStation ? (dayRecord?.id ?? null) : null, {
+      selectFirst: false,
+    });
+
+  return {
+    tourSelectorActive,
+    needsStation,
+    selectedTour,
+    setSelectedTour,
+    effectiveTour,
+    selectedDeliveryStation,
+    setSelectedDeliveryStation,
+    isStationOfDay,
+  };
 }
 
 /**
@@ -126,10 +192,6 @@ export default function PackingListBoxes() {
   const [selectedDeliveryDay, setSelectedDeliveryDay] = useState<number | null>(
     currentDay - 1,
   );
-  const [selectedDeliveryStation, setSelectedDeliveryStation] = useState<
-    string | null
-  >(null);
-  const [selectedTour, setSelectedTour] = useState<number | "all">("all");
 
   const isPast = useMemo(
     () => isWeekInPast(selectedYear, selectedWeek),
@@ -177,40 +239,24 @@ export default function PackingListBoxes() {
 
   const getDeliveryDayId = selectedDayRecord?.id ?? null;
 
-  const hasMultipleToursForSelectedDay = useMemo(() => {
-    if (!selectedDayRecord) return false;
-    const tours =
-      ((selectedDayRecord as unknown as Record<string, unknown>)
-        .number_of_tours as number) || 1;
-    return tours > 1;
-  }, [selectedDayRecord]);
-
-  // --- Granularity (inherited from PackingListBoxes) ---
-  // Not scoped to a share_type: the matrix spans every share type, so it needs
-  // the strictest (per-day, all-share-types) granularity.
-  const { daysOk, toursOk } = useShareContentGranularity({
+  const {
+    tourSelectorActive,
+    needsStation,
+    selectedTour,
+    setSelectedTour,
+    effectiveTour,
+    selectedDeliveryStation,
+    setSelectedDeliveryStation,
+    isStationOfDay,
+  } = usePackingScope({
     year: selectedYear,
-    delivery_week: selectedWeek ?? undefined,
-    day_number: selectedDeliveryDay ?? undefined,
+    week: selectedWeek,
+    dayNumber: selectedDeliveryDay,
+    dayRecord: selectedDayRecord,
   });
 
-  // Tour selector is live only when amounts are tour- but not day-consistent
-  // AND the day actually has multiple tours. Station selector (and a required
-  // station) appears when amounts are neither day- nor tour-consistent. While
-  // granularity is still loading (null) we conservatively require a station,
-  // exactly like PackingListBoxes.
-  const tourSelectorActive =
-    !daysOk && Boolean(toursOk) && hasMultipleToursForSelectedDay;
-  const needsStation = !daysOk && !toursOk;
-
-  const effectiveTour = useMemo<number | undefined>(() => {
-    if (!tourSelectorActive || selectedTour === "all") return undefined;
-    return selectedTour;
-  }, [tourSelectorActive, selectedTour]);
-
   const queryEnabled =
-    selectedDeliveryDay !== null &&
-    (!needsStation || selectedDeliveryStation !== null);
+    selectedDeliveryDay !== null && (!needsStation || isStationOfDay);
 
   const matrixParams =
     useMemo<CommissioningPackingListBoxesMatrixRetrieveParams>(
@@ -238,7 +284,7 @@ export default function PackingListBoxes() {
       ],
     );
 
-  const { data, isFetching } = usePackingMatrix(matrixParams, {
+  const { data, isFetching, isError, refetch } = usePackingMatrix(matrixParams, {
     enabled: queryEnabled,
     usesExternalDemand,
   });
@@ -314,7 +360,10 @@ export default function PackingListBoxes() {
 
   // The matrix ran but produced no combination columns (no share type
   // variations for this scope) → show the warning instead of an empty grid.
-  const noColumns = queryEnabled && !isFetching && matrixColumns.length === 0;
+  // A failed load is shown as such, never as a day without deliveries.
+  const loadFailed = queryEnabled && !isFetching && isError;
+  const noColumns =
+    queryEnabled && !isFetching && !isError && matrixColumns.length === 0;
 
   return (
     <div>
@@ -376,6 +425,21 @@ export default function PackingListBoxes() {
 
       {isMobile && !usesExternalDemand && matrixColumns.length > 0 && (
         <PackingListBoxesCountCard groups={comboColumns} columns={matrixColumns} />
+      )}
+
+      {loadFailed && (
+        <Alert
+          type="error"
+          showIcon
+          message={t("table.load_failed_title")}
+          description={t("table.load_failed_hint")}
+          action={
+            <Button size="small" onClick={() => refetch()}>
+              {t("table.retry")}
+            </Button>
+          }
+          className="editable-table-banner"
+        />
       )}
 
       {noColumns ? (

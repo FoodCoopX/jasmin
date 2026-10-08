@@ -24,15 +24,20 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("react-i18next", () => ({
-  useTranslation: () => ({
+// One ``t`` for every render, as react-i18next hands out: the note autosave
+// restarts its debounce whenever ``t`` changes.
+vi.mock("react-i18next", () => {
+  const translation = {
     t: (key: string, fallback?: unknown) =>
       typeof fallback === "string" ? fallback : key,
     i18n: { language: "de", changeLanguage: () => Promise.resolve() },
-  }),
-  Trans: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
-  initReactI18next: { type: "3rdParty", init: () => {} },
-}));
+  };
+  return {
+    useTranslation: () => translation,
+    Trans: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+    initReactI18next: { type: "3rdParty", init: () => {} },
+  };
+});
 
 vi.mock("@hooks/configuration/useTenant", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
@@ -40,13 +45,22 @@ vi.mock("@hooks/configuration/useTenant", async () => {
   return { useTenant: () => tenant };
 });
 
-// Finalizing renders and uploads PDFs; no test here finalizes.
+// Finalizing renders and uploads PDFs.
 vi.mock(
   "@features/commissioning/pdfs/forResellers/generateDeliveryNotePDF",
   () => ({ generateAndUploadDeliveryNotePDF: vi.fn() }),
 );
 vi.mock("@features/commissioning/pdfs/forResellers/generateInvoicePDF", () => ({
   generateAndUploadInvoicePDF: vi.fn(),
+}));
+
+const notifyMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  warning: vi.fn(),
+}));
+vi.mock("@shared/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@shared/utils")>()),
+  notify: notifyMock,
 }));
 
 const api = vi.hoisted(() => ({
@@ -115,6 +129,8 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
   };
 });
 
+import { generateAndUploadDeliveryNotePDF } from "@features/commissioning/pdfs/forResellers/generateDeliveryNotePDF";
+import { generateAndUploadInvoicePDF } from "@features/commissioning/pdfs/forResellers/generateInvoicePDF";
 import { useOrdersData } from "../useOrdersData";
 
 // ── The order on the server ─────────────────────────────────────────────────
@@ -284,6 +300,9 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   serverCrateLines = [CARROT_DEPOSIT, SMALL_DISCOUNTED, SMALL_FULL_PRICE];
   Object.values(api).forEach((fn) => fn.mockReset());
+  Object.values(notifyMock).forEach((fn) => fn.mockReset());
+  vi.mocked(generateAndUploadDeliveryNotePDF).mockReset();
+  vi.mocked(generateAndUploadInvoicePDF).mockReset();
   api.orderContents.mockImplementation(async () => ({
     items: [CARROTS],
     order: ORDER,
@@ -459,5 +478,67 @@ describe("useOrdersData crate list", () => {
     );
     expect(api.createOrderContent).toHaveBeenCalledTimes(1);
     expect(result.current.orderState.orderId).toBe("order-1");
+  });
+});
+
+describe("useOrdersData order note", () => {
+  it("tells the office when the note it typed could not be saved", async () => {
+    // A failed request without a message of its own.
+    api.setOrderNote.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 503, data: {} },
+    });
+    const { result } = await renderLoadedOrder();
+
+    act(() => result.current.setOrderNote("Leave at the back door"));
+
+    await waitFor(
+      () =>
+        expect(notifyMock.error).toHaveBeenCalledWith(
+          "common.error_saving_data",
+        ),
+      { timeout: 3000 },
+    );
+    expect(api.setOrderNote).toHaveBeenCalledWith("order-1", {
+      note: "Leave at the back door",
+    });
+  });
+});
+
+describe("useOrdersData PDFs after finalizing", () => {
+  it("generates every PDF and says how many failed", async () => {
+    vi.mocked(generateAndUploadDeliveryNotePDF).mockRejectedValueOnce(
+      new Error("render failed"),
+    );
+    const { result } = renderOrders();
+
+    await act(async () => {
+      await result.current.handleFinalizeInvoicesSuccess({
+        results: [
+          { success: true, delivery_note_id: "dn-1", invoice_id: "inv-1" },
+          { success: true, delivery_note_id: "dn-2", invoice_id: "inv-2" },
+        ],
+      });
+    });
+
+    expect(generateAndUploadDeliveryNotePDF).toHaveBeenCalledTimes(2);
+    expect(generateAndUploadInvoicePDF).toHaveBeenCalledTimes(2);
+    expect(notifyMock.warning).toHaveBeenCalledTimes(1);
+    expect(notifyMock.warning).toHaveBeenCalledWith(
+      "commissioning.pdf_generation_failed",
+    );
+  });
+
+  it("stays quiet when every delivery note PDF is generated", async () => {
+    const { result } = renderOrders();
+
+    await act(async () => {
+      await result.current.handleFinalizeDeliveryNotesSuccess({
+        results: [{ success: true, delivery_note_id: "dn-1" }],
+      });
+    });
+
+    expect(generateAndUploadDeliveryNotePDF).toHaveBeenCalledTimes(1);
+    expect(notifyMock.warning).not.toHaveBeenCalled();
   });
 });

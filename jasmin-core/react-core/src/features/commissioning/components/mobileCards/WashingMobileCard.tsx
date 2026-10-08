@@ -8,6 +8,7 @@ import {
 } from "./primitives";
 import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
+import "./WashingMobileCard.css";
 
 interface WashingMobileCardProps {
   record: TableRecord;
@@ -30,7 +31,7 @@ export function WashingMobileCard({
       <MobileCardContent>
         <MobileCardTitle name={articleName} sizeLabel={sizeLabel} />
         {washAmountText && (
-          <div style={{ fontSize: "0.9em", marginTop: 2, fontWeight: 600 }}>
+          <div className="washing-card-amount">
             {washAmountText}
           </div>
         )}

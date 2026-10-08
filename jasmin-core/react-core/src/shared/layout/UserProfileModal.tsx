@@ -141,7 +141,7 @@ export default function UserProfileModal({
               type="primary"
               onClick={handleSaveProfile}
               loading={saving}
-              style={{ background: "var(--color-primary-hover)" }}
+              className="primary-hover-shade-button"
             >
               {t("common.save")}
             </Button>

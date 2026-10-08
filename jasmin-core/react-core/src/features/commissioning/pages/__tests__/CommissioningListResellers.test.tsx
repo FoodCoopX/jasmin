@@ -241,6 +241,7 @@ const WEEK = "common.week";
 const YEAR = "common.year";
 const TITLE = "commissioning.commissioning_list_reseller";
 const NO_ORDERS = "commissioning.no_orders_title";
+const LOAD_FAILED = "table.load_failed_title";
 const EXPLAINER = "explainers.commissioning_lists";
 const DOWNLOAD = /download\.commissioning_list$/;
 const PU = "commissioning.pu";
@@ -355,6 +356,8 @@ const figuresOf = (block: HTMLElement): Record<string, string> =>
 
 const downloadButton = () => screen.getByRole("button", { name: DOWNLOAD });
 
+const isBusy = () => document.querySelector('[aria-busy="true"]') !== null;
+
 /** An order with carrots both by the bunch and by the kilo, and beetroot. */
 const FARM_SHOP_LINES = [
   line("Beetroot", 6, 2, { unit: "BUNCH" }),
@@ -441,13 +444,29 @@ describe("CommissioningListResellers loading", () => {
     await waitFor(() => expect(api.orders).toHaveBeenCalled());
     expect(cardNames()).toEqual([]);
     expect(screen.queryByText(NO_ORDERS)).not.toBeInTheDocument();
+    expect(isBusy()).toBe(true);
     expect(downloadButton()).toBeDisabled();
 
     orders.answer(TUESDAY_ORDERS);
 
     expect(await screen.findByText("Green Grocer")).toBeInTheDocument();
     expect(cardNames()).toEqual(["Green Grocer", "Corner Café"]);
+    expect(isBusy()).toBe(false);
     expect(downloadButton()).toBeEnabled();
+  });
+
+  it("says the orders could not be loaded, not that there are none, and loads them on retry", async () => {
+    api.orders.mockRejectedValueOnce(new Error("Network Error"));
+    renderPage();
+
+    expect(await screen.findByText(LOAD_FAILED)).toBeInTheDocument();
+    expect(screen.queryByText(NO_ORDERS)).not.toBeInTheDocument();
+    expect(downloadButton()).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "table.retry" }));
+
+    expect(await screen.findByText("Green Grocer")).toBeInTheDocument();
+    expect(screen.queryByText(LOAD_FAILED)).not.toBeInTheDocument();
   });
 });
 
@@ -533,6 +552,25 @@ describe("CommissioningListResellers cards", () => {
     await screen.findByText("Green Grocer");
 
     expect(screen.queryByText("Village Shop")).not.toBeInTheDocument();
+  });
+
+  it("names an article without a sort by its name and size alone", async () => {
+    farm.orders[slot(2026, 41, TUESDAY)] = [
+      orderOf("Farm Shop", [line("Carrots", 12, 2.5, { size: "L" })]),
+    ];
+    renderPage();
+    await screen.findByText("Farm Shop");
+
+    expect(rowsOf("Farm Shop")[0][1]).toBe(`Carrots, ${LARGE}`);
+  });
+
+  it("says there are no orders, and offers nothing to download, on a day whose orders are all empty", async () => {
+    farm.orders[slot(2026, 41, TUESDAY)] = [VILLAGE_SHOP];
+    renderPage();
+
+    expect(await screen.findByText(NO_ORDERS)).toBeInTheDocument();
+    expect(cardNames()).toEqual([]);
+    expect(downloadButton()).toBeDisabled();
   });
 
   it("says there are no orders, and offers nothing to download, on a day without orders", async () => {

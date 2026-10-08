@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useVegetableSizeOptions, useUnitOptions } from "@hooks/index";
+import { useNumberFormat, useVegetableSizeOptions, useUnitOptions } from "@hooks/index";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
 import {
   MobileCard,
@@ -10,6 +10,7 @@ import {
 } from "./primitives";
 import { recordText } from "./recordText";
 import { getSizeLabelOrEmpty } from "./sizeLabel";
+import "./ForecastMobileCard.css";
 
 interface ForecastMobileCardProps {
   record: TableRecord;
@@ -24,10 +25,12 @@ export function ForecastMobileCard({
   const { t } = useTranslation();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { getUnitLabel } = useUnitOptions();
+  const { format } = useNumberFormat();
 
   const articleName = recordText(record, "share_article_name");
   const sizeLabel = getSizeLabelOrEmpty(record.size as string, getVegetableSizeLabel);
-  const amount = record.amount as number | null | undefined;
+  // A decimal string on the wire ("12.00").
+  const amount = record.amount as string | number | null | undefined;
   const unitLabel = getUnitLabel(record.unit as string);
   const plotName = recordText(record, "plot_name");
   const bedNumber = record.bed_number as number | null | undefined;
@@ -42,9 +45,9 @@ export function ForecastMobileCard({
   if (record.for_all_markets) tags.push(t("commissioning.for_all_markets"));
 
   const rightSlot =
-    amount != null && amount > 0 ? (
-      <span style={{ fontWeight: 600 }}>
-        {amount} {unitLabel}
+    amount != null && Number(amount) > 0 ? (
+      <span className="forecast-card-amount">
+        {format(Number(amount), 0)} {unitLabel}
       </span>
     ) : null;
 

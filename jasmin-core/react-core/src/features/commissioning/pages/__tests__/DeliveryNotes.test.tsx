@@ -97,6 +97,7 @@ const bulkSendDocsMock = vi.fn();
 const dnContentsCreateMock = vi.fn();
 const dnContentsPatchMock = vi.fn();
 const dnDestroyMock = vi.fn();
+const sendToResellerMock = vi.fn();
 
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   useCommissioningOrdersOverviewList: (params: unknown, opts?: unknown) =>
@@ -117,6 +118,8 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
     dnContentsPatchMock(...args),
   commissioningDeliveryNotesDestroy: (...args: unknown[]) =>
     dnDestroyMock(...args),
+  commissioningDeliveryNotesSendToResellerCreate: (...args: unknown[]) =>
+    sendToResellerMock(...args),
 }));
 
 // ── Sub-component stubs ─────────────────────────────────────────────────────
@@ -190,7 +193,8 @@ vi.mock("@shared/ui", () => ({
 }));
 
 // EditableTable stub: expose a "select-first-row" button so we can drive
-// rowSelection without dragging the real table behaviour into this test.
+// rowSelection without dragging the real table behaviour into this test, and
+// render each row's action buttons.
 vi.mock("@shared/tables", async () => {
   // wrapApiFunctions is pure (type-only deps) — use the real one.
   const { wrapApiFunctions } = await import(
@@ -202,9 +206,14 @@ vi.mock("@shared/tables", async () => {
     EditableTable: ({
       onSelectedRowsChange,
       initialData,
+      columns,
     }: {
       onSelectedRowsChange?: (ids: (string | number)[]) => void;
       initialData?: Array<{ id: string | number }>;
+      columns?: Array<{
+        dataIndex?: string;
+        render?: (value: unknown, record: unknown) => React.ReactNode;
+      }>;
     }) => (
       <div data-testid="editable-table">
         <button
@@ -215,6 +224,13 @@ vi.mock("@shared/tables", async () => {
           select-all
         </button>
         <span data-testid="row-count">{initialData?.length ?? 0}</span>
+        {initialData?.map((row) => (
+          <div key={row.id}>
+            {columns
+              ?.find((column) => column.dataIndex === "actions")
+              ?.render?.(undefined, row)}
+          </div>
+        ))}
       </div>
     ),
   };
@@ -271,6 +287,7 @@ beforeEach(() => {
   dnContentsCreateMock.mockReset();
   dnContentsPatchMock.mockReset();
   dnDestroyMock.mockReset();
+  sendToResellerMock.mockReset();
   notifyMock.success.mockReset();
   notifyMock.error.mockReset();
   notifyMock.warning.mockReset();
@@ -422,5 +439,84 @@ describe("bulk send by email", () => {
       });
     });
     expect(await screen.findByTestId("job-drawer")).toHaveTextContent("job-1");
+  });
+});
+
+// ── Sending one delivery note to its reseller ───────────────────────────────
+
+describe("send to reseller", () => {
+  beforeEach(() => {
+    ordersOverviewListHookMock.mockReturnValue({
+      data: [makeRow({ delivery_note_is_finalized: true })],
+      refetch: vi.fn(),
+    });
+  });
+
+  const sendButton = () =>
+    screen.getByRole("button", {
+      name: /commissioning.send_delivery_note_to_reseller/,
+    });
+
+  it("confirms a sent delivery note", async () => {
+    sendToResellerMock.mockResolvedValue({ sent: true });
+    renderPage();
+
+    await userEvent.click(sendButton());
+
+    await waitFor(() =>
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        "commissioning.delivery_note_sent_to_reseller",
+      ),
+    );
+    expect(sendToResellerMock).toHaveBeenCalledWith("dn-7");
+  });
+
+  it("warns when the server did not send the delivery note", async () => {
+    sendToResellerMock.mockResolvedValue({ sent: false });
+    renderPage();
+
+    await userEvent.click(sendButton());
+
+    await waitFor(() =>
+      expect(notifyMock.warning).toHaveBeenCalledWith(
+        "commissioning.delivery_note_send_failed",
+      ),
+    );
+    expect(notifyMock.success).not.toHaveBeenCalled();
+  });
+
+  it("shows the server's message when sending is refused", async () => {
+    sendToResellerMock.mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { code: "no_invoice_email", message: "No invoice email." },
+      },
+    });
+    renderPage();
+
+    await userEvent.click(sendButton());
+
+    await waitFor(() =>
+      expect(notifyMock.error).toHaveBeenCalledWith("No invoice email."),
+    );
+  });
+
+  it("says the delivery note could not be sent when the server gives no reason", async () => {
+    sendToResellerMock.mockRejectedValue(
+      Object.assign(new Error("Request failed with status code 503"), {
+        isAxiosError: true,
+        response: { status: 503, data: "" },
+      }),
+    );
+    renderPage();
+
+    await userEvent.click(sendButton());
+
+    await waitFor(() =>
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        "commissioning.delivery_note_send_failed",
+      ),
+    );
   });
 });

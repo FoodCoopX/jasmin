@@ -68,6 +68,7 @@ from ..services import (
 )
 from ..utils.lookup import get_or_404
 from ..utils.query_params import DOCUMENTATION_MODELS, validate_query_params
+from ..utils.read_only_week import refuse_read_only_week
 from ..utils.validation_utils import parse_bulk_ids
 from .base_viewsets import BaseArchivableViewSet, CanBeDeletedDestroyMixin
 
@@ -218,6 +219,40 @@ def _refuse_another_week(model: str, pk: str, data: dict[str, Any]) -> None:
         # The entry's own week, so a client can name it without parsing prose.
         details={"year": stored["year"], "delivery_week": stored["delivery_week"]},
     )
+
+
+def _refuse_read_only_weeks(
+    validated_data: dict[str, Any], instance: Any | None = None
+) -> None:
+    """Refuse a write that touches a week the documentation pages show read-only.
+
+    An update is checked against the stored row's week and against the week the
+    body moves it to, so a row can neither be changed in a closed week nor moved
+    into one.
+    """
+    if instance is not None:
+        refuse_read_only_week(instance.year, instance.delivery_week)
+    year = validated_data.get("year", getattr(instance, "year", None))
+    week = validated_data.get("delivery_week", getattr(instance, "delivery_week", None))
+    if year is not None and week is not None:
+        refuse_read_only_week(year, week)
+
+
+def _refuse_read_only_stored_week(model: str, pk: str) -> None:
+    """Refuse an additional-theoretical update of an entry in a read-only week.
+
+    A missing row is left to the update's own lookup.
+    """
+    week_fields = ("year", "delivery_week")
+    actual_model = DocumentationSummaryService.MODEL_MAPPING[model]["actual"]
+    stored = actual_model._default_manager.filter(id=pk).values(*week_fields).first()
+    if stored is not None:
+        refuse_read_only_week(stored["year"], stored["delivery_week"])
+
+
+def _refuse_read_only_bulk_items(items: list[dict[str, Any]]) -> None:
+    for item in items:
+        refuse_read_only_week(item["year"], item["delivery_week"])
 
 
 def _optional_summary_scope(instance: Any) -> dict[str, Any]:
@@ -505,6 +540,7 @@ class _MovementSourceDestroyMixin:
             recalculate_actual_corrections,
         )
 
+        refuse_read_only_week(instance.year, instance.delivery_week)
         affected_movements = list(
             MovementShareArticle.objects.filter(**{self.movement_source_fk: instance})
         )
@@ -563,6 +599,7 @@ class WasteViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        _refuse_read_only_weeks(serializer.validated_data)
 
         waste = GenericDocumentationService.create_waste_with_related_objects(
             # ``created_by`` is read-only on the serializer — stamp it here.
@@ -581,6 +618,7 @@ class WasteViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):
 
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        _refuse_read_only_weeks(serializer.validated_data, instance)
 
         waste = GenericDocumentationService.update_waste_with_related_objects(
             instance=instance, validated_data=serializer.validated_data
@@ -601,6 +639,7 @@ class PurchaseViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        _refuse_read_only_weeks(serializer.validated_data)
 
         purchase = GenericDocumentationService.create_purchase_with_related_objects(
             # ``created_by`` is read-only on the serializer — stamp it here.
@@ -626,6 +665,7 @@ class PurchaseViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):
 
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        _refuse_read_only_weeks(serializer.validated_data, instance)
 
         purchase = GenericDocumentationService.update_purchase_with_related_objects(
             instance=instance, validated_data=serializer.validated_data
@@ -647,6 +687,7 @@ class PurchaseViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):
     def bulk_set_as_expected(self, request: Request) -> Response:
         serializer = PurchaseBulkSetAsExpectedRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        _refuse_read_only_bulk_items(serializer.validated_data["selectedData"])
         DocumentationSummaryService.bulk_set_purchase_as_expected(
             serializer.validated_data
         )
@@ -744,6 +785,7 @@ class DocumentationSummaryViewSet(RolePermissionsMixin, viewsets.ViewSet):
     def add_additional_theoretical_amount(self, request: Request) -> Response:
         model = _validated_model(request)
         data = _validated_additional_theoretical_body(request, partial=False)
+        refuse_read_only_week(data["year"], data["delivery_week"])
 
         instance = DocumentationSummaryService.add_additional_theoretical_amount(
             data, model
@@ -772,6 +814,7 @@ class DocumentationSummaryViewSet(RolePermissionsMixin, viewsets.ViewSet):
         model = _validated_model(request)
         data = _validated_additional_theoretical_body(request, partial=True)
         _refuse_another_week(model, pk, data)
+        _refuse_read_only_stored_week(model, pk)
 
         instance = DocumentationSummaryService.update_additional_theoretical_amount(
             data, pk, model
@@ -799,6 +842,7 @@ class HarvestViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        _refuse_read_only_weeks(serializer.validated_data)
 
         harvest = GenericDocumentationService.create_harvest_with_related_objects(
             # ``created_by`` is read-only on the serializer — stamp it here.
@@ -824,6 +868,7 @@ class HarvestViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):
 
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        _refuse_read_only_weeks(serializer.validated_data, instance)
 
         harvest = GenericDocumentationService.update_harvest_with_related_objects(
             instance=instance, validated_data=serializer.validated_data
@@ -845,6 +890,7 @@ class HarvestViewSet(_MovementSourceDestroyMixin, BaseArchivableViewSet):
     def bulk_set_as_expected(self, request: Request) -> Response:
         serializer = HarvestBulkSetAsExpectedRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        _refuse_read_only_bulk_items(serializer.validated_data["selectedData"])
         DocumentationSummaryService.bulk_set_as_expected(serializer.validated_data)
         return Response(status=status.HTTP_204_NO_CONTENT)
 

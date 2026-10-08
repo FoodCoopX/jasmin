@@ -1,0 +1,21 @@
+/* Expected / actual figures of a harvest or stock-count phone card. */
+.documentation-card-figures {
+  display: flex;
+  gap: 24px;
+  margin-top: 6px;
+}
+
+.documentation-card-amount {
+  font-weight: 500;
+  font-size: 1.2em;
+}
+
+/* The actual amount stays muted until something was recorded. */
+.documentation-card-amount.is-actual {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.documentation-card-amount.is-actual.has-amount {
+  color: var(--color-success-text);
+}

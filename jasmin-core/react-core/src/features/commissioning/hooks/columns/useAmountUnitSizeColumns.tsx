@@ -56,13 +56,15 @@ export const useAmountUnitSizeColumns = (config: AmountUnitSizeConfig = {}) => {
         // withClearOption does NOT prepend a blank/null option. A page that
         // genuinely needs a clearable size can still pass overrides.size.required.
         required: true,
-        hidden: !showSizeColumn,
         width: "7em",
         align: "center",
         fixed: true,
         options: vegetableSizeOptions,
         render: (value: unknown) => getVegetableSizeLabel(value as string),
         ...overrides.size,
+        // A page may hide the column further (a team view, a phone), but never
+        // show it on a farm without sizes.
+        hidden: !showSizeColumn || Boolean(overrides.size?.hidden),
       },
     );
     // Conditionally add amount column based on showAmount

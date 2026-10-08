@@ -1,10 +1,10 @@
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
-import { Alert, Button, Modal, Upload, message } from "antd";
+import { Alert, Button, Modal, Upload } from "antd";
 import { isValidElement, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import axiosService from "@shared/services/api";
 import { getErrorMessage } from "@shared/utils/apiError";
-import { downloadBlob } from "@shared/utils";
+import { downloadBlob, notify } from "@shared/utils";
 import type { DataImportResponse } from "@shared/api/generated/models";
 import ToolTipIcon from "./ToolTipIcon";
 
@@ -218,13 +218,13 @@ export default function DownloadCsvTemplateButton({
       // freshly-refetched page. Dry runs and partial imports (some rows failed)
       // still open the result modal so the outcome / failures stay visible.
       if (!dryRun && successful > 0 && failed === 0) {
-        message.success(t("csv_upload.import_success", { count: successful }));
+        notify.success(t("csv_upload.import_success", { count: successful }));
         onImported?.();
       } else {
         setResultOpen(true);
       }
     } catch (err) {
-      message.error(getErrorMessage(err, t("csv_upload.failed")));
+      notify.error(getErrorMessage(err, t("csv_upload.failed")));
     } finally {
       setUploading(false);
     }

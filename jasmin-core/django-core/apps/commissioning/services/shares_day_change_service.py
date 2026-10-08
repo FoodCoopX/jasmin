@@ -83,7 +83,8 @@ class SharesDayChangeService:
         """
         # ── Past-week guard ──
         if not force:
-            today = timezone.now().date()
+            # The farm's day, as the share days page counts it.
+            today = timezone.localdate()
             week_monday = Week(int(year), int(delivery_week)).monday()
             if week_monday <= today:
                 raise PastWeekError(

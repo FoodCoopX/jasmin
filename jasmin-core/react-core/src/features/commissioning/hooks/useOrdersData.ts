@@ -35,6 +35,7 @@ import type {
 // import it carries for ``<PDFViewer>``) into the eager chunk too.
 import { generateAndUploadDeliveryNotePDF } from "@features/commissioning/pdfs/forResellers/generateDeliveryNotePDF";
 import { generateAndUploadInvoicePDF } from "@features/commissioning/pdfs/forResellers/generateInvoicePDF";
+import { uploadPdfsWarningOnFailure } from "@features/commissioning/pdfs/forResellers/uploadPdfsWarningOnFailure";
 import {
   computeTaxBreakdown,
   totalsFromBreakdown,
@@ -52,6 +53,8 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import { pickTierPriceFromAmount } from "@shared/utils/tierPrice";
+import { notify } from "@shared/utils";
+import { getErrorMessage } from "@shared/utils/apiError";
 import { useCurrency } from "@hooks/configuration/useCurrency";
 import { useDefaultTaxRates } from "@hooks/configuration/useDefaultTaxRates";
 import { useTenant } from "@hooks/configuration/useTenant";
@@ -655,27 +658,13 @@ export function useOrdersData() {
       const body = responseData as BulkOperationResponse | undefined;
       const successResults = (body?.results ?? []).filter((r) => r.success);
 
-      // Generate delivery note PDFs (if not already generated)
-      for (const r of successResults) {
-        if (r.delivery_note_id) {
-          try {
-            await generateAndUploadDeliveryNotePDF(r.delivery_note_id, t, tenant as Record<string, unknown>, getSetting, logoUrl, bioLogoUrl);
-          } catch (err) {
-            console.error(`DN PDF generation failed for ${r.delivery_note_id}:`, err);
-          }
-        }
-      }
-
-      // Generate invoice PDFs
-      for (const r of successResults) {
-        if (r.invoice_id) {
-          try {
-            await generateAndUploadInvoicePDF(r.invoice_id, t, tenant as Record<string, unknown>, getSetting, logoUrl, bioLogoUrl);
-          } catch (err) {
-            console.error(`PDF generation failed for invoice ${r.invoice_id}:`, err);
-          }
-        }
-      }
+      // Delivery note PDFs first, then the invoice PDFs.
+      const deliveryNoteIds = successResults.flatMap((r) => (r.delivery_note_id ? [r.delivery_note_id] : []));
+      const invoiceIds = successResults.flatMap((r) => (r.invoice_id ? [r.invoice_id] : []));
+      await uploadPdfsWarningOnFailure([
+        ...deliveryNoteIds.map((id) => () => generateAndUploadDeliveryNotePDF(id, t, tenant as Record<string, unknown>, getSetting, logoUrl, bioLogoUrl)),
+        ...invoiceIds.map((id) => () => generateAndUploadInvoicePDF(id, t, tenant as Record<string, unknown>, getSetting, logoUrl, bioLogoUrl)),
+      ], t);
 
       // Invalidate all detail queries so PDF buttons pick up uploaded files
       const invalidations: Promise<void>[] = [];
@@ -705,13 +694,10 @@ export function useOrdersData() {
       const deliveryNoteIds = (body?.results ?? [])
         .filter((r) => r.success && r.delivery_note_id)
         .map((r) => r.delivery_note_id);
-      for (const id of deliveryNoteIds) {
-        try {
-          await generateAndUploadDeliveryNotePDF(id, t, tenant as Record<string, unknown>, getSetting, logoUrl, bioLogoUrl);
-        } catch (err) {
-          console.error(`PDF generation failed for delivery note ${id}:`, err);
-        }
-      }
+      await uploadPdfsWarningOnFailure(
+        deliveryNoteIds.map((id) => () => generateAndUploadDeliveryNotePDF(id, t, tenant as Record<string, unknown>, getSetting, logoUrl, bioLogoUrl)),
+        t,
+      );
       // Invalidate detail queries so PDF buttons pick up uploaded files
       await Promise.all(
         deliveryNoteIds.map((id) => queryClient.invalidateQueries({
@@ -731,13 +717,10 @@ export function useOrdersData() {
       const deliveryNoteIds = (body?.results ?? [])
         .filter((r) => r.success && r.delivery_note_id)
         .map((r) => r.delivery_note_id);
-      for (const id of deliveryNoteIds) {
-        try {
-          await generateAndUploadDeliveryNotePDF(id, t, tenant as Record<string, unknown>, getSetting, logoUrl, bioLogoUrl);
-        } catch (err) {
-          console.error(`DN PDF generation failed for ${id}:`, err);
-        }
-      }
+      await uploadPdfsWarningOnFailure(
+        deliveryNoteIds.map((id) => () => generateAndUploadDeliveryNotePDF(id, t, tenant as Record<string, unknown>, getSetting, logoUrl, bioLogoUrl)),
+        t,
+      );
       await Promise.all(
         deliveryNoteIds.map((id) => queryClient.invalidateQueries({
           queryKey: getCommissioningDeliveryNotesRetrieveQueryKey(id),
@@ -889,14 +872,14 @@ export function useOrdersData() {
         });
         lastServerNote.current = noteToSave;
       } catch (error) {
-        console.error("Error saving order note:", error);
+        notify.error(getErrorMessage(error, t("common.error_saving_data")));
         // Re-arm so the edit is retried on the next flush instead of lost.
         pendingNote.current = { orderId, note: noteToSave };
       }
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [orderNote, orderState.orderId]);
+  }, [orderNote, orderState.orderId, t]);
 
   // Flush a pending edit when the order changes or the hook unmounts, so a note
   // typed within the debounce window isn't dropped when the user navigates away

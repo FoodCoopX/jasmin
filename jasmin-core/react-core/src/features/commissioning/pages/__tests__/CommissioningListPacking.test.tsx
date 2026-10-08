@@ -20,9 +20,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
-  HarvestSharePlanningRow,
   ShareType,
-  ShareTypeEnum,
   ShareTypeVariation,
   SharesDeliveryDay,
 } from "@shared/api/generated/models";
@@ -160,86 +158,33 @@ vi.mock("@shared/utils/downloadBlob", () => ({
 }));
 
 import CommissioningListPacking from "../CommissioningListPacking";
+import {
+  deliveryDay,
+  FRUIT,
+  FRUIT_SHARE,
+  plan,
+  planned,
+  planningRequest,
+  type PlanningRow,
+  shareType,
+  variation,
+  VEGETABLE_SHARE,
+  VEGETABLES,
+  WEEK_40_VEGETABLES,
+  WEEK_41_FRUIT,
+  WEEK_41_VEGETABLES,
+  WEEK_42_VEGETABLES,
+} from "./commissioningListPacking.fixtures";
+import {
+  arrow,
+  choose,
+  optionsOf,
+  pending,
+  selectNamed,
+  shownIn,
+} from "./commissioningListPacking.helpers";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
-
-const VEGETABLES: ShareTypeEnum = "HARVEST_SHARE";
-const FRUIT: ShareTypeEnum = "HARVEST_SHARE_FRUIT";
-
-const shareType = (
-  id: string,
-  name: string,
-  shareOption: ShareTypeEnum | null,
-): ShareType => ({ id, name, share_option: shareOption, valid_from: "2026-01-05" });
-
-/** A share size of a share type, packed in bulk or in boxes. */
-const variation = (
-  shareTypeId: string,
-  size: ShareTypeVariation["size"],
-  packing: "bulk" | "boxes",
-): ShareTypeVariation => ({
-  id: `var-${shareTypeId}-${size}`,
-  share_type: shareTypeId,
-  size,
-  is_packed_bulk: packing === "bulk",
-  valid_from: "2026-01-05",
-});
-
-const VEGETABLE_SHARE = shareType("st-veg", "Vegetables", VEGETABLES);
-const FRUIT_SHARE = shareType("st-fruit", "Fruit", FRUIT);
-
-// Backend day numbers: 0 = Monday … 6 = Sunday.
-const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => ({
-  id,
-  day_number: dayNumber as SharesDeliveryDay["day_number"],
-  valid_from: "2026-01-05",
-  valid_until: null,
-});
-
-type PlanningRow = HarvestSharePlanningRow & Record<string, unknown>;
-
-/**
- * One planned article: how much of it the shares of each delivery day need,
- * summed over every station, and the percentage packed on top of that
- * against spoilage.
- */
-const planned = (
-  name: string,
-  unit: string,
-  size: string,
-  perDay: Record<string, number | string | null>,
-  bufferPercent = 0,
-): PlanningRow => ({
-  id: `sc-${name}-${unit}-${size}`,
-  year: 2026,
-  delivery_week: 41,
-  share_article: `sa-${name}`,
-  share_article_name: name,
-  unit,
-  size,
-  percentage_added_to_commissioning_list_packing: bufferPercent,
-  ...Object.fromEntries(
-    Object.entries(perDay).map(([dayId, amount]) => [`day_${dayId}_planned_amount`, amount]),
-  ),
-});
-
-const WEEK_41_VEGETABLES = [
-  // Half as much again on top: 18 on Tuesday, 12 on Friday.
-  planned("Carrots", "BUNCH", "M", { "day-tue": 12, "day-fri": 8 }, 50),
-  planned("Lettuce", "PCS", "L", { "day-tue": 30 }),
-  // Two and a half kilos are packed as three.
-  planned("Potatoes", "KG", "S", { "day-tue": "2.500", "day-fri": "0.000" }),
-  planned("Radishes", "BUNCH", "S", { "day-tue": 0, "day-fri": 10 }),
-  planned("Kale", "KG", "M", { "day-tue": null, "day-fri": null }),
-];
-// A quarter on top: 30.
-const WEEK_41_FRUIT = [planned("Apples", "KG", "M", { "day-tue": 24 }, 25)];
-const WEEK_42_VEGETABLES = [planned("Beetroot", "BUNCH", "M", { "day-tue": 6, "day-fri": 4 })];
-const WEEK_40_VEGETABLES = [planned("Spinach", "KG", "M", { "day-tue": 4 })];
-
-/** Where a plan belongs: a share option in a week. */
-const plan = (shareOption: string, { year = 2026, week = 41 } = {}) =>
-  `${year}/${week}/${shareOption}`;
 
 /** What the in-memory farm holds; the request spies answer from it. */
 let farm: {
@@ -254,14 +199,6 @@ type PlanningParams = { year: number; delivery_week: number; share_option: strin
 const answerFromFarm = async ({ year, delivery_week, share_option }: PlanningParams) => [
   ...(farm.plans[plan(share_option, { year, week: delivery_week })] ?? []),
 ];
-
-/** The plan request of a share option, for week 41 of 2026 unless told otherwise. */
-const planningRequest = (shareOption: string, { year = 2026, week = 41 } = {}) => ({
-  year,
-  delivery_week: week,
-  share_option: shareOption,
-  is_past: false,
-});
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -301,51 +238,6 @@ const LARGE = "commissioning.large";
 const dayLabel = (date: string) => `commissioning.delivery_day ${date}`;
 const TUESDAY_LABEL = dayLabel("Tuesday, 06.10.2026");
 const FRIDAY_LABEL = dayLabel("Friday, 09.10.2026");
-
-function selectNamed(name: string): HTMLElement {
-  const select = screen.getByRole("combobox", { name }).closest<HTMLElement>(".ant-select");
-  if (!select) throw new Error(`No select named ${name}`);
-  return select;
-}
-
-/** The label a select shows for its current value. */
-const shownIn = (select: HTMLElement) =>
-  select.querySelector(".ant-select-selection-item")?.textContent ?? "";
-
-function openDropdown(): HTMLElement {
-  const open = Array.from(
-    document.querySelectorAll<HTMLElement>(".ant-select-dropdown"),
-  ).filter((dropdown) => !dropdown.classList.contains("ant-select-dropdown-hidden"));
-  const dropdown = open[open.length - 1];
-  if (!dropdown) throw new Error("No select dropdown is open");
-  return dropdown;
-}
-
-const optionTexts = () =>
-  Array.from(
-    openDropdown().querySelectorAll<HTMLElement>(".ant-select-item-option-content"),
-  );
-
-async function optionsOf(select: HTMLElement): Promise<string[]> {
-  await userEvent.click(within(select).getByRole("combobox"));
-  return optionTexts().map((option) => option.textContent ?? "");
-}
-
-/** Picks an option by its visible label. The select's hidden accessibility
- * list repeats an option's value, which for a year is its label too. */
-async function choose(select: HTMLElement, option: string) {
-  await userEvent.click(within(select).getByRole("combobox"));
-  const item = optionTexts().find((content) => content.textContent === option);
-  if (!item) throw new Error(`No option ${option}`);
-  await userEvent.click(item);
-}
-
-/** The previous / next arrow beside a stepped selector. */
-function arrow(name: string, direction: "common.previous" | "common.next") {
-  const stepper = screen.getByRole("combobox", { name }).closest<HTMLElement>(".ant-space");
-  if (!stepper) throw new Error(`No stepper around ${name}`);
-  return within(stepper).getByRole("button", { name: direction });
-}
 
 /** Every share option's table, top to bottom. */
 const tables = () => Array.from(document.querySelectorAll<HTMLElement>("section"));
@@ -405,15 +297,6 @@ const onPaper = (name: string, unit: string, total: string, size?: string) =>
     total_amount_text: total,
     ...(size === undefined ? {} : { size_label: size }),
   });
-
-/** A request that answers only when the test says so. */
-function pending<T>() {
-  let answer!: (value: T) => void;
-  const promise = new Promise<T>((resolve) => {
-    answer = resolve;
-  });
-  return { promise, answer };
-}
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -527,7 +410,7 @@ describe("CommissioningListPacking share options", () => {
 
     expect(tables()).toHaveLength(1);
     expect(headings()).toEqual([]);
-    expect(rowsOf(tables()[0])[0]).toEqual(["Carrots", BUNCH, "18"]);
+    expect(rowsOf(tables()[0])[0]).toEqual(["Carrots", BUNCH, "18,0"]);
     expect(api.planning).toHaveBeenCalledTimes(1);
     expect(api.planning).toHaveBeenCalledWith(planningRequest(VEGETABLES));
   });
@@ -555,12 +438,12 @@ describe("CommissioningListPacking rows", () => {
 
     expect(columnsOf(tableOf(VEGETABLES_HEADING))).toEqual([ARTICLE, UNIT, TOTAL]);
     expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([
-      ["Carrots", BUNCH, "18"],
-      ["Lettuce", PIECES, "30"],
-      ["Potatoes", KG, "3"],
+      ["Carrots", BUNCH, "18,0"],
+      ["Lettuce", PIECES, "30,0"],
+      ["Potatoes", KG, "3,00"],
     ]);
     expect(columnsOf(tableOf(FRUIT_HEADING))).toEqual([ARTICLE, UNIT, TOTAL]);
-    expect(rowsOf(tableOf(FRUIT_HEADING))).toEqual([["Apples", KG, "30"]]);
+    expect(rowsOf(tableOf(FRUIT_HEADING))).toEqual([["Apples", KG, "30,00"]]);
   });
 
   it("adds each article's packing buffer to its amount and rounds the total up to whole units", async () => {
@@ -571,17 +454,50 @@ describe("CommissioningListPacking rows", () => {
         planned("Beans", "KG", "M", { "day-tue": 10 }, 25),
         planned("Potatoes", "KG", "M", { "day-tue": "2.500" }),
         planned("Onions", "PCS", "M", { "day-tue": 7 }),
+        // A tenth on top of 100 and of 50, exactly 110 and 55.
+        planned("Chives", "BUNCH", "M", { "day-tue": 100 }, 10),
+        planned("Parsley", "BUNCH", "M", { "day-tue": 50 }, 10),
       ],
     };
     renderPage();
     await screen.findByText("Carrots");
 
     expect(rowsOf(tables()[0])).toEqual([
-      ["Carrots", BUNCH, "18"],
+      ["Carrots", BUNCH, "18,0"],
       // 12.5 kilos with the buffer.
-      ["Beans", KG, "13"],
-      ["Potatoes", KG, "3"],
-      ["Onions", PIECES, "7"],
+      ["Beans", KG, "13,00"],
+      ["Potatoes", KG, "3,00"],
+      ["Onions", PIECES, "7,0"],
+      ["Chives", BUNCH, "110,0"],
+      ["Parsley", BUNCH, "55,0"],
+    ]);
+  });
+
+  it("writes the totals on screen and on paper in the farm's number format", async () => {
+    tenantSettings.values = { number_locale: "en-US" };
+    farm.shareTypes = [VEGETABLE_SHARE];
+    farm.plans = {
+      [plan(VEGETABLES)]: [
+        planned("Potatoes", "KG", "M", { "day-tue": 1250 }),
+        planned("Carrots", "BUNCH", "M", { "day-tue": 12 }),
+      ],
+    };
+    renderPage();
+    await screen.findByText("Carrots");
+
+    expect(rowsOf(tables()[0])).toEqual([
+      ["Potatoes", KG, "1,250.00"],
+      ["Carrots", BUNCH, "12.0"],
+    ]);
+
+    await userEvent.click(downloadButton());
+
+    await waitFor(() => expect(printed.documents).toHaveLength(1));
+    expect(printed.documents[0].props.groups).toEqual([
+      {
+        label: VEGETABLES_HEADING,
+        rows: [onPaper("Potatoes", KG, "1,250.00"), onPaper("Carrots", BUNCH, "12.0")],
+      },
     ]);
   });
 
@@ -600,7 +516,7 @@ describe("CommissioningListPacking rows", () => {
     renderPage();
     await screen.findByText("Carrots");
 
-    expect(rowsOf(tables()[0])).toEqual([["Carrots", BUNCH, "12"]]);
+    expect(rowsOf(tables()[0])).toEqual([["Carrots", BUNCH, "12,0"]]);
   });
 
   it("adds the size column, on screen and on paper, when the farm shows sizes", async () => {
@@ -610,9 +526,9 @@ describe("CommissioningListPacking rows", () => {
 
     expect(columnsOf(tableOf(VEGETABLES_HEADING))).toEqual([ARTICLE, UNIT, SIZE, TOTAL]);
     expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([
-      ["Carrots", BUNCH, MEDIUM, "18"],
-      ["Lettuce", PIECES, LARGE, "30"],
-      ["Potatoes", KG, SMALL, "3"],
+      ["Carrots", BUNCH, MEDIUM, "18,0"],
+      ["Lettuce", PIECES, LARGE, "30,0"],
+      ["Potatoes", KG, SMALL, "3,00"],
     ]);
 
     await userEvent.click(downloadButton());
@@ -625,12 +541,12 @@ describe("CommissioningListPacking rows", () => {
       {
         label: VEGETABLES_HEADING,
         rows: [
-          onPaper("Carrots", BUNCH, "18", ""),
-          onPaper("Lettuce", PIECES, "30", LARGE),
-          onPaper("Potatoes", KG, "3", SMALL),
+          onPaper("Carrots", BUNCH, "18,0", ""),
+          onPaper("Lettuce", PIECES, "30,0", LARGE),
+          onPaper("Potatoes", KG, "3,00", SMALL),
         ],
       },
-      { label: FRUIT_HEADING, rows: [onPaper("Apples", KG, "30", "")] },
+      { label: FRUIT_HEADING, rows: [onPaper("Apples", KG, "30,00", "")] },
     ]);
   });
 
@@ -669,8 +585,8 @@ describe("CommissioningListPacking choosing the day", () => {
 
     expect(await screen.findByText("Radishes")).toBeInTheDocument();
     expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([
-      ["Carrots", BUNCH, "12"],
-      ["Radishes", BUNCH, "10"],
+      ["Carrots", BUNCH, "12,0"],
+      ["Radishes", BUNCH, "10,0"],
     ]);
     // No fruit is needed on Friday.
     expect(rowsOf(tableOf(FRUIT_HEADING))).toEqual([]);
@@ -714,7 +630,7 @@ describe("CommissioningListPacking choosing the week and year", () => {
     expect(api.planning).toHaveBeenCalledWith(planningRequest(VEGETABLES, { week: 42 }));
     expect(api.planning).toHaveBeenCalledWith(planningRequest(FRUIT, { week: 42 }));
     await waitFor(() => expect(anyTableBusy()).toBe(false));
-    expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([["Beetroot", BUNCH, "6"]]);
+    expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([["Beetroot", BUNCH, "6,0"]]);
     expect(within(tableOf(FRUIT_HEADING)).getByText(NO_DATA)).toBeInTheDocument();
     expect(screen.queryByText("Carrots")).not.toBeInTheDocument();
   });
@@ -729,7 +645,7 @@ describe("CommissioningListPacking choosing the week and year", () => {
 
     expect(await screen.findByText("Beetroot")).toBeInTheDocument();
     expect(shownIn(selectNamed(DAY))).toBe(dayLabel("Friday, 16.10.2026"));
-    expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([["Beetroot", BUNCH, "4"]]);
+    expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([["Beetroot", BUNCH, "4,0"]]);
   });
 
   it("loads the previous week's plan from the week arrow", async () => {
@@ -742,7 +658,40 @@ describe("CommissioningListPacking choosing the week and year", () => {
     expect(shownIn(selectNamed(DAY))).toBe(dayLabel("Tuesday, 29.09.2026"));
     expect(api.planning).toHaveBeenCalledWith(planningRequest(VEGETABLES, { week: 40 }));
     expect(api.planning).toHaveBeenCalledWith(planningRequest(FRUIT, { week: 40 }));
-    expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([["Spinach", KG, "4"]]);
+    expect(rowsOf(tableOf(VEGETABLES_HEADING))).toEqual([["Spinach", KG, "4,00"]]);
+  });
+
+  it("asks for the stored plan once the week lies more than a week back", async () => {
+    renderPage();
+    await screen.findByText("Carrots");
+
+    await userEvent.click(arrow(WEEK, "common.previous"));
+    await screen.findByText("Spinach");
+    await userEvent.click(arrow(WEEK, "common.previous"));
+
+    await waitFor(() =>
+      expect(api.planning).toHaveBeenCalledWith(
+        planningRequest(VEGETABLES, { week: 39, isPast: true }),
+      ),
+    );
+    expect(api.planning).toHaveBeenCalledWith(planningRequest(FRUIT, { week: 39, isPast: true }));
+  });
+
+  it("gives a table to the share options of the chosen week, not to today's", async () => {
+    // The fruit share ends with week 41.
+    api.shareTypes.mockImplementation(async ({ active_at_date }: { active_at_date: string }) =>
+      active_at_date < "2026-10-12" ? [VEGETABLE_SHARE, FRUIT_SHARE] : [VEGETABLE_SHARE],
+    );
+    renderPage();
+    await screen.findByText("Apples");
+
+    await userEvent.click(arrow(WEEK, "common.next"));
+
+    expect(await screen.findByText("Beetroot")).toBeInTheDocument();
+    await waitFor(() => expect(tables()).toHaveLength(1));
+    expect(headings()).toEqual([]);
+    expect(api.shareTypes).toHaveBeenLastCalledWith({ active_at_date: "2026-10-17" });
+    expect(api.planning).not.toHaveBeenCalledWith(planningRequest(FRUIT, { week: 42 }));
   });
 
   it("asks for the same week of another year when the year changes", async () => {
@@ -846,27 +795,32 @@ describe("CommissioningListPacking download", () => {
     await userEvent.click(downloadButton());
 
     await waitFor(() => expect(printed.files).toHaveLength(1));
-    expect(printed.files[0]).toMatch(
-      /^commissioning\.commissioning_list_packing_2026_commissioning\.KW41(_\w+)?\.pdf$/,
+    expect(printed.files[0]).toBe(
+      "commissioning.commissioning_list_packing_2026_commissioning.KW41_COMMONWEEKDAYTUESDAY.pdf",
     );
     expect(printed.documents).toHaveLength(1);
     const [{ template, props }] = printed.documents;
     expect(template).toBe("CommissioningListPackingPDF");
-    expect(props).toMatchObject({ year: 2026, week: 41, showSize: false });
+    expect(props).toMatchObject({
+      year: 2026,
+      week: 41,
+      dayName: "COMMON.WEEKDAY_TUESDAY",
+      showSize: false,
+    });
     expect(props.groups).toEqual([
       {
         label: VEGETABLES_HEADING,
         rows: [
-          onPaper("Carrots", BUNCH, "18"),
-          onPaper("Lettuce", PIECES, "30"),
-          onPaper("Potatoes", KG, "3"),
+          onPaper("Carrots", BUNCH, "18,0"),
+          onPaper("Lettuce", PIECES, "30,0"),
+          onPaper("Potatoes", KG, "3,00"),
         ],
       },
-      { label: FRUIT_HEADING, rows: [onPaper("Apples", KG, "30")] },
+      { label: FRUIT_HEADING, rows: [onPaper("Apples", KG, "30,00")] },
     ]);
   });
 
-  it("prints the chosen day's articles and leaves out a share option with nothing to pack that day", async () => {
+  it("prints the chosen day's articles, named after that day, and leaves out a share option with nothing to pack that day", async () => {
     renderPage();
     await screen.findByText("Carrots");
     await choose(selectNamed(DAY), FRIDAY_LABEL);
@@ -875,12 +829,33 @@ describe("CommissioningListPacking download", () => {
     await userEvent.click(downloadButton());
 
     await waitFor(() => expect(printed.documents).toHaveLength(1));
+    expect(printed.files).toEqual([
+      "commissioning.commissioning_list_packing_2026_commissioning.KW41_COMMONWEEKDAYFRIDAY.pdf",
+    ]);
+    expect(printed.documents[0].props).toMatchObject({ dayName: "COMMON.WEEKDAY_FRIDAY" });
     expect(printed.documents[0].props.groups).toEqual([
       {
         label: VEGETABLES_HEADING,
-        rows: [onPaper("Carrots", BUNCH, "12"), onPaper("Radishes", BUNCH, "10")],
+        rows: [onPaper("Carrots", BUNCH, "12,0"), onPaper("Radishes", BUNCH, "10,0")],
       },
     ]);
+  });
+
+  it("offers the download only once every share option's plan is in", async () => {
+    const fruit = pending<void>();
+    api.planning.mockImplementation(async (params: PlanningParams) => {
+      if (params.share_option === FRUIT) await fruit.promise;
+      return answerFromFarm(params);
+    });
+    renderPage();
+
+    expect(await screen.findByText("Carrots")).toBeInTheDocument();
+    expect(downloadButton()).toBeDisabled();
+
+    fruit.answer();
+
+    expect(await screen.findByText("Apples")).toBeInTheDocument();
+    await waitFor(() => expect(downloadButton()).toBeEnabled());
   });
 
   it("prints the week the list shows", async () => {
@@ -895,7 +870,7 @@ describe("CommissioningListPacking download", () => {
     expect(printed.files[0]).toMatch(/_2026_commissioning\.KW42(_\w+)?\.pdf$/);
     expect(printed.documents[0].props).toMatchObject({ year: 2026, week: 42 });
     expect(printed.documents[0].props.groups).toEqual([
-      { label: VEGETABLES_HEADING, rows: [onPaper("Beetroot", BUNCH, "6")] },
+      { label: VEGETABLES_HEADING, rows: [onPaper("Beetroot", BUNCH, "6,0")] },
     ]);
   });
 });
@@ -915,8 +890,8 @@ describe("CommissioningListPacking on a phone", () => {
     expect(headings()).toEqual([VEGETABLES_HEADING, FRUIT_HEADING]);
     expect(cardsIn(tableOf(VEGETABLES_HEADING))).toEqual(["Carrots", "Lettuce", "Potatoes"]);
     expect(cardsIn(tableOf(FRUIT_HEADING))).toEqual(["Apples"]);
-    expect(detailsOf(cardOf("Carrots"))).toEqual([`${UNIT}: ${BUNCH}`, `${TOTAL}: 18`]);
-    expect(detailsOf(cardOf("Apples"))).toEqual([`${UNIT}: ${KG}`, `${TOTAL}: 30`]);
+    expect(detailsOf(cardOf("Carrots"))).toEqual([`${UNIT}: ${BUNCH}`, `${TOTAL}: 18,0`]);
+    expect(detailsOf(cardOf("Apples"))).toEqual([`${UNIT}: ${KG}`, `${TOTAL}: 30,00`]);
   });
 
   it("adds the size to the cards when the farm shows sizes", async () => {
@@ -927,7 +902,7 @@ describe("CommissioningListPacking on a phone", () => {
     expect(detailsOf(cardOf("Lettuce"))).toEqual([
       `${UNIT}: ${PIECES}`,
       `${SIZE}: ${LARGE}`,
-      `${TOTAL}: 30`,
+      `${TOTAL}: 30,0`,
     ]);
   });
 

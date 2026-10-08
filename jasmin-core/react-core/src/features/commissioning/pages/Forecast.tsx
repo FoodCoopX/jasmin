@@ -503,7 +503,6 @@ export default function Forecast() {
                 });
                 setSelectedRowKeys([]);
               } catch (error) {
-                console.error("Operation failed:", error);
                 notify.error(getErrorMessage(error, "Failed to load data"));
               }
             }}

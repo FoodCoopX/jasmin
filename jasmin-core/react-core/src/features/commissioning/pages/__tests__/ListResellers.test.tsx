@@ -381,6 +381,7 @@ const flag = (row: HTMLElement, columnTitle: string) =>
 
 const rowButton = (text: string, name: string) =>
   within(rowOf(text)).getByRole("button", { name });
+const ordersLink = (company: string) => within(rowOf(company)).getByRole("link", { name: "resellers.go_to_orders" });
 const statusButton = (company: string) =>
   within(cellOf(rowOf(company), "members.user_status")).getByRole("button");
 const addButton = () => screen.queryByRole("button", { name: /table\.add_plus_icon/ });
@@ -516,16 +517,13 @@ describe("ListResellers columns", () => {
   it("links each reseller to its orders and shows the state of its login", async () => {
     const { user } = await renderLoaded();
 
-    // The link's own name comes from the icon inside; its button carries the label.
-    const ordersLink = (company: string) =>
-      rowButton(company, "resellers.go_to_orders").closest("a");
     expect(ordersLink("Hofladen Gruber")).toHaveAttribute("href", "/commissioning/customer-orders/res-hofladen");
     expect(ordersLink("Biomarkt Sonnenschein")).toHaveAttribute("href", "/commissioning/customer-orders/res-biomarkt");
-    expect(statusButton("Hofladen Gruber")).toHaveAccessibleName("users.status_active");
-    expect(statusButton("Biomarkt Sonnenschein")).toHaveAccessibleName("users.status_no_user");
-    expect(statusButton("Café Zentral")).toHaveAccessibleName("users.status_pending_invitation");
+    expect(statusButton("Hofladen Gruber")).toHaveAccessibleName("button_library.user_active");
+    expect(statusButton("Biomarkt Sonnenschein")).toHaveAccessibleName("button_library.user_not_invited");
+    expect(statusButton("Café Zentral")).toHaveAccessibleName("button_library.user_pending_invitation");
     await user.click(screen.getByText("commissioning.hide_inactive"));
-    expect(statusButton("Kantine Nord")).toHaveAccessibleName("users.status_inactive");
+    expect(statusButton("Kantine Nord")).toHaveAccessibleName("button_library.user_inactive");
   });
 
   it("leaves out the offer group column when the tenant has no offer groups", async () => {
@@ -585,6 +583,8 @@ describe("ListResellers new reseller", () => {
     expect(within(draft).getByText("Standard")).toBeInTheDocument();
     const invoiceSettingsButton = { name: "resellers.invoice_settings_title" };
     expect(within(draft).queryByRole("button", invoiceSettingsButton)).not.toBeInTheDocument();
+    expect(within(draft).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(cellOf(draft, "members.user_status")).queryByRole("button")).not.toBeInTheDocument();
     await fillNewReseller(user);
     await saveRow(user);
 
@@ -599,7 +599,8 @@ describe("ListResellers new reseller", () => {
     );
     await screen.findByText("Gasthaus Linde");
     expect(within(rowOf("Gasthaus Linde")).getByText("Standard")).toBeInTheDocument();
-    expect(statusButton("Gasthaus Linde")).toHaveAccessibleName("users.status_no_user");
+    expect(statusButton("Gasthaus Linde")).toHaveAccessibleName("button_library.user_not_invited");
+    expect(ordersLink("Gasthaus Linde")).toHaveAttribute("href", "/commissioning/customer-orders/res-new");
     await user.click(rowButton("Gasthaus Linde", "resellers.invoice_settings_title"));
     expect(screen.getByText("Invoice settings of Gasthaus Linde")).toBeInTheDocument();
     expect(api.listResellers).toHaveBeenCalledTimes(1);
@@ -839,7 +840,7 @@ describe("ListResellers row actions", () => {
 
     expect(screen.queryByTestId("invite-user-modal")).not.toBeInTheDocument();
     await waitFor(() => expect(api.listResellers).toHaveBeenCalledTimes(2));
-    const pending = "users.status_pending_invitation";
+    const pending = "button_library.user_pending_invitation";
     await waitFor(() => expect(statusButton("Biomarkt Sonnenschein")).toHaveAccessibleName(pending));
   });
 
@@ -859,7 +860,7 @@ describe("ListResellers row actions", () => {
       expect(api.updateLogin).toHaveBeenCalledWith(userId, { account_status: accountStatus });
       expect(screen.queryByTestId("user-info-modal")).not.toBeInTheDocument();
       await waitFor(() =>
-        expect(statusButton(company)).toHaveAccessibleName(`users.status_${accountStatus}`),
+        expect(statusButton(company)).toHaveAccessibleName(`button_library.user_${accountStatus}`),
       );
       expect(api.listResellers).toHaveBeenCalledTimes(1);
     },
@@ -870,7 +871,7 @@ describe("ListResellers row actions", () => {
     const expired = login({ id: "user-clara", ...invitation });
     serverResellers = [HOFLADEN, { ...CAFE, linked_user_info: expired }];
     const { user } = await renderLoaded();
-
+    expect(statusButton("Café Zentral")).toHaveAccessibleName("button_library.user_pending_invitation_expired");
     await user.click(statusButton("Café Zentral"));
     expect(screen.getByText("pending_invitation, expired")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Resend invitation" }));
@@ -896,18 +897,18 @@ describe("ListResellers row actions", () => {
     await waitFor(() => expect(notify.error).toHaveBeenCalledWith(message));
     expect(notify.success).not.toHaveBeenCalled();
     expect(screen.getByTestId("user-info-modal")).toBeInTheDocument();
-    expect(statusButton("Hofladen Gruber")).toHaveAccessibleName("users.status_active");
+    expect(statusButton("Hofladen Gruber")).toHaveAccessibleName("button_library.user_active");
   });
 
-  it("reports a failed resend and keeps the login details open", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    api.resendInvitation.mockRejectedValue(axiosError(503, {}));
+  it.each([
+    ["the server's reason", { message: "Mail server down" }, "Mail server down"],
+    ["its own message without one", {}, "users.resend_failed"],
+  ])("reports a failed resend with %s and keeps the login details open", async (_, body, shown) => {
+    api.resendInvitation.mockRejectedValue(axiosError(503, body));
     const { user } = await renderLoaded();
-
     await user.click(statusButton("Café Zentral"));
     await user.click(screen.getByRole("button", { name: "Resend invitation" }));
-
-    await waitFor(() => expect(notify.error).toHaveBeenCalledWith("users.resend_failed"));
+    await waitFor(() => expect(notify.error).toHaveBeenCalledWith(shown));
     expect(notify.success).not.toHaveBeenCalled();
     expect(screen.getByTestId("user-info-modal")).toBeInTheDocument();
   });
@@ -924,8 +925,8 @@ describe("ListResellers CSV", () => {
 
     expect(screen.getByTestId("export-csv-modal")).toBeInTheDocument();
     expect(stubs.exportCsv?.filename).toBe("resellers.list_resellers");
-    expect(stubs.exportCsv?.data.map((row) => row.id)).toEqual([
-      "res-hofladen", "res-biomarkt", "res-cafe", "res-kantine",
+    expect(stubs.exportCsv?.data.map((row) => `${row.id}: ${row.offer_group_name}`)).toEqual([
+      "res-hofladen: Standard", "res-biomarkt: Wholesale", "res-cafe: Standard", "res-kantine: Standard",
     ]);
     expect(stubs.exportCsv?.columns.map((column) => column.dataIndex)).toEqual(
       expect.arrayContaining([

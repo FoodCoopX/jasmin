@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 
-import { getErrorMessage } from "../apiError";
+import { getErrorMessage, getServerErrorMessage } from "../apiError";
 
 /** Build a synthetic AxiosError carrying the given response body. */
 function axiosErrorWith(data: unknown, status = 400): AxiosError {
@@ -56,5 +56,29 @@ describe("getErrorMessage", () => {
 
   it("uses Error.message for thrown JS errors", () => {
     expect(getErrorMessage(new Error("Plain JS"))).toBe("Plain JS");
+  });
+});
+
+describe("getServerErrorMessage", () => {
+  it("returns the message the server gave", () => {
+    expect(getServerErrorMessage(axiosErrorWith({ message: "Mail server down" }))).toBe(
+      "Mail server down",
+    );
+    expect(getServerErrorMessage(axiosErrorWith({ email: ["Enter a valid email."] }))).toBe(
+      "Enter a valid email.",
+    );
+  });
+
+  it.each([
+    ["an empty body", axiosErrorWith({}, 503)],
+    ["an empty string body", axiosErrorWith("", 503)],
+    ["a thrown JS error", new Error("Plain JS")],
+    ["anything else", {}],
+  ])("returns nothing for %s, leaving the caller its own message", (_, err) => {
+    expect(getServerErrorMessage(err)).toBeUndefined();
+  });
+
+  it("leaves getErrorMessage falling back to the axios text", () => {
+    expect(getErrorMessage(axiosErrorWith({}, 503))).toBe("Request failed");
   });
 });

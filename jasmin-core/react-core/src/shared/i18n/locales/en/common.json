@@ -100,6 +100,7 @@
   "error_loading_data": "Could not load data",
   "error_saving": "Saving failed",
   "error_saving_data": "Could not save data",
+  "action_failed": "Action failed",
   "export_csv": "Export CSV",
   "generating_image": "Generating image …",
   "image_downloaded": "Image downloaded",

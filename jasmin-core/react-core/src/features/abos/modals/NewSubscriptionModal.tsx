@@ -724,7 +724,6 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
           );
         } else {
           notify.error(getErrorMessage(error, t("common.error")));
-          console.error("Failed to create subscription:", error);
         }
       } finally {
         setSaving(false);

@@ -101,8 +101,8 @@ describe("DocumentationHarvestMobileCard contents", () => {
 
     expect(screen.getByText("Carrots")).toBeInTheDocument();
     expect(figures()).toEqual([
-      [EXPECTED, "15", KG],
-      [ACTUAL, "14.000", ""],
+      [EXPECTED, "15,00", KG],
+      [ACTUAL, "14,00", ""],
     ]);
     expect(screen.getByText("Washed already")).toHaveClass("text-meta");
   });
@@ -115,7 +115,7 @@ describe("DocumentationHarvestMobileCard contents", () => {
       }),
     });
 
-    expect(figures()[0]).toEqual([EXPECTED, "4", KG]);
+    expect(figures()[0]).toEqual([EXPECTED, "4,00", KG]);
   });
 
   it("shows a placeholder for no expected harvest, and then the unit beside the actual one", () => {
@@ -128,14 +128,14 @@ describe("DocumentationHarvestMobileCard contents", () => {
 
     expect(figures()).toEqual([
       [EXPECTED, "–", KG],
-      [ACTUAL, "14.000", KG],
+      [ACTUAL, "14,00", KG],
     ]);
   });
 
   it("leaves the expected harvest out for a long-term storage", () => {
     renderCard({ isLongTermStorage: true });
 
-    expect(figures()).toEqual([[ACTUAL, "14.000", KG]]);
+    expect(figures()).toEqual([[ACTUAL, "14,00", KG]]);
     expect(screen.queryByText(EXPECTED)).not.toBeInTheDocument();
   });
 
@@ -143,16 +143,18 @@ describe("DocumentationHarvestMobileCard contents", () => {
     renderCard({ record: harvestRow({ harvest_amount: null }) });
 
     expect(figures()[1]).toEqual([ACTUAL, "–", ""]);
-    expect(actualAmount()).toHaveStyle({ color: "var(--color-text-muted)" });
+    expect(actualAmount()).toHaveClass("is-actual");
+    expect(actualAmount()).not.toHaveClass("has-amount");
   });
 
   it("colours a harvested amount green and a zero harvest muted", () => {
     const { unmount } = renderCard();
-    expect(actualAmount()).toHaveStyle({ color: "var(--color-success-text)" });
+    expect(actualAmount()).toHaveClass("is-actual", "has-amount");
     unmount();
 
     renderCard({ record: harvestRow({ harvest_amount: "0.000" }) });
-    expect(actualAmount()).toHaveStyle({ color: "var(--color-text-muted)" });
+    expect(actualAmount()).toHaveClass("is-actual");
+    expect(actualAmount()).not.toHaveClass("has-amount");
   });
 
   it("shows no note line for a row without a note", () => {
@@ -190,7 +192,7 @@ describe("DocumentationHarvestMobileCard contents", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
-  it.skip.each([
+  it.each([
     ["de-DE", "15,75", "14,50", "0,30"],
     ["en-US", "15.75", "14.50", "0.30"],
   ])(

@@ -523,15 +523,15 @@ describe("DocumentationPurchase loading and listing", () => {
     for (const title of [ACTUAL, SELLER, PRICE]) {
       expect(cellOf(onions, title).textContent).toBe("");
     }
-    expect(cellOf(rowOf("Pumpkins"), EXPECTED)).toHaveTextContent("6,00");
+    expect(cellOf(rowOf("Pumpkins"), EXPECTED).textContent).toBe("6,0");
   });
 
-  it("shows amounts and prices in the tenant's number format and currency", async () => {
+  it("shows amounts at their unit's precision, and prices, in the tenant's number format and currency", async () => {
     tenantState.settings = { currency: "USD", number_locale: "en-US" };
     farm.purchases[41] = [{
       ...CARROTS_BOUGHT, purchase_amount: "1250.00",
       theoretical_purchase_amount: 1000, additional_theoretical_purchase_amount: 250.5,
-    }];
+    }, purchaseRow(KALE, COLD_STORE, { purchase_amount: "1250.00" })];
     renderPage();
     await listed();
 
@@ -539,6 +539,7 @@ describe("DocumentationPurchase loading and listing", () => {
     expect(cellOf(carrots, EXPECTED)).toHaveTextContent("1,250.50");
     expect(cellOf(carrots, ACTUAL)).toHaveTextContent("1,250.00");
     expect(cellOf(carrots, PRICE)).toHaveTextContent("$1.85/commissioning.units.kg");
+    expect(cellOf(rowOf("Kale"), ACTUAL).textContent).toBe("1,250.0");
   });
 
   it("settles after loading instead of re-rendering in a loop", async () => {
@@ -558,7 +559,7 @@ describe("DocumentationPurchase choosing the week and storage", () => {
     await choose(screen.getByRole("combobox", { name: STORAGE }), "Packing shed");
     expect(await screen.findByText("Leeks")).toBeInTheDocument();
     expect(screen.queryByText("Carrots")).not.toBeInTheDocument();
-    expect(cellOf(rowOf("Leeks"), ACTUAL)).toHaveTextContent("40,00");
+    expect(cellOf(rowOf("Leeks"), ACTUAL).textContent).toBe("40,0");
     expect(cellOf(rowOf("Leeks"), PRICE)).toHaveTextContent("0,90 €/commissioning.units.pcs");
   });
 
@@ -634,7 +635,7 @@ describe("DocumentationPurchase recording a purchase", () => {
     );
     await editingDone();
     const leeks = rowOf("Leeks");
-    expect(cellOf(leeks, ACTUAL)).toHaveTextContent("25,50");
+    expect(cellOf(leeks, ACTUAL).textContent).toBe("25,5");
     expect(cellOf(leeks, SELLER)).toHaveTextContent("Sunny Hill Farm");
     expect(cellOf(leeks, PRICE)).toHaveTextContent("0,95 €/commissioning.units.pcs");
     expect(cellOf(leeks, NOTE)).toHaveTextContent("For the market boxes");

@@ -8,7 +8,6 @@
 
 import { Tag } from "antd";
 import dayjs from "dayjs";
-import type { MouseEvent } from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { adminConfirmationColumn } from "@shared/tables";
@@ -573,17 +572,14 @@ export function useAbosColumns({
         readOnly: true,
 
         render: (_: unknown, record: AboRecord) => {
-          const isEditing = record.key === -1 || record.isEditing; // Check if row is being edited
+          const isEditing = record.key === -1 || record.isEditing;
 
           return (
             <LinkButton
               variant="view"
-              to={isEditing ? "#" : `/members/members/${record.member}`}
-              tooltip={isEditing ? "" : t("members.view_details")}
+              to={`/members/members/${record.member}`}
+              tooltip={t("members.view_details")}
               disabled={isEditing}
-              onClick={
-                isEditing ? (e: MouseEvent) => e.preventDefault() : undefined
-              }
             />
           );
         },

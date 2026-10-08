@@ -504,7 +504,6 @@ describe("SuperAdminDashboard backups", () => {
   });
 
   it("reports a backup that could not be started", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
     api.post.mockRejectedValue(apiError("Backup container unreachable", 502));
     const user = userEvent.setup();
     renderPage();
@@ -524,7 +523,6 @@ describe("SuperAdminDashboard backups", () => {
 
 describe("SuperAdminDashboard backup failure without a reason", () => {
   it("says the backup could not be started", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
     api.post.mockRejectedValue({ isAxiosError: true, response: { status: 502 } });
     const user = userEvent.setup();
     renderPage();
