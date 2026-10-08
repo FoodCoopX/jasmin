@@ -282,3 +282,8 @@ tunables:
 # --- Run the whole CI gate in one shot ---------------------------------------
 .PHONY: check
 check: black ruff import-contracts module-length mypy pytest type-check lint lint-pins test-frontend size
+
+poetry-build:
+	mkdir -p $(DJANGO_DIR)/apps/static/picking-dist
+	cp -r $(REACT_DIR)/dist $(DJANGO_DIR)/apps/static/picking-dist
+	cd $(DJANGO_DIR) && poetry build

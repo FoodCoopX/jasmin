@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Jasmin Django App"
 authors = []
 license = "AGPL-3.0-or-later"
-package-mode = false
+package-mode = true
+packages = [{include = "apps"}, {include = "core"}]
+include = [
+  {path = "apps/static", format = ["sdist", "wheel"]},
+]
 
 [tool.poetry.dependencies]
 python = "^3.14"
