@@ -1,3 +1,8 @@
+# Jasmin for Tapir
+
+This is a fork of [Jasmin](https://github.com/birgit-seyr/jasmin) intended to be packaged and included in [Tapir](https://github.com/FoodCoopX/wirgarten-tapir).
+It is not intended for standalone use.
+
 # Jasmin Platform
 
 A multi-tenant management platform for CSA farms (Community Supported
