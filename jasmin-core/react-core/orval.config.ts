@@ -25,6 +25,7 @@ export default defineConfig({
           name: 'axiosService',
         },
       },
+      baseUrl: {runtime: "window._env_.COMMISSIONING_API_BASE_URL"},
     },
   },
 });

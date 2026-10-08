@@ -5,6 +5,7 @@ class AccountConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.accounts"
     verbose_name = "Accounts App"
+    label = "jasmin_accounts"
 
     def ready(self) -> None:
         from auditlog.registry import auditlog

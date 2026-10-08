@@ -13,7 +13,7 @@ const API_URL: string = import.meta.env.VITE_API_URL || "";
 
 /** Detect which auth realm the current host belongs to. */
 function isSuperAdminHost(): boolean {
-  return isSuperAdminHostname(window.location.hostname);
+  return isSuperAdminHostname(globalThis.location.hostname);
 }
 
 function refreshEndpoint(): string {
@@ -28,12 +28,37 @@ function loginRedirectPath(): string {
   return "/login";
 }
 
+let baseUrl;
+if (window.parent && window.parent._env_ && window.parent._env_["COMMISSIONING_API_BASE_URL"]) {
+  baseUrl = window.parent._env_["COMMISSIONING_API_BASE_URL"]
+} else if (window._env_ && window._env_["COMMISSIONING_API_BASE_URL"]) {
+  baseUrl = window._env_["COMMISSIONING_API_BASE_URL"]
+} else {
+  baseUrl = API_URL
+}
+
+function getCookie(name: string) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
 const axiosInstance = axios.create({
-  baseURL: API_URL,
+  baseURL: baseUrl,
   // CRITICAL: send the HttpOnly refresh cookie on every API call. Without
   // this the cookie is dropped and silent refresh fails.
   withCredentials: true,
-  headers: { "Content-Type": "application/json" },
+  headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
 });
 
 interface QueueItem {
