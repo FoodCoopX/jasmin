@@ -11,12 +11,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import update_last_login
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from . import two_factor_service
 from ..errors import (
     AccountBlocked,
     InvalidCredentials,
@@ -24,9 +25,8 @@ from ..errors import (
     TenantMismatch,
     TwoFactorEnrolmentRequired,
 )
-from ..models import JasminUser
-from . import two_factor_service
 
+JasminUser = get_user_model()
 logger = logging.getLogger("authentication")
 
 

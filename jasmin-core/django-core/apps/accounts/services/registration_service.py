@@ -11,15 +11,15 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from apps.authz.roles import Role
-
-from ..errors import RegistrationEmailNotVerified, RegistrationError
-from ..models import JasminUser
 from . import email_verification_service
+from ..errors import RegistrationEmailNotVerified, RegistrationError
 
+JasminUser = get_user_model()
 logger = logging.getLogger("authentication")
 
 
