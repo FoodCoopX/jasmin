@@ -16,7 +16,7 @@ from nanoid import generate
 
 from apps.authz.roles import VALID_ROLES, Role
 from apps.shared.languages import LanguageChoices
-
+from .choices import ThemeChoices
 from .constants import ID_LENGTH, JASMIN_ID_ALPHABET
 
 logger = logging.getLogger(__name__)
@@ -137,12 +137,7 @@ ACCOUNT_STATUS_CHOICES = [
 ]
 
 
-class ThemeChoices(models.TextChoices):
-    # Follow the device's light or dark setting — the default, until the user
-    # picks one of the other two.
-    SYSTEM = "system", "System"
-    LIGHT = "light", "Light"
-    DARK = "dark", "Dark"
+
 
 
 class JasminUserManager(BaseUserManager):
