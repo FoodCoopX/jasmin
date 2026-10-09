@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.accounts.models import ThemeChoices
+from apps.accounts.choices import ThemeChoices
 from apps.shared.languages import LanguageChoices
 
 # Column widths the request payloads are written into: ``JasminUser.first_name``
