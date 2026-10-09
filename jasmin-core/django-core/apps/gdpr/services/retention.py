@@ -6,20 +6,18 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
+from django.contrib.auth import get_user_model
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
 from apps.commissioning.models import CoopShare, InvoiceReseller, Member, Subscription
 from apps.payments.constants import OPEN_CHARGE_STATUSES
 from apps.payments.models import ChargeSchedule
-
 from .subjects import ErasureSubject
 
-if TYPE_CHECKING:
-    # Type-only: the runtime path uses ``get_user_model()``, so this module
-    # also works under a host project with a different ``AUTH_USER_MODEL``.
-    from apps.accounts.models import JasminUser
+JasminUser = get_user_model()
 
+if TYPE_CHECKING:
     # ``GDPRService`` is assembled in the package ``__init__`` and bound into
     # this module's namespace there. Method bodies must resolve it at call
     # time through the ASSEMBLED class so monkeypatched attributes on

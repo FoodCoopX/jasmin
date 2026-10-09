@@ -26,6 +26,7 @@ import datetime
 import logging
 from typing import TYPE_CHECKING
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
@@ -36,8 +37,9 @@ from apps.commissioning.errors import (
 from apps.commissioning.utils.iso_week_utils import share_delivery_date
 from apps.shared.subscription_hooks import notify_subscription_changed
 
+JasminUser = get_user_model()
+
 if TYPE_CHECKING:
-    from apps.accounts.models import JasminUser
     from apps.commissioning.models import Member, ShareDelivery
 
 logger = logging.getLogger(__name__)

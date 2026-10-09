@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 
@@ -22,16 +23,13 @@ from apps.commissioning.models import (
 )
 from apps.notifications.models import EmailLog
 from apps.payments.models import BillingProfile, ChargeSchedule
-
-from ..models import DeletionRequest
 from .anonymization import _ci_recipient_q, _ci_username_q
 from .subjects import ErasureSubject
+from ..models import DeletionRequest
+
+JasminUser = get_user_model()
 
 if TYPE_CHECKING:
-    # Type-only: the runtime path uses ``get_user_model()``, so this module
-    # also works under a host project with a different ``AUTH_USER_MODEL``.
-    from apps.accounts.models import JasminUser
-
     # ``GDPRService`` is assembled in the package ``__init__`` and bound into
     # this module's namespace there. Method bodies must resolve it at call
     # time through the ASSEMBLED class so monkeypatched attributes on

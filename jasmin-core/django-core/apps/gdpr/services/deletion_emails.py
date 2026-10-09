@@ -8,14 +8,12 @@ directly — see each function's docstring for the exact contract.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+
+from django.contrib.auth import get_user_model
 
 from ..models import DeletionRequest
 
-if TYPE_CHECKING:
-    # Type-only: used in annotations only, so a host project with a different
-    # ``AUTH_USER_MODEL`` can still import this module.
-    from apps.accounts.models import JasminUser
+JasminUser = get_user_model()
 
 logger = logging.getLogger("gdpr")
 

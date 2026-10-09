@@ -13,12 +13,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from rest_framework.exceptions import NotAuthenticated
+
+JasminUser = get_user_model()
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
 
-    from apps.accounts.models import JasminUser
     from apps.shared.tenants.models import Tenant
 
 

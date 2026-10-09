@@ -33,22 +33,20 @@ from apps.commissioning.models import (
 from apps.notifications.models import EmailLog
 from apps.payments.constants import PaymentMethodOptions
 from apps.payments.models import BillingProfile
-
+from .subjects import ErasureSubject
 from ..errors import RetentionPeriodActive
 from ..field_classes import FieldClass, get_classification, resolve_replacement
 from ..models import DeletionLog
-from .subjects import ErasureSubject
 
 if TYPE_CHECKING:
-    # Type-only: the runtime path uses ``get_user_model()``, so this module
-    # also works under a host project with a different ``AUTH_USER_MODEL``.
-    from apps.accounts.models import JasminUser
-
     # ``GDPRService`` is assembled in the package ``__init__`` and bound into
     # this module's namespace there. Method bodies must resolve it at call
     # time through the ASSEMBLED class so monkeypatched attributes on
     # ``GDPRService`` are honoured.
     from . import GDPRService
+
+from django.contrib.auth import get_user_model
+JasminUser = get_user_model()
 
 logger = logging.getLogger("gdpr")
 

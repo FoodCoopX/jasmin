@@ -17,9 +17,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from datetime import timedelta
-from typing import TYPE_CHECKING
 
-from django.contrib.auth import get_user_model, password_validation
+from django.contrib.auth import get_user_model
+from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError
 from django.db import OperationalError, ProgrammingError, transaction
 from django.utils import timezone
@@ -31,11 +31,7 @@ from apps.shared.languages import DEFAULT_LANGUAGE_CODE, SUPPORTED_LANGUAGE_CODE
 from apps.shared.tenant_urls import frontend_base_url, tenant_name
 from apps.shared.tenants.onboarding_emails import EmailCategory
 
-if TYPE_CHECKING:
-    # Type-only: the concrete user model keeps mypy precise, while the runtime
-    # path goes through ``get_user_model()`` so this module works under a host
-    # project whose ``AUTH_USER_MODEL`` is something else.
-    from apps.accounts.models import JasminUser
+JasminUser = get_user_model()
 
 logger = logging.getLogger("authentication")
 

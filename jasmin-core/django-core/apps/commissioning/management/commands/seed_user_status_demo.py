@@ -21,7 +21,6 @@ All demo emails follow ``demo_user_status_*@example.com`` and demo Reseller
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -34,10 +33,7 @@ from apps.commissioning.models import Member, Reseller, UserInvitation
 from apps.commissioning.models.basics import ContactEntity
 from apps.shared.tenants.models import Tenant
 
-if TYPE_CHECKING:
-    # Type-only: the concrete user model keeps mypy precise, while the runtime
-    # path goes through ``get_user_model()``.
-    from apps.accounts.models import JasminUser
+JasminUser = get_user_model()
 
 EMAIL_PREFIX = "demo_user_status_"
 DEMO_CUSTOMER_NUMBER_START = 90001

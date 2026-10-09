@@ -5,9 +5,10 @@ import uuid
 from collections.abc import Iterable
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import DateRangeField
 from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator
@@ -18,10 +19,7 @@ from django.utils import timezone
 from apps.shared.money import CENT, round_money, to_decimal
 from core.db_locks import acquire_advisory_xact_lock
 
-if TYPE_CHECKING:
-    # Type-only: the FKs above target ``settings.AUTH_USER_MODEL``, so nothing
-    # here needs the concrete class at runtime.
-    from apps.accounts.models import JasminUser
+JasminUser = get_user_model()
 
 from .managers import (
     ActiveOnlyManager,

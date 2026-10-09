@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
+from .member_email import schedule_member_email
 from ..errors import (
     MemberAlreadyCancelled,
     MemberAlreadyConfirmed,
@@ -30,13 +31,8 @@ from ..errors import (
     UserInBlockedStatus,
 )
 from ..models import Member
-from .member_email import schedule_member_email
 
-if TYPE_CHECKING:
-    # Type-only: the concrete user model keeps mypy precise, while the runtime
-    # path goes through ``get_user_model()`` so this module works under a host
-    # project whose ``AUTH_USER_MODEL`` is something else.
-    from apps.accounts.models import JasminUser
+JasminUser = get_user_model()
 
 logger = logging.getLogger(__name__)
 

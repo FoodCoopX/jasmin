@@ -17,6 +17,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 
 from apps.commissioning.models import (
     ConsentRecord,
@@ -30,16 +31,13 @@ from apps.commissioning.models import (
 )
 from apps.notifications.models import EmailLog
 from apps.payments.models import BillingProfile
-
-from ..field_classes import FieldClass, get_classification
 from .anonymization import _ci_recipient_q
 from .subjects import ErasureSubject
+from ..field_classes import FieldClass, get_classification
+
+JasminUser = get_user_model()
 
 if TYPE_CHECKING:
-    # Type-only: the runtime path uses ``get_user_model()``, so this module
-    # also works under a host project with a different ``AUTH_USER_MODEL``.
-    from apps.accounts.models import JasminUser
-
     # ``GDPRService`` is assembled in the package ``__init__`` and bound into
     # this module's namespace there — see the binding loop in ``__init__``.
     from . import GDPRService

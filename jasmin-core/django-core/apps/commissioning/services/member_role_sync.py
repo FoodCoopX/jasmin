@@ -16,12 +16,11 @@ Any new queryset bulk call site must call these functions itself.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from django.contrib.auth import get_user_model
 
 from apps.authz.roles import Role
 
-if TYPE_CHECKING:
-    from apps.accounts.models import JasminUser
+JasminUser = get_user_model()
 
 
 def ensure_member_role(user: JasminUser) -> None:
