@@ -9,14 +9,17 @@ the subject to the same three slots before anything is read or scrubbed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
 from apps.commissioning.models import Member, Reseller
+
 from ..field_classes import get_classification
 
-JasminUser = get_user_model()
+if TYPE_CHECKING:
+    from apps.accounts.models import JasminUser
 
 # Anonymization rewrites a user's email to ``deleted_<pk>@deleted.invalid``.
 ANONYMIZED_EMAIL_SUFFIX = "@deleted.invalid"

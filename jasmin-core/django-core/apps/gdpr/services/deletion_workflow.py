@@ -5,12 +5,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from .deletion_emails import send_deletion_pending_admin_office_email
-from .subjects import ErasureSubject
 from ..errors import (
     DeletionRequestNotPending,
     DeletionTokenExpired,
@@ -18,10 +15,14 @@ from ..errors import (
     RetentionPeriodActive,
 )
 from ..models import DeletionRequest, DeletionRequestState
-
-JasminUser = get_user_model()
+from .deletion_emails import send_deletion_pending_admin_office_email
+from .subjects import ErasureSubject
 
 if TYPE_CHECKING:
+    # Type-only: the runtime path uses ``get_user_model()``, so this module
+    # also works under a host project with a different ``AUTH_USER_MODEL``.
+    from apps.accounts.models import JasminUser
+
     # ``GDPRService`` is assembled in the package ``__init__`` and bound into
     # this module's namespace there. Method bodies must resolve it at call
     # time through the ASSEMBLED class so monkeypatched attributes on
