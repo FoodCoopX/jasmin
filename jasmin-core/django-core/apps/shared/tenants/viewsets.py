@@ -24,7 +24,6 @@ from apps.authz.permissions import IsAdmin, IsOffice, IsStaff, RolePermissionsMi
 from apps.shared.request_utils import auth_user, body, client_ip, request_tenant
 from core.serializers import ErrorResponseSerializer
 from core.throttling import TenantScopedRateThrottle
-
 from .errors import (
     CoopSharesBoundsInverted,
     EmptyNumberingPrefix,
@@ -214,8 +213,6 @@ class TenantViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # subdomain. An unfiltered ``Tenant.objects.all()`` would cross
         # over to the public schema and list every tenant on the platform.
         tenant = getattr(self.request, "tenant", None)
-        if tenant is None or tenant.schema_name == "public":
-            return Tenant.objects.none()
         return Tenant.objects.filter(pk=tenant.pk)
 
     def perform_update(self, serializer: Any) -> None:
