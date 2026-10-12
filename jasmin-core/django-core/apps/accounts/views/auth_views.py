@@ -13,7 +13,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.contrib.auth.signals import user_login_failed
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -40,6 +39,7 @@ from apps.shared.deferred_email import schedule_deferred_email
 from apps.shared.request_utils import auth_user, client_ip, request_tenant
 from core.serializers import ErrorResponseSerializer
 from core.throttling import set_throttle_scope
+
 from ..errors import (
     AuthError,
     InvalidCredentials,
@@ -49,6 +49,7 @@ from ..errors import (
     RegistrationCodeInvalid,
     RegistrationError,
 )
+from ..models import JasminUser
 from ..serializers import (
     InvitationAcceptRequestSerializer,
     InvitationVerifyResponseSerializer,
@@ -85,9 +86,6 @@ from ..services import (
 
 if TYPE_CHECKING:
     from apps.shared.tenants.models import Tenant
-
-
-JasminUser = get_user_model()
 
 logger = logging.getLogger("authentication")
 

@@ -36,7 +36,6 @@ from typing import Any
 from urllib.parse import quote
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework_simplejwt.exceptions import TokenError
@@ -48,8 +47,8 @@ from ..errors import (
     TwoFactorInvalidCode,
     TwoFactorNotEnrolled,
 )
+from ..models import JasminUser
 
-JasminUser = get_user_model()
 logger = logging.getLogger("authentication")
 
 

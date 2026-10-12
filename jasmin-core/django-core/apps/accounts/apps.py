@@ -1,7 +1,6 @@
 from django.apps import AppConfig
 
 
-
 class AccountConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.accounts"
@@ -10,10 +9,10 @@ class AccountConfig(AppConfig):
 
     def ready(self) -> None:
         from auditlog.registry import auditlog
-        from django.contrib.auth import get_user_model
 
         # Wire up signal handlers (e.g. an axes lockout -> the security log)
         from . import signals  # noqa: F401
+        from .models import JasminUser
 
         # Role grants, demotions and deactivations are the first thing an
         # auditor asks about, and the service layer's one event-log line about
@@ -28,7 +27,7 @@ class AccountConfig(AppConfig):
         # indefinitely. What masking misses, erasure still reaches —
         # ``GDPRService._scrub_auditlog_entries`` takes the user directly.
         auditlog.register(
-            get_user_model(),
+            JasminUser,
             exclude_fields=["password", "last_login", "updated_at"],
             mask_fields=[
                 "email",

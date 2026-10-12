@@ -34,7 +34,6 @@ import time
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import AccessToken
 
 from apps.accounts.errors import (
@@ -42,9 +41,9 @@ from apps.accounts.errors import (
     TwoFactorCodeRequired,
     TwoFactorInvalidCode,
 )
-from . import two_factor_service
+from apps.accounts.models import JasminUser
 
-JasminUser = get_user_model()
+from . import two_factor_service
 
 logger = logging.getLogger("authentication")
 

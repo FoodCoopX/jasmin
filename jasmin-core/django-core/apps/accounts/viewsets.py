@@ -9,7 +9,6 @@ resource and benefit from the standard ViewSet shape — including the
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
@@ -20,7 +19,9 @@ from rest_framework.viewsets import ViewSet
 from apps.authz.permissions import IsAdmin, RolePermissionsMixin
 from apps.shared.request_utils import auth_user
 from core.serializers import ErrorResponseSerializer
+
 from .errors import UserNotFound, UserNotPendingInvitation
+from .models import JasminUser
 from .permissions import RequiresStepUp
 from .serializers import (
     AdminUserCreateRequestSerializer,
@@ -34,7 +35,6 @@ from .services import (
     update_user_admin,
 )
 
-JasminUser = get_user_model()
 
 class AdminUserViewSet(RolePermissionsMixin, ViewSet):
     """Admin endpoints for managing tenant users.
