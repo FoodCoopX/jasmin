@@ -20,16 +20,16 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Prefetch
 
 from apps.authz.roles import VALID_ROLES, Role, validate_role_combination
 from core.db_locks import acquire_advisory_xact_lock
-
 from ..errors import AdminUserError, AdminUserRolesRequired
-from ..models import JasminUser
 
+JasminUser = get_user_model()
 logger = logging.getLogger("authentication")
 
 
