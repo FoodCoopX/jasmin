@@ -33,8 +33,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from core.tenant_db import connection
-
 from ..errors import (
     TrialMembersNotAllowed,
     TrialSubscriptionsNotAllowed,
@@ -46,9 +44,7 @@ if TYPE_CHECKING:
 
 
 def _settings():
-    from apps.shared.tenants.models import TenantSettings
-
-    return TenantSettings.get_current_settings(connection.tenant)
+    return None
 
 
 def _trial_members_enabled(overlay) -> bool:

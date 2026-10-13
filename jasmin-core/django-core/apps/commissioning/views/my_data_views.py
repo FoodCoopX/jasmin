@@ -12,11 +12,9 @@ from rest_framework.views import APIView
 from apps.authz.permissions import IsCustomer, IsMember
 from apps.shared.display_formats import DisplayFormats
 from apps.shared.request_utils import auth_user, body, client_ip
-from apps.shared.tenants.models import TenantSettings
 from core.errors import NotFoundError
 from core.serializers import ErrorResponseSerializer
 from core.tenant_db import connection
-
 from ..errors import CustomerProfileNotLinked, MemberProfileNotLinked
 from ..models import CoopShare, Member, Reseller
 from ..serializers import (
@@ -492,9 +490,8 @@ class MySubscriptionSubscribeView(APIView):
         # tenant enables it (validated against the variation's floor by
         # SubscriptionSerializer). Otherwise the reference price is forced — the
         # member never sets their own price.
-        from apps.shared.tenants.models import TenantSettings
 
-        current_settings = TenantSettings.get_current_settings(connection.tenant)
+        current_settings = None
         allows_solidarity = bool(
             current_settings and current_settings.allows_solidarity_pricing
         )

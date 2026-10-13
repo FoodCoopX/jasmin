@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
+from .member_email import schedule_member_email
 from ..errors import (
     MemberAlreadyCancelled,
     MemberAlreadyConfirmed,
@@ -30,7 +31,6 @@ from ..errors import (
     UserInBlockedStatus,
 )
 from ..models import Member
-from .member_email import schedule_member_email
 
 if TYPE_CHECKING:
     # Type-only: the concrete user model keeps mypy precise, while the runtime
@@ -341,7 +341,6 @@ class MemberService:
             create_user_with_invitation,
             resend_invitation,
         )
-        from apps.shared.tenants.onboarding_emails import EmailCategory
 
         if not member.email:
             raise MemberHasNoEmail("Member has no email address.")
@@ -360,7 +359,7 @@ class MemberService:
                 resend_invitation(
                     user=member.user,
                     created_by=admin_user,
-                    email_category=EmailCategory.MEMBER_LIFECYCLE,
+                    email_category="member_lifecycle",
                 )
                 return member
             raise MemberUserAlreadyActive("Member already has an active user account.")

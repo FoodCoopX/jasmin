@@ -1134,28 +1134,6 @@ class NumberedDocumentMixin(models.Model):
         Reads tenant settings to decide whether numbering is year-based and
         what prefix to apply. Returns the integer to assign to ``self.number``.
         """
-        from apps.shared.tenants.models import TenantSettings
-        from core.tenant_db import connection
-
-        tenant = connection.tenant
-        current_settings = TenantSettings.get_current_settings(tenant)
-
-        if current_settings:
-            year_based_field, prefix_setting_field = self._get_tenant_settings_fields()
-            prefix_value = getattr(current_settings, prefix_setting_field)
-
-            if getattr(current_settings, year_based_field):
-                qs = qs.filter(**self._get_filter_for_year_based())
-                # Year-reset bakes the year INTO the prefix so the per-year
-                # counter (which resets to 1 each January) can't collide across
-                # years on UNIQUE(prefix, number[, document_type]). This must hold
-                # even with an EMPTY base prefix — otherwise every year shares
-                # prefix='' and the second year's number=1 collides with the
-                # first's (a delayed-fuse IntegrityError at the new year).
-                year = self._get_document_year()
-                self.prefix = f"{prefix_value}-{year}" if prefix_value else str(year)
-            elif prefix_value:
-                self.prefix = prefix_value
 
         last_number = qs.aggregate(max_number=models.Max("number"))["max_number"]
         return (last_number or 0) + 1

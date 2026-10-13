@@ -35,8 +35,6 @@ from django.db.models.functions import Least
 from django.utils import timezone
 
 from apps.shared.display_formats import DisplayFormats
-from core.tenant_db import connection
-
 from ..errors import MemberAlreadyCancelled, MemberExitBeforeTransfer
 from ..models import CoopShare, CoopShareTransfer, Member
 
@@ -194,13 +192,10 @@ def _cascade_cancel_coop_shares(
     cancelled members' due dates."""
     from dateutil.relativedelta import relativedelta
 
-    from apps.shared.tenants.models import TenantSettings
 
-    settings = TenantSettings.get_current_settings(connection.tenant)
     retention_months = (
-        settings.retention_period_cancelled_members_coop_shares_in_months
-        if settings
-        else 0
+
+        0
     )
     payback_due = effective + relativedelta(months=retention_months)
 

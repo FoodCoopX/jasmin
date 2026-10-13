@@ -19,7 +19,6 @@ from apps.authz.permissions import (
 from apps.shared.request_utils import auth_user, body
 from core.errors import ForbiddenError, JasminError, NotFoundError
 from core.serializers import ErrorResponseSerializer
-
 from ..errors import (
     BulkFinalizeAppLabelInvalid,
     BulkFinalizeIdsInvalid,
@@ -39,7 +38,6 @@ from ..serializers import (
 from ..services.bulk_operations import bulk_with_savepoints
 from ..services.finalization_quota import (
     FinalizationReservation,
-    reserve_finalizations,
 )
 from ..services.planning_slots import PlanningSlot
 from ..utils import get_finalizable_objects
@@ -265,7 +263,6 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
         Only documents not yet final count, and finalizing an invoice also
         finalizes the delivery notes behind it. Runs inside the view's
         ``@transaction.atomic``, so a refusal rolls back cleanly."""
-        from apps.shared.tenants.models import RateLimitedAction
 
         from ..services import InvoiceService
 
@@ -280,16 +277,8 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
             if isinstance(obj, DeliveryNoteReseller) and not obj.is_finalized
         } | InvoiceService.unfinalized_upstream_delivery_note_ids(invoice_ids)
         return [
-            reserve_finalizations(
-                RateLimitedAction.INVOICE_FINALIZATION,
-                InvoiceReseller.objects.filter(pk__in=invoice_ids),
-                actor=user,
-            ),
-            reserve_finalizations(
-                RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
-                DeliveryNoteReseller.objects.filter(pk__in=delivery_note_ids),
-                actor=user,
-            ),
+            [],
+            [],
         ]
 
 

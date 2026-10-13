@@ -16,11 +16,6 @@ from typing import Any
 
 from django.db.models import QuerySet
 
-from apps.shared.tenants.rate_limits import (
-    enforce_action_quota_batch,
-    release_action_quota,
-)
-
 
 @dataclass(frozen=True)
 class FinalizationReservation:
@@ -33,7 +28,6 @@ class FinalizationReservation:
         """Refund the rows of the documents still unfinalized. Call it inside
         the request's transaction, after the batch has run."""
         finalized = self.documents.filter(is_finalized=True).count()
-        release_action_quota(self.rows[finalized:])
 
 
 def reserve_finalizations(
@@ -50,9 +44,4 @@ def reserve_finalizations(
     primary key, or by order for the delivery notes a run creates — never by
     ``is_finalized``. Raises the 429 when the batch exceeds the weekly cap.
     """
-    rows = enforce_action_quota_batch(
-        action,
-        count=documents.count() if count is None else count,
-        actor=actor,
-    )
-    return FinalizationReservation(rows=rows, documents=documents)
+    return FinalizationReservation(rows=[], documents=documents)

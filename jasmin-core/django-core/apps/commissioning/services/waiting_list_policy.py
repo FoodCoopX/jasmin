@@ -15,15 +15,11 @@ matching the model default of ``True``.
 
 from __future__ import annotations
 
-from core.tenant_db import connection
-
 from ..errors import WaitingListDisabled
 
 
 def _settings():
-    from apps.shared.tenants.models import TenantSettings
-
-    return TenantSettings.get_current_settings(connection.tenant)
+    return None
 
 
 def waiting_list_enabled() -> bool:

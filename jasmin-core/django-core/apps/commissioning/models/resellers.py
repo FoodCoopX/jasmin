@@ -11,7 +11,6 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
-from ..errors import CommissioningError, DocumentDateRequired, FinalizedError
 from .base import JasminModel
 from .choices import DayNumberOptions, DocumentType
 from .fields import delivery_week_field, size_vegetable_field, unit_field
@@ -35,6 +34,7 @@ from .mixin import (
     time_bound_valid_range_constraint,
     validate_nullable_date_order,
 )
+from ..errors import CommissioningError, DocumentDateRequired, FinalizedError
 
 logger = logging.getLogger(__name__)
 
@@ -206,13 +206,7 @@ class Reseller(JasminModel):
 
     @staticmethod
     def _current_tenant_settings():
-        # Lazy import — ``apps.commissioning`` is the "to-be-extracted"
-        # tenant app, so we keep the cross-app import out of the module
-        # namespace per CLAUDE.md ("isolation is one-way").
-        from apps.shared.tenants.models import TenantSettings
-        from core.tenant_db import connection
-
-        return TenantSettings.get_current_settings(connection.tenant)
+        return None
 
 
 class OrganicCertificate(JasminModel, TimeBoundMixin):

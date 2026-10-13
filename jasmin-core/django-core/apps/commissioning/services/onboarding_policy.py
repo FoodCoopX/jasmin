@@ -28,8 +28,6 @@ from typing import TYPE_CHECKING
 
 from django.utils import timezone
 
-from core.tenant_db import connection
-
 if TYPE_CHECKING:
     from apps.commissioning.models import Member, Subscription
 
@@ -39,9 +37,7 @@ ONBOARDING_BACKFILL_WEEKS = 6
 
 
 def _settings():
-    from apps.shared.tenants.models import TenantSettings
-
-    return TenantSettings.get_current_settings(connection.tenant)
+    return None
 
 
 def onboarding_mode_enabled() -> bool:
@@ -64,9 +60,7 @@ def assert_member_email_action_allowed() -> None:
         from apps.commissioning.errors import EmailActionBlockedInOnboardingMode
 
         raise EmailActionBlockedInOnboardingMode()
-    from apps.shared.tenants.email_service import assert_tenant_can_send_email
 
-    assert_tenant_can_send_email()
 
 
 def backfill_earliest_monday() -> datetime.date:

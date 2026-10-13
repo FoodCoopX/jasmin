@@ -25,7 +25,6 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from apps.shared.deferred_email import schedule_deferred_email
-from apps.shared.tenants.onboarding_emails import EmailCategory
 
 if TYPE_CHECKING:
     from ..models import Member
@@ -72,7 +71,7 @@ def schedule_member_email(
         related_object_type="member",
         related_object_id=str(member_id),
         language=recipient_language,
-        category=EmailCategory.MEMBER_LIFECYCLE,
+        category="member_lifecycle",
         logger=logger,
         log_error_event=log_error_event,
         log_not_sent_event=log_not_sent_event,

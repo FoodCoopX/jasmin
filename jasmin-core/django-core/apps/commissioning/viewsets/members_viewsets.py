@@ -48,7 +48,7 @@ from apps.shared.query_params import parse_body_bool
 from apps.shared.request_utils import auth_user, body, client_ip
 from core.pagination import OptionalLimitOffsetPagination
 from core.serializers import ErrorResponseSerializer
-
+from .badge_viewsets import pending_admin_confirmation_q
 from ..errors import (
     CoopShareConfirmedImmutable,
     CoopShareNotFromTransfer,
@@ -107,7 +107,6 @@ from ..services.waiting_list_offer_service import offer_price_fits_column
 from ..utils.optional_filters import apply_optional_filters
 from ..utils.query_params import validate_query_params
 from ..utils.validation_utils import parse_body_date, parse_bulk_ids
-from .badge_viewsets import pending_admin_confirmation_q
 
 logger = logging.getLogger(__name__)
 
@@ -473,8 +472,6 @@ class MemberViewSet(
 
         from django.db import transaction
 
-        from apps.shared.tenants.models import RateLimitedAction
-        from apps.shared.tenants.rate_limits import enforce_action_quota
 
         # Volume cap on member creation — an uncapped loop pollutes the
         # legally-relevant Genossenschaft member register. Atomic with the save
@@ -483,7 +480,6 @@ class MemberViewSet(
         # an existing login is in the same transaction: a link that fails
         # leaves no member behind for a retry to duplicate.
         with transaction.atomic():
-            enforce_action_quota(RateLimitedAction.MEMBER_CREATION, actor=request.user)
             # ``created_by`` is read-only on the serializer — stamp it here.
             member: Member = serializer.save(created_by=auth_user(request))
             if existing_user is not None:
@@ -979,16 +975,7 @@ class SubscriptionViewSet(
         has no tenant and leaves it out.
         """
         ctx = super().get_serializer_context()
-        from apps.shared.tenants.models import TenantSettings
-        from core.tenant_db import connection
 
-        tenant = connection.tenant
-        if tenant.schema_name != "public":
-            settings = TenantSettings.get_current_settings(tenant)
-            if settings is not None:
-                ctx["min_weeks_to_cancel_before_ending"] = (
-                    settings.min_weeks_to_cancel_before_ending
-                )
         if self.action in {"create", "update", "partial_update"} and not getattr(
             self, "swagger_fake_view", False
         ):

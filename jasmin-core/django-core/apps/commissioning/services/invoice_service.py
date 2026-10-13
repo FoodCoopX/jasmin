@@ -12,10 +12,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.shared.display_formats import DisplayFormats
-from apps.shared.tenants.models import RateLimitedAction
-from apps.shared.tenants.rate_limits import enforce_action_quota
 from core.errors import ConflictError
-
+from .email_dispatch import load_pdf_attachments, send_document_email
+from .finalize_utils import finalize_children
 from ..constants import crates_should_be_on_documents
 from ..errors import CommissioningError
 from ..models import (
@@ -25,8 +24,6 @@ from ..models import (
     InvoiceResellerContent,
 )
 from ..utils.iso_week_utils import coerce_document_date
-from .email_dispatch import load_pdf_attachments, send_document_email
-from .finalize_utils import finalize_children
 
 logger = logging.getLogger(__name__)
 
@@ -470,14 +467,7 @@ class InvoiceService:
                 code="invoice.empty",
             )
 
-        # Volume cap: refuse if this tenant is over its finalization quota. This
-        # is the legally-relevant moment (a sequential number is minted and the
-        # document auto-sends), so it is where a compromised office account could
-        # do the most damage. Storno creation routes through here too, so both
-        # invoices and cancellations draw on the one INVOICE_FINALIZATION cap.
-        # Runs before assign_final_number so a refused call burns no number.
-        if not skip_quota:
-            enforce_action_quota(RateLimitedAction.INVOICE_FINALIZATION, actor=user)
+
 
         invoice.assign_final_number()
 
@@ -924,14 +914,7 @@ class InvoiceService:
 
     @staticmethod
     def accounting_recipient() -> str | None:
-        """The tenant's accounting inbox (typically a DATEV import address),
-        or ``None`` when none is configured — a fine setup for a tenant
-        without such a pipeline."""
-        from apps.shared.tenants.models import TenantEmailConfig
-        from core.tenant_db import connection
-
-        config = TenantEmailConfig.get_active_for_schema(connection.tenant.schema_name)
-        return (config.accounting_email or None) if config else None
+        return None
 
     @staticmethod
     def send_claimed(
@@ -982,13 +965,11 @@ class InvoiceService:
         reseller-facing and accounting-facing sends today; if the
         wording ever needs to diverge, split into two slugs and pass
         different contexts here."""
-        from apps.shared.tenants.email_service import capture_tenant_email_context
 
         reseller = invoice.reseller
         # ``name`` is None for a contact with no company, first or last name.
         reseller_name = reseller.contact.name or ""
         # Invoices are sent from office requests, so the tenant is the real one.
-        tenant_context = capture_tenant_email_context()
 
         try:
             terms_days = reseller.get_payment_terms_days()
@@ -1018,7 +999,7 @@ class InvoiceService:
         invoice_number = invoice.full_number
 
         return {
-            "tenant_name": tenant_context["tenant_name"],
+            "tenant_name": "Placeholder tenant name",
             "reseller": {"name": reseller_name},
             "invoice": {
                 "number": invoice_number,
@@ -1026,7 +1007,7 @@ class InvoiceService:
                 "total": total_str,
                 "due_date": due_date_str,
             },
-            "tenant": {"bank_details": tenant_context["bank_details"]},
+            "tenant": {"bank_details": "placeholder tenant"},
         }
 
     @staticmethod

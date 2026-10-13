@@ -29,8 +29,6 @@ from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from core.tenant_db import connection
-
 from ..models import (
     CapacityReservation,
     ExternalShareDemand,
@@ -625,15 +623,14 @@ def _resolve_backend() -> _DemandBackend:
     tenant (set via the existing Configuration → Commissioning →
     Planning & Management UI).
     """
-    # Local import to keep this app loosely coupled from the tenants app.
-    from apps.shared.tenants.models import TenantSettings
+
 
     # Outside a request (a Huey task, a management command under
     # ``schema_context``) ``connection.tenant`` is a django-tenants FakeTenant;
     # ``get_current_settings`` resolves it to the real Tenant by schema_name,
     # so such a path picks the same backend as a request and never wipes an
     # external-CSV tenant's theoreticals.
-    settings = TenantSettings.get_current_settings(connection.tenant)
+    settings = None
     if settings and settings.uploads_weekly_share_amount:
         return ExternalDemandBackend()
     return SubscriptionDemandBackend()

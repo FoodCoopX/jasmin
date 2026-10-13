@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from isoweek import Week
 
+from .recompute import recompute_shares
 from ..errors import OfferGroupNotFound, ShareTypeVariationNotFound
 from ..models import (
     DefaultShareArticleInShare,
@@ -29,7 +30,6 @@ from ..utils import (
     split_forecast_amount_by_weight,
 )
 from ..utils.iso_week_utils import saturday_of_iso_week
-from .recompute import recompute_shares
 
 logger = logging.getLogger(__name__)
 
@@ -743,11 +743,7 @@ class ForecastService:
         """True iff the active tenant opted into the weighted forecast split.
 
         False when the tenant has no settings row — the feature is simply off."""
-        from apps.shared.tenants.models import TenantSettings
-        from core.tenant_db import connection
-
-        settings = TenantSettings.get_current_settings(connection.tenant)
-        return bool(settings and settings.distribute_forecast_by_weight)
+        return False
 
     @transaction.atomic
     def _create_or_update_share_contents(

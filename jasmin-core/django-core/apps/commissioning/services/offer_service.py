@@ -11,7 +11,8 @@ from django.db.models.functions import Coalesce
 from isoweek import Week
 
 from apps.shared.languages import LanguageChoices
-
+from .bulk_email_job import create_send_record_idempotent, emit_progress
+from .share_demand_service import ShareDemandService
 from ..models import (
     Forecast,
     ForecastOfferGroup,
@@ -25,8 +26,6 @@ from ..models import (
     ShareContent,
 )
 from ..models.choices import UnitOptions
-from .bulk_email_job import create_send_record_idempotent, emit_progress
-from .share_demand_service import ShareDemandService
 
 logger = logging.getLogger(__name__)
 
@@ -855,16 +854,12 @@ class OfferService:
         the polling drawer's progress bar. Synchronous callers just pass
         ``None``.
         """
-        from apps.shared.tenants.email_service import (
-            EmailService,
-            capture_tenant_email_context,
-        )
 
-        email_service = EmailService()
+
         # Tenant name / language / frontend URL — passed from the enqueueing
         # view (real Tenant); fall back to the live tenant for synchronous
         # callers. The worker's FakeTenant can't supply these.
-        ctx = email_ctx or capture_tenant_email_context()
+        ctx = email_ctx
 
         # Distinct requested ids — the progress denominator. The UI sends a
         # distinct selection, but dedup defensively so the bar can't overcount.
