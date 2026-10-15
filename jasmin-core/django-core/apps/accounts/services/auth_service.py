@@ -22,6 +22,7 @@ from ..errors import (
     AccountBlocked,
     InvalidCredentials,
     InvalidToken,
+    TenantMismatch,
     TwoFactorEnrolmentRequired,
 )
 
@@ -169,6 +170,17 @@ def refresh_access_token(
         refresh = RefreshToken(refresh_token)
     except TokenError as exc:
         raise InvalidToken(str(exc)) from exc
+
+    token_tenant = refresh.get("tenant_id")
+    if token_tenant is None:
+        raise InvalidToken("Missing tenant claim")
+    if not tenant_schema:
+        # Tenant resolution failed upstream. Fail closed — skipping the
+        # binding check here would let a token minted for tenant A be
+        # refreshed against any host whose tenant could not be resolved.
+        raise InvalidToken("Tenant could not be resolved")
+    if token_tenant != tenant_schema:
+        raise TenantMismatch("Token does not belong to this tenant")
 
     # Session cut-off: reject any refresh minted before the user last
     # revoked their sessions (password reset / logout-everywhere). Compared

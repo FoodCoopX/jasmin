@@ -10,6 +10,7 @@ from apps.commissioning.services import InvoiceService
 from apps.shared.display_formats import DisplayFormats
 from apps.shared.ops_alerts import alert_operator
 from apps.shared.retention import IMPORT_BATCH_RETENTION_DAYS
+from apps.shared.tenants.sweep import for_each_tenant
 
 log = logging.getLogger("django.security")
 ops_log = logging.getLogger("tasks")
@@ -271,8 +272,30 @@ def daily_subscription_renewals() -> None:
     """
 
     def run(tenant):
+        from apps.shared.tenants.models import TenantSettings
 
-        return
+        tenant_settings = TenantSettings.get_current_settings(tenant)
+        if not tenant_settings or not tenant_settings.subscriptions_are_auto_renewed:
+            return
+
+        from apps.commissioning.services.renewal import run_renewals
+
+        run_date = timezone.localdate()
+        result = run_renewals(
+            run_date, tenant_settings.min_weeks_to_cancel_before_ending
+        )
+        failed = result["failed"]
+        if result["created"] or failed:
+            ops_log.info(
+                "renewal.run tenant=%s created=%s failed=%s",
+                tenant.schema_name,
+                result["created"],
+                len(failed),
+            )
+        if failed:
+            _notify_office_of_renewal_failures(tenant, failed, run_date)
+
+    for_each_tenant(run, label="subscription.renewals")
 
 
 # ---------------------------------------------------------------------------

@@ -27,7 +27,6 @@ from apps.commissioning.models import (
 from apps.commissioning.models.choices import PaymentCycleOptions
 from apps.commissioning.services.consent_service import ConsentService
 from apps.commissioning.utils.iso_week_utils import share_delivery_date
-from apps.shared.current_tenant_settings import get_current_tenant_settings
 from apps.shared.money import round_money as _money
 from apps.shared.tenants.models import RateLimitedAction, Tenant, TenantSettings
 from apps.shared.tenants.rate_limits import enforce_action_quota
@@ -85,7 +84,7 @@ def _current_tenant() -> Tenant:
 class _BillingConfig:
     """Snapshot of the dynamic billing settings for the current tenant.
 
-    Pulled from `get_current_tenant_settings()` with safe
+    Pulled from `TenantSettings.get_current_settings(tenant)` with safe
     defaults if no settings row exists yet.
     """
 
@@ -95,7 +94,7 @@ class _BillingConfig:
 
     @classmethod
     def for_tenant(cls, tenant: Tenant) -> _BillingConfig:
-        tenant_settings = get_current_tenant_settings()
+        tenant_settings = TenantSettings.get_current_settings(tenant)
         if tenant_settings is None:
             return cls(
                 strategy=TenantSettings.BILLING_STRATEGY_EXACT,

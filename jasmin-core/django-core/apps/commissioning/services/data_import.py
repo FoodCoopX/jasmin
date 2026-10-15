@@ -494,6 +494,20 @@ def _too_many_rows(model_name: str) -> DataImportInvalid:
     member-creation budget: every part draws on that one budget, so a file
     bigger than what is left of it can't get in this week however it is split.
     """
+    if model_name == "member":
+        from apps.shared.tenants.models import RateLimitedAction
+        from apps.shared.tenants.rate_limits import remaining_weekly_quota
+
+        remaining = remaining_weekly_quota(RateLimitedAction.MEMBER_CREATION)
+        if remaining is not None and remaining <= _MAX_IMPORT_ROWS:
+            return DataImportInvalid(
+                f"CSV has more than {_MAX_IMPORT_ROWS} data rows, more members "
+                f"than the {remaining} the weekly member limit still allows. "
+                "Splitting the file won't get them in; a platform administrator "
+                "has to raise the limit first.",
+                code="data_import.over_member_limit",
+                details={"max_rows": _MAX_IMPORT_ROWS, "remaining": remaining},
+            )
     return DataImportInvalid(
         f"CSV has more than {_MAX_IMPORT_ROWS} data rows; imports are capped at "
         f"{_MAX_IMPORT_ROWS} rows per upload. Split the file.",
@@ -569,7 +583,22 @@ def import_rows_from_csv(
     if len(data_lines) > _MAX_IMPORT_ROWS:
         raise _too_many_rows(model_name)
     reserved_member_quota_ids: list[str] = []
+    if model_name == "member" and not dry_run:
+        # The interactive create path (MemberViewSet.create) is volume-capped, so
+        # the bulk import must draw on the SAME weekly member budget or it is a
+        # total bypass. Reserve the whole batch up front — the per-minute burst
+        # cap does not apply to a legitimate bulk import — so an over-cap import
+        # is refused cleanly (429) instead of partially applying. Unused
+        # reservations (blank/invalid rows that create no member) are refunded
+        # after the loop so a mostly-failing import doesn't burn the week's budget.
+        from apps.shared.tenants.models import RateLimitedAction
+        from apps.shared.tenants.rate_limits import enforce_action_quota_batch
 
+        reserved_member_quota_ids = enforce_action_quota_batch(
+            RateLimitedAction.MEMBER_CREATION,
+            count=len(data_lines),
+            actor=importing_user,
+        )
     bool_fields = _collect_bool_fields(serializer_cls)
     result = DataImportResult(model_name=model_name)
 
@@ -679,6 +708,14 @@ def import_rows_from_csv(
                     }
                 )
 
+    if reserved_member_quota_ids:
+        # Refund the reservations that never became a member (blank + failed
+        # rows): one ledger row was reserved per data row, one result entry
+        # exists per successful create, so the tail beyond the success count is
+        # unused. Refunding keeps the weekly budget honest for later imports.
+        from apps.shared.tenants.rate_limits import release_action_quota
+
+        release_action_quota(reserved_member_quota_ids[len(result.results) :])
 
     result.results.sort(key=lambda entry: entry["row"])
     result.errors.sort(key=lambda entry: entry["row"])

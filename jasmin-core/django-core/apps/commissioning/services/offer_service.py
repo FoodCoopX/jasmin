@@ -854,12 +854,16 @@ class OfferService:
         the polling drawer's progress bar. Synchronous callers just pass
         ``None``.
         """
+        from apps.shared.tenants.email_service import (
+            EmailService,
+            capture_tenant_email_context,
+        )
 
-
+        email_service = EmailService()
         # Tenant name / language / frontend URL — passed from the enqueueing
         # view (real Tenant); fall back to the live tenant for synchronous
         # callers. The worker's FakeTenant can't supply these.
-        ctx = email_ctx
+        ctx = email_ctx or capture_tenant_email_context()
 
         # Distinct requested ids — the progress denominator. The UI sends a
         # distinct selection, but dedup defensively so the bar can't overcount.

@@ -34,10 +34,10 @@ class SelfRegistrationEnabled(BasePermission):
     """
 
     def has_permission(self, request, view) -> bool:
-        from apps.shared.current_tenant_settings import get_current_tenant_settings
+        from apps.shared.tenants.models import TenantSettings
         from core.tenant_db import connection
 
-        current = get_current_tenant_settings()
+        current = TenantSettings.get_current_settings(connection.tenant)
         if current is None or not current.allows_self_registration:
             logger.info(
                 "auth.self_registration_refused tenant=%s path=%s",

@@ -743,9 +743,10 @@ class ForecastService:
         """True iff the active tenant opted into the weighted forecast split.
 
         False when the tenant has no settings row — the feature is simply off."""
-        from apps.shared.current_tenant_settings import get_current_tenant_settings
+        from apps.shared.tenants.models import TenantSettings
+        from core.tenant_db import connection
 
-        settings = get_current_tenant_settings()
+        settings = TenantSettings.get_current_settings(connection.tenant)
         return bool(settings and settings.distribute_forecast_by_weight)
 
     @transaction.atomic

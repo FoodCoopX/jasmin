@@ -16,6 +16,10 @@ from django.utils.html import escape as _html_escape
 from django.utils.safestring import SafeString, mark_safe
 
 from apps.shared.display_formats import DisplayFormats
+from apps.shared.tenants.email_service import (
+    EmailService,
+    capture_tenant_email_context,
+)
 from .bulk_email_job import create_send_record_idempotent, emit_progress
 
 logger = logging.getLogger(__name__)
@@ -210,7 +214,7 @@ def bulk_send_invoice_reminders(
     # Tenant name / language / bank details — passed from the enqueueing
     # view (real Tenant); fall back to the live tenant for synchronous
     # callers. The worker's FakeTenant can't supply these.
-    ctx = email_ctx
+    ctx = email_ctx or capture_tenant_email_context()
     # On the worker this is a lookup by schema, so it runs once per batch.
     formats = DisplayFormats.current()
 

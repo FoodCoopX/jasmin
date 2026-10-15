@@ -213,6 +213,8 @@ class TenantViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # subdomain. An unfiltered ``Tenant.objects.all()`` would cross
         # over to the public schema and list every tenant on the platform.
         tenant = getattr(self.request, "tenant", None)
+        if tenant is None or tenant.schema_name == "public":
+            return Tenant.objects.none()
         return Tenant.objects.filter(pk=tenant.pk)
 
     def perform_update(self, serializer: Any) -> None:

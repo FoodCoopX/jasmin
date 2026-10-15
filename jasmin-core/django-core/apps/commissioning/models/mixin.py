@@ -1134,9 +1134,11 @@ class NumberedDocumentMixin(models.Model):
         Reads tenant settings to decide whether numbering is year-based and
         what prefix to apply. Returns the integer to assign to ``self.number``.
         """
-        from apps.shared.current_tenant_settings import get_current_tenant_settings
+        from apps.shared.tenants.models import TenantSettings
+        from core.tenant_db import connection
 
-        current_settings = get_current_tenant_settings()
+        tenant = connection.tenant
+        current_settings = TenantSettings.get_current_settings(tenant)
 
         if current_settings:
             year_based_field, prefix_setting_field = self._get_tenant_settings_fields()

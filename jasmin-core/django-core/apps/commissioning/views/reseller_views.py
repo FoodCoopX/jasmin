@@ -32,6 +32,7 @@ from ..errors import (
 from ..models import (
     CrateContentInvoiceReseller,
     DeliveryNoteReseller,
+    InvoiceReseller,
     InvoiceResellerContent,
     OfferGroup,
     OfferSending,
@@ -76,6 +77,7 @@ from ..services.bulk_results import (
 )
 from ..services.finalization_quota import (
     FinalizationReservation,
+    reserve_finalizations,
 )
 from ..utils.iso_week_utils import week_day_to_date
 from ..utils.lookup import get_or_404
@@ -326,11 +328,17 @@ class BulkCreateDocumentsFromOrdersView(APIViewRolePermissionsMixin, APIView):
         # delivery_note branch only creates.
         reservation: FinalizationReservation | None = None
         if model == "invoice":
+            from apps.shared.tenants.models import RateLimitedAction
 
             to_finalize = [
                 order.id for order in orders if not _has_finalized_delivery_note(order)
             ]
-            reservation = []
+            reservation = reserve_finalizations(
+                RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
+                DeliveryNoteReseller.objects.filter(order_id__in=to_finalize),
+                count=len(to_finalize),
+                actor=request.user,
+            )
 
         def handler(
             order: Order,
@@ -476,6 +484,7 @@ class BulkFinalizeDocumentsView(APIViewRolePermissionsMixin, APIView):
         over-cap batch is refused (429) before anything is finalized; the run
         then finalizes with ``skip_quota``. Only documents not yet final count,
         and finalizing an invoice also finalizes the delivery notes behind it."""
+        from apps.shared.tenants.models import RateLimitedAction
 
         delivery_notes = [
             order.delivery_note
@@ -484,7 +493,15 @@ class BulkFinalizeDocumentsView(APIViewRolePermissionsMixin, APIView):
         ]
         if model == "delivery_note":
             return [
-                []
+                reserve_finalizations(
+                    RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
+                    DeliveryNoteReseller.objects.filter(
+                        pk__in=[
+                            note.pk for note in delivery_notes if not note.is_finalized
+                        ]
+                    ),
+                    actor=actor,
+                )
             ]
         invoice_ids = {
             invoice.pk
@@ -494,8 +511,20 @@ class BulkFinalizeDocumentsView(APIViewRolePermissionsMixin, APIView):
             if not invoice.is_finalized
         }
         return [
-            [],
-            [],
+            reserve_finalizations(
+                RateLimitedAction.INVOICE_FINALIZATION,
+                InvoiceReseller.objects.filter(pk__in=invoice_ids),
+                actor=actor,
+            ),
+            reserve_finalizations(
+                RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
+                DeliveryNoteReseller.objects.filter(
+                    pk__in=InvoiceService.unfinalized_upstream_delivery_note_ids(
+                        invoice_ids
+                    )
+                ),
+                actor=actor,
+            ),
         ]
 
 
@@ -1237,8 +1266,21 @@ class BulkCreateSummaryInvoiceFromOrdersView(APIViewRolePermissionsMixin, APIVie
         # The view finalizes each usable delivery note that isn't final yet
         # before rolling them into one summary invoice, so it reserves those
         # finalizations (see ``finalization_quota``).
+        from apps.shared.tenants.models import RateLimitedAction
 
-        reservation = []
+        reservation = reserve_finalizations(
+            RateLimitedAction.DELIVERY_NOTE_FINALIZATION,
+            DeliveryNoteReseller.objects.filter(
+                pk__in=[
+                    delivery_note.pk
+                    for delivery_note in delivery_note_by_order.values()
+                    if delivery_note is not None
+                    and not delivery_note.is_finalized
+                    and delivery_note.id not in already_invoiced_delivery_note_ids
+                ]
+            ),
+            actor=request.user,
+        )
 
         delivery_notes = []
         errors: list[dict[str, Any]] = []
@@ -1477,6 +1519,7 @@ class BulkSendInvoiceRemindersViaEmailView(APIViewRolePermissionsMixin, APIView)
     def post(self, request: Request) -> Response:
         from apps.commissioning.tasks import run_bulk_invoice_reminder_send
         from apps.notifications.jobs import enqueue_job
+        from apps.shared.tenants.email_service import capture_tenant_email_context
 
         order_ids = parse_bulk_ids(request)
         model = body(request).get("model")
@@ -1496,7 +1539,7 @@ class BulkSendInvoiceRemindersViaEmailView(APIViewRolePermissionsMixin, APIView)
             task=run_bulk_invoice_reminder_send,
             task_kwargs={
                 "order_ids": [str(order_id) for order_id in order_ids],
-                "email_ctx": {},
+                "email_ctx": capture_tenant_email_context(),
             },
             created_by=auth_user(request),
         )
@@ -1540,8 +1583,10 @@ class BulkSendDocumentsViaEmailView(APIViewRolePermissionsMixin, APIView):
     def post(self, request: Request) -> Response:
         from apps.commissioning.tasks import run_bulk_document_send
         from apps.notifications.jobs import enqueue_job
+        from apps.shared.tenants.email_service import assert_tenant_can_send_email
 
         params = validate_bulk_document_request(request)
+        assert_tenant_can_send_email()
         job = enqueue_job(
             kind=f"{params['model']}.bulk_send",
             task=run_bulk_document_send,
@@ -1649,6 +1694,7 @@ class BulkSendOffersViaEmailView(APIViewRolePermissionsMixin, APIView):
     def post(self, request: Request) -> Response:
         from apps.commissioning.tasks import run_bulk_offer_send
         from apps.notifications.jobs import enqueue_job
+        from apps.shared.tenants.email_service import capture_tenant_email_context
 
         serializer = BulkSendOffersRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1669,7 +1715,7 @@ class BulkSendOffersViaEmailView(APIViewRolePermissionsMixin, APIView):
                 "year": data["year"],
                 "delivery_week": data["delivery_week"],
                 "offer_group_id": str(offer_group.id),
-                "email_ctx": {},
+                "email_ctx": capture_tenant_email_context(),
             },
             created_by=auth_user(request),
         )

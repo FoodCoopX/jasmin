@@ -36,9 +36,10 @@ RESERVATION_TTL_DAYS = 14
 def _reservation_ttl_days() -> int:
     """The tenant's configured reservation TTL (days), defaulting to
     ``RESERVATION_TTL_DAYS`` when there is no settings overlay yet."""
-    from apps.shared.current_tenant_settings import get_current_tenant_settings
+    from apps.shared.tenants.models import TenantSettings
+    from core.tenant_db import connection
 
-    settings = get_current_tenant_settings()
+    settings = TenantSettings.get_current_settings(connection.tenant)
     if settings is None:
         return RESERVATION_TTL_DAYS
     return settings.reservation_ttl_days

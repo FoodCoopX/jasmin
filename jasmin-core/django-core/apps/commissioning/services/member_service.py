@@ -341,6 +341,7 @@ class MemberService:
             create_user_with_invitation,
             resend_invitation,
         )
+        from apps.shared.tenants.onboarding_emails import EmailCategory
 
         if not member.email:
             raise MemberHasNoEmail("Member has no email address.")
@@ -359,7 +360,7 @@ class MemberService:
                 resend_invitation(
                     user=member.user,
                     created_by=admin_user,
-                    email_category="member_lifecycle",
+                    email_category=EmailCategory.MEMBER_LIFECYCLE,
                 )
                 return member
             raise MemberUserAlreadyActive("Member already has an active user account.")

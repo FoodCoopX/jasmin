@@ -22,7 +22,41 @@ PURCHASE_DAY = 1  # tuesday
 
 
 def _resolve_tenant_setting(attr_name: str):
-    return None
+    """Return ``TenantSettings.<attr_name>`` for the active tenant, or
+    ``None`` if no tenant context is available.
+
+    Only the small set of exceptions that legitimately mean "no tenant
+    context to read from" is caught — swallowing anything else (transient DB
+    errors, code bugs) would silently return the hardcoded default tax rate
+    for GoBD-relevant computations:
+
+    * ``ImproperlyConfigured`` — bound connection has no tenant.
+    * ``OperationalError`` / ``ProgrammingError`` — DB unreachable or
+      ``shared_tenants_tenantsettings`` table doesn't exist yet
+      (initial migrations, test setup).
+
+    Everything else (model errors, attribute typos in the settings
+    field, etc.) bubbles up so the bug gets seen.
+    """
+    from django.core.exceptions import ImproperlyConfigured
+    from django.db import OperationalError, ProgrammingError
+
+    from apps.shared.tenants.models import TenantSettings
+    from core.tenant_db import connection
+
+    try:
+        settings = TenantSettings.get_current_settings(connection.tenant)
+    except (ImproperlyConfigured, OperationalError, ProgrammingError) as exc:
+        logger.warning(
+            "tax_rate.lookup_failed attr=%s error=%s — falling back to constant",
+            attr_name,
+            exc,
+        )
+        return None
+
+    if settings is None:
+        return None
+    return getattr(settings, attr_name)
 
 
 def get_default_tax_rate_articles():

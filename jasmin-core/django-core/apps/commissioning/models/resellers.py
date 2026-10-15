@@ -209,9 +209,10 @@ class Reseller(JasminModel):
         # Lazy import — ``apps.commissioning`` is the "to-be-extracted"
         # tenant app, so we keep the cross-app import out of the module
         # namespace per CLAUDE.md ("isolation is one-way").
-        from apps.shared.current_tenant_settings import get_current_tenant_settings
+        from apps.shared.tenants.models import TenantSettings
+        from core.tenant_db import connection
 
-        return get_current_tenant_settings()
+        return TenantSettings.get_current_settings(connection.tenant)
 
 
 class OrganicCertificate(JasminModel, TimeBoundMixin):

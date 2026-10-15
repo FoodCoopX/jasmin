@@ -6,6 +6,8 @@ from datetime import date
 from django.db import models, transaction
 
 from apps.shared.display_formats import DisplayFormats
+from apps.shared.tenants.models import RateLimitedAction
+from apps.shared.tenants.rate_limits import enforce_action_quota
 from core.errors import ConflictError
 from .email_dispatch import load_pdf_attachments, send_document_email
 from .finalize_utils import finalize_children
@@ -143,6 +145,14 @@ class DeliveryNoteService:
             raise CommissioningError(
                 "Cannot finalize delivery note - it has no items",
                 code="delivery_note.empty",
+            )
+
+        # Volume cap on the legally-relevant finalization step (mints a
+        # sequential number, becomes a sendable document). Before
+        # assign_final_number so a refused call burns no number.
+        if not skip_quota:
+            enforce_action_quota(
+                RateLimitedAction.DELIVERY_NOTE_FINALIZATION, actor=user
             )
 
         delivery_note.assign_final_number()

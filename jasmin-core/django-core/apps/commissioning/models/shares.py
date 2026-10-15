@@ -349,11 +349,11 @@ class ShareTypeVariation(JasminModel, TimeBoundMixin):
         # this keeps the model honest against admin saves and direct
         # API writes from someone who didn't notice the gate.
         if self.requires_optin:
-            from apps.shared.current_tenant_settings import (
-                get_current_tenant_settings,
-            )
+            from apps.shared.tenants.models import TenantSettings
+            from core.tenant_db import connection
 
-            current_settings = get_current_tenant_settings()
+            tenant = connection.tenant
+            current_settings = TenantSettings.get_current_settings(tenant)
             if (
                 current_settings
                 and not current_settings.allows_share_type_variation_optin

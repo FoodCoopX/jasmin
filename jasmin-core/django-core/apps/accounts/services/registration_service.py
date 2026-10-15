@@ -212,9 +212,9 @@ def register_public_applicant(
     # Trial members subscribe no coop shares (``coop_shares_count`` computed
     # above already forces 0 for trials).
     if coop_shares_count > 0:
-        from apps.shared.current_tenant_settings import get_current_tenant_settings
+        from apps.shared.tenants.models import TenantSettings
 
-        settings = get_current_tenant_settings()
+        settings = TenantSettings.get_current_settings(tenant)
         # value_one_coop_share is a whole-unit PositiveIntegerField — snapshot
         # it as-is (no rounding needed) so the equity record survives later
         # value changes (GenG §31).

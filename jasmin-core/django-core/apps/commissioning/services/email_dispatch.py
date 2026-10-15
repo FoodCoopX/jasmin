@@ -83,6 +83,7 @@ def send_document_email(
     error). Callers resolve the recipient (and its skip-logging) first;
     ``context_builder`` is invoked lazily only once a real send is attempted.
     """
+    from apps.shared.tenants.email_service import EmailService
 
     if not attachments:
         logger.warning(
@@ -91,7 +92,15 @@ def send_document_email(
         return False
 
     try:
-        success = False
+        success = EmailService().send_email(
+            slug=slug,
+            to_emails=[to_email],
+            context=context_builder(),
+            attachments=attachments,
+            purpose=purpose,
+            related_object_type=related_object_type,
+            related_object_id=str(document.pk),
+        )
     except (
         smtplib.SMTPException,
         ConnectionError,

@@ -11,6 +11,8 @@ from django.utils import timezone
 from isoweek import Week
 
 from apps.shared.subscription_hooks import notify_subscription_changed
+from apps.shared.tenants.models import RateLimitedAction
+from apps.shared.tenants.rate_limits import enforce_action_quota
 from .additional_share_policy import (
     assert_additional_share_has_base,
     assert_additional_share_has_base_on_update,
@@ -316,6 +318,9 @@ class SubscriptionService:
             # delivery + billing obligations; capping it bounds how fast those
             # can be minted. Placed alongside the capacity gate — both reject a
             # fresh confirm here — and the cap is platform-owned (public Tenant).
+            enforce_action_quota(
+                RateLimitedAction.SUBSCRIPTION_CONFIRMATION, actor=actor
+            )
             VariationCapacityService.assert_capacity_available(subscription)
 
         if not subscription.default_delivery_station_day_id:

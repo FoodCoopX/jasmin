@@ -12,6 +12,8 @@ from rest_framework.views import APIView
 from core.errors import NotFoundError
 from core.protected_media import INTERNAL_MEDIA_LOCATION
 from core.serializers import ErrorResponseSerializer
+from core.tenant_db import connection
+from .errors import NoTenantContext
 from .models import Tenant
 from .serializers import CurrentTenantSerializer
 
@@ -36,8 +38,18 @@ _MANIFEST_MAX_AGE = 60 * 60
 
 
 def _tenant_from_schema() -> Tenant:
+    """Resolve the tenant django-tenants routed this request to.
+
+    Subdomain -> schema resolution already happened in ``TenantMainMiddleware``;
+    this is only the lookup of the owning row.
+    """
+    schema_name = connection.schema_name
+
+    if schema_name == "public":
+        raise NoTenantContext("No tenant context")
+
     try:
-        return Tenant.objects.get()
+        return Tenant.objects.get(schema_name=schema_name)
     except Tenant.DoesNotExist:
         raise NotFoundError("Tenant not found") from None
 

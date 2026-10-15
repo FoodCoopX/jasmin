@@ -10,9 +10,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.authz.permissions import IsCustomer, IsMember
-from apps.shared.current_tenant_settings import get_current_tenant_settings
 from apps.shared.display_formats import DisplayFormats
 from apps.shared.request_utils import auth_user, body, client_ip
+from apps.shared.tenants.models import TenantSettings
 from core.errors import NotFoundError
 from core.serializers import ErrorResponseSerializer
 from core.tenant_db import connection
@@ -359,7 +359,7 @@ class MyCoopShareSubscribeView(APIView):
                 "subscribing."
             )
 
-        settings = get_current_tenant_settings()
+        settings = TenantSettings.get_current_settings(tenant=connection.tenant)
         value_one = settings.value_one_coop_share if settings else None
         # Never persist a 0-valued share — a missing/zero tenant
         # coop-share value is a configuration error, not a silent default.
@@ -491,7 +491,9 @@ class MySubscriptionSubscribeView(APIView):
         # tenant enables it (validated against the variation's floor by
         # SubscriptionSerializer). Otherwise the reference price is forced — the
         # member never sets their own price.
-        current_settings = get_current_tenant_settings()
+        from apps.shared.tenants.models import TenantSettings
+
+        current_settings = TenantSettings.get_current_settings(connection.tenant)
         allows_solidarity = bool(
             current_settings and current_settings.allows_solidarity_pricing
         )
