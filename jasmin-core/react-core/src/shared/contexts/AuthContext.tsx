@@ -3,7 +3,7 @@ import {createContext, useCallback, useContext, useEffect, useMemo, useState,} f
 import {useNavigate} from "react-router-dom";
 import {isAxiosError} from "axios";
 
-import axiosInstance, {performRefresh, setRefreshUserListener,} from "@shared/services/api";
+import axiosInstance, {performRefresh} from "@shared/services/api";
 import {type AuthEndpoints, SUPER_ADMIN_AUTH_ENDPOINTS, TENANT_AUTH_ENDPOINTS,} from "@shared/services/authEndpoints";
 import {isSuperAdminHostname as isSuperAdminHost} from "@shared/auth/superAdminHost";
 import {getErrorMessage} from "@shared/utils/apiError";
@@ -163,19 +163,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     });
-  }, []);
-
-  // A refresh that carries the user (host application session, see
-  // ``RefreshUser``) stores it like a login does: no login page needed, and a
-  // user switched in the host application replaces the cached one. Registered
-  // before the boot effect below so that the boot refresh already reaches it.
-  useEffect(() => {
-    setRefreshUserListener((user) => {
-      const data: AuthMetadata = { user };
-      localStorage.setItem("auth", JSON.stringify(data));
-      setMeta(data);
-    });
-    return () => setRefreshUserListener(null);
   }, []);
 
   // Hydrate user metadata from localStorage and attempt silent refresh on boot.

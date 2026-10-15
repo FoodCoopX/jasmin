@@ -71,29 +71,6 @@ const processQueue = (error: unknown, token: string | null = null) => {
 };
 
 /**
- * The user a refresh response may carry. A host application that replaces
- * Jasmin's login with its own session (e.g. Tapir) answers every refresh with
- * the session's user, in the same shape as the login response's ``user`` —
- * so the roles are known without ever going through the login page.
- */
-export interface RefreshUser {
-  id: string;
-  roles?: string[];
-  [key: string]: unknown;
-}
-
-type RefreshUserListener = (user: RefreshUser) => void;
-
-let refreshUserListener: RefreshUserListener | null = null;
-
-/** Registered by ``AuthProvider`` to store the user a refresh returns. */
-export function setRefreshUserListener(
-  listener: RefreshUserListener | null,
-): void {
-  refreshUserListener = listener;
-}
-
-/**
  * Perform a single refresh call, deduplicated across concurrent callers.
  *
  * If a refresh is already in flight (e.g. triggered by a 401 from another
@@ -110,15 +87,10 @@ export async function performRefresh(): Promise<string> {
   }
   isRefreshing = true;
   try {
-    const { data } = await axiosInstance.post<{
-      access: string;
-      user?: RefreshUser;
-    }>(refreshEndpoint(), {});
-    // The user is stored before the access token is published, so the app
-    // never renders authenticated with no roles.
-    if (data.user) {
-      refreshUserListener?.(data.user);
-    }
+    const { data } = await axiosInstance.post<{ access: string }>(
+      refreshEndpoint(),
+      {},
+    );
     setAccessToken(data.access);
     processQueue(null, data.access);
     return data.access;
