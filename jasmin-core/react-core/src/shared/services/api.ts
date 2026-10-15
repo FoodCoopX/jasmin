@@ -28,15 +28,6 @@ function loginRedirectPath(): string {
   return "/login";
 }
 
-let baseUrl;
-if (window.parent && window.parent._env_ && window.parent._env_["COMMISSIONING_API_BASE_URL"]) {
-  baseUrl = window.parent._env_["COMMISSIONING_API_BASE_URL"]
-} else if (window._env_ && window._env_["COMMISSIONING_API_BASE_URL"]) {
-  baseUrl = window._env_["COMMISSIONING_API_BASE_URL"]
-} else {
-  baseUrl = API_URL
-}
-
 function getCookie(name: string) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -54,7 +45,7 @@ function getCookie(name: string) {
 const csrftoken = getCookie('csrftoken');
 
 const axiosInstance = axios.create({
-  baseURL: baseUrl,
+  baseURL: API_URL,
   // CRITICAL: send the HttpOnly refresh cookie on every API call. Without
   // this the cookie is dropped and silent refresh fails.
   withCredentials: true,

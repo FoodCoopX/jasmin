@@ -90,7 +90,6 @@ export default defineConfig({
   },
   build: {
     minify: 'terser',
-    sourcemap: true,
     terserOptions: {
       compress: {
         drop_console: true,
@@ -99,9 +98,6 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        chunkFileNames: 'static/assets/js/[name]-[hash].js',
-        entryFileNames: 'static/assets/js/[name]-[hash].js',
-        assetFileNames: 'static/assets/[ext]/[name]-[hash].[ext]',
         // Function form is required under Vite 5/6 — the historical
         // object form silently produced an empty ``vendor`` chunk
         // (the chunk file emitted, but React + React-DOM ended up
