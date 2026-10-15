@@ -19,6 +19,7 @@ from apps.authz.permissions import (
 from apps.shared.request_utils import auth_user, body
 from core.errors import ForbiddenError, JasminError, NotFoundError
 from core.serializers import ErrorResponseSerializer
+
 from ..errors import (
     BulkFinalizeAppLabelInvalid,
     BulkFinalizeIdsInvalid,

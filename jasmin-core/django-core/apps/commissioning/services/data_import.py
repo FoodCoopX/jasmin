@@ -40,6 +40,7 @@ from rest_framework import serializers as drf_serializers
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from core.errors import JasminError
+
 from ..errors import DataImportInvalid, MemberLinkConflict
 from ..serializers import (
     CoopShareImportSerializer,

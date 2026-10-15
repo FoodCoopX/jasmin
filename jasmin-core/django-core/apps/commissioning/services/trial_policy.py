@@ -34,6 +34,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from core.tenant_db import connection
+
 from ..errors import (
     TrialMembersNotAllowed,
     TrialSubscriptionsNotAllowed,

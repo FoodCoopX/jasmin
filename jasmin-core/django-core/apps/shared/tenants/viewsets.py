@@ -24,6 +24,7 @@ from apps.authz.permissions import IsAdmin, IsOffice, IsStaff, RolePermissionsMi
 from apps.shared.request_utils import auth_user, body, client_ip, request_tenant
 from core.serializers import ErrorResponseSerializer
 from core.throttling import TenantScopedRateThrottle
+
 from .errors import (
     CoopSharesBoundsInverted,
     EmptyNumberingPrefix,

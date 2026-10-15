@@ -1,12 +1,23 @@
-import type {ReactNode} from "react";
-import {createContext, useCallback, useContext, useEffect, useMemo, useState,} from "react";
-import {useNavigate} from "react-router-dom";
-import {isAxiosError} from "axios";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
 
-import axiosInstance, {performRefresh} from "@shared/services/api";
-import {type AuthEndpoints, SUPER_ADMIN_AUTH_ENDPOINTS, TENANT_AUTH_ENDPOINTS,} from "@shared/services/authEndpoints";
-import {isSuperAdminHostname as isSuperAdminHost} from "@shared/auth/superAdminHost";
-import {getErrorMessage} from "@shared/utils/apiError";
+import axiosInstance, { performRefresh } from "@shared/services/api";
+import {
+  SUPER_ADMIN_AUTH_ENDPOINTS,
+  TENANT_AUTH_ENDPOINTS,
+  type AuthEndpoints,
+} from "@shared/services/authEndpoints";
+import { isSuperAdminHostname as isSuperAdminHost } from "@shared/auth/superAdminHost";
+import { getErrorMessage } from "@shared/utils/apiError";
 import type {
   LoginOrChallengeResponse,
   LoginRequest,
@@ -20,7 +31,7 @@ import {
   setAccessToken as setStoredAccessToken,
   subscribeAccessToken,
 } from "@shared/services/tokenStore";
-import {TenantContext} from "./TenantContext";
+import { TenantContext } from "./TenantContext";
 
 /**
  * User metadata cached by the context. Deliberately LOOSER than the

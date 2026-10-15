@@ -48,7 +48,7 @@ from apps.shared.query_params import parse_body_bool
 from apps.shared.request_utils import auth_user, body, client_ip
 from core.pagination import OptionalLimitOffsetPagination
 from core.serializers import ErrorResponseSerializer
-from .badge_viewsets import pending_admin_confirmation_q
+
 from ..errors import (
     CoopShareConfirmedImmutable,
     CoopShareNotFromTransfer,
@@ -107,6 +107,7 @@ from ..services.waiting_list_offer_service import offer_price_fits_column
 from ..utils.optional_filters import apply_optional_filters
 from ..utils.query_params import validate_query_params
 from ..utils.validation_utils import parse_body_date, parse_bulk_ids
+from .badge_viewsets import pending_admin_confirmation_q
 
 logger = logging.getLogger(__name__)
 

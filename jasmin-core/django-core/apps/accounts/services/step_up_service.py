@@ -45,7 +45,6 @@ from apps.accounts.errors import (
 from . import two_factor_service
 
 JasminUser = get_user_model()
-
 logger = logging.getLogger("authentication")
 
 

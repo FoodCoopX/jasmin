@@ -16,6 +16,7 @@ from apps.shared.tenants.models import TenantSettings
 from core.errors import NotFoundError
 from core.serializers import ErrorResponseSerializer
 from core.tenant_db import connection
+
 from ..errors import CustomerProfileNotLinked, MemberProfileNotLinked
 from ..models import CoopShare, Member, Reseller
 from ..serializers import (

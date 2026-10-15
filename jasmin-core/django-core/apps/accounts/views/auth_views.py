@@ -40,6 +40,7 @@ from apps.shared.deferred_email import schedule_deferred_email
 from apps.shared.request_utils import auth_user, client_ip, request_tenant
 from core.serializers import ErrorResponseSerializer
 from core.throttling import set_throttle_scope
+
 from ..errors import (
     AuthError,
     InvalidCredentials,
@@ -86,9 +87,7 @@ from ..services import (
 if TYPE_CHECKING:
     from apps.shared.tenants.models import Tenant
 
-
 JasminUser = get_user_model()
-
 logger = logging.getLogger("authentication")
 
 

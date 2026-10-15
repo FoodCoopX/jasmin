@@ -17,7 +17,6 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from . import two_factor_service
 from ..errors import (
     AccountBlocked,
     InvalidCredentials,
@@ -25,6 +24,7 @@ from ..errors import (
     TenantMismatch,
     TwoFactorEnrolmentRequired,
 )
+from . import two_factor_service
 
 JasminUser = get_user_model()
 logger = logging.getLogger("authentication")

@@ -24,15 +24,13 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.contrib.auth import password_validation
+from django.contrib.auth import get_user_model, password_validation
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.exceptions import ValidationError
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
 from apps.accounts.errors import InvalidResetLink, WeakPassword
-
 JasminUser = get_user_model()
 logger = logging.getLogger("authentication")
 

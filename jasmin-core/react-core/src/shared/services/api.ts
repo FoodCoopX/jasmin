@@ -1,15 +1,19 @@
 /// <reference types="vite/client" />
-import axios, {AxiosError, AxiosRequestConfig} from "axios";
-import {isSuperAdminHostname} from "@shared/auth/superAdminHost";
-import {getErrorCode, type JasminErrorPayload} from "@shared/utils/apiError";
-import {runStepUpFlow} from "./stepUp";
-import {clearAccessToken, getAccessToken, setAccessToken,} from "./tokenStore";
+import axios, { AxiosError, AxiosRequestConfig } from "axios";
+import { isSuperAdminHostname } from "@shared/auth/superAdminHost";
+import { getErrorCode, type JasminErrorPayload } from "@shared/utils/apiError";
+import { runStepUpFlow } from "./stepUp";
+import {
+  clearAccessToken,
+  getAccessToken,
+  setAccessToken,
+} from "./tokenStore";
 
 const API_URL: string = import.meta.env.VITE_API_URL || "";
 
 /** Detect which auth realm the current host belongs to. */
 function isSuperAdminHost(): boolean {
-  return isSuperAdminHostname(globalThis.location.hostname);
+  return isSuperAdminHostname(window.location.hostname);
 }
 
 function refreshEndpoint(): string {

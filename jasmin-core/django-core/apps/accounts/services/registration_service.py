@@ -16,8 +16,9 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from apps.authz.roles import Role
-from . import email_verification_service
+
 from ..errors import RegistrationEmailNotVerified, RegistrationError
+from . import email_verification_service
 
 JasminUser = get_user_model()
 logger = logging.getLogger("authentication")

@@ -13,14 +13,7 @@ from isoweek import Week
 from apps.shared.subscription_hooks import notify_subscription_changed
 from apps.shared.tenants.models import RateLimitedAction
 from apps.shared.tenants.rate_limits import enforce_action_quota
-from .additional_share_policy import (
-    assert_additional_share_has_base,
-    assert_additional_share_has_base_on_update,
-)
-from .capacity_reservation_service import CapacityReservationService
-from .delivery_cycle import filter_weeks_by_delivery_cycle
-from .variation_capacity_service import VariationCapacityService
-from .waiting_list_policy import assert_waiting_list_enabled
+
 from ..errors import (
     CancellationAfterValidUntil,
     CancellationBeforeValidFrom,
@@ -40,6 +33,14 @@ from ..models import (
     ShareTypeVariation,
     Subscription,
 )
+from .additional_share_policy import (
+    assert_additional_share_has_base,
+    assert_additional_share_has_base_on_update,
+)
+from .capacity_reservation_service import CapacityReservationService
+from .delivery_cycle import filter_weeks_by_delivery_cycle
+from .variation_capacity_service import VariationCapacityService
+from .waiting_list_policy import assert_waiting_list_enabled
 
 logger = logging.getLogger(__name__)
 

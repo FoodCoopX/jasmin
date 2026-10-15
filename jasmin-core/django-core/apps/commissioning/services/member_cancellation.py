@@ -36,6 +36,7 @@ from django.utils import timezone
 
 from apps.shared.display_formats import DisplayFormats
 from core.tenant_db import connection
+
 from ..errors import MemberAlreadyCancelled, MemberExitBeforeTransfer
 from ..models import CoopShare, CoopShareTransfer, Member
 

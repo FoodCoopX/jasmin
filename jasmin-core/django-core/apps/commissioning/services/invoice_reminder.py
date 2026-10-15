@@ -20,6 +20,7 @@ from apps.shared.tenants.email_service import (
     EmailService,
     capture_tenant_email_context,
 )
+
 from .bulk_email_job import create_send_record_idempotent, emit_progress
 
 logger = logging.getLogger(__name__)

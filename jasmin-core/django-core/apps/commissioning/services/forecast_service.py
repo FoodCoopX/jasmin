@@ -8,7 +8,6 @@ from django.db import transaction
 from django.db.models import Q
 from isoweek import Week
 
-from .recompute import recompute_shares
 from ..errors import OfferGroupNotFound, ShareTypeVariationNotFound
 from ..models import (
     DefaultShareArticleInShare,
@@ -30,6 +29,7 @@ from ..utils import (
     split_forecast_amount_by_weight,
 )
 from ..utils.iso_week_utils import saturday_of_iso_week
+from .recompute import recompute_shares
 
 logger = logging.getLogger(__name__)
 

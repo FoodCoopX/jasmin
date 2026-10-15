@@ -16,6 +16,7 @@ matching the model default of ``True``.
 from __future__ import annotations
 
 from core.tenant_db import connection
+
 from ..errors import WaitingListDisabled
 
 

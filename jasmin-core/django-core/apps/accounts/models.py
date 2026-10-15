@@ -16,6 +16,7 @@ from nanoid import generate
 
 from apps.authz.roles import VALID_ROLES, Role
 from apps.shared.languages import LanguageChoices
+
 from .choices import ThemeChoices
 from .constants import ID_LENGTH, JASMIN_ID_ALPHABET
 
@@ -135,9 +136,6 @@ ACCOUNT_STATUS_CHOICES = [
     ("pending_invitation", "Pending Invitation"),
     ("inactive", "Inactive"),
 ]
-
-
-
 
 
 class JasminUserManager(BaseUserManager):

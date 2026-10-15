@@ -27,6 +27,7 @@ from django.db.models import Prefetch
 
 from apps.authz.roles import VALID_ROLES, Role, validate_role_combination
 from core.db_locks import acquire_advisory_xact_lock
+
 from ..errors import AdminUserError, AdminUserRolesRequired
 
 JasminUser = get_user_model()

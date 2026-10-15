@@ -13,6 +13,7 @@ from core.errors import NotFoundError
 from core.protected_media import INTERNAL_MEDIA_LOCATION
 from core.serializers import ErrorResponseSerializer
 from core.tenant_db import connection
+
 from .errors import NoTenantContext
 from .models import Tenant
 from .serializers import CurrentTenantSerializer

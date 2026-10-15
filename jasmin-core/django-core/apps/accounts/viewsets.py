@@ -20,6 +20,7 @@ from rest_framework.viewsets import ViewSet
 from apps.authz.permissions import IsAdmin, RolePermissionsMixin
 from apps.shared.request_utils import auth_user
 from core.serializers import ErrorResponseSerializer
+
 from .errors import UserNotFound, UserNotPendingInvitation
 from .permissions import RequiresStepUp
 from .serializers import (
@@ -35,6 +36,7 @@ from .services import (
 )
 
 JasminUser = get_user_model()
+
 
 class AdminUserViewSet(RolePermissionsMixin, ViewSet):
     """Admin endpoints for managing tenant users.

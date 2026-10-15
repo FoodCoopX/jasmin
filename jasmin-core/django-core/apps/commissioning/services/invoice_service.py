@@ -15,8 +15,7 @@ from apps.shared.display_formats import DisplayFormats
 from apps.shared.tenants.models import RateLimitedAction
 from apps.shared.tenants.rate_limits import enforce_action_quota
 from core.errors import ConflictError
-from .email_dispatch import load_pdf_attachments, send_document_email
-from .finalize_utils import finalize_children
+
 from ..constants import crates_should_be_on_documents
 from ..errors import CommissioningError
 from ..models import (
@@ -26,6 +25,8 @@ from ..models import (
     InvoiceResellerContent,
 )
 from ..utils.iso_week_utils import coerce_document_date
+from .email_dispatch import load_pdf_attachments, send_document_email
+from .finalize_utils import finalize_children
 
 logger = logging.getLogger(__name__)
 

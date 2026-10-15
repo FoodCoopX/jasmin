@@ -30,6 +30,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from core.tenant_db import connection
+
 from ..models import (
     CapacityReservation,
     ExternalShareDemand,
