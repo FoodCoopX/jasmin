@@ -349,6 +349,26 @@ class ShareTypeVariation(JasminModel, TimeBoundMixin):
         # this keeps the model honest against admin saves and direct
         # API writes from someone who didn't notice the gate.
         if self.requires_optin:
+            from apps.shared.current_tenant_settings import (
+                get_current_tenant_settings,
+            )
+
+            current_settings = get_current_tenant_settings()
+            if (
+                current_settings
+                and not current_settings.allows_share_type_variation_optin
+            ):
+                raise ValidationError(
+                    {
+                        "requires_optin": (
+                            "Per-delivery opt-in is not enabled for this "
+                            "tenant. Enable "
+                            "``allows_share_type_variation_optin`` in tenant "
+                            "settings before flagging a variation as on-off."
+                        )
+                    }
+                )
+
             # Jokers (per-period opt-OUT) and on-off opt-in (per-period
             # opt-IN) are mutually exclusive on the same share type — a member
             # can't both actively confirm each delivery AND skip deliveries via

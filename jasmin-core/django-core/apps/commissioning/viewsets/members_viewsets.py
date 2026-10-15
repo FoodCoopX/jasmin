@@ -975,7 +975,13 @@ class SubscriptionViewSet(
         has no tenant and leaves it out.
         """
         ctx = super().get_serializer_context()
+        from apps.shared.current_tenant_settings import get_current_tenant_settings
 
+        settings = get_current_tenant_settings()
+        if settings is not None:
+            ctx["min_weeks_to_cancel_before_ending"] = (
+                settings.min_weeks_to_cancel_before_ending
+            )
         if self.action in {"create", "update", "partial_update"} and not getattr(
             self, "swagger_fake_view", False
         ):

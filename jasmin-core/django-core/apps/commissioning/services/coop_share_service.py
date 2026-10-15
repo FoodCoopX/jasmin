@@ -11,6 +11,7 @@ from django.db import models, transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
+from apps.shared.current_tenant_settings import get_current_tenant_settings
 from core.db_locks import acquire_advisory_xact_lock
 from ..errors import (
     CoopShareConfirmedFieldsLocked,
@@ -245,7 +246,9 @@ class CoopShareService:
         if not CoopShareService._bounds_apply_to(member):
             return
 
-        return
+        current_settings = get_current_tenant_settings()
+        if not current_settings:
+            return
 
         min_coop_shares = current_settings.min_number_coop_shares
         max_coop_shares = current_settings.max_number_coop_shares
@@ -285,8 +288,9 @@ class CoopShareService:
         if not CoopShareService._bounds_apply_to(member):
             return
 
-
-        return
+        current_settings = get_current_tenant_settings()
+        if not current_settings:
+            return
 
         total = CoopShareService.member_total_shares(
             member, only_confirmed=only_confirmed
@@ -322,12 +326,12 @@ class CoopShareService:
         Raises :class:`apps.commissioning.errors.MemberCoopSharesOutOfRange`
         on violation (HTTP 400 ``member.coop_shares_out_of_range``).
         """
-
-
         if member.is_trial:
             return
 
-        return
+        current_settings = get_current_tenant_settings()
+        if not current_settings:
+            return
 
         min_coop_shares = current_settings.min_number_coop_shares
         max_coop_shares = current_settings.max_number_coop_shares

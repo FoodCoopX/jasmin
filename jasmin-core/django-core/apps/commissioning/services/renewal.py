@@ -185,7 +185,10 @@ def _current_tenant_settings():
     """The active tenant's current ``TenantSettings``, or ``None`` when no
     settings row is in force. Read ONCE by the batch callers and threaded into
     ``create_renewal_draft`` to avoid re-reading it per renewed row."""
-    return None
+    from apps.shared.current_tenant_settings import get_current_tenant_settings
+
+    return get_current_tenant_settings()
+
 
 def _anchored_term_end(valid_from: datetime.date, settings) -> datetime.date | None:
     """The tenant's configured ISO-week-anchored term end for a renewal starting

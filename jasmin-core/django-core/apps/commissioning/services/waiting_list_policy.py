@@ -19,7 +19,9 @@ from ..errors import WaitingListDisabled
 
 
 def _settings():
-    return None
+    from apps.shared.current_tenant_settings import get_current_tenant_settings
+
+    return get_current_tenant_settings()
 
 
 def waiting_list_enabled() -> bool:

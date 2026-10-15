@@ -7,7 +7,6 @@ from django.core.validators import EmailValidator, MaxValueValidator, MinValueVa
 from django.db import IntegrityError, models
 from django.db.models import F, Q
 from django.utils import timezone
-from django_tenants.models import DomainMixin, TenantMixin
 from encrypted_model_fields.fields import EncryptedCharField
 from nanoid import generate
 

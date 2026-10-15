@@ -45,9 +45,9 @@ def assert_price_meets_solidarity_floor(
     if price is None or share_type_variation_id is None:
         return
 
+    from apps.shared.current_tenant_settings import get_current_tenant_settings
 
-
-    current_settings = None
+    current_settings = get_current_tenant_settings()
     if not (current_settings and current_settings.allows_solidarity_pricing):
         return
 

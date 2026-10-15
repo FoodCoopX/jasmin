@@ -192,10 +192,13 @@ def _cascade_cancel_coop_shares(
     cancelled members' due dates."""
     from dateutil.relativedelta import relativedelta
 
+    from apps.shared.current_tenant_settings import get_current_tenant_settings
 
+    settings = get_current_tenant_settings()
     retention_months = (
-
-        0
+        settings.retention_period_cancelled_members_coop_shares_in_months
+        if settings
+        else 0
     )
     payback_due = effective + relativedelta(months=retention_months)
 

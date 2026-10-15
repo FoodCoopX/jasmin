@@ -44,7 +44,9 @@ if TYPE_CHECKING:
 
 
 def _settings():
-    return None
+    from apps.shared.current_tenant_settings import get_current_tenant_settings
+
+    return get_current_tenant_settings()
 
 
 def _trial_members_enabled(overlay) -> bool:

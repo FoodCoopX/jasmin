@@ -37,7 +37,9 @@ ONBOARDING_BACKFILL_WEEKS = 6
 
 
 def _settings():
-    return None
+    from apps.shared.current_tenant_settings import get_current_tenant_settings
+
+    return get_current_tenant_settings()
 
 
 def onboarding_mode_enabled() -> bool:

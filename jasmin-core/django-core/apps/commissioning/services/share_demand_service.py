@@ -623,14 +623,10 @@ def _resolve_backend() -> _DemandBackend:
     tenant (set via the existing Configuration → Commissioning →
     Planning & Management UI).
     """
+    # Local import to keep this app loosely coupled from the host application.
+    from apps.shared.current_tenant_settings import get_current_tenant_settings
 
-
-    # Outside a request (a Huey task, a management command under
-    # ``schema_context``) ``connection.tenant`` is a django-tenants FakeTenant;
-    # ``get_current_settings`` resolves it to the real Tenant by schema_name,
-    # so such a path picks the same backend as a request and never wipes an
-    # external-CSV tenant's theoreticals.
-    settings = None
+    settings = get_current_tenant_settings()
     if settings and settings.uploads_weekly_share_amount:
         return ExternalDemandBackend()
     return SubscriptionDemandBackend()
