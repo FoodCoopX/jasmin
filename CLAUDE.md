@@ -216,6 +216,12 @@ Every `JasminError` code needs `de` **and** `en` entries in the locale
 - **For params: use the ones in the catalogue if possible.**
 - **ALWAYS use the generated types and API clients** — see
   [Data fetching](#data-fetching) for the frontend half of this rule.
+- **Help texts sparingly.** A serializer field's `help_text` or a parameter's
+  `description` lands in the schema and the generated client, so it follows
+  the comment rule: write one only when it tells what the name doesn't — a
+  unit, a format, what `null` means, a constraint, a counting rule. `year =
+  IntegerField(help_text="The year.")` is noise; leave it bare. Facts shared
+  by several fields go once into the serializer's docstring.
 
 **OpenAPI query params come from the catalogue — never hand-roll
 `OpenApiParameter` in `@extend_schema`.** A query parameter is declared ONCE as
@@ -418,8 +424,8 @@ time.
 
 Four more CI gates hold size, naming and layering still, and all four ratchet
 in BOTH directions like the mypy baseline above: a finding the change introduces
-fails, and so does a register entry that no longer occurs. The register can only
-shrink.
+fails, and so does a register entry that no longer occurs. The finding registers
+can only shrink; a size pin may grow a little, as below.
 
 | Gate | Command | Register |
 | ---- | ------- | -------- |
@@ -428,15 +434,21 @@ shrink.
 | Backend module length (1000 lines, the frontend's `max-lines`; tests and migrations don't count) | `poetry run python scripts/module_length.py check` / `make module-length` | `jasmin-core/django-core/module-length-baseline.txt` |
 | Frontend size & complexity (`max-lines`, `max-lines-per-function`, `complexity`) | `npm run lint` **and** `npm run lint:pins` / `make lint-pins` | `jasmin-core/react-core/eslint.hygiene-pins.js` |
 
-- **Never hand-edit a baseline.** Re-freeze it: `poetry run python
-  scripts/ruff_baseline.py freeze` (or `make ruff-freeze`) and commit the result.
-- **A pin may only go DOWN.** Split the function or the file, then lower the
-  number to whatever `npm run lint:pins` reports — or delete the entry once the
-  file is under the global threshold. `npm run lint` alone can't see below a
-  pin, which is why `lint:pins` re-measures; raising a pin is how a gate quietly
-  stops gating. The backend's module-length pins work the same way: split the
-  module, then `poetry run python scripts/module_length.py freeze` (or `make
-  module-length-freeze`), which only ever lowers or drops a pin.
+- **Never hand-edit a finding baseline** (mypy, ruff). Re-freeze it: `poetry
+  run python scripts/ruff_baseline.py freeze` (or `make ruff-freeze`) and commit
+  the result. The size pins below are the one exception.
+- **A pin follows the code down, and goes up only a little.** When a function
+  or file gets shorter, lower the number to whatever `npm run lint:pins`
+  reports — or delete the entry once the file is under the global threshold.
+  `npm run lint` alone can't see below a pin, which is why `lint:pins`
+  re-measures. A change that adds a few lines to a pinned function or file — an
+  extra conditional entry, a guard — may raise its pin to the new measured
+  value; say so in the report. Growth beyond a few lines means splitting the
+  function or the file instead: pins raised by whole features are how a gate
+  quietly stops gating. The backend's module-length pins work the same way:
+  split the module, then `poetry run python scripts/module_length.py freeze`
+  (or `make module-length-freeze`), which only ever lowers or drops a pin, so
+  a small raise there is a hand edit of that module's line.
 - **An exemption is a documented extraction blocker, not a permission slip.** A
   new one carries its unwind plan; one that stops matching a real import is an
   error and has to be deleted rather than left standing.
