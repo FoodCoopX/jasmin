@@ -32138,6 +32138,10 @@ components:
         allows_waiting_list_for_subscriptions:
           type: boolean
           readOnly: true
+        capabilities:
+          allOf:
+          - $ref: '#/components/schemas/HostCapabilities'
+          readOnly: true
       required:
       - name
     DataImportErrorItem:
@@ -34556,6 +34560,34 @@ components:
       - plot
       - start_cell
       - year
+    HostCapabilities:
+      type: object
+      description: What this deployment offers (``apps.shared.host_capabilities``).
+      properties:
+        support_tickets:
+          type: boolean
+          readOnly: true
+        gdpr:
+          type: boolean
+          readOnly: true
+        user_accounts:
+          type: boolean
+          readOnly: true
+        operating_mode_choice:
+          type: boolean
+          readOnly: true
+        legal_notice:
+          type: boolean
+          readOnly: true
+        web_app:
+          type: boolean
+          readOnly: true
+        manual_share_import:
+          type: boolean
+          readOnly: true
+        pickup_lists:
+          type: boolean
+          readOnly: true
     InventoryEntry:
       type: object
       description: Response serializer for PATCH on an INVENTORY movement.
@@ -42125,6 +42157,10 @@ components:
           type: object
           additionalProperties: {}
           readOnly: true
+        capabilities:
+          allOf:
+          - $ref: '#/components/schemas/HostCapabilities'
+          readOnly: true
         app_icon_version:
           type: string
           readOnly: true
@@ -47498,6 +47534,10 @@ components:
           type: object
           additionalProperties: {}
           readOnly: true
+        capabilities:
+          allOf:
+          - $ref: '#/components/schemas/HostCapabilities'
+          readOnly: true
         app_icon_version:
           type: string
           readOnly: true
@@ -47949,6 +47989,10 @@ components:
         current_settings:
           type: object
           additionalProperties: {}
+          readOnly: true
+        capabilities:
+          allOf:
+          - $ref: '#/components/schemas/HostCapabilities'
           readOnly: true
       required:
       - name

@@ -26,6 +26,7 @@ vi.mock("../TenantContext", async () => {
 });
 vi.mock("@shared/api/generated/auth/auth", () => ({ authPartialUpdate }));
 
+import { TenantContext } from "../TenantContext";
 import { LocaleProvider, useLocale } from "../LocaleContext";
 
 let probed: ReturnType<typeof useLocale> | null = null;
@@ -131,5 +132,58 @@ describe("LocaleProvider theme", () => {
     // Through AuthContext, which also keeps the stored ``auth`` entry: a later
     // profile save writes the signed-in user back whole.
     expect(updateUser).toHaveBeenCalledWith({ theme: "dark" });
+  });
+
+  it("inside a host application that has the logins, keeps a choice in this browser only", async () => {
+    fakeDevice(false);
+    auth.user = { id: "u1", theme: "light" };
+    localStorage.setItem("theme", "system");
+    const hostValue = {
+      tenant: { capabilities: { user_accounts: false } },
+    } as unknown as Parameters<typeof TenantContext.Provider>[0]["value"];
+    render(
+      <TenantContext.Provider value={hostValue}>
+        <LocaleProvider>
+          <Probe />
+        </LocaleProvider>
+      </TenantContext.Provider>,
+    );
+    // The host's user carries no theme of jasmin's; this browser's choice holds.
+    await waitFor(() => expect(probed?.themePreference).toBe("system"));
+
+    await act(() => probed!.saveThemePreference("dark"));
+
+    expect(authPartialUpdate).not.toHaveBeenCalled();
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(probed?.theme).toBe("dark");
+    expect(localStorage.getItem("theme")).toBe("dark");
+  });
+
+  it("keeps this browser's choice while the tenant is still loading, before it says there are no logins", async () => {
+    fakeDevice(false);
+    // The host writes its user, with a theme of its own, before jasmin starts.
+    auth.user = { id: "u1", theme: "light" };
+    localStorage.setItem("theme", "dark");
+    const tree = (value: unknown) => (
+      <TenantContext.Provider
+        value={value as Parameters<typeof TenantContext.Provider>[0]["value"]}
+      >
+        <LocaleProvider>
+          <Probe />
+        </LocaleProvider>
+      </TenantContext.Provider>
+    );
+    const view = render(tree({ loading: true, tenant: null }));
+    await waitFor(() => expect(probed?.themePreference).toBe("dark"));
+
+    view.rerender(
+      tree({
+        loading: false,
+        tenant: { capabilities: { user_accounts: false } },
+      }),
+    );
+
+    await waitFor(() => expect(probed?.themePreference).toBe("dark"));
+    expect(localStorage.getItem("theme")).toBe("dark");
   });
 });

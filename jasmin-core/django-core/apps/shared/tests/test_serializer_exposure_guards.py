@@ -306,6 +306,9 @@ _ANONYMOUS_TENANT_FIELDS = frozenset(
         "app_icon_version",
         "auditing_association",
         "bio_logo",
+        # What the deployment offers, not a fact about the farm; the frontend
+        # needs it before login.
+        "capabilities",
         "city",
         "content_responsible",
         "country",

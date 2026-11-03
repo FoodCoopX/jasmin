@@ -1,4 +1,4 @@
-import { RequireRole } from "@shared/auth";
+import { RequireCapability, RequireRole } from "@shared/auth";
 import { lazy } from "react";
 import type { AppRoute } from "../types";
 
@@ -412,9 +412,11 @@ export const commissioningRoutes: AppRoute[] = [
   {
     path: "/commissioning/delivery-stations-details",
     element: (
-      <RequireRole flag="isStaff">
-        <DeliveryStationsDetails />
-      </RequireRole>
+      <RequireCapability name="pickup_lists">
+        <RequireRole flag="isStaff">
+          <DeliveryStationsDetails />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
@@ -496,9 +498,11 @@ export const commissioningRoutes: AppRoute[] = [
   {
     path: "/commissioning/import-shares",
     element: (
-      <RequireRole flag="isOffice">
-        <ImportShares />
-      </RequireRole>
+      <RequireCapability name="manual_share_import">
+        <RequireRole flag="isOffice">
+          <ImportShares />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
 ];

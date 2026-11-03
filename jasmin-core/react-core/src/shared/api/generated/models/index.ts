@@ -341,6 +341,7 @@ export * from './harvestSharePlanningRowTourVariations';
 export * from './harvestSharePlanningRowVariations';
 export * from './harvestSharePlanningUpdateRequest';
 export * from './historicalPlanting';
+export * from './hostCapabilities';
 export * from './inventoryEntry';
 export * from './invitationAcceptRequest';
 export * from './invitationVerifyResponse';

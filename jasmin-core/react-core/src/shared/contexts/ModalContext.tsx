@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext";
+import { useCapability } from "@hooks/configuration/useCapability";
 import { notify } from "@shared/utils";
 
 const EDIT_MODES = {
@@ -34,23 +35,37 @@ function asEditMode(value: unknown): EditMode | null {
     : null;
 }
 
+function readBrowserEditMode(): EditMode | null {
+  try {
+    return asEditMode(localStorage.getItem("editMode"));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The edit mode is a device-local preference: it is kept on the signed-in
- * user in the stored ``auth`` entry and never sent to the server.
+ * user in the stored ``auth`` entry and never sent to the server. Without
+ * jasmin's own logins the host application writes that entry afresh on every
+ * visit, which would drop the mode with it, so it then has a key of its own in
+ * this browser.
  */
 export function ModalProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { user, updateUser } = useAuth();
+  const keptOnUser = useCapability("user_accounts");
   const [editMode, setEditMode] = useState<EditMode>(
     asEditMode(user?.edit_mode) ?? EDIT_MODES.INLINE,
   );
 
   useEffect(() => {
-    const storedMode = asEditMode(user?.edit_mode);
+    const storedMode = keptOnUser
+      ? asEditMode(user?.edit_mode)
+      : readBrowserEditMode();
     if (storedMode) {
       setEditMode(storedMode);
     }
-  }, [user]);
+  }, [user, keptOnUser]);
 
   const saveEditMode = useCallback(
     (newMode: EditMode) => {
@@ -59,14 +74,18 @@ export function ModalProvider({ children }: { children: ReactNode }) {
       }
       setEditMode(newMode);
       try {
-        updateUser({ edit_mode: newMode });
+        if (keptOnUser) {
+          updateUser({ edit_mode: newMode });
+        } else {
+          localStorage.setItem("editMode", newMode);
+        }
       } catch {
         // The browser refused the stored entry (quota, blocked storage):
         // the mode still applies for this session.
         notify.error(t("profile.preferences_save_error"));
       }
     },
-    [editMode, updateUser, t],
+    [editMode, keptOnUser, updateUser, t],
   );
 
   const toggleEditMode = useCallback(() => {

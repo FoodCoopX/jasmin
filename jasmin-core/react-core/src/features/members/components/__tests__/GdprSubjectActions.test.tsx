@@ -50,7 +50,11 @@ vi.mock("@shared/api/generated/gdpr/gdpr", () => ({
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import GdprSubjectActions from "../GdprSubjectActions";
+import { TenantContext } from "@shared/contexts/TenantContext";
+import GdprSubjectActions, {
+  MemberDataProtectionCard,
+  ResellerDataProtection,
+} from "../GdprSubjectActions";
 
 function renderActions(onErased = vi.fn()) {
   const client = new QueryClient();
@@ -179,5 +183,62 @@ describe("GdprSubjectActions", () => {
     expect(
       screen.getByRole("button", { name: "gdpr.office_actions.erase_confirm" }),
     ).toBeDisabled();
+  });
+});
+
+describe("ResellerDataProtection", () => {
+  function renderInDeployment(capabilities: Record<string, boolean>) {
+    const value = { tenant: { capabilities } } as unknown as Parameters<
+      typeof TenantContext.Provider
+    >[0]["value"];
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <TenantContext.Provider value={value}>
+          <ResellerDataProtection reseller={{ id: "ReSeLlEr0001" }} />
+        </TenantContext.Provider>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("offers the office's actions in the reseller's dialog", () => {
+    renderInDeployment({ gdpr: true });
+
+    expect(screen.getByText("gdpr.office_actions.title")).toBeInTheDocument();
+  });
+
+  it("shows nothing where the deployment has no data-protection actions", () => {
+    renderInDeployment({ gdpr: false });
+
+    expect(screen.queryByText("gdpr.office_actions.title")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /gdpr.office_actions.erase/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("MemberDataProtectionCard", () => {
+  function renderInDeployment(capabilities: Record<string, boolean>) {
+    const value = { tenant: { capabilities } } as unknown as Parameters<
+      typeof TenantContext.Provider
+    >[0]["value"];
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <TenantContext.Provider value={value}>
+          <MemberDataProtectionCard memberId="MeMbEr000001" />
+        </TenantContext.Provider>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("offers the office's actions on the member's page", () => {
+    renderInDeployment({ gdpr: true });
+
+    expect(screen.getByText("gdpr.office_actions.title")).toBeInTheDocument();
+  });
+
+  it("shows nothing where the deployment has no data-protection actions", () => {
+    renderInDeployment({ gdpr: false });
+
+    expect(screen.queryByText("gdpr.office_actions.title")).not.toBeInTheDocument();
   });
 });

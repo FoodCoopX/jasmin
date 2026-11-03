@@ -7,6 +7,7 @@
  */
 import type { PatchedTenantCurrentSettings } from './patchedTenantCurrentSettings';
 import type { PatchedTenantSettings } from './patchedTenantSettings';
+import type { HostCapabilities } from './hostCapabilities';
 import type { TenantLanguageEnum } from './tenantLanguageEnum';
 import type { PatchedTenantEmail } from './patchedTenantEmail';
 import type { PatchedTenantEmailForOrders } from './patchedTenantEmailForOrders';
@@ -37,6 +38,7 @@ export interface PatchedTenant {
   readonly id?: string;
   readonly current_settings?: PatchedTenantCurrentSettings;
   readonly settings?: PatchedTenantSettings;
+  readonly capabilities?: HostCapabilities;
   readonly app_icon_version?: string;
   tenant_language?: TenantLanguageEnum;
   readonly schema_name?: string;

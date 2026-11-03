@@ -19,6 +19,7 @@ import { authPartialUpdate } from "@shared/api/generated/auth/auth";
 import { gdprRequestDeletionCreate } from "@shared/api/generated/gdpr/gdpr";
 import { useAuth } from "@shared/contexts/AuthContext";
 import { RoleTags, useRoles } from "@shared/auth";
+import { useCapability } from "@hooks/index";
 import { notify } from "@shared/utils";
 import { getServerErrorMessage } from "@shared/utils/apiError";
 import TwoFactorPanel from "@shared/profile/TwoFactorPanel";
@@ -57,6 +58,8 @@ export default function UserProfileModal({
   const { t } = useTranslation();
   const { user, logout, updateUser } = useAuth();
   const { roles } = useRoles();
+  const offersUserAccounts = useCapability("user_accounts");
+  const offersGdpr = useCapability("gdpr");
 
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -189,25 +192,37 @@ export default function UserProfileModal({
         defaultActiveKey={initialTab}
         key={`${open ? "open" : "closed"}-${initialTab}`}
         items={[
-          {
-            key: "profile",
-            label: t("profile.tab_profile"),
-            children: profileTab,
-          },
-          {
-            key: "my_data",
-            label: t("profile.tab_my_data"),
-            children: (
-              <MyDataTab
-                onRequestDeletion={() => setDeleteConfirmVisible(true)}
-              />
-            ),
-          },
-          {
-            key: "two_factor",
-            label: t("profile.tab_two_factor"),
-            children: <TwoFactorPanel />,
-          },
+          ...(offersUserAccounts
+            ? [
+                {
+                  key: "profile",
+                  label: t("profile.tab_profile"),
+                  children: profileTab,
+                },
+              ]
+            : []),
+          ...(offersGdpr
+            ? [
+                {
+                  key: "my_data",
+                  label: t("profile.tab_my_data"),
+                  children: (
+                    <MyDataTab
+                      onRequestDeletion={() => setDeleteConfirmVisible(true)}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(offersUserAccounts
+            ? [
+                {
+                  key: "two_factor",
+                  label: t("profile.tab_two_factor"),
+                  children: <TwoFactorPanel />,
+                },
+              ]
+            : []),
         ]}
       />
 

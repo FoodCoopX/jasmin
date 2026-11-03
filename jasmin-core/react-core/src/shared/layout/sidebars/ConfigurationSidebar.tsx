@@ -1,5 +1,5 @@
 import { SettingOutlined } from "@ant-design/icons";
-import { useTenant } from "@hooks/index";
+import { useCapability, useTenant } from "@hooks/index";
 import { filterByRole, useRoles, type RoleGatedItem } from "@shared/auth";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -21,6 +21,7 @@ export default function ConfigurationSidebar({
     "uploads_weekly_share_amount",
     false,
   ) as boolean;
+  const offersUserAccounts = useCapability("user_accounts");
 
   const items = [
     {
@@ -62,12 +63,18 @@ export default function ConfigurationSidebar({
             </Link>
           ),
         },
-        {
-          key: "configuration-users",
-          requireRole: "isAdmin",
-          icon: <SettingOutlined />,
-          label: <Link to="/configuration/users">{t("users.title")}</Link>,
-        },
+        ...(offersUserAccounts
+          ? [
+              {
+                key: "configuration-users",
+                requireRole: "isAdmin",
+                icon: <SettingOutlined />,
+                label: (
+                  <Link to="/configuration/users">{t("users.title")}</Link>
+                ),
+              },
+            ]
+          : []),
       ],
     },
 

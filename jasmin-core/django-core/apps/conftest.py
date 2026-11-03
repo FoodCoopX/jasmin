@@ -25,3 +25,16 @@ def _end_on_public_schema():
     """
     yield
     connection.set_schema_to_public()
+
+
+@pytest.fixture(autouse=True)
+def _no_jasmin_host_from_the_environment(monkeypatch):
+    """Run every test as standalone jasmin, whatever the shell exports.
+
+    Without a ``JASMIN_HOST`` setting, ``apps.shared.host_capabilities`` reads
+    the environment variable, which a dev stack sets to preview Tapir mode. A
+    suite started from such a shell would otherwise run in Tapir mode, and every
+    commissioning test would plan from imported demand. Tests that need a host
+    name set it themselves.
+    """
+    monkeypatch.delenv("JASMIN_HOST", raising=False)

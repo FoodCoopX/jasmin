@@ -319,4 +319,56 @@ describe("LocaleProvider language", () => {
       expect(probed?.error).toBe("profile.preferences_save_error");
     });
   });
+
+  describe("inside a host application that has the logins", () => {
+    function renderInHost() {
+      const HostContext = TenantContext as unknown as Context<
+        | {
+            tenant: {
+              tenant_language: string;
+              capabilities: { user_accounts: boolean };
+            };
+          }
+        | undefined
+      >;
+      render(
+        <HostContext.Provider
+          value={{
+            tenant: {
+              tenant_language: "de",
+              capabilities: { user_accounts: false },
+            },
+          }}
+        >
+          <LocaleProvider>
+            <Probe />
+          </LocaleProvider>
+        </HostContext.Provider>,
+      );
+    }
+
+    it("speaks the pick in this browser, not a language the host's user carries", () => {
+      auth.user = { id: "u1", user_language: "en" };
+      localStorage.setItem("language", "de");
+      browserPrefers("en-US");
+      renderInHost();
+
+      expect(probed?.language).toBe("de");
+    });
+
+    it("keeps a pick in this browser instead of saving it to a profile that isn't there", async () => {
+      auth.user = { id: "u1", user_language: "de" };
+      browserPrefers("de-DE");
+      renderInHost();
+      expect(probed?.language).toBe("de");
+
+      await act(() => probed!.saveLanguage("en"));
+
+      expect(authPartialUpdate).not.toHaveBeenCalled();
+      expect(updateUser).not.toHaveBeenCalled();
+      expect(notify.error).not.toHaveBeenCalled();
+      expect(probed?.language).toBe("en");
+      expect(storedPick()).toBe("en");
+    });
+  });
 });

@@ -16,6 +16,15 @@ const stable = vi.hoisted(() => ({
   // today — the mocked getSetting below then falls through to the caller's
   // default instead of answering with a hardcoded boolean.
   weeklyUpload: undefined as boolean | undefined,
+  // What the deployment offers; a name left out is offered.
+  capabilities: {} as Record<string, boolean>,
+  // The tenant row the page reads. ``navigation`` carries the tenant's STORED
+  // module preference — both modules on. The weekly-upload lock must never
+  // overwrite it.
+  tenantRow: {
+    id: "tenant-1",
+    navigation: { show_members: true, show_abos: true },
+  } as Record<string, unknown>,
   // The page's autosave callback, captured at render so a test can fire the
   // save the office's next edit would fire and inspect what goes on the wire.
   save: null as null | (() => Promise<void>),
@@ -39,9 +48,7 @@ vi.mock("@hooks/index", async () => {
   const { makeUseTenantMock } = await import("../../../../test/tenantMock");
   // Built once, outside the useTenant arrow, so the identity is reference-stable.
   const tenant = makeUseTenantMock({
-    // ``navigation`` carries the tenant's STORED module preference — both
-    // modules on. The weekly-upload lock must never overwrite it.
-    tenant: { id: "tenant-1", navigation: { show_members: true, show_abos: true } },
+    tenant: stable.tenantRow,
     // Mirrors the real getSetting (TenantContext): a tenant with no settings
     // object, or a missing path segment, yields the CALLER-SUPPLIED default.
     // Flipping the page's ``false`` default to ``true`` therefore changes what
@@ -53,6 +60,7 @@ vi.mock("@hooks/index", async () => {
   });
   return {
     useTenant: () => tenant,
+    useCapability: (name: string) => stable.capabilities[name] ?? true,
     useAutoSave: (options: { save: () => Promise<void> }) => {
       stable.save = options.save;
       return stable.autoSave;
@@ -75,7 +83,10 @@ vi.mock("@shared/utils", () => ({
   toApiDate: () => null,
 }));
 
-import { tenantsTenantsPartialUpdate } from "@shared/api/generated/tenants/tenants";
+import {
+  tenantsSettingsUpdateCurrentSettingsUpdate,
+  tenantsTenantsPartialUpdate,
+} from "@shared/api/generated/tenants/tenants";
 import { SettingsRenderer } from "../../components/SettingsRenderer";
 import ConfigurationApp from "../ConfigurationApp";
 
@@ -117,6 +128,10 @@ describe("ConfigurationApp weekly-upload tenants", () => {
   beforeEach(() => {
     stable.weeklyUpload = undefined;
     stable.save = null;
+    stable.capabilities = {};
+    delete stable.tenantRow.settings;
+    delete stable.tenantRow.current_settings;
+    vi.mocked(tenantsSettingsUpdateCurrentSettingsUpdate).mockClear();
     vi.mocked(tenantsTenantsPartialUpdate).mockClear();
   });
 
@@ -191,6 +206,38 @@ describe("ConfigurationApp weekly-upload tenants", () => {
     expect(savedNavigation()).toMatchObject({
       show_members: true,
       show_abos: true,
+    });
+  });
+
+  it("leaves out the operating-mode switch where the host fixes the mode", () => {
+    // Inside such a host the payload already reports the import mode.
+    stable.weeklyUpload = true;
+    stable.capabilities = { operating_mode_choice: false };
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()).not.toContain("settings.operating_mode.title");
+    expect(
+      screen.queryByRole("checkbox", { name: WEEKLY_UPLOAD }),
+    ).not.toBeInTheDocument();
+    expect(moduleToggle(MEMBERS)).toBeDisabled();
+    expect(moduleToggle(COMMISSIONING)).toBeEnabled();
+  });
+
+  it("saves the stored operating mode back, not the one the host fixes", async () => {
+    // The merged settings report the mode in effect (on, fixed by the host);
+    // the row underneath still stores off, and a save must leave it so.
+    stable.weeklyUpload = true;
+    stable.capabilities = { operating_mode_choice: false };
+    stable.tenantRow.settings = { uploads_weekly_share_amount: true };
+    stable.tenantRow.current_settings = { uploads_weekly_share_amount: false };
+    render(<ConfigurationApp />);
+
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
+      settings: { uploads_weekly_share_amount: false },
     });
   });
 });

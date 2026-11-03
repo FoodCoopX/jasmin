@@ -49,6 +49,10 @@ const settings = vi.hoisted(() => ({
   showAbos: undefined as boolean | undefined,
 }));
 
+// What the deployment offers; a name left out is offered, as with a payload
+// that carries no capabilities.
+const capabilities = vi.hoisted(() => ({}) as Record<string, boolean>);
+
 vi.mock("@hooks/index", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
   const tenant = makeUseTenantMock({
@@ -62,7 +66,11 @@ vi.mock("@hooks/index", async () => {
       return defaultValue;
     },
   });
-  return { useTenant: () => tenant, useIsMobile: () => false };
+  return {
+    useTenant: () => tenant,
+    useIsMobile: () => false,
+    useCapability: (name: string) => capabilities[name] ?? true,
+  };
 });
 
 // The section bar is hidden on mobile, so every role gate has to pass for the
@@ -258,5 +266,26 @@ describe("TopNavigation section bar", () => {
       expect(screen.getByText(label)).toBeInTheDocument();
       expect(linkTo(route), `${route} must be linked`).not.toBeNull();
     }
+  });
+});
+
+describe("TopNavigation help button", () => {
+  beforeEach(() => {
+    delete capabilities.support_tickets;
+  });
+
+  it("offers the support tickets where the deployment has them", () => {
+    renderNavigation();
+
+    expect(screen.getByTestId("help")).toBeInTheDocument();
+    expect(screen.getByTestId("user-menu")).toBeInTheDocument();
+  });
+
+  it("drops the help button where the deployment has no support tickets", () => {
+    capabilities.support_tickets = false;
+    renderNavigation();
+
+    expect(screen.queryByTestId("help")).not.toBeInTheDocument();
+    expect(screen.getByTestId("user-menu")).toBeInTheDocument();
   });
 });

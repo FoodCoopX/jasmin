@@ -36,6 +36,7 @@ vi.mock("@shared/utils/notify", () => ({ default: notify }));
 
 import { AuthProvider } from "../AuthContext";
 import { ModalProvider, useModal } from "../ModalContext";
+import { TenantContext } from "../TenantContext";
 
 let probed: ReturnType<typeof useModal> | null = null;
 function Probe() {
@@ -51,6 +52,26 @@ function renderProvider() {
           <Probe />
         </ModalProvider>
       </AuthProvider>
+    </MemoryRouter>,
+  );
+}
+
+/** Inside a host application that has the logins: the tenant reports no
+ *  ``user_accounts``. */
+function renderInHost() {
+  const value = {
+    loading: false,
+    tenant: { capabilities: { user_accounts: false } },
+  } as unknown as Parameters<typeof TenantContext.Provider>[0]["value"];
+  return render(
+    <MemoryRouter>
+      <TenantContext.Provider value={value}>
+        <AuthProvider>
+          <ModalProvider>
+            <Probe />
+          </ModalProvider>
+        </AuthProvider>
+      </TenantContext.Provider>
     </MemoryRouter>,
   );
 }
@@ -109,5 +130,31 @@ describe("ModalProvider edit mode", () => {
     expect(probed?.editMode).toBe("modal");
     expect(notify.error).toHaveBeenCalledWith("profile.preferences_save_error");
     expect(profileUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("ModalProvider edit mode inside a host application", () => {
+  it("keeps the toggled mode in this browser, not on the host's stored user", async () => {
+    renderInHost();
+    await waitFor(() => expect(probed?.editMode).toBe("inline"));
+
+    act(() => probed!.toggleEditMode());
+
+    expect(probed?.editMode).toBe("modal");
+    expect(localStorage.getItem("editMode")).toBe("modal");
+    expect(storedUser()).toEqual({ id: "u1" });
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
+  it("keeps the mode when the host writes its user afresh on the next visit", async () => {
+    const first = renderInHost();
+    await waitFor(() => expect(probed?.editMode).toBe("inline"));
+    act(() => probed!.toggleEditMode());
+    first.unmount();
+    localStorage.setItem("auth", JSON.stringify({ user: { id: "u1" } }));
+
+    renderInHost();
+
+    await waitFor(() => expect(probed?.isModalMode).toBe(true));
   });
 });

@@ -37,18 +37,10 @@ import {
  * The net effect: every backend field auto-flows in via ``Tenant``; we
  * only maintain the *frontend-only* additions here.
  */
-type TenantData = Omit<
-  Tenant,
-  "settings" | "current_settings" | "features"
-> & {
+type TenantData = Omit<Tenant, "settings" | "current_settings"> & {
   slug?: string;
   settings?: Record<string, unknown>;
   current_settings?: Record<string, unknown>;
-  // Backend ships the active feature flags as a string list. The
-  // generated ``TenantFeatures`` widens to ``unknown | null`` (the
-  // OpenAPI schema models it as a JSONField), which would lose the
-  // ``.includes(...)`` typing every consumer uses.
-  features?: string[];
   [key: string]: unknown;
 };
 

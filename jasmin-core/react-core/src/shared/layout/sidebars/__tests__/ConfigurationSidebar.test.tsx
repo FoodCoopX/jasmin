@@ -47,6 +47,10 @@ const settings = vi.hoisted(() => ({
   weeklyUpload: false as boolean | undefined,
 }));
 
+// What the deployment offers; a name left out is offered, as with a payload
+// that carries no capabilities.
+const capabilities = vi.hoisted(() => ({}) as Record<string, boolean>);
+
 vi.mock("@hooks/index", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
   const tenant = makeUseTenantMock({
@@ -56,7 +60,10 @@ vi.mock("@hooks/index", async () => {
         ? settings.weeklyUpload
         : defaultValue,
   });
-  return { useTenant: () => tenant };
+  return {
+    useTenant: () => tenant,
+    useCapability: (name: string) => capabilities[name] ?? true,
+  };
 });
 
 // Every entry in this sidebar is ``requireRole: "isAdmin"``; the real
@@ -207,5 +214,30 @@ describe("ConfigurationSidebar", () => {
     for (const entry of untouchedGroupEntries) {
       expect(screen.getByText(entry)).toBeInTheDocument();
     }
+  });
+});
+
+describe("ConfigurationSidebar users page", () => {
+  beforeEach(() => {
+    settings.weeklyUpload = false;
+    delete capabilities.user_accounts;
+  });
+
+  it("links the users page where the deployment has its own logins", () => {
+    renderSidebar();
+
+    expect(screen.getByText("users.title")).toBeInTheDocument();
+    expect(
+      document.querySelector('a[href="/configuration/users"]'),
+    ).not.toBeNull();
+  });
+
+  it("drops the users page where the host application owns the logins", () => {
+    capabilities.user_accounts = false;
+    renderSidebar();
+
+    expect(screen.queryByText("users.title")).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/configuration/users"]')).toBeNull();
+    expect(screen.getByText("configuration.general")).toBeInTheDocument();
   });
 });

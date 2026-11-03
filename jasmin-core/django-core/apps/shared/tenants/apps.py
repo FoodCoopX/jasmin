@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+from django.core import checks
 
 
 class TenantsConfig(AppConfig):
@@ -26,3 +27,10 @@ class TenantsConfig(AppConfig):
     # and ``email_config.updated`` (``authz``). In a container they go to
     # stdout like every logger; on bare metal to auth.log, app.log and
     # security.log respectively.
+
+    def ready(self):
+        # Registered here because a host application that embeds jasmin
+        # installs this app as well, so the check runs on both.
+        from apps.shared.host_capabilities import check_jasmin_host
+
+        checks.register(check_jasmin_host)

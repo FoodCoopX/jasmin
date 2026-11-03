@@ -10,6 +10,7 @@ import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import SidebarShell from "./SidebarShell";
+import { useCommissioningEntryFilter } from "./useCommissioningEntryFilter";
 import { usePackingListVisibility } from "./usePackingListVisibility";
 
 import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
@@ -117,7 +118,7 @@ export default function CommissioningSidebar({
   const sells_to_resellers = getSetting("sells_to_resellers", true);
   const { packingMode, showBulkPackingList, showBoxesPackingList } =
     usePackingListVisibility();
-  const weekly_upload = getSetting("uploads_weekly_share_amount", false);
+  const withoutHiddenEntries = useCommissioningEntryFilter();
 
   // The station-fee billing is only relevant for solawis that actually charge
   // pickup-station fees. Fetch stations only for office users (the only ones who
@@ -236,20 +237,17 @@ export default function CommissioningSidebar({
             </Link>
           ),
         },
-        ...(weekly_upload
-          ? [
-              {
-                key: "commissioning-import-shares",
+        // Shown in the import-shares mode only (useCommissioningEntryFilter).
+        {
+          key: "commissioning-import-shares",
 
-                requireRole: "isOffice",
-                label: (
-                  <Link to="/commissioning/import-shares">
-                    {t("commissioning.import_shares")}
-                  </Link>
-                ),
-              },
-            ]
-          : []),
+          requireRole: "isOffice",
+          label: (
+            <Link to="/commissioning/import-shares">
+              {t("commissioning.import_shares")}
+            </Link>
+          ),
+        },
 
         {
           key: "commissioning-amount-share-type-variations",
@@ -691,7 +689,10 @@ export default function CommissioningSidebar({
   return (
     <SidebarShell
       header={t("nav.commissioning")}
-      items={filterByRole(baseMenuItems as unknown as RoleGatedItem[], flags)}
+      items={filterByRole(
+        withoutHiddenEntries(baseMenuItems as unknown as RoleGatedItem[]),
+        flags,
+      )}
       openKeys={Array.isArray(openKeys) ? openKeys : []}
       onOpenChange={onOpenChange}
     />

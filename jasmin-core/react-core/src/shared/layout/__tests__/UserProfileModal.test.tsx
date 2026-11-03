@@ -55,6 +55,7 @@ vi.mock("../MyDataTab", () => ({
   ),
 }));
 
+import { TenantContext } from "@shared/contexts/TenantContext";
 import UserProfileModal from "../UserProfileModal";
 
 async function editAndSave() {
@@ -189,5 +190,42 @@ describe("UserProfileModal layout", () => {
     await userEvent.click(await screen.findByRole("button", { name: "request-deletion" }));
 
     expect(await screen.findByRole("alert")).toHaveClass("mb-16");
+  });
+});
+
+describe("UserProfileModal tabs", () => {
+  function renderInDeployment(capabilities: Record<string, boolean>) {
+    const value = { tenant: { capabilities } } as unknown as Parameters<
+      typeof TenantContext.Provider
+    >[0]["value"];
+    render(
+      <TenantContext.Provider value={value}>
+        <UserProfileModal open onClose={vi.fn()} initialTab="my_data" />
+      </TenantContext.Provider>,
+    );
+  }
+
+  it("shows the profile, my data and two-factor tabs on its own", async () => {
+    renderInDeployment({ user_accounts: true, gdpr: true });
+
+    for (const tab of ["profile.tab_profile", "profile.tab_my_data", "profile.tab_two_factor"]) {
+      expect(await screen.findByRole("tab", { name: tab })).toBeInTheDocument();
+    }
+  });
+
+  it("leaves out the account tabs where the host application owns the logins", async () => {
+    renderInDeployment({ user_accounts: false, gdpr: true });
+
+    expect(await screen.findByRole("tab", { name: "profile.tab_my_data" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "profile.tab_profile" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "profile.tab_two_factor" })).not.toBeInTheDocument();
+  });
+
+  it("leaves out my data where the deployment has no data-protection actions", async () => {
+    renderInDeployment({ user_accounts: true, gdpr: false });
+
+    expect(await screen.findByRole("tab", { name: "profile.tab_profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "profile.tab_my_data" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "request-deletion" })).not.toBeInTheDocument();
   });
 });

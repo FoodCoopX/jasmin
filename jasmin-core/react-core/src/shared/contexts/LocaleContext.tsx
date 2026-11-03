@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import { useAuth } from "./AuthContext";
 import { TenantContext } from "./TenantContext";
+import { useCapability } from "@hooks/configuration/useCapability";
 import { authPartialUpdate } from "@shared/api/generated/auth/auth";
 import {
   ThemeEnum,
@@ -200,11 +201,19 @@ export function useIsDarkTheme(): boolean {
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const { user, updateUser } = useAuth();
+  const { user: signedInUser, updateUser } = useAuth();
   // Direct ``useContext`` instead of ``useTenant()`` because LocaleProvider
   // is also mounted on the platform (super-admin) domain where there is no
   // TenantProvider — ``useTenant()`` would throw.
   const tenantCtx = useContext(TenantContext);
+  // Without jasmin's own logins the signed-in user belongs to the host
+  // application: it carries none of jasmin's preferences and has no profile to
+  // save them to. Language, theme and sidebar then stay in this browser, as
+  // they do signed out. Until the tenant says which it is, the user waits:
+  // read early, a host user's theme would overwrite the one kept here.
+  const offersUserAccounts = useCapability("user_accounts");
+  const user =
+    offersUserAccounts && !tenantCtx?.loading ? signedInUser : null;
   const tenantLanguage = tenantCtx?.tenant?.tenant_language ?? null;
   const [language, setLanguage] = useState(() =>
     resolveLanguage(user?.user_language, tenantLanguage),

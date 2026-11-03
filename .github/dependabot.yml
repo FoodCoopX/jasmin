@@ -50,7 +50,15 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
+      # @vitest/mocker 3 takes msw ^2 as a peer, so msw 3 waits for a vitest
+      # whose mocker accepts it.
+      - dependency-name: "msw"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      # @mui/icons-material peers on its own @mui/material major, so the two
+      # move together.
+      - dependency-name: "@mui/material"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@mui/icons-material"
         update-types: ["version-update:semver-major"]
@@ -76,13 +84,13 @@ updates:
       # client from a new major is the wrong shape for that workflow.
       - dependency-name: "orval"
         update-types: ["version-update:semver-major"]
-      # i18next 26 + i18next-http-backend 4 are ONE migration, not two bumps
-      # (the backend plugin tracks the core's plugin API). Translation loading
-      # is load-bearing: `de` is the fallbackLng, so a regression doesn't throw
-      # — it renders raw key strings to users. Do both together, deliberately.
+      # i18next 26 and react-i18next 17 are ONE migration, not two bumps:
+      # react-i18next 17 peers on i18next >= 26.2. Translation loading is
+      # load-bearing: `de` is the fallbackLng, so a regression doesn't throw —
+      # it renders raw key strings to users. Do both together, deliberately.
       - dependency-name: "i18next"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "i18next-http-backend"
+      - dependency-name: "react-i18next"
         update-types: ["version-update:semver-major"]
       # jsdom 25 -> 30 is five majors of the test ENVIRONMENT at once. Every
       # vitest suite runs on it, so a behavioural change surfaces as unrelated

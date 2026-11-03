@@ -35,6 +35,8 @@ x-backend-env: &backend-env
   EMAIL_HOST_PASSWORD: ""
   FRONTEND_DOMAIN: localhost:3000
   TIME_ZONE: ${TIME_ZONE:-Europe/Berlin}
+  # "tapir" previews jasmin as embedded in Tapir (apps.shared.host_capabilities).
+  JASMIN_HOST: ${JASMIN_HOST:-standalone}
   # Sentry-compatible DSN. Empty = SDK no-op (default in dev).
   SENTRY_DSN: ${SENTRY_DSN:-}
 

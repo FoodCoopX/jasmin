@@ -50,6 +50,7 @@ export { useSubscriptionTerm } from './useSubscriptionTerm';
 export { useTableRowSelection } from './useTableRowSelection';
 export { useSepaMandateStatus } from './useSepaMandateStatus';
 export { useTenant } from './configuration/useTenant';
+export { useCapability } from './configuration/useCapability';
 export { useOnboardingMode } from './configuration/useOnboardingMode';
 export { useTenantSmtpConfigured } from './configuration/useTenantSmtpConfigured';
 export { useInvitationDisabledReason } from './configuration/useInvitationDisabledReason';

@@ -7,6 +7,7 @@
  */
 import type { CurrentTenantEmail } from './currentTenantEmail';
 import type { CurrentTenantWebsite } from './currentTenantWebsite';
+import type { HostCapabilities } from './hostCapabilities';
 
 /**
  * Pre-login bootstrap payload — **anonymous endpoint**.
@@ -158,4 +159,5 @@ export interface CurrentTenant {
   readonly min_weeks_from_creation_to_start_delivery?: number;
   readonly allows_solidarity_pricing?: boolean;
   readonly allows_waiting_list_for_subscriptions?: boolean;
+  readonly capabilities?: HostCapabilities;
 }
