@@ -1,9 +1,8 @@
 import { useRef, useEffect, useMemo } from "react";
 import type { KeyboardEvent } from "react";
 import { Form } from "antd";
-import type { InputRef } from "antd";
 import type { Dayjs } from "dayjs";
-import FormInput from "./FormInput";
+import FormInput, { type FormInputRef } from "./FormInput";
 import { useTranslation } from "react-i18next";
 import type { EditableCellProps, EditableColumnConfig, TableRecord, SelectOption } from "./types";
 import { buildLiveRecord } from "./buildLiveRecord";
@@ -138,7 +137,7 @@ const EditingCell = <T extends TableRecord = TableRecord>({
     return options as SelectOption[];
   }, [options, record, formValues]);
 
-  const inputRef = useRef<InputRef | null>(null);
+  const inputRef = useRef<FormInputRef | null>(null);
   const selectEnterCountRef = useRef(0);
 
   const { t } = useTranslation();
@@ -170,17 +169,16 @@ const EditingCell = <T extends TableRecord = TableRecord>({
     // the select macrotask fires, so the existing value isn't overwritten.
     if (editing && inputRef.current && shouldFocus) {
       requestAnimationFrame(() => {
-        const input =
-          inputRef.current?.input ??
-          (inputRef.current as unknown as HTMLInputElement | null);
+        const input = inputRef.current?.input ?? inputRef.current;
         if (!input) return;
         input.focus();
         if (
+          input instanceof HTMLInputElement &&
           inputType !== "select" &&
           inputType !== "checkbox" &&
           inputType !== "switch"
         ) {
-          input.select?.();
+          input.select();
         }
       });
     }
@@ -281,12 +279,13 @@ const EditingCell = <T extends TableRecord = TableRecord>({
   const ariaLabel = nodeText(columnConfig?.title) || dataIndex;
 
   // Expose validation errors to assistive tech without changing the borderless
-  // visual: keep AntD's `help=""` (no visible explain node) and instead point
-  // the control's `aria-invalid`/`aria-describedby` at an off-screen .sr-only
-  // node carrying the message — covers both rules-path errors and the
-  // server/unique-check errors in `formErrors` that bypass AntD's validation.
+  // visual. AntD's Form.Item points the control's `aria-describedby` at its own
+  // explain node whenever it has a rule error or a `help`, overriding any
+  // describedby the control carries, so the message has to live in that node:
+  // `help` carries the table's own errors (server/unique-check errors in
+  // `formErrors` that bypass AntD's validation), AntD fills it with the rule
+  // errors otherwise, and `.editable-cell-form-item` hides it visually.
   const errorMessage = getErrorMessage();
-  const errorDescriptionId = `editable-cell-error-${dataIndex}`;
 
   const getInputNode = () => {
     const wrappedOnFieldChange = columnConfig?.onFieldChange
@@ -317,7 +316,6 @@ const EditingCell = <T extends TableRecord = TableRecord>({
         onKeyDown={handleKeyDown}
         aria-label={ariaLabel}
         aria-invalid={errorMessage ? true : undefined}
-        aria-describedby={errorMessage ? errorDescriptionId : undefined}
         style={{
           textAlign: columnConfig?.align || "left",
         }}
@@ -344,13 +342,14 @@ const EditingCell = <T extends TableRecord = TableRecord>({
     >
       <Form.Item
         name={dataIndex}
+        className="editable-cell-form-item"
         style={{ margin: 0 }}
         validateStatus={errorMessage ? "error" : "success"}
         valuePropName={valuePropName}
         getValueFromEvent={getValueFromEvent}
         getValueProps={getValueProps}
         hasFeedback={false}
-        help=""
+        help={errorMessage ? <span role="alert">{errorMessage}</span> : undefined}
         rules={[
           {
             required: required,
@@ -361,11 +360,6 @@ const EditingCell = <T extends TableRecord = TableRecord>({
       >
         {getInputNode()}
       </Form.Item>
-      {errorMessage && (
-        <span id={errorDescriptionId} className="sr-only" role="alert">
-          {errorMessage}
-        </span>
-      )}
     </td>
   );
 };

@@ -25,7 +25,6 @@ from rest_framework import status
 from apps.commissioning.models import (
     DeliveryNoteContent,
     InvoiceResellerContent,
-    Share,
     ShareContent,
     ShareDelivery,
 )
@@ -258,13 +257,11 @@ class TestInvoiceRecipientSnapshotLock:
     ):
         invoice = InvoiceResellerFactory()
         assert invoice.recipient_snapshot is None
-        original_hash_version = invoice.document_hash_version
 
         resp = api_client.patch(
             reverse("invoices-detail", kwargs={"pk": invoice.pk}),
             {
                 "recipient_snapshot": {"name": "Forged Recipient GmbH"},
-                "document_hash_version": original_hash_version + 5,
                 "note": "edited",
             },
             format="json",
@@ -274,7 +271,6 @@ class TestInvoiceRecipientSnapshotLock:
         invoice.refresh_from_db()
         assert invoice.note == "edited"
         assert invoice.recipient_snapshot is None
-        assert invoice.document_hash_version == original_hash_version
 
 
 # ---------------------------------------------------------------------------
@@ -406,24 +402,21 @@ class TestDocumentationLocks:
     def test_theoretical_harvest_patch_cannot_rewrite_authorship(
         self, api_client, tenant
     ):
-        # The theoretical list/detail queryset is scoped to the recent weeks
-        # around "now"; pin the clock inside the factory's week 15/2026.
-        with time_machine.travel(datetime.datetime(2026, 4, 13, 12, 0), tick=False):
-            theoretical_harvest = TheoreticalHarvestFactory()
-            original_created_at = theoretical_harvest.created_at
+        theoretical_harvest = TheoreticalHarvestFactory()
+        original_created_at = theoretical_harvest.created_at
 
-            resp = api_client.patch(
-                reverse(
-                    "theoretical_harvests-detail",
-                    kwargs={"pk": theoretical_harvest.pk},
-                ),
-                {
-                    "created_by": JasminUserFactory().pk,
-                    "created_at": FORGED_TIMESTAMP,
-                    "note": "edited",
-                },
-                format="json",
-            )
+        resp = api_client.patch(
+            reverse(
+                "theoretical_harvests-detail",
+                kwargs={"pk": theoretical_harvest.pk},
+            ),
+            {
+                "created_by": JasminUserFactory().pk,
+                "created_at": FORGED_TIMESTAMP,
+                "note": "edited",
+            },
+            format="json",
+        )
 
         assert resp.status_code == status.HTTP_200_OK, resp.data
         theoretical_harvest.refresh_from_db()
@@ -755,9 +748,7 @@ class TestShareDayLocks:
     """``SharesDayChangeService`` owns the six weekday columns on a Share: it
     refuses a past week and rebuilds the theoretical rows and movements that
     snapshotted the old day. A plain PATCH does neither, so the columns lock
-    once the row exists. Create leaves them open — the day grid lays out a new
-    week through this endpoint, and a NULL day field would be backfilled from
-    the delivery day's defaults instead of the days the office picked.
+    once the row exists.
     """
 
     def test_patch_cannot_move_a_weekday(self, api_client, tenant):
@@ -785,32 +776,3 @@ class TestShareDayLocks:
         assert share.harvesting_day == original_harvesting_day
         assert share.washing_day == original_washing_day
         assert share.changed_day_number is None
-
-    def test_create_still_sets_every_weekday(self, api_client, tenant):
-        delivery_day = SharesDeliveryDayFactory()
-
-        resp = api_client.post(
-            reverse("share-list"),
-            {
-                "year": 2026,
-                "delivery_week": 15,
-                "delivery_day": delivery_day.pk,
-                "share_type_variation": ShareTypeVariationFactory().pk,
-                "changed_day_number": 4,
-                "harvesting_day": 5,
-                "packing_day": 6,
-                "washing_day": 3,
-                "cleaning_day": 2,
-                "get_current_stock_day": 1,
-            },
-            format="json",
-        )
-
-        assert resp.status_code == status.HTTP_201_CREATED, resp.data
-        share = Share.objects.get(pk=resp.data["id"])
-        assert share.changed_day_number == 4
-        assert share.harvesting_day == 5
-        assert share.packing_day == 6
-        assert share.washing_day == 3
-        assert share.cleaning_day == 2
-        assert share.get_current_stock_day == 1

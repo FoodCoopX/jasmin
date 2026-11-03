@@ -2,7 +2,7 @@ import { Alert } from "antd";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { useTenant } from "@hooks/index";
+import { useCapability, useTenant } from "@hooks/index";
 
 interface ImportSharesModeBannerProps {
   /**
@@ -32,6 +32,8 @@ export default function ImportSharesModeBanner({
     "uploads_weekly_share_amount",
     false,
   ) as boolean;
+  // A host that imports the amounts itself has no import page to link to.
+  const offersManualShareImport = useCapability("manual_share_import");
 
   if (!usesExternalDemand) return null;
 
@@ -43,9 +45,11 @@ export default function ImportSharesModeBanner({
       message={
         <>
           {t(messageKey)}{" "}
-          <Link to="/commissioning/import-shares">
-            {t("common.import_shares_mode_banner_link")}
-          </Link>
+          {offersManualShareImport && (
+            <Link to="/commissioning/import-shares">
+              {t("common.import_shares_mode_banner_link")}
+            </Link>
+          )}
         </>
       }
     />

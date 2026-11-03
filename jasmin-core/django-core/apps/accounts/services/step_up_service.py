@@ -69,9 +69,9 @@ def verify_and_issue_step_up_token(
     user:
         The currently-authenticated user — i.e. ``request.user`` at
         the endpoint. We re-verify their password against the hash
-        on the user row; we do NOT call ``authenticate()``, because
-        that would touch django-axes counters and is_active checks
-        meant for the login flow.
+        on the user row rather than calling ``authenticate()``: the
+        session already names the user, and the view checks and
+        counts the (email, IP) lockout itself (``login_lockout``).
     password:
         The password the user typed into the step-up modal.
     totp_code:
@@ -132,6 +132,10 @@ def verify_and_issue_step_up_token(
     for claim in _CARRY_CLAIMS:
         if claim in payload:
             new_access[claim] = payload[claim]
+    # The step-up token ends when the presented one would have: a fresh
+    # lifetime would let password-only step-ups keep a session going forever.
+    if "exp" in payload:
+        new_access["exp"] = payload["exp"]
     new_access["step_up_verified_at"] = int(time.time())
 
     logger.info(

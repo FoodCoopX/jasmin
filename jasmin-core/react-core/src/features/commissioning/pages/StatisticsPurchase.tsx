@@ -16,10 +16,6 @@ import { isOutsidePurchaseCostRange } from "../utils/purchaseCostRange";
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
-// Finance-green — the same single-money-series colour DashboardAbos uses for
-// billed income (this is spend, but the pages read as a matched pair).
-const PURCHASE_COLOR = "#3f8600";
-
 /**
  * Office overview of purchase ("Zukauf") spending: total money bought-in per
  * ISO week over a date range, as a bar per week. Mirrors DashboardAbos — a
@@ -58,10 +54,14 @@ export default function StatisticsPurchase() {
 
   const { chartData, series, total } = useMemo(() => {
     const points = (rawData ?? []) as PurchaseCostByWeek[];
+    // Bare ISO week number on the x-axis (the selected range is shown in the
+    // picker above) — "week/year" once the range spans years, so the two
+    // weeks numbered 1 around a New Year stay apart. ``amount`` is a 2dp
+    // money string on the wire.
+    const spansYears = new Set(points.map((point) => point.year)).size > 1;
     const chartData = points.map((point) => ({
-      // Bare ISO week number on the x-axis (the selected range is shown in the
-      // picker above); ``amount`` is a 2dp money string on the wire.
-      label: point.week,
+      key: `${point.year}-${point.week}`,
+      label: spansYears ? `${point.week}/${point.year}` : point.week,
       amount: parseFloat(point.amount) || 0,
     }));
     const total = chartData.reduce((sum, point) => sum + point.amount, 0);
@@ -69,7 +69,9 @@ export default function StatisticsPurchase() {
       {
         id: "amount",
         label: t("commissioning.statistics_purchase_series"),
-        color: PURCHASE_COLOR,
+        // Recharts writes the colour into the bars' SVG ``fill`` attribute,
+        // where the browser resolves the token per theme.
+        color: "var(--color-chart-money)",
       },
     ];
     return { chartData, series, total };
@@ -101,17 +103,13 @@ export default function StatisticsPurchase() {
         {/* The totals are only as good as the prices entered in the planning /
             article-price screens — same data-quality caveat as the current-stock
             documentation page. */}
-        <div
-          className="alert-banner alert-banner-danger"
-          style={{ marginTop: "1em" }}
-        >
+        <div className="alert-banner alert-banner-danger mt-1em">
           {t("commissioning.statistics_purchase_data_quality_warning")}
         </div>
 
         <Card
-          className="dark-green-border"
+          className="dark-green-border mt-1em"
           title={t("commissioning.statistics_purchase_chart_title")}
-          style={{ marginTop: "1em" }}
         >
           <Text type="secondary">
             {t("commissioning.statistics_purchase_total", {
@@ -128,6 +126,7 @@ export default function StatisticsPurchase() {
             // visually-hidden data table (per-week figures for screen readers).
             ariaLabel={t("commissioning.statistics_purchase_chart_title")}
             xHeader={t("commissioning.KW")}
+            rowKey="key"
             // Weeks with no buy-in (e.g. delivery-exception weeks): a dark-grey
             // baseline stub bar, with their x-axis week number one step greyer.
             // Show every week number, not just recharts' auto-thinned subset.

@@ -7,9 +7,9 @@ import BaseEntitySelector, {
 
 interface OfferGroupSelectorProps {
   selectedOfferGroup: string | null;
-  setSelectedOfferGroup: (value: string) => void;
-  onOfferGroupChange?: ((value: string) => void) | null;
-  include_null_option?: boolean;
+  /** Gets `null` once the list loads empty, so no stale group stays picked. */
+  setSelectedOfferGroup: (value: string | null) => void;
+  onOfferGroupChange?: ((value: string | null) => void) | null;
   preserveSelection?: boolean;
 }
 
@@ -22,7 +22,7 @@ const OfferGroupSelector = ({
   const { t } = useTranslation();
   const { offerGroups, loading } = useOfferGroups();
 
-  const options = useMemo<SelectorOption<string>[]>(
+  const options = useMemo<SelectorOption<string | null>[]>(
     () =>
       offerGroups.map((og) => ({
         value: og.value,
@@ -32,16 +32,17 @@ const OfferGroupSelector = ({
   );
 
   return (
-    <BaseEntitySelector<string>
+    <BaseEntitySelector<string | null>
       value={selectedOfferGroup}
       onValueChange={setSelectedOfferGroup}
       onChange={onOfferGroupChange}
       options={options}
       loading={loading}
       placeholder={t("placeholder.offer_group_selector")}
-      style={{ width: "12em", marginLeft: "0em", marginTop: "2em" }}
+      className="bold-select week-selector-select offer-group-selector"
       autoSelectFirst
       preserveSelection={preserveSelection}
+      emptyValue={null}
     />
   );
 };

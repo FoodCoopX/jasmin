@@ -20,6 +20,7 @@ import { useRoles } from "@shared/auth";
 import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 import { MemberSelector } from "@shared/selectors";
+import { toApiDate } from "@shared/utils/apiDate";
 import SepaMandateImportModal from "@features/abos/modals/SepaMandateImportModal";
 import SepaSetupModal from "@features/members/modals/SepaSetupModal";
 
@@ -64,7 +65,9 @@ export default function SepaMandates() {
   // Two-way active toggle for a SEPA_DD profile. ``is_active`` is step-up
   // gated on the backend; the api.ts interceptor drives the password prompt +
   // retry, so nothing special is needed here.
-  const patchMutation = usePaymentsBillingProfilesPartialUpdate();
+  const patchMutation = usePaymentsBillingProfilesPartialUpdate({
+    mutation: { meta: { silent: true } },
+  });
   const toggleActive = useCallback(
     async (row: SepaMandateRow, nextActive: boolean) => {
       if (!row.id) return;
@@ -99,9 +102,7 @@ export default function SepaMandates() {
         id: paperRow.id,
         data: {
           member: paperRow.member,
-          sepa_mandate_paper_received_at: paperDate
-            ? paperDate.format("YYYY-MM-DD")
-            : null,
+          sepa_mandate_paper_received_at: toApiDate(paperDate),
         },
       });
       notify.success(t("sepa.paper_saved"));

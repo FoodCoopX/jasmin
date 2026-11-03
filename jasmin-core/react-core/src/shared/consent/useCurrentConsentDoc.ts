@@ -1,6 +1,6 @@
-import dayjs from "dayjs";
 import { useMemo } from "react";
 import { useCommissioningConsentDocumentsList } from "@shared/api/generated/commissioning/commissioning";
+import { todayApiDate } from "@shared/utils/apiDate";
 import type {
   CommissioningConsentDocumentsListKind,
   ConsentDocument,
@@ -21,12 +21,12 @@ import type {
 export function useCurrentConsentDoc(kind: CommissioningConsentDocumentsListKind) {
   const { data, isLoading } = useCommissioningConsentDocumentsList({ kind });
   const doc: ConsentDocument | undefined = useMemo(() => {
-    const today = dayjs().format("YYYY-MM-DD");
+    const today = todayApiDate();
     const inForce = (data ?? []).filter(
       (d) =>
         d.valid_from <= today && (!d.valid_until || d.valid_until >= today),
     );
-    return inForce.find((d) => !d.valid_until) ?? inForce[0];
+    return inForce.find((d) => !d.valid_until) ?? inForce.at(0);
   }, [data]);
   return { doc, isLoading };
 }

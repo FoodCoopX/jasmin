@@ -132,21 +132,22 @@ class NotSuperAdminToken(AuthError):
     code = "super_admin.not_super_admin_token"
 
 
-# --------------------------------------------------------------------------- #
-# Backups                                                                      #
-# --------------------------------------------------------------------------- #
-
-
-class BackupScriptMissing(JasminError):
-    code = "super_admin.backup_script_missing"
-    http_status = 500
-
-
-class BackupFailed(JasminError):
-    code = "super_admin.backup_failed"
-    http_status = 500
-
-
-class BackupTimedOut(JasminError):
-    code = "super_admin.backup_timed_out"
-    http_status = 504
+__all__ = [
+    "TenantNotFound",
+    "TenantUserNotFound",
+    "TenantSchemaMissing",
+    "DomainInUse",
+    "TenantProvisioningFailed",
+    "UserEmailExists",
+    "InvalidRoles",
+    "LastAdminProtected",
+    "ResellerNotFound",
+    "ResellerAlreadyLinked",
+    "SuperAdminMissingCredentials",
+    "SuperAdminInvalidCredentials",
+    "SuperAdminAccountDisabled",
+    "SuperAdminAccountLocked",
+    "RefreshTokenMissing",
+    "RefreshTokenInvalid",
+    "NotSuperAdminToken",
+]

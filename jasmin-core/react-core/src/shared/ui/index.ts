@@ -1,6 +1,8 @@
 export { default as ToolTipIcon } from './ToolTipIcon';
 export { default as ExplainerText } from './ExplainerText';
 export { default as DownloadCsvTemplateButton } from './DownloadCsvTemplateButton';
+export { default as CsvColumnsTable } from './CsvColumnsTable';
+export type { CsvColumnHelp } from './CsvColumnsTable';
 export { default as SepaMandateStatusTag } from './SepaMandateStatusTag';
 export { default as BulkActionButton } from './BulkActionButton';
 export { default as IconActionButton } from './IconActionButton';
@@ -24,6 +26,7 @@ export { default as SummaryStatsCard } from './SummaryStatsCard';
 export type { SummaryStat } from './SummaryStatsCard';
 export { default as ComingSoon } from './ComingSoon';
 export { default as EmptyHint } from './EmptyHint';
+export { default as NotAuthorizedResult } from './NotAuthorizedResult';
 export { default as TenantHeaderLogo } from './TenantHeaderLogo';
 export { default as CheckboxMultiSelectList } from './CheckboxMultiSelectList';
 export type {

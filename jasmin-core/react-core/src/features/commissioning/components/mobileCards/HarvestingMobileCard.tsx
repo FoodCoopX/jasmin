@@ -10,7 +10,7 @@ import {
   MobileCardTitle,
 } from "./primitives";
 import { recordText } from "./recordText";
-import { getSizeLabelOrEmpty } from "./sizeLabel";
+import { getSizeLabelOrEmpty } from "@features/commissioning/utils/sizeLabel";
 import "./HarvestingMobileCard.css";
 
 interface HarvestingMobileCardProps {
@@ -154,33 +154,20 @@ export function HarvestingMobileCard({
           <div
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              marginLeft: 8,
-              flexShrink: 0,
-            }}
+            className="harvest-confirm-action"
           >
             <Button
               shape="circle"
               size="large"
               onClick={() => onConfirmHarvest(record)}
-              style={{
-                width: 48,
-                height: 48,
-                backgroundColor: isConfirmed
-                  ? "var(--color-success-bg)"
-                  : "var(--color-error-bg)",
-                borderColor: isConfirmed
-                  ? "var(--color-success-border)"
-                  : "var(--color-error-border)",
-                color: isConfirmed
-                  ? "var(--color-share-content)"
-                  : "var(--color-error-text)",
-                fontSize: 20,
-              }}
+              className={
+                isConfirmed
+                  ? "harvest-confirm-button is-confirmed"
+                  : "harvest-confirm-button"
+              }
               icon={<CheckOutlined />}
               title={t("commissioning.actual_harvest")}
+              aria-label={t("commissioning.actual_harvest")}
             />
           </div>
         )}

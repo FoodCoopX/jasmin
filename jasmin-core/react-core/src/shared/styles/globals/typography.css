@@ -138,6 +138,15 @@ h5 {
   color: var(--color-primary);
 }
 
+/* An amount still to be had, such as an offer's: red once none is left. */
+.amount-none-left {
+  color: var(--color-error-text);
+}
+
+.amount-left {
+  color: var(--color-success-text);
+}
+
 /* The line under a page's title that says what the page is for. */
 .page-subtitle {
   margin-top: 0;
@@ -148,6 +157,14 @@ h5 {
 .modal-subtitle {
   margin-top: 0;
   color: var(--color-text-secondary);
+}
+
+/* An explanation paragraph at the top of a modal's body; keeps the line
+   breaks the translation carries. */
+.modal-intro {
+  white-space: pre-line;
+  color: var(--color-text-secondary);
+  margin-bottom: 1em;
 }
 
 /* Generic muted helpers (used as plain inline color, no font-size override). */

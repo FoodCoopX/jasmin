@@ -194,7 +194,7 @@ async function renderLoaded() {
 
 const TITLE = "commissioning.list_plots";
 const ACTIVE = "commissioning.is_active";
-const NAME = "resellers.name";
+const NAME = "commissioning.name";
 const DUPLICATE_NAME = "validation.unique.name — table.save_failed_hint";
 
 const bodyRows = () =>
@@ -226,7 +226,7 @@ const activeFlag = (row: HTMLElement) => within(cellOf(row, ACTIVE)).getByRole("
 
 const rowButton = (text: string, name: string) => within(rowOf(text)).getByRole("button", { name });
 const deleteButton = (text: string) => within(rowOf(text)).queryByRole("button", { name: "table.delete" });
-const addButton = () => screen.queryByRole("button", { name: /table\.add_plus_icon/ });
+const addButton = () => screen.queryByRole("button", { name: /table\.add_record/ });
 // AntD's Spin turns itself off in an effect, a render after the rows arrive,
 // so a test waits for it to go.
 const spinner = () => document.querySelector(".ant-spin-spinning");
@@ -382,7 +382,7 @@ describe("ListPlots new plot", () => {
     expect(stored("plot-new-1")?.is_active).toBe(false);
   });
 
-  it.skip("refuses a new plot without a name and sends nothing", async () => {
+  it("refuses a new plot without a name and sends nothing", async () => {
     silenceConsoleErrors();
     const { user } = await renderLoaded();
 

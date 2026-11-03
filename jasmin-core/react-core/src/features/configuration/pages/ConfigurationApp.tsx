@@ -2,13 +2,12 @@ import { Card, Col, Row, Space, Spin } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "react-i18next";
-import type { Tenant } from "@shared/api/generated/models";
 import {
   tenantsSettingsUpdateCurrentSettingsUpdate,
   tenantsTenantsPartialUpdate,
 } from "@shared/api/generated/tenants/tenants";
 import { AutoSaveIndicator } from "@shared/ui";
-import { useAutoSave, useTenant } from "@hooks/index";
+import { useAutoSave, useCapability, useTenant } from "@hooks/index";
 import { notify } from "@shared/utils";
 import {
   SettingsCategory,
@@ -38,183 +37,191 @@ export default function ConfigurationApp() {
     "uploads_weekly_share_amount",
     false,
   ) as boolean;
+  // A host application that fixes the operating mode leaves nothing to choose.
+  const offersOperatingModeChoice = useCapability("operating_mode_choice");
 
   const settingsConfig = useMemo<SettingsCategory[]>(
-    () => [
-      // First card on the page: this one switch decides whether the tenant
-      // runs subscriptions at all, and it gates the module toggles below.
-      {
-        category: "operating_mode",
-        title: t("settings.operating_mode.title"),
-        settings: [
-          {
-            key: "uploads_weekly_share_amount",
-            label: t("settings.commissioning.uploads_weekly_amount"),
-            description: t("settings.commissioning.uploads_weekly_amount_desc"),
-            type: "checkbox",
-            defaultValue: false,
-          },
-        ],
-      },
-      {
-        category: "general",
-        title: t("settings.general.title"),
-        settings: [
-          {
-            key: "currency",
-            label: t("settings.general.currency"),
-            type: "select",
-            options: [
-              { value: "EUR", label: "EUR" },
-              { value: "CHF", label: "CHF" },
-              { value: "USD", label: "USD" },
-            ],
-            defaultValue: "EUR",
-          },
+    () =>
+      [
+        // First card on the page: this one switch decides whether the tenant
+        // runs subscriptions at all, and it gates the module toggles below.
+        {
+          category: "operating_mode",
+          title: t("settings.operating_mode.title"),
+          settings: [
+            {
+              key: "uploads_weekly_share_amount",
+              label: t("settings.commissioning.uploads_weekly_amount"),
+              description: t(
+                "settings.commissioning.uploads_weekly_amount_desc",
+              ),
+              type: "checkbox",
+              defaultValue: false,
+            },
+          ],
+        },
+        {
+          category: "general",
+          title: t("settings.general.title"),
+          settings: [
+            {
+              key: "currency",
+              label: t("settings.general.currency"),
+              type: "select",
+              options: [
+                { value: "EUR", label: "EUR" },
+                { value: "CHF", label: "CHF" },
+                { value: "USD", label: "USD" },
+              ],
+              defaultValue: "EUR",
+            },
 
-          {
-            key: "date_format",
-            label: t("settings.general.dateFormat"),
-            type: "select",
-            options: [
-              { value: "DD.MM.YYYY", label: "DD.MM.YYYY" },
-              { value: "DD/MM/YYYY", label: "DD/MM/YYYY" },
-              { value: "YYYY-MM-DD", label: "YYYY-MM-DD" },
-              { value: "MM-DD-YYYY", label: "MM-DD-YYYY" },
-            ],
-            defaultValue: "DD.MM.YYYY",
-          },
-          {
-            key: "time_format",
-            label: t("settings.general.timeFormat"),
-            type: "select",
-            options: [
-              { value: "HH:mm", label: "HH:mm (24h, e.g. 14:30)" },
-              { value: "HH:mm:ss", label: "HH:mm:ss (24h with seconds)" },
-              { value: "hh:mm A", label: "hh:mm AM/PM (e.g. 02:30 PM)" },
-              { value: "h:mm A", label: "h:mm AM/PM (e.g. 2:30 PM)" },
-            ],
-            defaultValue: "HH:mm",
-          },
-          {
-            key: "csv_format",
-            label: t("settings.general.csvFormat"),
-            type: "select",
-            options: [
-              {
-                value: "de",
-                label: t("settings.general.csvFormat_de"),
-              },
-              {
-                value: "en",
-                label: t("settings.general.csvFormat_en"),
-              },
-            ],
-            defaultValue: "de",
-          },
-          {
-            key: "number_locale",
-            label: t("settings.general.numberLocale"),
-            type: "select",
-            // BCP-47 tags for Intl.NumberFormat in the UI and PDFs; the
-            // backend writes the amounts in its emails with the same tag.
-            // Stored on Tenant.number_locale.
-            options: [
-              { value: "de-DE", label: "1.234,56" },
-              { value: "de-CH", label: "1’234.56" },
-              { value: "en-US", label: "1,234.56" },
-              { value: "fr-FR", label: "1 234,56" },
-            ],
-            defaultValue: "de-DE",
-          },
-        ],
-      },
-      {
-        category: "planning",
-        title: t("settings.commissioning.planning.title"),
-        settings: [
-          {
-            key: "allow_upload_for_data_lists",
-            label: t("settings.commissioning.allow_upload_for_data_lists"),
-            description: t(
-              "settings.commissioning.allow_upload_for_data_lists_desc",
-            ),
+            {
+              key: "date_format",
+              label: t("settings.general.dateFormat"),
+              type: "select",
+              options: [
+                { value: "DD.MM.YYYY", label: "DD.MM.YYYY" },
+                { value: "DD/MM/YYYY", label: "DD/MM/YYYY" },
+                { value: "YYYY-MM-DD", label: "YYYY-MM-DD" },
+                { value: "MM-DD-YYYY", label: "MM-DD-YYYY" },
+              ],
+              defaultValue: "DD.MM.YYYY",
+            },
+            {
+              key: "time_format",
+              label: t("settings.general.timeFormat"),
+              type: "select",
+              options: [
+                { value: "HH:mm", label: "HH:mm (24h, e.g. 14:30)" },
+                { value: "HH:mm:ss", label: "HH:mm:ss (24h with seconds)" },
+                { value: "hh:mm A", label: "hh:mm AM/PM (e.g. 02:30 PM)" },
+                { value: "h:mm A", label: "h:mm AM/PM (e.g. 2:30 PM)" },
+              ],
+              defaultValue: "HH:mm",
+            },
+            {
+              key: "csv_format",
+              label: t("settings.general.csvFormat"),
+              type: "select",
+              options: [
+                {
+                  value: "de",
+                  label: t("settings.general.csvFormat_de"),
+                },
+                {
+                  value: "en",
+                  label: t("settings.general.csvFormat_en"),
+                },
+              ],
+              defaultValue: "de",
+            },
+            {
+              key: "number_locale",
+              label: t("settings.general.numberLocale"),
+              type: "select",
+              // BCP-47 tags for Intl.NumberFormat in the UI and PDFs; the
+              // backend writes the amounts in its emails with the same tag.
+              // Stored on Tenant.number_locale.
+              options: [
+                { value: "de-DE", label: "1.234,56" },
+                { value: "de-CH", label: "1’234.56" },
+                { value: "en-US", label: "1,234.56" },
+                { value: "fr-FR", label: "1 234,56" },
+              ],
+              defaultValue: "de-DE",
+            },
+          ],
+        },
+        {
+          category: "planning",
+          title: t("settings.commissioning.planning.title"),
+          settings: [
+            {
+              key: "allow_upload_for_data_lists",
+              label: t("settings.commissioning.allow_upload_for_data_lists"),
+              description: t(
+                "settings.commissioning.allow_upload_for_data_lists_desc",
+              ),
 
-            type: "checkbox",
-            defaultValue: false,
-          },
-        ],
-      },
-      {
-        category: "navigation",
-        title: t("settings.navigation.title"),
-        settings: [
-          {
-            key: "navigation.show_members",
-            label: t("settings.navigation.show_members"),
-            type: "checkbox",
-            defaultValue: true,
-            disabled: weeklyUpload,
-            disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
-            disabledDisplayValue: false,
-          },
-          {
-            key: "navigation.show_abos",
-            label: t("settings.navigation.show_abos"),
-            type: "checkbox",
-            defaultValue: true,
-            disabled: weeklyUpload,
-            disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
-            disabledDisplayValue: false,
-          },
-          {
-            key: "navigation.show_commissioning",
-            label: t("settings.navigation.show_commissioning"),
-            type: "checkbox",
-            defaultValue: true,
-          },
-          {
-            key: "navigation.show_staff",
-            label: t("settings.navigation.show_staff"),
-            type: "checkbox",
-            defaultValue: true,
-          },
-          {
-            key: "navigation.show_warehouse",
-            label: t("settings.navigation.show_warehouse"),
-            type: "checkbox",
-            defaultValue: true,
-          },
-          {
-            key: "navigation.show_economics",
-            label: t("settings.navigation.show_economics"),
-            type: "checkbox",
-            defaultValue: true,
-          },
-          {
-            key: "navigation.show_cultivation",
-            label: t("settings.navigation.show_cultivation"),
-            type: "checkbox",
-            defaultValue: true,
-          },
-        ],
-      },
+              type: "checkbox",
+              defaultValue: false,
+            },
+          ],
+        },
+        {
+          category: "navigation",
+          title: t("settings.navigation.title"),
+          settings: [
+            {
+              key: "navigation.show_members",
+              label: t("settings.navigation.show_members"),
+              type: "checkbox",
+              defaultValue: true,
+              disabled: weeklyUpload,
+              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
+              disabledDisplayValue: false,
+            },
+            {
+              key: "navigation.show_abos",
+              label: t("settings.navigation.show_abos"),
+              type: "checkbox",
+              defaultValue: true,
+              disabled: weeklyUpload,
+              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
+              disabledDisplayValue: false,
+            },
+            {
+              key: "navigation.show_commissioning",
+              label: t("settings.navigation.show_commissioning"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_staff",
+              label: t("settings.navigation.show_staff"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_warehouse",
+              label: t("settings.navigation.show_warehouse"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_economics",
+              label: t("settings.navigation.show_economics"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_cultivation",
+              label: t("settings.navigation.show_cultivation"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+          ],
+        },
 
-      // {
-      //   category: "ai",
-      //   title: t("settings.ai.title", "AI Settings"),
-      //   settings: [
-      //     {
-      //       key: "ai.claude_enabled",
-      //       label: t("settings.ai.claude_enabled", "Enable Claude AI"),
-      //       type: "checkbox",
-      //       disabled: true,
-      //       defaultValue: false,
-      //     },
-      //   ],
-      // },
-    ],
-    [t, weeklyUpload],
+        // {
+        //   category: "ai",
+        //   title: t("settings.ai.title", "AI Settings"),
+        //   settings: [
+        //     {
+        //       key: "ai.claude_enabled",
+        //       label: t("settings.ai.claude_enabled", "Enable Claude AI"),
+        //       type: "checkbox",
+        //       disabled: true,
+        //       defaultValue: false,
+        //     },
+        //   ],
+        // },
+      ].filter(
+        (category) =>
+          offersOperatingModeChoice || category.category !== "operating_mode",
+      ),
+    [t, weeklyUpload, offersOperatingModeChoice],
   );
 
   // Sync state from tenant data
@@ -234,11 +241,12 @@ export default function ConfigurationApp() {
       tenant as Record<string, unknown>,
     );
 
-    // Hydrate the versioned ``TenantSettings`` overlay values from the merged
-    // ``settings`` dict the backend exposes on ``current-tenant`` so the form
-    // shows the persisted value (and not just the default).
+    // Fill the TenantSettings fields from the stored row (current_settings), because
+    // that row is what this form saves. The merged `settings` show the mode in effect,
+    // which a host such as Tapir can force on; saving that back would store a choice
+    // nobody made.
     const tenantSettingsOverlay =
-      ((tenant as Record<string, unknown>).settings as
+      ((tenant as Record<string, unknown>).current_settings as
         | Record<string, unknown>
         | undefined) || {};
     for (const overlayKey of TENANT_SETTINGS_OVERLAY_KEYS) {
@@ -266,7 +274,7 @@ export default function ConfigurationApp() {
     // overlay-backed inputs on their stale defaults. The ``hasChanges ||
     // saving`` guard above still protects in-progress edits. (TenantContext
     // memoizes the value, so this only re-fires on a real data change.)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seeds on tenant data, not on draft state
   }, [tenant]);
 
   // Stable refs for save handler
@@ -300,7 +308,7 @@ export default function ConfigurationApp() {
       await tenantsTenantsPartialUpdate(tenantId, {
         ...dataToSend,
         ...mappedTenantFields,
-      } as unknown as Tenant);
+      });
 
       // ``TenantSettings`` overlay (versioned, not on the Tenant row) needs
       // its own endpoint. Skip the call when nothing in the overlay changed.

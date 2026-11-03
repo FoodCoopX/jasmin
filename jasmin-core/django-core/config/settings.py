@@ -5,6 +5,8 @@ import time
 from datetime import timedelta
 from pathlib import Path
 
+from config.spectacular import SPECTACULAR_SETTINGS  # noqa: F401
+
 # Force the process timezone so log timestamps (which use time.localtime via
 # the logging module) are in our local zone instead of UTC.
 os.environ.setdefault("TZ", os.environ.get("TIME_ZONE", "Europe/Berlin"))
@@ -59,6 +61,10 @@ if not DEBUG:
         raise ValueError(
             "FIELD_ENCRYPTION_KEY must be set in production (and must not be the dev default)."
         )
+    if os.environ.get("INVOICE_HASH_KEY", "").strip() in ("", "dev-invoice-hash-key"):
+        raise ValueError(
+            "INVOICE_HASH_KEY must be set in production (and must not be the dev default)."
+        )
     # Ops-alert email: ``mail_admins()`` and ``AdminEmailHandler`` send
     # to whatever's in ADMINS. If EMAIL_ADMIN is unset or still points
     # at one of the placeholder domains nobody owns, those alerts go
@@ -82,14 +88,13 @@ if not DEBUG:
             "(mail_admins / AdminEmailHandler alerts connect to it; an empty "
             "or loopback host silently drops every ops alert)."
         )
-    # The CORS allow-regex + CSRF trusted origins for the browser auth
-    # surface are DERIVED from FRONTEND_DOMAIN. Unset, the tenant-subdomain CORS
-    # regex is never built and the app boots with a broken cross-origin auth
-    # surface — fail fast instead.
+    # The CSRF trusted origins and FRONTEND_BASE_URL (the link base for a tenant
+    # without a Domain row) are DERIVED from FRONTEND_DOMAIN. Unset, CSRF trusts
+    # no farm host and those links point nowhere — fail fast instead.
     if not os.environ.get("FRONTEND_DOMAIN", "").strip():
         raise ValueError(
-            "FRONTEND_DOMAIN must be set in production (drives the CORS "
-            "allow-regex and CSRF trusted origins for the browser auth surface)."
+            "FRONTEND_DOMAIN must be set in production (drives the CSRF trusted "
+            "origins and the base URL of links to the frontend)."
         )
     # Defense-in-depth, symmetric with the SECRET_KEY / FIELD_ENCRYPTION
     # _KEY guards above — refuse to boot on the committed dev DB password.
@@ -108,46 +113,9 @@ if not DEBUG:
 # paste a real DSN from the GlitchTip UI.
 _SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
 if _SENTRY_DSN:
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.integrations.huey import HueyIntegration
-    from sentry_sdk.integrations.logging import LoggingIntegration
+    from core.sentry_setup import init_sentry
 
-    # send_default_pii=False stops Sentry AUTO-attaching user.email / IP, but
-    # NOT PII the app put into a log message. INFO/WARNING lines become
-    # breadcrumbs on the next ERROR event, beyond the GDPR erasure pipeline —
-    # these hooks scrub email/IP substrings (see core/sentry_scrub.py).
-    from core.sentry_scrub import (
-        before_breadcrumb as _sentry_before_breadcrumb,
-    )
-    from core.sentry_scrub import (
-        before_send as _sentry_before_send,
-    )
-
-    sentry_sdk.init(
-        dsn=_SENTRY_DSN,
-        integrations=[
-            DjangoIntegration(),
-            # INFO and WARNING log lines become Sentry breadcrumbs; ERROR
-            # and above become Sentry events. Keeps the noise floor
-            # honest without flooding the project.
-            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
-            # Surface Huey periodic-task crashes as Sentry events with
-            # task name + args + traceback (the LoggingIntegration alone
-            # would catch the bare exception line but lose the context).
-            HueyIntegration(),
-        ],
-        # 5% perf sampling — cheap baseline; raise once you have a
-        # specific endpoint you want to drill into.
-        traces_sample_rate=0.05,
-        # GDPR: never auto-attach user.email / IP. If you ever decide
-        # to attach them deliberately, do it per-event with
-        # ``sentry_sdk.set_user(...)`` after consent gating.
-        send_default_pii=False,
-        before_breadcrumb=_sentry_before_breadcrumb,
-        before_send=_sentry_before_send,
-        environment="production" if not DEBUG else "development",
-    )
+    init_sentry(_SENTRY_DSN, debug=DEBUG)
 
 # TRANSLATION for pdfs:
 USE_I18N = True
@@ -422,6 +390,20 @@ FIELD_ENCRYPTION_KEY = [
     if _key.strip()
 ]
 
+# The key of the tamper hash sealed into a finalized invoice (an HMAC, see
+# ``apps.commissioning.services.invoice_hash``). It lives outside the database,
+# so a change that gets past an invoice's protection can't be given a matching
+# hash without the server's secrets. Losing it leaves every sealed hash
+# unverifiable, so keep a copy with the other secrets. To rotate it, set the
+# new key here and the old one in INVOICE_HASH_KEY_FALLBACKS (comma-separated):
+# invoices sealed with an old key keep verifying.
+INVOICE_HASH_KEY = os.environ.get("INVOICE_HASH_KEY", "dev-invoice-hash-key")
+INVOICE_HASH_KEY_FALLBACKS = [
+    _key.strip()
+    for _key in os.environ.get("INVOICE_HASH_KEY_FALLBACKS", "").split(",")
+    if _key.strip()
+]
+
 # Platform / super-admin domain configuration. Reads the SAME env name the
 # rest of the stack uses (docker-compose, nginx, .env.example, and the
 # frontend's VITE_SUPER_ADMIN_SUBDOMAIN) so there is one name for one concept.
@@ -441,9 +423,8 @@ ALLOWED_HOSTS = os.environ.get(
 CORS_ALLOW_CREDENTIALS = True
 CORS_EXPOSE_HEADERS = ["Authorization"]
 
-# In development, be permissive — but NOT a wildcard, because cookies
-# (HttpOnly refresh tokens) require an explicit origin in
-# Access-Control-Allow-Origin together with Allow-Credentials: true.
+# In development, be permissive — but NOT a wildcard: cookies (HttpOnly refresh
+# tokens) need an explicit Access-Control-Allow-Origin with Allow-Credentials.
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = [
@@ -457,29 +438,27 @@ if DEBUG:
         r"^http://([a-z0-9-]+\.)?localhost(:\d+)?$",
         r"^http://([a-z0-9-]+\.)?127\.0\.0\.1(:\d+)?$",
     ]
+    FRONTEND_BASE_URL = "http://localhost:3000"
 else:
-    # Production - strict CORS, with wildcard support for tenant subdomains.
+    # Production: same-origin only, since both SPAs call relative /api/ URLs. An
+    # origin pattern covering the tenant subdomains would let a page on one host
+    # read another host's login or refresh answer: the refresh cookie is
+    # SameSite=Strict, but sibling subdomains are one site. Only the origins
+    # listed in CORS_ALLOWED_ORIGINS get an answer.
     CORS_ALLOW_ALL_ORIGINS = False
-    cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
-    if cors_origins:
-        CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(",")]
-    else:
-        CORS_ALLOWED_ORIGINS = []
-
-    # Allow https://<anything>.<FRONTEND_DOMAIN> (tenant subdomains).
-    # Define the regex list UNCONDITIONALLY so a prod branch with
-    # FRONTEND_DOMAIN unset has an explicit (empty) value rather than leaving
-    # the setting undefined.
+    CORS_ALLOWED_ORIGINS = [
+        origin.strip()
+        for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
     CORS_ALLOWED_ORIGIN_REGEXES = []
-    _frontend_domain = os.environ.get("FRONTEND_DOMAIN", "").strip()
-    if _frontend_domain:
-        import re as _re
 
-        _escaped = _re.escape(_frontend_domain)
-        CORS_ALLOWED_ORIGIN_REGEXES = [
-            rf"^https://([a-z0-9-]+\.)?{_escaped}$",
-        ]
-        # CSRF must trust the same origins (Django 4+ requires scheme).
+    # FRONTEND_BASE_URL is the link base for a tenant that resolves no Domain
+    # row (a FakeTenant in a Huey task or a command).
+    _frontend_domain = os.environ.get("FRONTEND_DOMAIN", "").strip()
+    FRONTEND_BASE_URL = f"https://{_frontend_domain}"
+    if _frontend_domain:
+        # The farm's own hosts (Django 4+ requires the scheme).
         CSRF_TRUSTED_ORIGINS = [
             f"https://{_frontend_domain}",
             f"https://*.{_frontend_domain}",
@@ -522,12 +501,15 @@ if DEBUG:
 # env var here — an unconditional read would overwrite that derived value with
 # an empty list whenever the (optional) env var is unset.
 
+# AUTH_ORIGIN_GUARD=False switches off the same-origin check of the refresh-cookie
+# endpoints (apps/shared/same_origin.py), should a proxy strip or alter its headers.
+AUTH_ORIGIN_GUARD = os.environ.get("AUTH_ORIGIN_GUARD", "True").lower() != "false"
+
 
 # Apps
 SHARED_APPS = [
     "corsheaders",
     "rest_framework",
-    "django_filters",
     "drf_spectacular",
     # Registers the ``run_huey`` management command (the background-task
     # consumer used by the docker ``huey`` service and ``make huey``). The
@@ -604,11 +586,11 @@ TENANT_MODEL = "tenants.Tenant"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
 
 MIDDLEWARE = [
-    # Liveness probe short-circuit. MUST be above TenantMainMiddleware: the
-    # Docker / gateway / uptime healthchecks hit /health/ on hosts that map to
-    # no tenant (localhost, 127.0.0.1, the upstream name), which the tenant
-    # middleware would 404 before any view runs. Answers /health/ with 200
-    # without tenant/DB resolution.
+    # Probe short-circuit. MUST be above TenantMainMiddleware: the healthchecks
+    # (/health/, liveness) and the smoke tests and uptime monitors
+    # (/health/ready/, database + Redis) come in on hosts that map to no tenant
+    # (localhost, 127.0.0.1, the upstream name), which the tenant middleware
+    # would 404 before any view runs.
     "core.middleware.HealthCheckMiddleware",
     # Stamps Cache-Control: no-store on every /api/ response so a shared CDN
     # (Bunny) can never cache + cross-serve a per-tenant API response. Near the
@@ -644,7 +626,7 @@ MIDDLEWARE = [
     # django-auditlog: attributes each change to its user, looked up when the
     # entry is written so the JWT user DRF authenticates counts too.
     "apps.shared.audit_log_middleware.JasminAuditlogMiddleware",
-    # django-axes must be LAST so it sees the resolved request.user.
+    # Answers locks axes flags on Django's request; DRF auth views raise their own.
     "axes.middleware.AxesMiddleware",
 ]
 
@@ -738,7 +720,7 @@ TEMPLATES = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    # django-axes must be FIRST so it can intercept failed logins.
+    # django-axes first: it refuses a locked (email, IP) pair before any password.
     "axes.backends.AxesStandaloneBackend",
     "apps.accounts.backends.EmailOrUsernameModelBackend",
     "django.contrib.auth.backends.ModelBackend",
@@ -749,15 +731,20 @@ AUTHENTICATION_BACKENDS = [
 # of an IBAN — in change diffs that are retained indefinitely.
 AUDITLOG_MASK_CALLABLE = "apps.shared.pii_masking.mask_for_audit_log"
 
-# django-axes — account-level lockout against credential stuffing.
-AXES_ENABLED = not DEBUG  # Don't get locked out during development.
-AXES_FAILURE_LIMIT = 5  # Lock after 5 failed attempts.
-AXES_COOLOFF_TIME = 1  # hours
-AXES_LOCKOUT_PARAMETERS = [
-    ["username", "ip_address"]
-]  # Lock the (user, ip) pair, not the whole IP.
-AXES_RESET_ON_SUCCESS = True
-AXES_LOCKOUT_CALLABLE = None  # Default 403 response.
+# django-axes: failed sign-ins of tenant users, counted per (email, client IP).
+# How the views check, count and clear them: apps/accounts/services/login_lockout.py.
+AXES_ENABLED = not DEBUG  # Nothing is recorded or locked in development.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # hours without a failure until a pair's count, or lock, lapses
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_USERNAME_CALLABLE = "apps.accounts.services.login_lockout.axes_username"
+# LOGIN_LOCKOUT_ENABLED=True locks a pair at the limit. Off by default: while every
+# client of one CDN edge arrives with the edge's address, a lock refuses them all.
+AXES_LOCK_OUT_AT_FAILURE = (
+    os.environ.get("LOGIN_LOCKOUT_ENABLED", "False").lower() == "true"
+)
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
+AXES_LOCKOUT_CALLABLE = None  # axes' own 429, which never reaches the DRF views
 AXES_VERBOSE = True
 # One trusted proxy hop: the gateway nginx, which appends the address it sees
 # to X-Forwarded-For, so we trust the last entry. Keep it at 1 although Bunny
@@ -765,18 +752,13 @@ AXES_VERBOSE = True
 # client there could forge X-Forwarded-For past the super-admin IP allowlist
 # and into the lockout, throttle and consent-IP keys. Behind Bunny, the client
 # address has to come from nginx's real_ip on the tenant vhost, before the
-# request reaches Django. Single source of
-# truth for the proxy depth — django-axes, DRF's NUM_PROXIES, and
-# ``apps.shared.request_utils.client_ip`` all read it so throttle/lockout
-# keying and the recorded forensic/consent IP stay in sync.
+# request reaches Django. Single source of truth for the proxy depth: DRF's
+# NUM_PROXIES and ``apps.shared.request_utils.client_ip`` (which django-axes
+# keys on) read it, so throttle/lockout keys and logged IPs stay in sync.
 TRUSTED_PROXY_COUNT = int(os.environ.get("TRUSTED_PROXY_COUNT", "1"))
-# django-ipware is NOT a dependency, so axes' ``AXES_IPWARE_*`` settings were
-# inert and axes silently fell back to ``REMOTE_ADDR`` (= the gateway proxy IP),
-# attributing every lockout to the proxy instead of the real client. Point axes
-# at the same proxy-aware helper the rest of the stack uses (it honors
-# ``TRUSTED_PROXY_COUNT`` / X-Forwarded-For) so throttle + lockout keying match
-# the recorded forensic IP. axes calls this with a single ``request`` arg (see
-# ``axes.helpers.get_client_ip_address``), which ``client_ip`` accepts.
+# django-ipware isn't installed, so axes would key on REMOTE_ADDR, the gateway.
+# The proxy-aware helper keys the lockout on the address the throttles and the
+# logs use; axes calls it with the request alone, which ``client_ip`` accepts.
 AXES_CLIENT_IP_CALLABLE = "apps.shared.request_utils.client_ip"
 
 # ---- Super-admin IP allowlist (app-layer defense-in-depth) ----------------
@@ -823,9 +805,6 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    "DEFAULT_FILTER_BACKENDS": [
-        "django_filters.rest_framework.DjangoFilterBackend",
-    ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_CLASSES": [
         # Tenant-aware: namespaces each scope's cache bucket by schema so a
@@ -843,11 +822,11 @@ REST_FRAMEWORK = {
         # spike rarely, e.g. when a new season opens) and cheap for
         # the office to bump if a real campaign is running.
         "register": "10/hour",
-        # Login: anti-credential-stuffing. django-axes locks individual
-        # accounts after N failures, but doesn't slow an attacker
-        # iterating a list of emails (each is a single attempt per
-        # account). 20/minute per IP throttles the iteration loop
-        # itself without blocking a human typing their own password.
+        # Login: anti-credential-stuffing. The (email, IP) lockout, once
+        # LOGIN_LOCKOUT_ENABLED is on, stops repeats on one address, never an
+        # attacker iterating a list of emails (one attempt per address).
+        # 20/minute per IP throttles the iteration loop itself without
+        # blocking a human typing their own password.
         "login": "20/minute",
         # GDPR Art. 17 request lodging — each request sends mail to
         # ``user.email``. A stolen JWT (or a malicious office account)
@@ -905,9 +884,9 @@ REST_FRAMEWORK = {
         "super_admin_login": "10/hour",
         # Tenant step-up password re-confirm. Its own bucket: at the generous
         # ``login`` ceiling (20/min) a valid low-privilege token could grind
-        # the password to mint a sudo-mode token. Tighter
-        # per-user rate here PLUS the step-up view feeds django-axes so
-        # repeated wrong passwords lock the (username, ip) pair.
+        # the password to mint a sudo-mode token. A tighter per-user rate; the
+        # view also counts wrong passwords and codes toward the (email, IP)
+        # lockout, which refuses them once LOGIN_LOCKOUT_ENABLED is on.
         "step_up": "10/minute",
     },
     # Exactly one trusted proxy in front of Django: the gateway nginx, which
@@ -917,9 +896,9 @@ REST_FRAMEWORK = {
     # per-request-varying forged XFF gets a fresh throttle bucket every
     # request — a full bypass of the scoped rate limits below. NUM_PROXIES=1
     # makes DRF read only the last (gateway-appended) entry, i.e. the true
-    # client IP. Driven by the same TRUSTED_PROXY_COUNT as
-    # AXES_IPWARE_PROXY_COUNT above so both stay in sync (e.g. when a CDN is
-    # added in front of the gateway).
+    # client IP. Driven by the same TRUSTED_PROXY_COUNT as ``client_ip`` above
+    # (the address the lockout keys on) so both stay in sync (e.g. when a CDN
+    # is added in front of the gateway).
     "NUM_PROXIES": TRUSTED_PROXY_COUNT,
     # Single project-wide exception handler. Translates every exception that
     # escapes a view into the canonical {code, message, field, details,
@@ -1166,12 +1145,12 @@ MEDIA_URL_SIGNATURE_BUCKET = int(
     os.environ.get("MEDIA_URL_SIGNATURE_BUCKET", str(60 * 60))
 )
 
-# Filesystem location of the pg_dump backup files. Read by the
-# ``prune_old_backups`` and ``alert_on_stale_backups`` Huey tasks in
-# apps/shared/tenants/tasks.py.
-# Default ``/backups`` matches the path inside the prod container as
-# mounted by docker-compose.yml; override via environment for dev/tests.
+# Read by the Huey tasks in apps/shared/tenants/tasks.py: where the backups live
+# (``/backups`` as docker-compose.yml mounts them; override for dev/tests), and the
+# free space, in percent of a disk, under which a warning and a critical alert go out.
 BACKUP_DIR = os.environ.get("BACKUP_DIR", "/backups")
+DISK_FREE_WARNING_PERCENT = float(os.environ.get("DISK_FREE_WARNING_PERCENT", "20"))
+DISK_FREE_CRITICAL_PERCENT = float(os.environ.get("DISK_FREE_CRITICAL_PERCENT", "10"))
 
 # How old the newest backup artifact of a kind may get before
 # ``alert_on_stale_backups`` emails the admins. Backups run daily at 02:00, so
@@ -1285,67 +1264,6 @@ else:
         "REDIS_URL must be set when DEBUG=False — it backs the shared cache and "
         "throttle counters across gunicorn workers."
     )
-
-
-# DRF Spectacular
-SPECTACULAR_SETTINGS = {
-    "TITLE": "Jasmin Platform API",
-    "DESCRIPTION": "CSA Management Platform API",
-    "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,
-    # THE KEY SETTING - Don't split request/response into separate schemas
-    "COMPONENT_SPLIT_REQUEST": False,
-    "COMPONENT_SPLIT_PATCH": False,
-    # Map your enum classes to prevent duplicates
-    "ENUM_NAME_OVERRIDES": {
-        "MovementTypeEnum": "apps.commissioning.models.choices.MovementTypeOptions",
-        "CultivationOriginEnum": "apps.commissioning.models.choices.CultivationOriginOptions",
-        "DeliveryCycleEnum": "apps.commissioning.models.choices.DeliveryCycleOptions",
-        "ShareTypeVariationSizeEnum": "apps.commissioning.models.choices.ShareTypeVariationSizeOptions",
-        "UnitEnum": "apps.commissioning.models.choices.UnitOptions",
-        "PaymentCycleEnum": "apps.commissioning.models.choices.PaymentCycleOptions",
-        "VegetableSizeEnum": "apps.commissioning.models.choices.VegetableSizeOptions",
-        "ShareTypeEnum": "apps.commissioning.models.choices.ShareOptions",
-        # All the *_day fields across SharesDeliveryDay / OrdersDeliveryDay /
-        # Order / Share / etc. use the same DayNumberOptions choice set.
-        # Without this override, spectacular auto-generates ~8 distinct
-        # enum names (HarvestingDayEnum, WashingDayEnum, etc.) that all
-        # describe the same Monday-to-Sunday set — one shared
-        # ``DayNumberEnum`` keeps the generated TS client cleaner.
-        "DayNumberEnum": "apps.commissioning.models.choices.DayNumberOptions",
-        # Three unrelated models each have a ``kind`` CharField with its
-        # own choice set; without these overrides spectacular falls back
-        # to hash-suffixed names like ``Kind085Enum``.
-        "OpsChecklistKindEnum": "apps.shared.super_admin.models.OpsChecklistItem.KIND_CHOICES",
-        "ExternalCodeMappingKindEnum": "apps.commissioning.models.imports.ExternalCodeMapping.KIND_CHOICES",
-        "ConsentKindEnum": "apps.commissioning.models.choices.ConsentKind",
-        "TicketStatusEnum": "apps.shared.support.models.TicketStatus",
-        "TicketPriorityEnum": "apps.shared.support.models.TicketPriority",
-        "AuthorKindEnum": "apps.shared.support.models.AuthorKind",
-        # Two request bodies have a ``model`` ChoiceField with different choice
-        # sets: bulk (un)finalize and bulk documents. Once a field name carries
-        # two sets, spectacular hash-suffixes every set that has no override,
-        # so both are named here — keeping the existing ``ModelEnum`` (bulk
-        # documents, ``BulkDocumentRequestSerializer.model``) stable.
-        "BulkFinalizeRequestModelEnum": "apps.commissioning.serializers.finalize_serializer.FINALIZABLE_MODEL_NAMES",
-        "ModelEnum": ["delivery_note", "invoice"],
-    },
-    "COMPONENT_NO_READ_ONLY_REQUIRED": True,
-    "SCHEMA_PATH_PREFIX": "/api/",
-    "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,
-    "SCHEMA_COERCE_PATH_PK": True,
-    # Postprocessing to handle any remaining edge cases
-    "POSTPROCESSING_HOOKS": [
-        "drf_spectacular.hooks.postprocess_schema_enums",
-        # Auto-inject canonical 4xx error responses (400/401/403/404)
-        # into every operation so the orval-generated frontend client
-        # carries a typed ErrorResponse for every endpoint without us
-        # having to litter every viewset with ``responses={400: ...}``.
-        # Explicit per-view declarations always win — the hook uses
-        # setdefault. See ``core.openapi`` for the rules.
-        "core.openapi.inject_canonical_error_responses",
-    ],
-}
 
 
 # Security Headers

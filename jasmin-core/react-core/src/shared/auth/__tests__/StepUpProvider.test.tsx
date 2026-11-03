@@ -11,6 +11,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "@shared/i18n";
 import { runStepUpFlow } from "@shared/services/stepUp";
 import { getAccessToken, setAccessToken } from "@shared/services/tokenStore";
 import StepUpProvider from "../StepUpProvider";
@@ -41,6 +42,12 @@ function wrongPasswordError() {
       data: { code: "auth.step_up_test_code", message: "Invalid password." },
     },
   };
+}
+
+/** An access token whose ``exp`` lies ``seconds`` from now. */
+function tokenEnding(seconds: number): string {
+  const exp = Math.floor(Date.now() / 1000) + seconds;
+  return `header.${btoa(JSON.stringify({ exp }))}.signature`;
 }
 
 async function submitPassword(user: ReturnType<typeof userEvent.setup>) {
@@ -90,6 +97,75 @@ describe("StepUpProvider", () => {
     await waitFor(() =>
       expect(screen.queryByLabelText("auth.step_up.password")).not.toBeInTheDocument(),
     );
+  });
+
+  it("renews a session that would end inside the step-up window before asking", async () => {
+    const user = userEvent.setup();
+    render(
+      <StepUpProvider>
+        <div />
+      </StepUpProvider>,
+    );
+    setAccessToken(tokenEnding(120));
+    const refresh = vi.fn(async () => setAccessToken("fresh-token"));
+
+    const flow = runStepUpFlow({ ttlSeconds: 300, refresh });
+    flow.catch(() => {});
+    await screen.findByText("auth.step_up.title");
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    axiosPostMock.mockResolvedValueOnce({
+      data: { access: "sudo-token", ttl_seconds: 300 },
+    });
+    await submitPassword(user);
+
+    await expect(flow).resolves.toBe("sudo-token");
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(axiosPostMock.mock.calls[0][2].headers).toEqual({
+      Authorization: "Bearer fresh-token",
+    });
+  });
+
+  it("leaves a session that outlasts the step-up window as it is", async () => {
+    const user = userEvent.setup();
+    render(
+      <StepUpProvider>
+        <div />
+      </StepUpProvider>,
+    );
+    const presented = tokenEnding(900);
+    setAccessToken(presented);
+    const refresh = vi.fn();
+
+    const flow = runStepUpFlow({ ttlSeconds: 300, refresh });
+    flow.catch(() => {});
+    await screen.findByText("auth.step_up.title");
+    axiosPostMock.mockResolvedValueOnce({
+      data: { access: "sudo-token", ttl_seconds: 300 },
+    });
+    await submitPassword(user);
+
+    await expect(flow).resolves.toBe("sudo-token");
+    expect(refresh).not.toHaveBeenCalled();
+    expect(axiosPostMock.mock.calls[0][2].headers).toEqual({
+      Authorization: `Bearer ${presented}`,
+    });
+  });
+
+  it("ends the flow without opening the modal when the renewal fails", async () => {
+    render(
+      <StepUpProvider>
+        <div />
+      </StepUpProvider>,
+    );
+    setAccessToken(tokenEnding(60));
+    const refresh = vi.fn(() => Promise.reject(new Error("refresh refused")));
+
+    await expect(runStepUpFlow({ ttlSeconds: 300, refresh })).rejects.toThrow(
+      "refresh refused",
+    );
+    expect(screen.queryByText("auth.step_up.title")).not.toBeInTheDocument();
+    expect(axiosPostMock).not.toHaveBeenCalled();
   });
 
   it("unmounting mid-prompt rejects the flow so a later flow can start", async () => {
@@ -180,6 +256,38 @@ describe("StepUpProvider", () => {
       { password: "hunter2", totp_code: "123456" },
       expect.anything(),
     );
+  });
+
+  it("shows a lockout in the app's own words and keeps the flow open", async () => {
+    const user = userEvent.setup();
+    render(
+      <StepUpProvider>
+        <div />
+      </StepUpProvider>,
+    );
+
+    const flow = runStepUpFlow({ ttlSeconds: 300 });
+    flow.catch(() => {});
+    await screen.findByText("auth.step_up.title");
+
+    const serverMessage =
+      "Too many failed attempts. Try again later or reset your password.";
+    axiosPostMock.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 429,
+        data: { code: "auth.account_locked", message: serverMessage },
+      },
+    });
+    await submitPassword(user);
+
+    const lockedMessage = i18n.t("errors.auth.account_locked");
+    expect(lockedMessage).not.toBe("errors.auth.account_locked");
+    expect(await screen.findByText(lockedMessage)).toBeInTheDocument();
+    expect(screen.queryByText(serverMessage)).not.toBeInTheDocument();
+    // The modal stays up for a later try; the original action isn't failed.
+    expect(screen.getByLabelText("auth.step_up.password")).toBeInTheDocument();
+    expect(getAccessToken()).toBe("stale-token");
   });
 
   it("cancelling the modal rejects the flow", async () => {

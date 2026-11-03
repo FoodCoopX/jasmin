@@ -7,11 +7,13 @@
  * antd Select is stubbed: the behavior under test is the reconciliation
  * effect that fires setSelectedShareType, not the rendered widget.
  */
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("antd", () => ({
-  Select: () => null,
+  Select: ({ className }: { className?: string }) => (
+    <div data-testid="select" className={className} />
+  ),
 }));
 
 const mockUseShareTypes = vi.fn();
@@ -71,6 +73,74 @@ describe("ShareTypeSelector — preserveSelection default", () => {
 
     await waitFor(() =>
       expect(setSelectedShareType).toHaveBeenCalledWith("veg"),
+    );
+  });
+});
+
+describe("ShareTypeSelector — an emptied list", () => {
+  it("drops the pick once the list loads empty", async () => {
+    mockUseShareTypes.mockReturnValue({ shareTypes: [], loading: false });
+    const setSelectedShareType = vi.fn();
+
+    render(
+      <ShareTypeSelector
+        selectedShareType="honey"
+        setSelectedShareType={setSelectedShareType}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(setSelectedShareType).toHaveBeenCalledWith(null),
+    );
+  });
+
+  it("keeps the pick while the list is still loading", async () => {
+    mockUseShareTypes.mockReturnValue({ shareTypes: [], loading: true });
+    const setSelectedShareType = vi.fn();
+
+    render(
+      <ShareTypeSelector
+        selectedShareType="honey"
+        setSelectedShareType={setSelectedShareType}
+      />,
+    );
+
+    await Promise.resolve();
+    expect(setSelectedShareType).not.toHaveBeenCalled();
+  });
+
+  it("leaves an empty pick alone on an empty list", async () => {
+    mockUseShareTypes.mockReturnValue({ shareTypes: [], loading: false });
+    const setSelectedShareType = vi.fn();
+
+    render(
+      <ShareTypeSelector
+        selectedShareType={null}
+        setSelectedShareType={setSelectedShareType}
+      />,
+    );
+
+    await Promise.resolve();
+    expect(setSelectedShareType).not.toHaveBeenCalled();
+  });
+});
+
+describe("ShareTypeSelector — look", () => {
+  it("adds a page's class to its own classes", () => {
+    mockUseShareTypes.mockReturnValue({ shareTypes: SHARE_TYPES, loading: false });
+
+    render(
+      <ShareTypeSelector
+        selectedShareType="veg"
+        setSelectedShareType={() => {}}
+        className="share-type-selector--outdented"
+      />,
+    );
+
+    expect(screen.getByTestId("select")).toHaveClass(
+      "bold-select",
+      "week-selector-select",
+      "share-type-selector--outdented",
     );
   });
 });

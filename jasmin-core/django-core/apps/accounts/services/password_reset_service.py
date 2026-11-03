@@ -31,6 +31,8 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
 from apps.accounts.errors import InvalidResetLink, WeakPassword
+from apps.accounts.services.login_lockout import clear_all_failures
+
 JasminUser = get_user_model()
 logger = logging.getLogger("authentication")
 
@@ -117,6 +119,10 @@ def confirm_password_reset(*, uid: str, token: str, password: str) -> JasminUser
     from apps.accounts.services.auth_service import revoke_all_sessions
 
     revoke_all_sessions(user)
+
+    # The reset proved control of the mailbox, and the new password has had no
+    # wrong guesses: the owner signs in with it at once, wherever a lock held.
+    clear_all_failures(user.email)
 
     logger.info("password_reset.confirm success user=%s", user.pk)
     return user

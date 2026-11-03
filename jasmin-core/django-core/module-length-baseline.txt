@@ -2,27 +2,24 @@
 # Managed by scripts/module_length.py; do not hand-edit. A pin only goes
 # down: split the module, then
 #     poetry run python scripts/module_length.py freeze
-# 22 module(s).
+# 19 module(s).
 
-apps/commissioning/errors.py: 2323
-apps/commissioning/models/members.py: 1129
+apps/commissioning/models/members.py: 1121
 apps/commissioning/models/mixin.py: 1413
-apps/commissioning/models/resellers.py: 1332
+apps/commissioning/models/resellers.py: 1324
 apps/commissioning/models/shares.py: 1158
 apps/commissioning/serializers/members_serializer.py: 1122
-apps/commissioning/serializers/resellers_serializer.py: 1313
-apps/commissioning/serializers/shares_serializer.py: 1067
+apps/commissioning/serializers/resellers_serializer.py: 1200
+apps/commissioning/serializers/shares_serializer.py: 1066
 apps/commissioning/services/default_share_content_service.py: 1184
-apps/commissioning/services/documentation_summary_service.py: 1086
-apps/commissioning/services/invoice_service.py: 1111
+apps/commissioning/services/documentation_summary_service.py: 1028
 apps/commissioning/services/offer_service.py: 1081
-apps/commissioning/services/order_content_service.py: 1121
-apps/commissioning/views/reseller_views.py: 1729
-apps/commissioning/views/stock_views.py: 1311
-apps/commissioning/viewsets/members_viewsets.py: 1850
-apps/commissioning/viewsets/resellers_viewsets.py: 1855
+apps/commissioning/services/order_content_service.py: 1025
+apps/commissioning/views/reseller_views.py: 1442
+apps/commissioning/viewsets/members_viewsets.py: 1836
+apps/commissioning/viewsets/resellers_viewsets.py: 1557
 apps/commissioning/viewsets/shares_viewsets.py: 2286
 apps/notifications/registry.py: 1051
-apps/payments/services.py: 1421
+apps/payments/services.py: 1233
 apps/shared/super_admin/viewsets.py: 1161
-config/settings.py: 1364
+config/settings.py: 1282

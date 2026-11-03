@@ -16,6 +16,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningResellersListParams,
+  PatchedReseller,
   Reseller,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
@@ -63,7 +64,7 @@ const resellersResource: CrudResource<TableRecord> = {
   create: (payload) =>
     commissioningResellersCreate(payload as unknown as Reseller),
   update: (id, payload) =>
-    commissioningResellersPartialUpdate(id, payload as unknown as Reseller),
+    commissioningResellersPartialUpdate(id, payload as PatchedReseller),
   delete: (id) =>
     commissioningResellersDestroy(id, { delete_context: "resellers" }),
   getListQueryKey: getCommissioningResellersListQueryKey,
@@ -238,7 +239,6 @@ export default function ListResellers() {
     (transformedData: Record<string, unknown>) => ({
       ...transformedData,
       is_reseller: true,
-      comes_from_reseller_page: true,
     }),
     [],
   );
@@ -516,6 +516,8 @@ export default function ListResellers() {
         columns={columns}
         filename={t("commissioning.resellers_template.csv")}
         modelName="reseller"
+        // The template has no is_reseller column: every imported row becomes a reseller.
+        fixedValues={{ is_reseller: true }}
         onUploadSuccess={list.invalidate}
       />
 

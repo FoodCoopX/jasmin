@@ -124,16 +124,27 @@ def anonymise_long_cancelled_members() -> dict[str, int]:
     retention window are deleted once they are past it
     (``_purge_files_kept_by_erasure``).
 
-    Two log channels per anonymisation:
+    Log channels per member:
 
       * ``gdpr.ex_member_anonymised`` (INFO) — happy path; goes into
         the GDPR audit log for regulator-facing accountability.
+      * ``gdpr.ex_member_login_kept`` (INFO) — follows it when the member's
+        login holds a staff or customer role. The login stays, released from
+        the member and without the member role
+        (``ErasureSubject.of_ex_member``).
       * ``gdpr.ex_member_blocked`` (WARNING) — retention block fired
         despite 10y+ elapsed. Usually means open CoopShares, open
         invoices, or active subscriptions that should have been
         closed at member exit. Office needs to clean those up; the
         member will keep showing up here until they do. The operator gets
         an email per tenant with blocked members, at most once a week.
+      * ``gdpr.ex_member_anonymisation_failed`` (ERROR, with traceback) — the
+        erasure raised. The operator gets an email per tenant listing those
+        members, at most once a day; the sweep tries them again every night.
+
+    A tenant whose sweep raises outside a member's erasure (the file purge,
+    say) is not counted as scanned, and ``for_each_tenant`` emails the
+    operator about it.
     """
     cutoff = _retention_cutoff()
     log.info(
@@ -145,16 +156,34 @@ def anonymise_long_cancelled_members() -> dict[str, int]:
     counters = {
         "anonymised": 0,
         "blocked": 0,
+        "failed": 0,
         "files_purged_for": 0,
         "tenants_scanned": 0,
+        "tenants_failed": 0,
     }
 
     def sweep(tenant) -> None:
-        counters["tenants_scanned"] += 1
-        anonymised, blocked = _run_for_current_schema(cutoff)
+        failed_member_ids: list[str] = []
+        anonymised, blocked = _run_for_current_schema(
+            cutoff, failed_member_ids=failed_member_ids
+        )
         counters["anonymised"] += anonymised
         counters["blocked"] += blocked
-        counters["files_purged_for"] += _purge_files_kept_by_erasure(cutoff)
+        counters["failed"] += len(failed_member_ids)
+        # Both alerts go out before the file purge, so a purge that raises
+        # can't swallow them.
+        if failed_member_ids:
+            alert_operator(
+                f"{tenant.name}: {len(failed_member_ids)} ex-member erasure(s) failed",
+                f"Tenant '{tenant.name}' (schema {tenant.schema_name}): the "
+                f"erasure of these ex-members past the {EX_MEMBER_RETENTION_YEARS}-"
+                f"year retention raised an error: {', '.join(failed_member_ids)}. "
+                "The huey container's log (docker compose logs huey) holds each "
+                "traceback as gdpr.ex_member_anonymisation_failed; the sweep tries "
+                "them again every night.",
+                throttle_key=f"gdpr.ex_member_failed:{tenant.schema_name}",
+                throttle_seconds=20 * 3600,
+            )
         if blocked:
             alert_operator(
                 f"{tenant.name}: {blocked} ex-member erasure(s) blocked",
@@ -166,31 +195,39 @@ def anonymise_long_cancelled_members() -> dict[str, int]:
                 throttle_key=f"gdpr.ex_member_blocked:{tenant.schema_name}",
                 throttle_seconds=7 * 24 * 3600,
             )
+        counters["files_purged_for"] += _purge_files_kept_by_erasure(cutoff)
+        counters["tenants_scanned"] += 1
 
     # ``include_inactive=True``: a legal retention obligation persists on a
     # frozen (is_active=False) tenant, so the erasure SLA must keep running
     # there. Per-tenant failures are isolated and logged (to the gdpr log)
     # so one bad schema never aborts the sweep.
-    for_each_tenant(
+    counters["tenants_failed"] = for_each_tenant(
         sweep, label="gdpr.retention_sweep", logger=log, include_inactive=True
     )
 
     log.info(
-        "gdpr.retention_sweep_done anonymised=%s blocked=%s files_purged_for=%s "
-        "tenants_scanned=%s",
+        "gdpr.retention_sweep_done anonymised=%s blocked=%s failed=%s "
+        "files_purged_for=%s tenants_scanned=%s tenants_failed=%s",
         counters["anonymised"],
         counters["blocked"],
+        counters["failed"],
         counters["files_purged_for"],
         counters["tenants_scanned"],
+        counters["tenants_failed"],
     )
     return dict(counters)
 
 
-def _run_for_current_schema(cutoff: datetime.date) -> tuple[int, int]:
+def _run_for_current_schema(
+    cutoff: datetime.date, *, failed_member_ids: list[str] | None = None
+) -> tuple[int, int]:
     """Process candidates under the currently-active tenant schema.
 
     Split out from ``anonymise_long_cancelled_members`` so tests can
-    drive it directly without re-entering ``schema_context``.
+    drive it directly without re-entering ``schema_context``. A member whose
+    erasure raises is logged and, when ``failed_member_ids`` is given, added
+    to it.
 
     Returns ``(anonymised_count, blocked_count)``.
     """
@@ -206,7 +243,8 @@ def _run_for_current_schema(cutoff: datetime.date) -> tuple[int, int]:
         # scrub. The outer loop is intentionally NOT wrapped, so one
         # failing member doesn't poison the rest of the run.
         try:
-            GDPRService.anonymize_subject(ErasureSubject.of_member(member))
+            subject = ErasureSubject.of_ex_member(member)
+            GDPRService.anonymize_subject(subject)
         except RetentionPeriodActive as exc:
             reasons = exc.details.get("reasons", [])
             log.warning(
@@ -222,12 +260,20 @@ def _run_for_current_schema(cutoff: datetime.date) -> tuple[int, int]:
                 "gdpr.ex_member_anonymisation_failed member_id=%s",
                 member.pk,
             )
+            if failed_member_ids is not None:
+                failed_member_ids.append(member.pk)
         else:
             log.info(
                 "gdpr.ex_member_anonymised member_id=%s " "days_since_cancellation=%s",
                 member.pk,
                 days_since,
             )
+            if subject.user is None and member.user_id is not None:
+                log.info(
+                    "gdpr.ex_member_login_kept member_id=%s user_id=%s",
+                    member.pk,
+                    member.user_id,
+                )
             anonymised += 1
 
     return anonymised, blocked
@@ -376,7 +422,6 @@ def alert_on_mass_deletes() -> dict[str, int]:
     counters = {"tenants_scanned": 0}
 
     def collect(tenant) -> None:
-        counters["tenants_scanned"] += 1
         rows = (
             LogEntry.objects.filter(
                 action=LogEntry.Action.DELETE,
@@ -398,6 +443,7 @@ def alert_on_mass_deletes() -> dict[str, int]:
                 continue
             key = (tenant.schema_name, str(actor_id))
             by_actor.setdefault(key, Counter())[display] += 1
+        counters["tenants_scanned"] += 1
 
     # ``include_inactive=True``: insider data destruction is exactly what a
     # frozen (offboarding / disputed / breached) tenant is at risk of, so the
@@ -445,6 +491,16 @@ def alert_on_mass_deletes() -> dict[str, int]:
     }
 
 
+def _sql_identifier(name: str) -> str:
+    """``name`` as a quoted Postgres identifier."""
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _sql_literal(value: str) -> str:
+    """``value`` as a Postgres string literal."""
+    return "'" + value.replace("'", "''") + "'"
+
+
 def _send_mass_delete_ops_alert(
     bursts: list[tuple[tuple[str, str], Counter[str], int]],
 ) -> None:
@@ -454,7 +510,9 @@ def _send_mass_delete_ops_alert(
     platform's transactional mail uses also carries this — no extra
     config. The email is short on purpose and names nobody: each burst
     comes with the query that lists its deletions in the tenant schema's
-    audit log (Django admin isn't installed, so there is no admin page).
+    audit log (Django admin isn't installed, so there is no admin page). The
+    schema and the actor come from rows the app writes, so the query quotes
+    them, and the operator runs it as the app's database role.
     """
     from auditlog.models import LogEntry
 
@@ -470,8 +528,9 @@ def _send_mass_delete_ops_alert(
         )
         lines.append(
             "    SELECT timestamp, content_type_id, object_pk, object_repr "
-            f'FROM "{tenant_schema}".auditlog_logentry '
-            f"WHERE actor_id = '{actor_id}' AND action = {LogEntry.Action.DELETE} "
+            f"FROM {_sql_identifier(tenant_schema)}.auditlog_logentry "
+            f"WHERE actor_id = {_sql_literal(str(actor_id))} "
+            f"AND action = {LogEntry.Action.DELETE} "
             f"AND timestamp >= now() - interval '{window_hours} hours' "
             "ORDER BY timestamp;"
         )
@@ -481,8 +540,9 @@ def _send_mass_delete_ops_alert(
             f"Window: last {window_hours}h",
             f"Threshold: {MASS_DELETE_THRESHOLD}",
             "",
-            "Triage: run each burst's query in psql on the database "
-            "(docker compose exec postgres psql -U <user> -d <db>).",
+            "Triage: run each burst's query in psql as the app's own database "
+            "role, not the superuser: docker compose exec postgres sh -c "
+            '\'psql -U "${APP_DB_USER:-$POSTGRES_USER}" -d "$POSTGRES_DB"\'',
         ]
     )
     mail_admins(
@@ -571,7 +631,6 @@ def alert_on_deletion_endpoint_bursts() -> dict[str, int]:
     counters = {"tenants_scanned": 0}
 
     def collect(tenant) -> None:
-        counters["tenants_scanned"] += 1
         lodge_rows = (
             DeletionRequest.objects.filter(
                 requested_at__gte=cutoff,
@@ -595,6 +654,7 @@ def alert_on_deletion_endpoint_bursts() -> dict[str, int]:
         for ip in confirm_rows:
             confirm_by_ip.setdefault((tenant.schema_name, str(ip)), 0)
             confirm_by_ip[(tenant.schema_name, str(ip))] += 1
+        counters["tenants_scanned"] += 1
 
     # ``include_inactive=True``: abuse of the public deletion endpoints stays a
     # concern on a frozen tenant, so keep scanning every non-public tenant.

@@ -54,6 +54,7 @@ from ..errors import (
     CoopShareNotFromTransfer,
     MemberConfirmedImmutable,
     SubscriptionAlreadyConfirmed,
+    SubscriptionAlreadyRejected,
     SubscriptionConfirmedImmutable,
     SubscriptionPriceInvalid,
 )
@@ -103,6 +104,7 @@ from ..services.onboarding_policy import (
     onboarding_mode_enabled,
 )
 from ..services.renewal import term_predecessor
+from ..services.subscription_rejection import reject_subscription
 from ..services.waiting_list_offer_service import offer_price_fits_column
 from ..utils.optional_filters import apply_optional_filters
 from ..utils.query_params import validate_query_params
@@ -435,8 +437,8 @@ class MemberViewSet(
             "email if ``notify_user=true``. Otherwise the member stays pending "
             "until the office confirms it. In onboarding mode the member is "
             "only linked.\n"
-            "  * ``pending_invitation``  → link only; the member is "
-            "auto-confirmed when the user accepts the invitation.\n"
+            "  * ``pending_invitation``  → link only; accepting an invitation "
+            "sent through this member's ``send_invitation`` confirms it.\n"
             "  * ``pending_approval``    → 409 conflict; the user already "
             "has a pending member application.\n"
             "  * ``inactive``            → 409 conflict.\n"
@@ -532,7 +534,7 @@ class MemberViewSet(
             200: MemberSerializer,
             # ``ConfirmationDate*`` errors.
             400: ErrorResponseSerializer,
-            # ``MemberAlreadyConfirmed`` / ``MemberAlreadyCancelled``.
+            # ``MemberAlreadyConfirmed`` / ``MemberAlreadyRejected`` / ``MemberAlreadyCancelled``.
             409: ErrorResponseSerializer,
         },
     )
@@ -557,7 +559,7 @@ class MemberViewSet(
             # already-confirmed check raises the 409.
             member = Member.objects.select_for_update().get(pk=member.pk)
 
-            # Raises MemberAlreadyConfirmed (409) when not pending.
+            # Raises MemberAlreadyConfirmed / MemberAlreadyRejected (409) when not pending.
             MemberService().confirm_and_notify(
                 member,
                 admin_user=auth_user(request),
@@ -583,7 +585,11 @@ class MemberViewSet(
                 },
             }
         },
-        responses={200: MemberSerializer},
+        responses={
+            200: MemberSerializer,
+            # ``MemberAlreadyConfirmed``.
+            409: ErrorResponseSerializer,
+        },
     )
     @action(detail=True, methods=["post"])
     def reject(self, request: Request, pk: str | None = None) -> Response:
@@ -1181,7 +1187,8 @@ class SubscriptionViewSet(
             # Onboarding mode: ``SubscriptionMemberNotAdmitted`` /
             # ``SubscriptionEndsAfterMemberExit``.
             400: ErrorResponseSerializer,
-            # ``SubscriptionAlreadyConfirmed`` / ``DeliveryStationOverCapacity``.
+            # ``SubscriptionAlreadyConfirmed`` / ``SubscriptionAlreadyRejected`` /
+            # ``MemberAlreadyRejected`` / ``DeliveryStationOverCapacity``.
             409: ErrorResponseSerializer,
         },
     )
@@ -1208,6 +1215,10 @@ class SubscriptionViewSet(
 
             if subscription.admin_confirmed:
                 raise SubscriptionAlreadyConfirmed("Subscription is already confirmed")
+            # A reject that took the lock first has decided it: confirmed, the
+            # subscription would be billed while it shows as rejected.
+            if subscription.admin_rejected_at is not None:
+                raise SubscriptionAlreadyRejected("Subscription has been rejected")
 
             # A member who has initiated their exit gets no new deliveries or
             # PLANNED charges. Onboarding mode records subscriptions that
@@ -1259,8 +1270,9 @@ class SubscriptionViewSet(
             # or below-floor price.
             400: ErrorResponseSerializer,
             # Capacity full, ``EmailActionBlockedInOnboardingMode``,
-            # ``EmailSendingNotSetUp`` (no SMTP host of the tenant's own), or
-            # ``WaitingListOfferMemberHasNoEmail``.
+            # ``EmailSendingNotSetUp`` (no SMTP host of the tenant's own),
+            # ``WaitingListOfferMemberHasNoEmail``, or
+            # ``WaitingListOfferEntryClosed`` (entry or member cancelled/rejected).
             409: ErrorResponseSerializer,
         },
     )
@@ -1295,46 +1307,20 @@ class SubscriptionViewSet(
                 },
             }
         },
-        responses={200: SubscriptionSerializer},
+        responses={
+            200: SubscriptionSerializer,
+            # ``SubscriptionAlreadyConfirmed``.
+            409: ErrorResponseSerializer,
+        },
     )
     @action(detail=True, methods=["post"])
     def reject(self, request: Request, pk: str | None = None) -> Response:
         enforce_privileged(request, "Only office staff may reject subscriptions.")
-        subscription: Subscription = self.get_object()
-
-        # ``reject`` is for PENDING applications only. Rejecting an already
-        # CONFIRMED subscription would merely un-flip the flag while leaving
-        # its materialised ShareDeliveries and PLANNED ChargeSchedule rows
-        # intact — those are still SEPA-debited (create_run filters on
-        # status=PLANNED, not admin_confirmed). Genuine revocation of a
-        # confirmed subscription must route through ``cancel`` (which drops
-        # future deliveries + PLANNED charges and re-plans). Already-rejected
-        # rows stay idempotent (admin_confirmed is False).
-        if subscription.admin_confirmed:
-            raise SubscriptionAlreadyConfirmed(
-                "Confirmed subscriptions cannot be rejected — cancel them instead."
-            )
-
-        reason: str | None = body(request).get("reason")
-
-        # Mirrors ``MembersViewSet.reject``: no email side-effect today
-        # — subscriptions don't ship a ``subscription.application_
-        # rejected`` template yet. Add the email wiring alongside the
-        # template if product asks. For now ``reject()`` just stamps
-        # the audit fields and saves.
-        subscription.reject(admin_user=auth_user(request), reason=reason, save=True)
-
-        # Free the draft's held station-day capacity. The reject stamps flags
-        # but does NOT delete the row, so the CASCADE that would otherwise drop
-        # the CapacityReservation never fires — without this, the rejected
-        # applicant keeps blocking the slot (and any waiting_list promotion) until
-        # the 14-day TTL lapses.
-        from ..services.capacity_reservation_service import (
-            CapacityReservationService,
+        subscription = reject_subscription(
+            self.get_object(),
+            admin_user=auth_user(request),
+            reason=body(request).get("reason"),
         )
-
-        CapacityReservationService.release_for_subscription(subscription)
-
         updated = self.refetch_for_response(subscription)
         return Response(self.get_serializer(updated).data, status=status.HTTP_200_OK)
 
@@ -1619,7 +1605,7 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             200: CoopShareSerializer,
             # ``ConfirmationDate*`` errors / ``MemberCoopSharesOutOfRange``.
             400: ErrorResponseSerializer,
-            # ``MemberAlreadyCancelled`` / ``CoopShareNotPending``.
+            # ``MemberAlreadyCancelled`` / ``MemberAlreadyRejected`` / ``CoopShareNotPending``.
             409: ErrorResponseSerializer,
         },
     )
@@ -1629,11 +1615,11 @@ class CoopShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
         Vice-versa cascade: if the share belongs to a not-yet-admitted member,
         confirming the share admits the member too (initial admission from the
-        equity side) — which in turn confirms the member's other pending shares
-        and sends the admission email. This is best-effort: if the member is not
-        yet eligible for admission (e.g. below the min-shares window), the share
-        is still confirmed and the member stays pending (admit later via
-        member-confirm). Members admitted earlier skip this entirely.
+        equity side), which confirms the member's other pending shares and sends
+        the admission email. Best-effort: a member not yet eligible (e.g. below
+        the min-shares window) stays pending and the share is still confirmed.
+        The confirm is refused for a rejected member (409 ``MemberAlreadyRejected``);
+        a new invitation re-admits them. Members admitted earlier skip this.
 
         In onboarding mode the confirmation date, the email suppression and the
         departed-member admission reach the share and the member cascade alike.

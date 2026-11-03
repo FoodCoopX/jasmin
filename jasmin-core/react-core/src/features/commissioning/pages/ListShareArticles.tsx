@@ -11,6 +11,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningShareArticlesListParams,
+  PatchedShareArticle,
   ShareArticle,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
@@ -23,7 +24,7 @@ import {
 import {
   EditableTable,
   type CrudResource,
-  gatedByPermission,
+  permissionsWithDeletable,
   useCrudListPage,
 } from "@shared/tables";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
@@ -44,6 +45,7 @@ import {
   useShareOptions,
 } from "@features/commissioning/hooks";
 import { getShareOptionLabel, syncPurchasedName } from "@shared/utils";
+import { newShareArticleShareFlag } from "@features/commissioning/utils/newShareArticleShare";
 
 // Pure row predicates — a row is harvest-only or purchase-only based on
 // ``is_purchased``. Module-level so they're stable references.
@@ -65,7 +67,7 @@ const shareArticlesResource: CrudResource<TableRecord> = {
   update: (id, payload) =>
     commissioningShareArticlesPartialUpdate(
       id,
-      payload as unknown as ShareArticle,
+      payload as PatchedShareArticle,
     ),
   delete: commissioningShareArticlesDestroy,
   getListQueryKey: getCommissioningShareArticlesListQueryKey,
@@ -93,17 +95,8 @@ export default function ListShareArticles() {
   const [allArticlesExportVisible, setAllArticlesExportVisible] =
     useState(false);
 
-  // Custom delete guard (identical to `permissionsWithDeletable` but spelled
-  // out because delete gating here also needs `canEdit`).
   const permissions = useMemo(
-    () => ({
-      ...gatedByPermission(canEdit),
-      canDeleteRecord: (record: TableRecord) => {
-        if (!canEdit) return false;
-        if (record.key === -1 || !record.id) return true;
-        return record.can_be_deleted !== false;
-      },
-    }),
+    () => permissionsWithDeletable(canEdit),
     [canEdit],
   );
 
@@ -132,12 +125,11 @@ export default function ListShareArticles() {
 
   const handleOpenModal = useCallback(
     (record: Record<string, unknown>) => {
-      if (!canManagePrices) return;
       setSelectedShareArticleId(String(record.id ?? ""));
       setSelectedShareArticleName(record.name as string);
       setModalVisible(true);
     },
-    [canManagePrices],
+    [],
   );
 
   const handleCloseModal = useCallback(() => {
@@ -213,15 +205,11 @@ export default function ListShareArticles() {
     ) => {
       if (record.key === -1) {
         // customSave turns every ticked per-option flag into share_option_list,
-        // so a new article ticks only an option whose column the office sees:
-        // the filtered one, or else the vegetable share (the common case)
-        // when the farm runs it.
-        const preselectedShareOption =
-          activeFilter !== "all"
-            ? activeFilter
-            : visibleShareOptions.some((opt) => opt.value === "HARVEST_SHARE")
-              ? "harvest_share"
-              : null;
+        // so a new article ticks only an option whose column the office sees.
+        const preselectedShareOption = newShareArticleShareFlag(
+          activeFilter !== "all" ? activeFilter : null,
+          visibleShareOptions.some((opt) => opt.value === "HARVEST_SHARE"),
+        );
         const defaultValues: Record<string, unknown> = {
           is_active: true,
           ...(preselectedShareOption && { [preselectedShareOption]: true }),
@@ -274,7 +262,7 @@ export default function ListShareArticles() {
     <div>
       <div className="flex-between">
         <div>
-          <h1 style={{ marginBottom: 0 }}>
+          <h1 className="mb-0">
             {t("commissioning.share_articles")}
           </h1>
           <h5>{t("commissioning.share_articles_description")}</h5>
@@ -312,14 +300,7 @@ export default function ListShareArticles() {
         </Flex>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
+      <div className="flex-center-y gap-16 mb-16">
         <Radio.Group
           value={activeFilter}
           onChange={(e) => setActiveFilter(e.target.value)}

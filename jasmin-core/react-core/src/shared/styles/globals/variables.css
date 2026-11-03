@@ -4,6 +4,9 @@
   --color-primary: rgb(34, 108, 71);
   --color-primary-hover: rgb(29, 96, 62);
   --color-primary-active: rgb(136, 0, 111);
+  /* A fill that carries white text: buttons, badges, the selected segment. */
+  --color-primary-solid: rgb(34, 108, 71);
+  --color-text-on-primary: #ffffff;
 
   --color-primary-light: rgba(206, 221, 207);
 
@@ -28,6 +31,10 @@
   /* The banner naming the plot above a group of harvest cards. */
   --color-plot-header-bg: #eaf6dc;
   --color-plot-header-text: #3a5a1c;
+  /* The single money series of a statistics chart (purchase spending). */
+  --color-chart-money: #3f8600;
+  /* A harvest share planning row scaffolded from a forecast or backed by stock. */
+  --color-planning-row-highlight: #008000;
 
   /* Surface & text colors for components */
   --color-bg-base: #ffffff;
@@ -65,6 +72,14 @@
   --color-error-bg: #fff1f0;
   --color-error-border: #ffccc7;
   --color-error-text: #c62828;
+  /* The border that marks the order day selects on the Orders page. */
+  --color-order-day-border: #743984;
+  /* Download and export buttons: a lavender fill, and the far end of the
+     gradient a disabled one fades into. */
+  --color-download-bg: rgb(193, 172, 213);
+  --color-download-text: #000000;
+  --color-download-disabled-bg-end: #e5e5e5;
+  --color-bevel-highlight: rgba(255, 255, 255, 0.6);
   /* And for something waiting on someone, and for plain information. */
   --color-warning-bg: #fff3e0;
   --color-warning-text: #b34700;
@@ -139,6 +154,10 @@
   --color-primary: rgb(76, 175, 120);
   --color-primary-hover: rgb(96, 195, 140);
   --color-primary-active: rgb(56, 155, 100);
+  /* Stays the dark green: white text on the dark theme's light primary
+     would fall below 3:1. */
+  --color-primary-solid: rgb(34, 108, 71);
+  --color-text-on-primary: #ffffff;
   --color-primary-light: rgba(76, 175, 120, 0.15);
   --color-accent: #1f1f1f;
   --color-border-tabs: #555;
@@ -170,6 +189,11 @@
   --color-error-bg: #2a1215;
   --color-error-border: #5c2223;
   --color-error-text: #ff7875;
+  --color-order-day-border: #b57fc6;
+  --color-download-bg: rgb(100, 70, 130);
+  --color-download-text: #e0e0e0;
+  --color-download-disabled-bg-end: #1a1a1a;
+  --color-bevel-highlight: rgba(255, 255, 255, 0.6);
   --color-warning-bg: #2b1d11;
   --color-warning-text: #f3b765;
   --color-info-bg: #111d2c;
@@ -189,6 +213,8 @@
   --color-order-content: #a5d6a7;
   --color-plot-header-bg: #162312;
   --color-plot-header-text: #66bb6a;
+  --color-chart-money: #73d13d;
+  --color-planning-row-highlight: #73d13d;
 
   /* Role tags (dark): AntD's dark palette for each hue — its first step for the
      background, the third for the border and the eighth for the text. */

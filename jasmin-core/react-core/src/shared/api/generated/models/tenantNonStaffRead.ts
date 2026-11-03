@@ -9,6 +9,7 @@ import type { TenantNonStaffReadEmail } from './tenantNonStaffReadEmail';
 import type { TenantNonStaffReadWebsite } from './tenantNonStaffReadWebsite';
 import type { TenantNonStaffReadSettings } from './tenantNonStaffReadSettings';
 import type { TenantNonStaffReadCurrentSettings } from './tenantNonStaffReadCurrentSettings';
+import type { HostCapabilities } from './hostCapabilities';
 
 /**
  * Narrowed tenant payload for non-staff reads (member, customer).
@@ -139,4 +140,5 @@ export interface TenantNonStaffRead {
   legal_notice_extra_html?: string;
   readonly settings?: TenantNonStaffReadSettings;
   readonly current_settings?: TenantNonStaffReadCurrentSettings;
+  readonly capabilities?: HostCapabilities;
 }

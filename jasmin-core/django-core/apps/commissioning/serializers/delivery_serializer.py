@@ -11,7 +11,9 @@ from ..errors import (
     DeliveryExceptionInvalidRange,
     DeliveryExceptionOverlap,
     DeliveryExceptionPeriodLocked,
+    DeliveryStationMoreThanOneFee,
     PictureInvalid,
+    TourNumberBelowOne,
 )
 from ..models import DeliveryExceptionPeriod, DeliveryStation, DeliveryStationDay
 from ..utils.capacity_window import build_capacity_by_week, parse_capacity_window
@@ -29,6 +31,15 @@ from .serializers_mixin import (
 # ========================================
 # DELIVERY STATION SERIALIZERS
 # ========================================
+
+
+def refuse_tour_number_below_one(value: int) -> None:
+    """Field validator for every ``tour_number`` input. Listed in
+    ``validators`` so it runs before the field's own ``min_value=1`` check,
+    which stays for the schema's ``minimum`` but would answer with DRF's
+    uncoded message."""
+    if value < 1:
+        raise TourNumberBelowOne()
 
 
 class CapacityWeekEntrySerializer(serializers.Serializer):
@@ -154,6 +165,23 @@ class DeliveryStationSerializer(
         # reverse relation) instead of running ``can_delete_instance`` per row.
         list_serializer_class = DeliveryStationListSerializer
 
+    FEE_FIELDS = ("fee_per_box_net", "fee_per_month_net", "fee_per_year_net")
+
+    def validate(self, attrs):
+        """A station is paid one way only. A partial update is judged together
+        with the fees the station stores, so adding a second fee is refused
+        while switching from one to another in the same write is not."""
+        attrs = super().validate(attrs)
+        fees = [
+            attrs.get(field, getattr(self.instance, field, 0))
+            for field in self.FEE_FIELDS
+        ]
+        if sum(1 for fee in fees if fee and fee > 0) > 1:
+            raise DeliveryStationMoreThanOneFee(
+                "Only one fee applies: per box, per month or per year."
+            )
+        return attrs
+
     def validate_picture(self, value):
         """Only a decodable PNG/JPEG/WEBP/GIF is stored, re-encoded under a
         generated name with the matching extension — the served Content-Type
@@ -272,6 +300,9 @@ class DeliveryStationDaySerializer(
     # The delivery tours list only the station days that hold a stop; saving
     # the tours clears the stop of every station day left off them.
     tour_assignment_missing = serializers.SerializerMethodField()
+    tour_number = serializers.IntegerField(
+        required=False, min_value=1, validators=[refuse_tour_number_below_one]
+    )
 
     class Meta:
         model = DeliveryStationDay
@@ -279,6 +310,19 @@ class DeliveryStationDaySerializer(
 
     def get_tour_assignment_missing(self, obj) -> bool:
         return obj.stop_order is None
+
+    def validate(self, attrs):
+        # A row stored with tour 0 fails the table's CHECK on any UPDATE, so an
+        # edit that leaves tour_number out is refused with the coded error
+        # rather than a database error.
+        attrs = super().validate(attrs)
+        if (
+            self.instance is not None
+            and "tour_number" not in attrs
+            and self.instance.tour_number < 1
+        ):
+            raise TourNumberBelowOne()
+        return attrs
 
     def validate_capacity(self, value):
         """Floor a capacity edit at the busiest upcoming week's occupancy.
@@ -441,7 +485,9 @@ class DeliveryTourResponseSerializer(serializers.Serializer):
 class DeliveryTourUpdateSerializer(serializers.Serializer):
     """Serializer for updating a single tour (POST/PUT)."""
 
-    tour_number = serializers.IntegerField(min_value=1)
+    tour_number = serializers.IntegerField(
+        min_value=1, validators=[refuse_tour_number_below_one]
+    )
     positions = DeliveryTourPositionSerializer(many=True)
 
     def validate_positions(self, positions):
@@ -718,7 +764,20 @@ class DeliveryStationFeesSerializer(serializers.Serializer):
     fee_type = serializers.ChoiceField(
         choices=["per_box", "per_month", "per_year", "none"]
     )
-    quantity = serializers.IntegerField()
+    quantity = serializers.IntegerField(
+        help_text=(
+            "Whole units: the billed quantity rounded up. Kept for clients that "
+            "read an integer count; the total is based on billed_quantity."
+        )
+    )
+    billed_quantity = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        help_text=(
+            "The quantity the total is based on: boxes delivered, or the months "
+            "or years of the range prorated by day."
+        ),
+    )
     quantity_unit = serializers.CharField(allow_blank=True)
     rate_net = serializers.CharField()
     total_net = serializers.CharField()

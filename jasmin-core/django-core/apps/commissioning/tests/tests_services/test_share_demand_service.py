@@ -490,6 +490,33 @@ class TestShareDemandServiceDispatcher:
         # schema_name → external backend (not the subscription backend).
         assert isinstance(backend, ExternalDemandBackend)
 
+    def test_resolve_backend_takes_the_imported_demand_inside_tapir(
+        self, tenant, settings
+    ):
+        # Tapir delivers the demand only as import batches and keeps no
+        # subscriptions, so the mode holds there whatever the row stores.
+        from django.db import connection
+
+        from apps.commissioning.services.share_demand_service import (
+            _resolve_backend,
+        )
+        from apps.shared.tenants.models import TenantSettings
+
+        current = TenantSettings.get_current_settings(connection.tenant)
+        stored = current.uploads_weekly_share_amount if current else None
+        if current:
+            current.uploads_weekly_share_amount = False
+            current.save(update_fields=["uploads_weekly_share_amount"])
+        try:
+            assert isinstance(_resolve_backend(), SubscriptionDemandBackend)
+
+            settings.JASMIN_HOST = "tapir"
+            assert isinstance(_resolve_backend(), ExternalDemandBackend)
+        finally:
+            if current:
+                current.uploads_weekly_share_amount = stored
+                current.save(update_fields=["uploads_weekly_share_amount"])
+
 
 # ---------------------------------------------------------------------------
 # Virtual-variation asymmetry locks (demand decomposes; capacity does NOT)

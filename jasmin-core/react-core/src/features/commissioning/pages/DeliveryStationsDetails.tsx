@@ -1,5 +1,4 @@
 import { useQueries } from "@tanstack/react-query";
-import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,6 +22,7 @@ import { DaySelector, WeekSelector } from "@shared/selectors";
 import { DeliveryStationSelector } from "@features/commissioning/selectors";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText, PastWarningMessage, ToolTipIcon } from "@shared/ui";
+import { ReadOnlyReportTable } from "@shared/tables";
 import {
   useVegetableSizeOptions,
   useTenant,
@@ -180,7 +180,7 @@ export default function DeliveryStationsDetails() {
     useMemo<CommissioningShareDeliveryDetailsMatrixRetrieveParams>(
       () => ({
         year: selectedYear,
-        delivery_week: selectedWeek ?? 0,
+        delivery_week: selectedWeek,
         day_number: selectedDeliveryDay ?? 0,
         delivery_station: selectedDeliveryStation ?? "",
       }),
@@ -214,7 +214,7 @@ export default function DeliveryStationsDetails() {
     useMemo<CommissioningPackingListMemberAmountsRetrieveParams>(
       () => ({
         year: selectedYear,
-        delivery_week: selectedWeek ?? 0,
+        delivery_week: selectedWeek,
         day_number: selectedDeliveryDay ?? 0,
         delivery_station: selectedDeliveryStation ?? "",
         is_packed_bulk: true,
@@ -252,7 +252,7 @@ export default function DeliveryStationsDetails() {
         ? deliveryStations.map((station) =>
             getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
               year: selectedYear,
-              delivery_week: selectedWeek!,
+              delivery_week: selectedWeek,
               day_number: selectedDeliveryDay,
               delivery_station: station.value,
             }),
@@ -268,7 +268,7 @@ export default function DeliveryStationsDetails() {
         ? deliveryStations.map((station) =>
             getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
               year: selectedYear,
-              delivery_week: selectedWeek!,
+              delivery_week: selectedWeek,
               day_number: selectedDeliveryDay,
               delivery_station: station.value,
               is_packed_bulk: true,
@@ -285,7 +285,7 @@ export default function DeliveryStationsDetails() {
     queries: weekSlots.map(({ dayNum, station }) =>
       getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions({
         year: selectedYear,
-        delivery_week: selectedWeek!,
+        delivery_week: selectedWeek,
         day_number: dayNum,
         delivery_station: station.value,
       }),
@@ -297,7 +297,7 @@ export default function DeliveryStationsDetails() {
     queries: weekSlots.map(({ dayNum, station }) =>
       getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
         year: selectedYear,
-        delivery_week: selectedWeek!,
+        delivery_week: selectedWeek,
         day_number: dayNum,
         delivery_station: station.value,
         is_packed_bulk: true,
@@ -444,13 +444,13 @@ export default function DeliveryStationsDetails() {
         <DaySelector
           selectedDay={selectedDeliveryDay}
           setSelectedDay={setSelectedDeliveryDay}
-          selectedWeek={selectedWeek!}
+          selectedWeek={selectedWeek}
           selectedYear={selectedYear}
           days={dayNumbers}
           suffix={t("commissioning.delivery_day")}
         />
       </div>
-      <div style={{ marginTop: "1em", marginLeft: "-2em" }}>
+      <div className="delivery-stations-details__station-selector">
         <DeliveryStationSelector
           selectedDeliveryStation={selectedDeliveryStation}
           setSelectedDeliveryStation={setSelectedDeliveryStation}
@@ -459,17 +459,10 @@ export default function DeliveryStationsDetails() {
         />
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          gap: "1em",
-          marginTop: "1em",
-        }}
-      >
+      <div className="delivery-stations-details__pdf-buttons">
         <DeliveryStationDetailsPDFGenerator
           pages={currentStationPages}
-          week={selectedWeek!}
+          week={selectedWeek}
           dayName={selectedDayName}
           tenant={tenantInfo}
           filename={generatePdfFilename([
@@ -487,12 +480,12 @@ export default function DeliveryStationsDetails() {
         />
         <ToolTipIcon
           title={t("tooltip.pickup_list_single_delivery_station")}
-          style={{ marginLeft: "-1em" }}
+          className="tooltip-icon-beside-button"
         />
 
         <DeliveryStationDetailsPDFGenerator
           pages={allStationsDayPages}
-          week={selectedWeek!}
+          week={selectedWeek}
           dayName={selectedDayName}
           tenant={tenantInfo}
           filename={generatePdfFilename([
@@ -507,12 +500,12 @@ export default function DeliveryStationsDetails() {
         />
         <ToolTipIcon
           title={t("tooltip.pickup_list_whole_day")}
-          style={{ marginLeft: "-1em" }}
+          className="tooltip-icon-beside-button"
         />
 
         <DeliveryStationDetailsPDFGenerator
           pages={allStationsWeekPages}
-          week={selectedWeek!}
+          week={selectedWeek}
           dayName={t("commissioning.whole_week")}
           tenant={tenantInfo}
           filename={generatePdfFilename([
@@ -526,7 +519,7 @@ export default function DeliveryStationsDetails() {
         />
         <ToolTipIcon
           title={t("tooltip.pickup_list_whole_week")}
-          style={{ marginLeft: "-1em" }}
+          className="tooltip-icon-beside-button"
         />
       </div>
 
@@ -538,27 +531,21 @@ export default function DeliveryStationsDetails() {
           {t("commissioning.packing_list_no_columns")}
         </PastWarningMessage>
       ) : (
-        <Table
+        <ReadOnlyReportTable
           columns={columns}
           dataSource={matrixRows}
           pagination={false}
-          size="small"
           loading={loading}
-          className="custom-jasmin-table w-max"
-          rowKey={(record) => record.id || record.name}
+          className="custom-jasmin-table w-max mt-2em"
+          rowKey="id"
           bordered
-          style={{ width: "max-content", marginTop: "2em" }}
-          locale={{
-            emptyText: (
-              <div style={{ height: "4em" }}>
-                {matrixFailed
-                  ? t("common.error_loading_data")
-                  : selectedDeliveryStation
-                    ? t("table.no_data")
-                    : t("commissioning.select_delivery_station")}
-              </div>
-            ),
-          }}
+          emptyText={
+            matrixFailed
+              ? t("common.error_loading_data")
+              : selectedDeliveryStation
+                ? t("table.no_data")
+                : t("commissioning.select_delivery_station")
+          }
         />
       )}
 

@@ -21,6 +21,7 @@ import type {
 } from "@shared/api/generated/models";
 import { DaySelector, WeekSelector } from "@shared/selectors";
 import { EmptyHint, ExplainerText, PastWarningMessage } from "@shared/ui";
+import { ReadOnlyReportTable } from "@shared/tables";
 import {
   activeAtDateForWeek,
   formatDayLabel,
@@ -28,7 +29,7 @@ import {
   generatePdfFilename,
   getDayName,
 } from "@shared/utils";
-import { Spin, Table } from "antd";
+import { Spin } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
@@ -153,17 +154,15 @@ function TourTable({
   );
 
   return (
-    <div style={{ marginTop: "4em", marginBottom: "2em" }}>
+    <div className="delivery-stations-overview__tour">
       <h3>{t("commissioning.tour_number", { number: tourNumber })}</h3>
-      <Table
+      <ReadOnlyReportTable
         columns={columns}
         dataSource={stations}
         pagination={false}
-        size="small"
         className="custom-jasmin-table w-max"
-        rowKey={(record) => record.delivery_station_day_id}
+        rowKey="delivery_station_day_id"
         bordered
-        locale={{ emptyText: <EmptyHint>{t("table.no_data")}</EmptyHint> }}
       />
     </div>
   );
@@ -223,7 +222,7 @@ export default function DeliveryStationsOverview() {
     useMemo<CommissioningDeliveryStationToursOverviewRetrieveParams>(
       () => ({
         year: selectedYear,
-        delivery_week: selectedWeek ?? 0,
+        delivery_week: selectedWeek,
         day_number: selectedDeliveryDay ?? 0,
       }),
       [selectedYear, selectedWeek, selectedDeliveryDay],
@@ -292,7 +291,7 @@ export default function DeliveryStationsOverview() {
       <DaySelector
         selectedDay={selectedDeliveryDay}
         setSelectedDay={setSelectedDeliveryDay}
-        selectedWeek={selectedWeek!}
+        selectedWeek={selectedWeek}
         selectedYear={selectedYear}
         days={dayNumbers}
         suffix={t("commissioning.delivery_day")}
@@ -301,14 +300,14 @@ export default function DeliveryStationsOverview() {
       {/* PDF Download — combination-based, so only for subscription tenants
           (import tenants have no combos; the on-page flat view covers them). */}
       {showTours && tours.length > 0 && !usesExternalDemand && (
-        <div style={{ marginTop: "3em" }}>
+        <div className="delivery-stations-overview__pdf">
           <DeliveryStationsOverviewPDFGenerator
             tours={tours.map((tour) => ({
               tour_number: tour.tour_number,
               columns: tour.columns,
               stations: tour.stations,
             }))}
-            week={selectedWeek!}
+            week={selectedWeek}
             dayName={
               selectedDeliveryDay !== null
                 ? getDayName(selectedDeliveryDay, t)

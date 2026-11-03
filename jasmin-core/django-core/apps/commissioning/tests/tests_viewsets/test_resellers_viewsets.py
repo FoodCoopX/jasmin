@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.db import connection
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -16,6 +17,7 @@ from apps.commissioning.models import (
     CrateDeliveryNoteContent,
     CrateOrderContent,
     InvoiceResellerContent,
+    OfferGroup,
     Order,
     OrganicCertificate,
     Reseller,
@@ -31,9 +33,11 @@ from apps.commissioning.tests.factories import (
     OfferGroupFactory,
     OrderContentFactory,
     OrderFactory,
+    OrdersDeliveryDayFactory,
     ResellerFactory,
     ShareArticleFactory,
 )
+from apps.commissioning.tests.tests_services.test_einvoice_upload import cii_invoice
 
 
 # ---------------------------------------------------------------------------
@@ -501,6 +505,52 @@ class TestOfferGroupViewSet:
         resp = api_client.get(self.URL)
         assert len(resp.data) >= 1
 
+    def test_a_group_carries_no_active_flag(self, api_client, tenant):
+        OfferGroupFactory()
+        resp = api_client.get(self.URL)
+        assert resp.status_code == status.HTTP_200_OK
+        assert all("is_active" not in row for row in resp.data)
+
+    def test_an_active_flag_in_the_query_is_ignored(self, api_client, tenant):
+        # A browser still running an earlier bundle may send it.
+        group = OfferGroupFactory()
+        resp = api_client.get(self.URL, {"is_active": "false"})
+        assert resp.status_code == status.HTTP_200_OK
+        assert group.pk in {row["id"] for row in resp.data}
+
+    def test_a_create_carrying_an_active_flag_is_accepted(self, api_client, tenant):
+        # An earlier bundle still sends ``is_active``; the serializer drops it.
+        resp = api_client.post(
+            self.URL,
+            {"number": 4711, "name": "Kantinen", "is_active": False},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        assert "is_active" not in resp.data
+        assert OfferGroup.objects.get(pk=resp.data["id"]).name == "Kantinen"
+
+    def test_an_update_carrying_an_active_flag_is_accepted(self, api_client, tenant):
+        group = OfferGroupFactory()
+        resp = api_client.patch(
+            reverse("offer_group-detail", args=[group.pk]),
+            {"name": "Gastro", "is_active": False},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        group.refresh_from_db()
+        assert group.name == "Gastro"
+
+    def test_the_kept_column_defaults_to_active(self, tenant):
+        # The column stays for releases that still read it; an insert from
+        # this code leaves it out, so the database fills in ``true``.
+        group = OfferGroupFactory()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT is_active FROM commissioning_offergroup WHERE id = %s",
+                [group.pk],
+            )
+            assert cursor.fetchone() == (True,)
+
 
 # ---------------------------------------------------------------------------
 # OfferViewSet
@@ -602,6 +652,60 @@ class TestOrderContentViewSet:
         assert resp.status_code == status.HTTP_200_OK, resp.data
         order_content = OrderContent.objects.get(offer=offer)
         assert order_content.tax_rate is not None
+
+    def _article_line_with_empty_days(self, reseller, share_article):
+        """An article line as the Orders page sends it for a new order whose
+        day selectors are empty."""
+        return {
+            "share_article": str(share_article.id),
+            "reseller": str(reseller.id),
+            "year": 2026,
+            "delivery_week": 15,
+            "day_number": 3,
+            "amount": "12",
+            "price_per_unit": "2.5",
+            "unit": "KG",
+            "size": "M",
+            "harvesting_day": None,
+            "packing_day": None,
+            "washing_day": None,
+            "cleaning_day": None,
+        }
+
+    def test_create_with_empty_days_and_no_defaults_names_the_missing_day(
+        self, api_client, tenant
+    ):
+        reseller = ResellerFactory()
+        body = self._article_line_with_empty_days(reseller, ShareArticleFactory())
+
+        resp = api_client.post(self.URL, body, format="json")
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST, resp.data
+        assert resp.data["code"] == "order.day_missing"
+        assert resp.data["details"] == {"context": "harvesting_day", "day_number": 3}
+        assert not Order.objects.filter(reseller=reseller).exists()
+
+    def test_create_with_empty_days_takes_the_order_defaults(self, api_client, tenant):
+        OrdersDeliveryDayFactory(
+            day_number=3,
+            default_harvesting_day=1,
+            default_packing_day=3,
+            default_washing_day=2,
+            default_cleaning_day=2,
+        )
+        reseller = ResellerFactory()
+        body = self._article_line_with_empty_days(reseller, ShareArticleFactory())
+
+        resp = api_client.post(self.URL, body, format="json")
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        order = Order.objects.get(reseller=reseller)
+        assert (
+            order.harvesting_day,
+            order.packing_day,
+            order.washing_day,
+            order.cleaning_day,
+        ) == (1, 3, 2, 2)
 
     # The Orders page (``useOrdersData`` + ``useOrderColumns`` custom saves)
     # sends the whole edited row: EditableTable seeds the form with every key
@@ -1504,72 +1608,94 @@ _HOSTILE_EINVOICE_XML = (
     b"<invoice>&payload;</invoice>"
 )
 
-_MATCHING_EINVOICE_XML = (
-    b'<rsm:Invoice xmlns:rsm="urn:example">'
-    b"<rsm:ExchangedDocument><rsm:ID>RE-2026-7</rsm:ID></rsm:ExchangedDocument>"
-    b"<rsm:GrandTotalAmount>10.00</rsm:GrandTotalAmount>"
-    b"</rsm:Invoice>"
-)
-
-
-class TestVerifyEinvoiceXmlMatches:
-    """Which uploaded e-invoice bodies block an upload and which are tolerated."""
-
-    @staticmethod
-    def _verify(raw: bytes, *, number=7, sum_brutto=Decimal("10.00")):
-        from io import BytesIO
-        from types import SimpleNamespace
-
-        from apps.commissioning.viewsets.resellers_viewsets import (
-            _verify_einvoice_xml_matches,
-        )
-
-        document = SimpleNamespace(number=number, sum_brutto=sum_brutto)
-        return _verify_einvoice_xml_matches(document, BytesIO(raw))
-
-    def test_a_matching_body_passes(self):
-        assert self._verify(_MATCHING_EINVOICE_XML) is None
-
-    def test_a_wrong_number_is_reported(self):
-        raw = _MATCHING_EINVOICE_XML.replace(b"RE-2026-7", b"RE-2026-8")
-
-        assert "number" in self._verify(raw)
-
-    def test_a_malformed_body_is_tolerated(self):
-        assert self._verify(b"<invoice") is None
-
-    def test_a_body_defusedxml_refuses_blocks_the_upload(self):
-        assert self._verify(_HOSTILE_EINVOICE_XML) is not None
-
 
 @pytest.mark.django_db
 class TestInvoiceEinvoiceXmlUpload:
-    def test_an_xml_defusedxml_refuses_is_rejected(self, api_client, tenant):
+    """The invoice upload stores the e-invoice XML sent with it only when that is
+    a CII invoice and nothing a browser could run. Which bodies pass is covered
+    body by body in ``tests_services/test_einvoice_upload.py``."""
+
+    @staticmethod
+    def _upload(api_client, invoice, xml: bytes):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        invoice = InvoiceResellerFactory(is_finalized=True)
-        url = reverse("invoices-upload-pdf", kwargs={"pk": invoice.pk})
-
-        resp = api_client.post(
-            url,
+        return api_client.post(
+            reverse("invoices-upload-pdf", kwargs={"pk": invoice.pk}),
             {
                 "file": SimpleUploadedFile(
                     "invoice.pdf", b"%PDF-1.4 minimal", content_type="application/pdf"
                 ),
                 "xml_file": SimpleUploadedFile(
-                    "invoice.xml",
-                    _HOSTILE_EINVOICE_XML,
-                    content_type="application/xml",
+                    "invoice.xml", xml, content_type="application/xml"
                 ),
             },
             format="multipart",
         )
+
+    @staticmethod
+    def _cii_invoice_of(invoice, **parts) -> bytes:
+        """A CII invoice stating ``invoice``'s number and total, so nothing but
+        ``parts`` can stand in the way of storing it."""
+        return cii_invoice(
+            document_id=f"{invoice.prefix}-{invoice.number}",
+            grand_total=f"{invoice.sum_brutto:.2f}",
+            **parts,
+        )
+
+    def _assert_refused(self, api_client, invoice, xml: bytes):
+        resp = self._upload(api_client, invoice, xml)
 
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
         assert resp.data["code"] == "uploaded_document.invalid"
         assert resp.data["field"] == "xml_file"
         invoice.refresh_from_db()
         assert not invoice.file
+        assert not invoice.xml_file
+
+    @pytest.mark.parametrize(
+        "xml",
+        [
+            _HOSTILE_EINVOICE_XML,
+            b'<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+            b"<script>alert(1)</script></body></html>",
+            b"<invoice",
+        ],
+        ids=["external-entity", "xhtml", "malformed"],
+    )
+    def test_an_xml_that_is_not_a_cii_invoice_is_refused(self, api_client, tenant, xml):
+        self._assert_refused(api_client, InvoiceResellerFactory(is_finalized=True), xml)
+
+    @pytest.mark.parametrize(
+        "parts",
+        [
+            {
+                "inside": '<h:script xmlns:h="http://www.w3.org/1999/xhtml">'
+                "alert(1)</h:script>"
+            },
+            {"prolog": '<?xml-stylesheet type="text/xsl" href="#x"?>\n'},
+        ],
+        ids=["script", "stylesheet"],
+    )
+    def test_a_cii_invoice_a_browser_would_run_is_refused(
+        self, api_client, tenant, parts
+    ):
+        invoice = InvoiceResellerFactory(is_finalized=True)
+
+        self._assert_refused(
+            api_client, invoice, self._cii_invoice_of(invoice, **parts)
+        )
+
+    def test_the_invoices_cii_invoice_is_stored(self, api_client, tenant):
+        invoice = InvoiceResellerFactory(is_finalized=True)
+        xml = self._cii_invoice_of(invoice)
+
+        resp = self._upload(api_client, invoice, xml)
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        invoice.refresh_from_db()
+        assert invoice.file
+        with invoice.xml_file.open("rb") as stored:
+            assert stored.read() == xml
 
 
 # ---------------------------------------------------------------------------

@@ -326,12 +326,45 @@
 }
 
 .changed-day {
-  color: #a8071a;
+  color: var(--color-error-text);
   font-weight: bold;
 }
 
 .read-only-amounts-planning {
   font-size: 0.85em !important;
+}
+
+/* A harvest share planning amount cell. Highlighted while it is empty but a
+   forecast assigns its variation. */
+.planning-variation-cell {
+  padding: 4px;
+  border-radius: 2px;
+  min-height: 20px;
+}
+
+.planning-variation-cell-highlight {
+  background-color: var(--color-highlight);
+}
+
+/* A harvest share planning row scaffolded from a forecast (bold) or backed by
+   leftover stock (normal weight); see planningRowEmphasis.ts. */
+.planning-row-forecast {
+  color: var(--color-planning-row-highlight);
+  font-weight: bold;
+}
+
+.planning-row-stock {
+  color: var(--color-planning-row-highlight);
+  font-weight: normal;
+}
+
+.still-free-ok {
+  color: var(--color-success-text);
+}
+
+.still-free-over-planned {
+  color: var(--color-error-text);
+  font-weight: bold;
 }
 
 .joker-taken-row,
@@ -504,4 +537,19 @@
 .ant-tag.email-status-tag {
   white-space: normal;
   max-width: 100%;
+}
+
+/* An inline-edit cell keeps its error message out of the borderless layout
+   but in the explain node AntD's Form.Item points the control's
+   aria-describedby at, so screen readers still read it. */
+.editable-cell-form-item .ant-form-item-explain {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -25,6 +25,7 @@ import {
   termCapacity,
   termWeekKeys,
 } from "@features/abos/utils/stationCapacity";
+import { offerErrorMessage } from "@features/abos/utils/offerErrorMessage";
 import { EditableTable, wrapApiFunctions } from "@shared/tables";
 import type {
   ApiFunctions,
@@ -47,7 +48,6 @@ import { useAdminConfirmationModalAbos } from "@features/abos/hooks/modals/useAd
 import { useSharedAboColumns } from "@features/abos/hooks/columns/useSharedAboColumns";
 import { notify, toApiDate } from "@shared/utils";
 import { parseDateLoose } from "@shared/utils/endOfTerm";
-import { getErrorCode, getErrorMessage } from "@shared/utils/apiError";
 import type { AboRecord } from "./types";
 
 export default function WaitingListAbos() {
@@ -264,21 +264,17 @@ export default function WaitingListAbos() {
     ) => {
       if (!value) return {};
 
-      try {
-        const selectedVariation = allShareTypeVariations.find(
-          (variation) => variation.value === value,
-        );
+      const selectedVariation = allShareTypeVariations.find(
+        (variation) => variation.value === value,
+      );
 
-        if (selectedVariation && selectedVariation.active_price_per_delivery) {
-          form.setFieldsValue({
-            price_per_delivery: selectedVariation.active_price_per_delivery,
-          });
-          return {
-            price_per_delivery: selectedVariation.active_price_per_delivery,
-          };
-        }
-      } catch (error) {
-        console.error("Error setting weekly_price:", error);
+      if (selectedVariation && selectedVariation.active_price_per_delivery) {
+        form.setFieldsValue({
+          price_per_delivery: selectedVariation.active_price_per_delivery,
+        });
+        return {
+          price_per_delivery: selectedVariation.active_price_per_delivery,
+        };
       }
 
       return {};
@@ -292,7 +288,7 @@ export default function WaitingListAbos() {
   // termCapacity evaluator the modal / abos-select / overview use. Offering
   // holds the slot, so an already-offered (SPOT_AVAILABLE) row reads as full
   // here and can't be double-offered.
-  const offerMutation = useCommissioningAbosOfferSpotCreate();
+  const offerMutation = useCommissioningAbosOfferSpotCreate({ mutation: { meta: { silent: true } } });
 
   const variationById = useMemo(() => {
     const map = new Map<string, (typeof allShareTypeVariations)[number]>();
@@ -372,16 +368,7 @@ export default function WaitingListAbos() {
             invalidateData();
           },
           onError: (error) => {
-            const code = getErrorCode(error);
-            notify.error(
-              code === "share_type_variation.over_capacity"
-                ? t("abos.offer_variation_full")
-                : code === "delivery_station.over_capacity"
-                  ? t("abos.offer_station_full")
-                  : code === "onboarding_mode.email_action_blocked"
-                    ? getErrorMessage(error, t("abos.offer_failed"))
-                    : t("abos.offer_failed"),
-            );
+            notify.error(offerErrorMessage(error, t));
           },
         },
       );

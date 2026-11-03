@@ -22,13 +22,15 @@ import {
 } from "@shared/tables";
 import type {
   ApiFunctions,
+  EditableColumnConfig,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText } from "@shared/ui";
 import { DELIVERY_DAY_SHORT_KEYS } from "@shared/utils/weekdayNames";
 import { useNoteColumn } from "@hooks/index";
 
-type Mapping = TableRecord & ExternalCodeMapping & { id: string };
+// A row being added carries none of the mapping's fields yet.
+type MappingRow = TableRecord & Partial<Omit<ExternalCodeMapping, "id">>;
 
 interface SelectOption {
   value: string;
@@ -53,16 +55,14 @@ export default function ExternalCodeMappingsModal({
 
   // React Query handles the initial load + caching. ``enabled: open``
   // keeps it idle until the modal is shown; ``onDataChange`` below
-  // refetches after EditableTable mutations land.
-  // ``kind`` is typed as required on the generated params, but the
-  // backend returns ALL mappings when omitted (which is what this modal
-  // wants). Cast to keep the original runtime behavior.
+  // refetches after EditableTable mutations land. Without ``kind`` the
+  // backend returns every mapping, which is what this modal lists.
   const {
     data: mappingsData,
     isLoading,
     refetch,
   } = useCommissioningExternalCodeMappingsList(
-    {} as Parameters<typeof useCommissioningExternalCodeMappingsList>[0],
+    {},
     { query: { enabled: open } },
   );
   const data = useMemo<TableRecord[]>(
@@ -86,17 +86,25 @@ export default function ExternalCodeMappingsModal({
     { query: { enabled: open } },
   );
 
+  // Dated like the delivery days: a variation replaced from a week on and
+  // its successor share their name and size, and the weekly import asks the
+  // office to map the version valid then.
   const variationOptions = useMemo<SelectOption[]>(
     () =>
       (variationsData ?? []).map((v) => {
         const sizeLabel = getShareTypeVariationSizeLabel(v.size);
-        const parts = [v.share_type_name, sizeLabel].filter(Boolean);
+        const name =
+          [v.share_type_name, sizeLabel].filter(Boolean).join(" · ") ||
+          t("import_shares.mappings.no_label");
+        const validity = [formatDate(v.valid_from), formatDate(v.valid_until)]
+          .filter(Boolean)
+          .join(" → ");
         return {
           value: v.id as string,
-          label: `${v.id} — ${parts.join(" · ") || t("import_shares.mappings.no_label")}`,
+          label: `${v.id} — ${[name, validity].filter(Boolean).join(" · ")}`,
         };
       }),
-    [variationsData, getShareTypeVariationSizeLabel, t],
+    [variationsData, getShareTypeVariationSizeLabel, t, formatDate],
   );
 
   const stationOptions = useMemo<SelectOption[]>(
@@ -170,20 +178,15 @@ export default function ExternalCodeMappingsModal({
     [variationOptions, stationOptions, dayOptions],
   );
 
+  // Only the mapping's own kind names its object: an id of another kind's
+  // object is one the import can't resolve, so it shows as the bare id.
   const internalIdLabel = (kind: string | undefined, id: string) => {
     if (!id) return "";
-    // Try the kind-specific list first, then fall back to all options
     const kindList = kind ? (optionsByKind[kind] ?? []) : [];
-    const allOptions = [...variationOptions, ...stationOptions, ...dayOptions];
-    return (
-      (
-        kindList.find((o) => o.value === id) ??
-        allOptions.find((o) => o.value === id)
-      )?.label ?? id
-    );
+    return kindList.find((o) => o.value === id)?.label ?? id;
   };
 
-  const columns: any[] = [
+  const columns: EditableColumnConfig<MappingRow>[] = [
     {
       title: <>{t("import_shares.mappings.kind")}</>,
       dataIndex: "kind",
@@ -194,7 +197,7 @@ export default function ExternalCodeMappingsModal({
       width: "14em",
       align: "left",
       sortable: true,
-      render: (v: string) => kindLabel(v),
+      render: (v) => kindLabel(String(v ?? "")),
       // When kind changes during edit, clear internal_id (old id no longer valid)
       onFieldChange: () => ({ internal_id: undefined }),
     },
@@ -216,15 +219,15 @@ export default function ExternalCodeMappingsModal({
       // Dynamic options based on the kind currently selected on this row
       // (form values, not just the persisted record). When kind isn't set
       // yet, fall back to the union so the column is never empty/disabled.
-      options: (record: Mapping) => {
-        const kind = record.kind as string | undefined;
+      options: (record) => {
+        const kind = record.kind;
         if (kind && optionsByKind[kind]) return optionsByKind[kind];
         return [...variationOptions, ...stationOptions, ...dayOptions];
       },
       required: true,
       width: "35em",
       align: "left",
-      render: (v: unknown, record: Mapping) =>
+      render: (v, record) =>
         internalIdLabel(record.kind, String(v ?? "")),
     },
     noteColumn,
@@ -252,7 +255,7 @@ export default function ExternalCodeMappingsModal({
         onDeleteSuccess={() => void refetch()}
         focusIndex="external_code"
         uniqueCheck={["kind", "external_code"]}
-        uniqueCheckMessage={t("validation.unique.name")}
+        uniqueCheckMessage={t("validation.unique.external_code_mapping")}
         permissions={permissions}
       />
 

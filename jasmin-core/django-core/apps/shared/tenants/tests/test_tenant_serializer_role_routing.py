@@ -72,6 +72,8 @@ SHARED_FIELDS = (
     # Settings overlay
     "settings",
     "current_settings",
+    # What the deployment offers; every role's UI hides the rest.
+    "capabilities",
 )
 
 

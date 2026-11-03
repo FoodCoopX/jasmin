@@ -3,7 +3,7 @@ import {
   SettingsRenderer,
 } from "@features/configuration/components/SettingsRenderer";
 import { AppIconSettings } from "@features/configuration/components/AppIconSettings";
-import { useAutoSave, useTenant } from "@hooks/index";
+import { useAutoSave, useCapability, useTenant } from "@hooks/index";
 import type { Tenant } from "@shared/api/generated/models";
 import { tenantsTenantsPartialUpdate } from "@shared/api/generated/tenants/tenants";
 import type { Writable } from "@shared/api/typeHelpers";
@@ -51,6 +51,13 @@ const TENANT_LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((language) => ({
   label: `${language.name} (${language.code.toUpperCase()})`,
 }));
 
+function resolveMediaUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.startsWith("http")
+    ? value
+    : `${import.meta.env.VITE_API_URL || ""}${value}`;
+}
+
 export default function ConfigurationGeneral() {
   const [tenantData, setTenantData] = useState<TenantFormState>({});
   const [settings, setSettings] = useState<Record<string, unknown>>({});
@@ -58,18 +65,14 @@ export default function ConfigurationGeneral() {
 
   const { t } = useTranslation();
   const { tenant, refreshTenant } = useTenant();
+  // A host application isn't installed as jasmin's app, so the icon and short
+  // name have nothing to do there.
+  const offersWebApp = useCapability("web_app");
 
   // Branding uploads (logo + organic logo) go through the shared multipart
   // picture-upload hook — a separate, immediate PATCH decoupled from the JSON
   // autosave of the scalar fields below.
   const tenantEndpoint = `/api/tenants/tenants/${tenant?.id ?? ""}/`;
-
-  const resolveMediaUrl = (value: string | null | undefined): string | null =>
-    value
-      ? value.startsWith("http")
-        ? value
-        : `${import.meta.env.VITE_API_URL || ""}${value}`
-      : null;
 
   const logoPreviewUrl = resolveMediaUrl(tenant?.logo);
   const bioLogoPreviewUrl = resolveMediaUrl(tenant?.bio_logo);
@@ -318,6 +321,10 @@ export default function ConfigurationGeneral() {
     ],
     [t],
   );
+  // A host application publishes its own legal notice.
+  const shownCategories = useCapability("legal_notice")
+    ? tenantFieldsConfig
+    : tenantFieldsConfig.filter((c) => c.category !== "legal_notice");
 
   // Sync state from tenant data
   const tenantIdRef = useRef(tenant?.id);
@@ -385,7 +392,7 @@ export default function ConfigurationGeneral() {
     // (TenantContext memoizes the value, so this only re-fires on a real data
     // change.) ``hasChanges``/``saving`` are intentionally omitted so merely
     // toggling them never re-seeds over a fresh draft.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seeds on tenant data, not on draft state
   }, [tenant]);
 
   // Stable refs for save handler
@@ -439,11 +446,7 @@ export default function ConfigurationGeneral() {
       // new file column can never be forgotten by only one save path.
       const tenantFields = withoutTenantFileFields(currentTenantData);
 
-      // Directional cast at the orval boundary: the autosave sends a
-      // partial snapshot while the generated body type requires
-      // ``name`` — the field names/types themselves are checked by
-      // ``TenantFormState``.
-      await tenantsTenantsPartialUpdate(tenantId, tenantFields as Tenant);
+      await tenantsTenantsPartialUpdate(tenantId, tenantFields);
 
       // Pull the freshly-saved tenant row into TenantContext so the
       // form's next read of ``tenant.<field>`` reflects what's in the
@@ -503,7 +506,7 @@ export default function ConfigurationGeneral() {
       <Space direction="vertical" size="middle" className="w-full">
         {/* Tenant Fields. The branding/upload card is rendered right after the
             "organization" (Sonstiges) card rather than at the very bottom. */}
-        {tenantFieldsConfig.map((category) => (
+        {shownCategories.map((category) => (
           <Fragment key={category.category}>
             <Card
               title={category.title}
@@ -573,26 +576,28 @@ export default function ConfigurationGeneral() {
                       </div>
                     </div>
                   </Col>
-                  <Col xs={24} md={8}>
-                    <div style={{ padding: "4px 0" }}>
-                      <AppIconSettings
-                        iconUrl={appIconPreviewUrl}
-                        iconUploading={appIconUploading}
-                        onIconUpload={uploadAppIcon}
-                        shortName={String(
-                          getTenantFieldValue("app_short_name", ""),
-                        )}
-                        onShortNameChange={(value) =>
-                          handleTenantFieldChange(
-                            "app_short_name",
-                            value,
-                            "input",
-                          )
-                        }
-                        tenantName={tenant?.name ?? ""}
-                      />
-                    </div>
-                  </Col>
+                  {offersWebApp && (
+                    <Col xs={24} md={8}>
+                      <div style={{ padding: "4px 0" }}>
+                        <AppIconSettings
+                          iconUrl={appIconPreviewUrl}
+                          iconUploading={appIconUploading}
+                          onIconUpload={uploadAppIcon}
+                          shortName={String(
+                            getTenantFieldValue("app_short_name", ""),
+                          )}
+                          onShortNameChange={(value) =>
+                            handleTenantFieldChange(
+                              "app_short_name",
+                              value,
+                              "input",
+                            )
+                          }
+                          tenantName={tenant?.name ?? ""}
+                        />
+                      </div>
+                    </Col>
+                  )}
                 </Row>
               </Card>
             )}

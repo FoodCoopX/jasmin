@@ -4,7 +4,11 @@ import {
   commissioningOrderContentsCreate,
   commissioningOrderContentsPartialUpdate,
 } from "@shared/api/generated/commissioning/commissioning";
-import type { OrderContent, UnitEnum } from "@shared/api/generated/models";
+import type {
+  OrderContent,
+  PatchedOrderContent,
+  UnitEnum,
+} from "@shared/api/generated/models";
 import type { Writable } from "@shared/api/typeHelpers";
 import { notify, pickTierPrice } from "@shared/utils";
 import {
@@ -24,6 +28,12 @@ interface Params {
   selectedWeek: number;
   selectedDay: number;
   finalTiers: number[];
+  /**
+   * Whether the caller prices the lines it saves, as the office does on its
+   * route to this page. The server prices a customer's lines itself from the
+   * offer's tiers, so a customer's save carries no price.
+   */
+  setsPrice: boolean;
   invalidateOrders: () => void;
 }
 
@@ -33,6 +43,7 @@ export function useCustomerOrderMutations({
   selectedWeek,
   selectedDay,
   finalTiers,
+  setsPrice,
   invalidateOrders,
 }: Params) {
   const { t } = useTranslation();
@@ -101,19 +112,23 @@ export function useCustomerOrderMutations({
       if (amount == null) return;
 
       const amountPerPu = Number(record.amount_per_pu) || 1;
-      const price = calculatePricePerUnit(amount > 0 ? amount : 0, record);
       const computedAmount = (amount * amountPerPu).toFixed(3);
+      const pricing = setsPrice
+        ? {
+            price_per_unit: String(
+              calculatePricePerUnit(amount > 0 ? amount : 0, record),
+            ),
+          }
+        : {};
 
       if (record.order_content_id) {
-        const patch: Partial<Writable<OrderContent>> = {
+        const patch: PatchedOrderContent = {
           amount: computedAmount,
-          price_per_unit: String(price),
+          ...pricing,
         };
         await commissioningOrderContentsPartialUpdate(
           record.order_content_id,
-          // PATCH sends a partial body against the generated full-model
-          // signature — single directional cast at the orval boundary.
-          patch as OrderContent,
+          patch,
         );
         return;
       }
@@ -126,7 +141,7 @@ export function useCustomerOrderMutations({
         day_number: selectedDay,
         reseller: resellerId,
         amount: computedAmount,
-        price_per_unit: String(price),
+        ...pricing,
         // List rows carry the unit as a plain string; the values are
         // the backend's UnitEnum members.
         unit: record.unit as UnitEnum,
@@ -136,6 +151,7 @@ export function useCustomerOrderMutations({
     [
       orderAmounts,
       calculatePricePerUnit,
+      setsPrice,
       resellerId,
       selectedYear,
       selectedWeek,

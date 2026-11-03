@@ -28,7 +28,10 @@ class TestSeededRunbooks:
             ("csp_audit", "nginx/security_headers.conf"),
             ("rotate_django_secret", "DJANGO_SECRET_KEY_FALLBACK"),
             ("rotate_db_password", "docker compose exec postgres"),
+            ("rotate_db_password", "APP_DB_PASSWORD"),
             ("rotate_backup_encryption_key", "old key"),
+            ("rotate_bunny_token", "BUNNY_ORIGIN_SECRET_NEXT"),
+            ("rotate_bunny_token", "./scripts/validate_gateway_config.sh"),
         ],
     )
     def test_runbook_names_the_current_procedure(self, _tenant_schema, kind, expected):

@@ -48,7 +48,6 @@ import {
 } from "@features/commissioning/components/mobileCards";
 import { PackingBoxesMatrixPDFGenerator } from "@features/commissioning/pdfs";
 import {
-  currentWeek,
   useIsMobile,
   useNumberFormat,
   useTenant,
@@ -63,8 +62,6 @@ import {
   getDayName,
   isWeekInPast,
 } from "@shared/utils";
-
-const currentDay = dayjs().isoWeekday();
 
 /** The matrix the page shows: the boxes of each combination, or — for a farm
  *  that uploads its weekly share amounts — the amounts per share. */
@@ -107,7 +104,7 @@ function usePackingScope({
   dayNumber: number | null;
   dayRecord: ShareDeliveryDayOption | undefined;
 }) {
-  const [selectedTour, setSelectedTour] = useState<number | "all">("all");
+  const [selectedTour, setSelectedTour] = useState<number | "all" | null>("all");
   const { daysOk, toursOk } = useShareContentGranularity({
     year,
     delivery_week: week ?? undefined,
@@ -120,10 +117,10 @@ function usePackingScope({
 
   // The tour picker offers only the day's tours, so the list asks for one of
   // them from the start: the first until another is picked, and the first
-  // again when the picked one isn't among the day's.
+  // again when the picked one isn't among the day's or none is picked.
   const effectiveTour = useMemo<number | undefined>(() => {
     if (!tourSelectorActive) return undefined;
-    return selectedTour !== "all" && selectedTour <= numberOfTours
+    return typeof selectedTour === "number" && selectedTour <= numberOfTours
       ? selectedTour
       : 1;
   }, [tourSelectorActive, selectedTour, numberOfTours]);
@@ -148,7 +145,7 @@ function usePackingScope({
 }
 
 /**
- * Packing boxes MATRIX (v2 of PackingListBoxes).
+ * Packing boxes MATRIX.
  *
  * Columns are the distinct box COMBINATIONS that actually occur — a base box
  * (non-additional share) plus the add-ons ("Zusatz") packed into it — derived
@@ -157,19 +154,18 @@ function usePackingScope({
  * share_articles; each cell is the per-box quantity of that article in that
  * combination. The pinned first row is the box count per combination.
  *
- * Scope + granularity mirror PackingListBoxes: the tenant's ShareContent
- * granularity decides which scope selector is needed — nothing when every day
- * has the same amounts (days_ok), a tour selector when amounts are tour- but
- * not day-consistent, and a required delivery-station selector otherwise. The
- * count row follows whichever scope is active.
+ * Scope: the tenant's ShareContent granularity decides which scope selector
+ * is needed — nothing when every day has the same amounts (days_ok), a tour
+ * selector when amounts are tour- but not day-consistent, and a required
+ * delivery-station selector otherwise. The count row follows whichever scope
+ * is active.
  */
 export default function PackingListBoxes() {
   const { t } = useTranslation();
   const { getSetting } = useTenant();
   const isMobile = useIsMobile();
 
-  // Shared identity columns (article / unit / size + note) — the SAME left
-  // columns PackingListBoxes uses.
+  // Shared identity columns (article / unit / size + note).
   const { baseColumns, noteColumn, withUnitSizeLabels } =
     usePackingBaseColumns();
 
@@ -187,10 +183,14 @@ export default function PackingListBoxes() {
   ) as boolean;
 
   // --- Filters (scope). No ShareType selector — all share types at once. ---
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedWeek,
+    setSelectedWeek,
+  } = useYearWeekState();
   const [selectedDeliveryDay, setSelectedDeliveryDay] = useState<number | null>(
-    currentDay - 1,
+    () => dayjs().isoWeekday() - 1,
   );
 
   const isPast = useMemo(
@@ -262,7 +262,7 @@ export default function PackingListBoxes() {
     useMemo<CommissioningPackingListBoxesMatrixRetrieveParams>(
       () => ({
         year: selectedYear,
-        delivery_week: selectedWeek ?? currentWeek,
+        delivery_week: selectedWeek,
         day_number: selectedDeliveryDay ?? 0,
         delivery_station: needsStation
           ? (selectedDeliveryStation ?? undefined)
@@ -379,7 +379,7 @@ export default function PackingListBoxes() {
         <DaySelector
           selectedDay={selectedDeliveryDay}
           setSelectedDay={setSelectedDeliveryDay}
-          selectedWeek={selectedWeek ?? currentWeek}
+          selectedWeek={selectedWeek}
           selectedYear={selectedYear}
           days={deliveryDayOptions}
           suffix={t("commissioning.delivery_day")}
@@ -403,10 +403,7 @@ export default function PackingListBoxes() {
       </MobileStack>
 
       {!isMobile && (
-        <div
-          className="section-divider"
-          style={{ display: "flex", gap: "1em" }}
-        >
+        <div className="section-divider flex-row gap-1em">
           <PackingBoxesMatrixPDFGenerator
             columns={matrixColumns.length ? matrixColumns : null}
             data={rows.length ? rows : null}

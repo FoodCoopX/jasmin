@@ -31,7 +31,6 @@ import { ExplainerText, MobileStack, PastWarningMessage } from "@shared/ui";
 import { AddShareArticleEntry } from "@features/commissioning/components";
 import { useRoles } from "@shared/auth";
 import {
-  currentWeek,
   useInvalidateAfterTableMutation,
   useNoteColumn,
   useYearWeekState,
@@ -42,17 +41,21 @@ import {
   useShareArticles,
 } from "@features/commissioning/hooks";
 
-const currentDay = dayjs().isoWeekday();
-
 const shareArticleFilters = {
   is_active: true,
 };
 
 export default function DocumentationWaste() {
   const { isStaff } = useRoles();
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
-  const [selectedDay, setSelectedDay] = useState<number | null>(currentDay - 1);
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedWeek,
+    setSelectedWeek,
+  } = useYearWeekState();
+  const [selectedDay, setSelectedDay] = useState<number | null>(
+    () => dayjs().isoWeekday() - 1,
+  );
   const [selectedStorage, setSelectedStorage] = useState<string | null>(null);
   const isPast = useMemo(
     () => isWeekInPast(selectedYear, selectedWeek),
@@ -60,8 +63,12 @@ export default function DocumentationWaste() {
   );
   const queryClient = useQueryClient();
   const permissions = useMemo(
-    () => gatedByPermission(isStaff && !isPast),
-    [isStaff, isPast],
+    () => ({
+      ...gatedByPermission(isStaff && !isPast),
+      // A new row needs a storage to stamp on it.
+      canAdd: isStaff && !isPast && selectedStorage !== null,
+    }),
+    [isStaff, isPast, selectedStorage],
   );
 
   const { noteColumn } = useNoteColumn();
@@ -74,14 +81,10 @@ export default function DocumentationWaste() {
   const { amountUnitSizeColumns } = useAmountUnitSizeColumns({
     overrides: {
       unit: {
-        disabled: (record: Record<string, unknown>) => {
-          if (record.key != -1) return true;
-        },
+        disabled: (record: Record<string, unknown>) => record.key !== -1,
       },
       size: {
-        disabled: (record: Record<string, unknown>) => {
-          if (record.key != -1) return true;
-        },
+        disabled: (record: Record<string, unknown>) => record.key !== -1,
       },
       // A waste is stored with two decimals, so it is typed and shown with them.
       amount: { inputType: "positive_decimal2" },
@@ -96,7 +99,7 @@ export default function DocumentationWaste() {
   const listParams = useMemo<CommissioningWasteListParams>(
     () => ({
       year: selectedYear,
-      delivery_week: selectedWeek!,
+      delivery_week: selectedWeek,
       day_number: selectedDay!,
       is_past: isPast,
     }),
@@ -130,7 +133,7 @@ export default function DocumentationWaste() {
       ...transformedData,
       storage: selectedStorage,
       year: selectedYear,
-      delivery_week: selectedWeek ?? currentWeek,
+      delivery_week: selectedWeek,
       day_number: selectedDay,
     }),
     [selectedYear, selectedWeek, selectedDay, selectedStorage],
@@ -149,7 +152,7 @@ export default function DocumentationWaste() {
     () => [
       {
         ...shareArticleColumn,
-        disabled: (record: TableRecord) => record.key != -1,
+        disabled: (record: TableRecord) => record.key !== -1,
       },
       ...amountUnitSizeColumns,
       {
@@ -183,7 +186,7 @@ export default function DocumentationWaste() {
         />
         <DaySelector
           selectedYear={selectedYear}
-          selectedWeek={selectedWeek ?? currentWeek}
+          selectedWeek={selectedWeek}
           selectedDay={selectedDay}
           setSelectedDay={setSelectedDay}
           days={[0, 1, 2, 3, 4, 5, 6]}
@@ -210,6 +213,11 @@ export default function DocumentationWaste() {
         customSave={customSave}
         customEdit={customEdit}
         permissions={permissions}
+        // The rows are all of the selected storage, so the check needs no storage.
+        uniqueCheck={["share_article", "unit", "size"]}
+        uniqueCheckMessage={t(
+          "validation.unique.share_article_unit_size_must_be_unique",
+        )}
         keyboardAddShortcut={true}
       />
       <AddShareArticleEntry

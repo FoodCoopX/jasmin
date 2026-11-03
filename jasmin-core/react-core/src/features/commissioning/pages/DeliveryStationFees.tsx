@@ -17,17 +17,42 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText } from "@shared/ui";
-import { buildCsvString, mondayOfIsoWeek, toApiDate } from "@shared/utils";
-import { useCurrency } from "@hooks/index";
+import {
+  buildCsvString,
+  csvDecimal,
+  mondayOfIsoWeek,
+  resolveCsvDialect,
+  toApiDate,
+} from "@shared/utils";
+import { useCurrency, useNumberFormat, useTenant } from "@hooks/index";
 
 type FeeRow = DeliveryStationFees & TableRecord;
+
+// The decimals a billed quantity needs: none for whole boxes or months, up to
+// the four the server sends for a prorated month or year.
+const quantityDecimals = (quantity: string) =>
+  quantity.split(".")[1]?.replace(/0+$/, "").length ?? 0;
+
+// The units the fees endpoint counts a quantity in; a station without a fee
+// has none.
+const FEE_QUANTITY_UNIT_KEYS: Record<string, string> = {
+  boxes: "commissioning.fee_quantity_unit.boxes",
+  months: "commissioning.fee_quantity_unit.months",
+  years: "commissioning.fee_quantity_unit.years",
+};
 
 /** What the solawi owes each fee-carrying delivery station over a period. The
  * on-screen table is driven by a year + week selector ("all weeks" = the whole
  * year); the CSV button still exports an office-chosen date range. */
 export default function DeliveryStationFees() {
   const { t } = useTranslation();
-  const { currencySymbol } = useCurrency();
+  const { formatCurrency } = useCurrency();
+  const { format: formatNumber } = useNumberFormat();
+  const { getSetting } = useTenant();
+  const csvDialect = useMemo(
+    () => resolveCsvDialect(getSetting("csv_format", "de") as string),
+    [getSetting],
+  );
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState(() => dayjs().year());
   // null week = "all delivery weeks" → the whole year (so the table isn't empty
@@ -44,6 +69,22 @@ export default function DeliveryStationFees() {
           none: "commissioning.fee_type_none",
         }[feeType] ?? "commissioning.fee_type_none",
       ),
+    [t],
+  );
+
+  // The billed quantity, written by ``writeNumber``, with its unit by name:
+  // "30 boxes", "1 month", "0.2258 months".
+  const quantityLabel = useCallback(
+    (
+      row: DeliveryStationFees,
+      writeNumber: (quantity: string, decimals: number) => string,
+    ) => {
+      const quantity = row.billed_quantity;
+      const text = writeNumber(quantity, quantityDecimals(quantity));
+      return row.quantity_unit in FEE_QUANTITY_UNIT_KEYS
+        ? `${text} ${t(FEE_QUANTITY_UNIT_KEYS[row.quantity_unit], { count: Number(quantity) })}`
+        : text;
+    },
     [t],
   );
 
@@ -98,10 +139,10 @@ export default function DeliveryStationFees() {
 
       {
         title: t("commissioning.quantity"),
-        dataIndex: "quantity",
-        key: "quantity",
+        dataIndex: "billed_quantity",
+        key: "billed_quantity",
         align: "right",
-        render: (value) => `${value} x`,
+        render: (_, record) => quantityLabel(record, formatNumber),
       },
       {
         title: t("commissioning.rate_net"),
@@ -109,17 +150,17 @@ export default function DeliveryStationFees() {
         key: "rate_net",
         align: "right",
         render: (value, record) =>
-          `${value} ${currencySymbol} / ${feeTypeLabel(record.fee_type as string)}`,
+          `${formatCurrency(Number(value))} / ${feeTypeLabel(record.fee_type as string)}`,
       },
       {
         title: t("commissioning.total_net"),
         dataIndex: "total_net",
         key: "total_net",
         align: "right",
-        render: (value) => `${value} ${currencySymbol}`,
+        render: (value) => formatCurrency(Number(value)),
       },
     ],
-    [t, feeTypeLabel, currencySymbol],
+    [t, feeTypeLabel, formatCurrency, formatNumber, quantityLabel],
   );
 
   const fetchFeesCsv = useCallback(
@@ -138,13 +179,17 @@ export default function DeliveryStationFees() {
       const csvRows = feeRows.map((row: DeliveryStationFees) => [
         row.delivery_station_name ?? row.delivery_station,
         feeTypeLabel(row.fee_type),
-        `${row.quantity} ${row.quantity_unit}`,
-        row.rate_net,
-        row.total_net,
+        quantityLabel(row, (quantity, decimals) =>
+          Number(quantity)
+            .toFixed(decimals)
+            .replace(".", csvDialect.decimalSeparator),
+        ),
+        csvDecimal(row.rate_net),
+        csvDecimal(row.total_net),
       ]);
-      return buildCsvString(headers, csvRows);
+      return buildCsvString(headers, csvRows, csvDialect);
     },
-    [feeTypeLabel, t],
+    [feeTypeLabel, quantityLabel, t, csvDialect],
   );
 
   return (
@@ -168,14 +213,13 @@ export default function DeliveryStationFees() {
         permissions={READ_ONLY_PERMISSION}
         pagination={true}
         showSearchBar={true}
-        style={{ width: "50%" }}
+        className="custom-jasmin-table delivery-station-fees__table"
       />
 
       <Button
-        className="download-button"
+        className="download-button mt-1em"
         icon={<DownloadOutlined />}
         onClick={() => setCsvModalOpen(true)}
-        style={{ marginTop: "1em" }}
       >
         {t("commissioning.download_csv")}
       </Button>

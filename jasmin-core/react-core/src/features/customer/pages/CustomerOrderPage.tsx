@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, Col, Row, Table, Tag, Typography } from "antd";
+import { Card, Col, Row, Tag, Typography } from "antd";
+import { ReadOnlyReportTable } from "@shared/tables";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,9 +25,9 @@ import type {
   OtherArticleRow,
 } from "@features/customer/types";
 import { DaySelector, WeekSelector } from "@shared/selectors";
+import { useRoles } from "@shared/auth";
 import { useAuth } from "@shared/contexts/AuthContext";
 import {
-  currentWeek,
   useCurrency,
   useTenant,
   useTimeFormat,
@@ -54,8 +55,12 @@ export default function CustomerOrderPage() {
   const resellerId =
     resellerIdParam || (user?.reseller_id as string | undefined);
 
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedWeek,
+    setSelectedWeek,
+  } = useYearWeekState();
   const currentDay = dayjs().isoWeekday();
   const [selectedDay, setSelectedDay] = useState(
     currentDay - 1 === 6 ? 5 : currentDay - 1,
@@ -79,7 +84,7 @@ export default function CustomerOrderPage() {
   const offersParams = useMemo<CommissioningOffersListParams>(
     () => ({
       year: selectedYear,
-      delivery_week: selectedWeek ?? currentWeek,
+      delivery_week: selectedWeek,
       reseller: resellerId!,
     }),
     [selectedYear, selectedWeek, resellerId],
@@ -92,7 +97,7 @@ export default function CustomerOrderPage() {
   const orderParams = useMemo<CommissioningOrderContentsListParams>(
     () => ({
       year: selectedYear,
-      delivery_week: selectedWeek ?? currentWeek,
+      delivery_week: selectedWeek,
       day_number: selectedDay,
       reseller: resellerId!,
     }),
@@ -117,7 +122,7 @@ export default function CustomerOrderPage() {
   const { orderingDeadline, isOrderingClosed } = useOrderingDeadline(
     oddDefaults,
     selectedYear,
-    selectedWeek ?? currentWeek,
+    selectedWeek,
   );
 
   const invalidateOrders = useCallback(() => {
@@ -202,6 +207,9 @@ export default function CustomerOrderPage() {
   // Single-tier mode when the tenant hasn't configured tiers — only
   // ``price_1`` is ever picked, no quantity-based escalation.
   const finalTiers = useOfferTiers();
+  // The roles the backend takes a line's price from (office, admin,
+  // management); it prices a customer's lines itself.
+  const { isOffice, isManagement } = useRoles();
 
   // Order-level info for the summary header (outside the cards): once anything
   // is ordered every row for this reseller/week/day shares one Order, so the
@@ -229,9 +237,10 @@ export default function CustomerOrderPage() {
   } = useCustomerOrderMutations({
     resellerId,
     selectedYear,
-    selectedWeek: selectedWeek ?? currentWeek,
+    selectedWeek: selectedWeek,
     selectedDay,
     finalTiers,
+    setsPrice: isOffice || isManagement,
     invalidateOrders,
   });
 
@@ -282,7 +291,7 @@ export default function CustomerOrderPage() {
         />
         <DaySelector
           selectedYear={selectedYear}
-          selectedWeek={selectedWeek ?? currentWeek}
+          selectedWeek={selectedWeek}
           selectedDay={selectedDay}
           setSelectedDay={(v) => v !== null && setSelectedDay(v)}
           days={
@@ -360,14 +369,13 @@ export default function CustomerOrderPage() {
             >
               {t("customer.prices_are_netto")}
             </Text>
-            <Table
+            <ReadOnlyReportTable
               dataSource={tableData}
               columns={columns}
               rowKey="id"
               pagination={false}
-              size="small"
               className="custom-jasmin-table compact-table"
-              locale={{ emptyText: t("customer.no_offers") }}
+              emptyText={t("customer.no_offers")}
             />
           </Card>
         </Col>
@@ -383,12 +391,11 @@ export default function CustomerOrderPage() {
               title={t("customer.other_articles")}
               className="dark-green-border"
             >
-              <Table
+              <ReadOnlyReportTable
                 dataSource={otherArticleRows}
                 columns={otherArticleColumns}
                 rowKey="id"
                 pagination={false}
-                size="small"
                 className="custom-jasmin-table compact-table"
               />
             </Card>

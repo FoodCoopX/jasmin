@@ -10,9 +10,10 @@
  * the selectors are stubs.
  */
 
-import { act, render, screen } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Form } from "antd";
 import dayjs from "dayjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -70,7 +71,13 @@ const VARIATIONS = [
   { id: "vlarge", size: "L", sort_order: 2, share_type: "harvest", valid_from: "2026-01-05" },
 ];
 const SHARE_ARTICLES = [
-  { id: "art-carrot", name: "Carrots", default_movement_unit: "KG" },
+  {
+    id: "art-carrot",
+    name: "Carrots",
+    default_movement_unit: "KG",
+    kg_per_piece_M: "0.150",
+    net_price_for_boxes_pieces: "0.40",
+  },
   {
     id: "art-apple",
     name: "Apples commissioning.purchased_name_suffix",
@@ -107,6 +114,22 @@ const PLANNING_ROWS = [
   },
 ];
 const GRANULARITY = { days_ok: true, tours_ok: true };
+// A tour-planned week: Tuesday runs tours 1 and 2, Friday's station carries no
+// tour number (the backend sends ``used_tours: null`` for it).
+const TOUR_WEEK_DAYS = [
+  { ...DELIVERY_DAYS[0], number_of_tours: 2, used_tours: [1, 2] },
+  {
+    id: "dfri",
+    day_number: 4,
+    valid_from: "2026-01-05",
+    number_of_tours: 1,
+    used_tours: null,
+    delivery_stations: [
+      { id: "stfarm", short_name: "Farm", tour_number: null, stop_order: 1 },
+    ],
+  },
+];
+const TOUR_GRANULARITY = { days_ok: false, tours_ok: true };
 const EMPTY: unknown[] = [];
 
 const settled = (data: unknown) => ({
@@ -122,16 +145,21 @@ const SETTLED_EMPTY = settled(EMPTY);
 const SETTLED_COUNTS = settled(SUBSCRIBER_COUNTS);
 const SETTLED_AVERAGES = settled({});
 const IDLE = settled(undefined);
+const SETTLED_TOUR_WEEK_DAYS = settled(TOUR_WEEK_DAYS);
+
+// The week the page loads; tests switch to the tour-planned week.
+const week = vi.hoisted(() => ({ tourPlanned: false }));
 
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
-  useCommissioningSharesDeliveryDaysList: () => SETTLED_DAYS,
+  useCommissioningSharesDeliveryDaysList: () =>
+    week.tourPlanned ? SETTLED_TOUR_WEEK_DAYS : SETTLED_DAYS,
   useCommissioningShareTypeVariationsList: (params: unknown, options: unknown) =>
     api.variationsList(params, options),
   useCommissioningHistoricalShareTypeVariationAveragesRetrieve: () =>
     SETTLED_AVERAGES,
   useCommissioningShareArticlesList: () => SETTLED_ARTICLES,
   useCommissioningGranularityRetrieve: () => ({
-    data: GRANULARITY,
+    data: week.tourPlanned ? TOUR_GRANULARITY : GRANULARITY,
     isLoading: false,
     error: null,
     refetch: api.refetchGranularity,
@@ -250,6 +278,7 @@ function grid(): EditableTableProps {
 
 beforeEach(() => {
   table.props = null;
+  week.tourPlanned = false;
   api.refetchGranularity.mockReset();
   api.variationsList.mockReset().mockReturnValue(settled(VARIATIONS));
   const planningResult = settled(PLANNING_ROWS);
@@ -456,5 +485,142 @@ describe("PlanningShareContentBase", () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: planningListKey() });
     expect(api.refetchGranularity).toHaveBeenCalled();
+  });
+});
+
+describe("PlanningShareContentBase article defaults", () => {
+  const changeSize = (values: Record<string, unknown>) => {
+    const [form] = renderHook(() => Form.useForm()).result.current;
+    form.setFieldsValue(values);
+    const size = grid().columns.find((c) => c.key === "size");
+    if (!size?.onFieldChange) throw new Error("no size column");
+    act(() => {
+      size.onFieldChange?.(values.size, { key: -1 }, form, "size");
+    });
+    return form.getFieldsValue(true);
+  };
+
+  it("takes a piece's weight and price from the article for the row's size", () => {
+    renderPage();
+
+    expect(
+      changeSize({ share_article: "art-carrot", unit: "PCS", size: "M" }),
+    ).toMatchObject({ kg_per_piece: "0.150", price_per_unit: "0.40" });
+  });
+
+  it("clears the weight for kilos and keeps the price the article has none for", () => {
+    renderPage();
+    changeSize({ share_article: "art-carrot", unit: "PCS", size: "M" });
+
+    expect(
+      changeSize({
+        share_article: "art-carrot",
+        unit: "KG",
+        size: "M",
+        kg_per_piece: "0.150",
+        price_per_unit: "0.40",
+      }),
+    ).toMatchObject({ kg_per_piece: null, price_per_unit: "0.40" });
+  });
+
+  it("clears the price of a newly picked article that has none for the unit", () => {
+    renderPage();
+
+    expect(
+      changeSize({ share_article: "art-carrot", unit: "BUNCH", size: "M", price_per_unit: "9.99" }),
+    ).toMatchObject({ kg_per_piece: null, price_per_unit: null });
+  });
+});
+
+describe("PlanningShareContentBase still free", () => {
+  const stillFree = (record: TableRecord) => {
+    const column = grid().columns.find((c) => c.key === "still_free");
+    if (!column?.render) throw new Error("no still-free column");
+    return render(<>{column.render(undefined, record, 0)}</>).container;
+  };
+
+  it("adds the stock on hand to the forecast before taking off the planned amounts", () => {
+    renderPage();
+
+    // 40 kg forecast + 12.5 kg stock − (10 × 0.5 kg + 4 × 1 kg)
+    expect(
+      stillFree({
+        key: "row-carrot",
+        unit: "KG",
+        forecast_available_amount: "40.00",
+        forecast_unit: "KG",
+        current_stock_begin_of_week: 12.5,
+        "day_dtue_variation_vsmall": 0.5,
+        "day_dtue_variation_vlarge": 1,
+      }),
+    ).toHaveTextContent("43,50");
+  });
+
+  it("leaves out a forecast counted in another unit than the row", () => {
+    renderPage();
+
+    // 12.5 kg stock − (10 × 0.5 kg + 4 × 1 kg); the 40 pieces stay out.
+    expect(
+      stillFree({
+        key: "row-carrot",
+        unit: "KG",
+        forecast_available_amount: "40.00",
+        forecast_unit: "PCS",
+        current_stock_begin_of_week: 12.5,
+        "day_dtue_variation_vsmall": 0.5,
+        "day_dtue_variation_vlarge": 1,
+      }),
+    ).toHaveTextContent("3,50");
+  });
+
+  it("counts the stock alone for a row without a forecast", () => {
+    renderPage();
+
+    expect(
+      stillFree({ key: "row-leek", unit: "KG", current_stock_begin_of_week: 3 }),
+    ).toHaveTextContent("3,00");
+  });
+});
+
+describe("PlanningShareContentBase tour planning", () => {
+  beforeEach(() => {
+    week.tourPlanned = true;
+  });
+
+  it("plans a day whose station carries no tour number as a whole day", () => {
+    renderPage();
+
+    expect(screen.getByTestId("planning-mode")).toHaveTextContent("tours");
+    const friday = grid().columns.find((c) => c.key === "day_dfri")!;
+    expect(friday.children?.[0]).toMatchObject({
+      dataIndex: "day_dfri_variation_vsmall",
+      inputType: "positive_decimal2",
+    });
+    expect(friday.children?.[0].children).toBeUndefined();
+    expect(friday.children?.[1].children).toBeUndefined();
+  });
+
+  it("saves the tour cells of a toured day and the whole-day cells of a day without tours", () => {
+    renderPage();
+
+    const payload = grid().customSave!(
+      {
+        share_article: "art-carrot",
+        "day_dtue_variation_vsmall": 0.4,
+        "day_dtue_variation_vsmall_tour_1": 0.4,
+        "day_dtue_variation_vsmall_station_stmarket": 0.4,
+        "day_dfri_variation_vsmall": 0.6,
+        "day_dfri_variation_vsmall_station_stfarm": 0.6,
+      },
+      { key: "row-carrot" },
+    );
+
+    expect(payload).toEqual({
+      share_article: "art-carrot",
+      "day_dtue_variation_vsmall_tour_1": 0.4,
+      "day_dfri_variation_vsmall": 0.6,
+      year: YEAR,
+      delivery_week: WEEK,
+    });
   });
 });

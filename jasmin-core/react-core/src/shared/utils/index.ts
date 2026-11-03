@@ -27,7 +27,7 @@ export {
 } from './amountFormat';
 export { getShareOptionLabel } from './shareOptionLabel';
 
-export { getDayName } from './weekdayNames';
+export { getDayName, toDayNumber } from './weekdayNames';
 export { generatePdfFilename } from './pdfFilename';
 export { formatWeekLabel, formatDayLabel } from './weekLabels';
 // NB: pdfColumns (extractPdfColumns) is intentionally NOT re-exported here.
@@ -41,18 +41,17 @@ export {
     syncPurchasedName,
 } from './purchasedName';
 export { default as notify } from './notify';
-export { logger } from './logger';
-export { buildCsvString, downloadCsvBlob, resolveCsvDialect } from './csv';
+export { buildCsvString, csvDecimal, downloadCsvBlob, resolveCsvDialect } from './csv';
 export { downloadBlob } from './downloadBlob';
 export { openStoredPdf } from './openStoredPdf';
 export { zipFilesToBlob } from './zip';
 export type { ZipEntry } from './zip';
-export { activeAtDateForWeek, dateForWeekDayNumber, hasWeekBegun, isoWeekRangeLabel, isWeekInPast, isYearInPast, mondayOfIsoWeek } from './weekRange';
+export { activeAtDateForWeek, dateForWeekDayNumber, hasWeekBegun, isoWeekRangeLabel, isWeekInPast, isYearInPast, mondayOfIsoWeek, nextIsoWeek } from './weekRange';
 export { hasTierPrice, pickTierPrice, pickTierPriceFromAmount } from './tierPrice';
 export { isSepaMandateActiveForTerm } from './sepaMandate';
 export { variationAllowsTrial, filterVariationsForTrial } from './trialVariations';
 export type { TrialAllowable } from './trialVariations';
-export { toApiDate } from './apiDate';
+export { formatApiDate, toApiDate, todayApiDate } from './apiDate';
 export { unwrapList } from './unwrapList';
 export { buildMonthAxis } from './monthAxis';
 export type { MonthAxis } from './monthAxis';

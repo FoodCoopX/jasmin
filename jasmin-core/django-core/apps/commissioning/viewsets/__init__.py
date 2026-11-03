@@ -57,6 +57,7 @@ from .members_viewsets import (
     MemberViewSet,
     SubscriptionViewSet,
 )
+from .offers_viewsets import OfferViewSet
 from .resellers_viewsets import (
     CommissioningListResellersViewSet,
     CrateOrderContentViewSet,
@@ -65,7 +66,6 @@ from .resellers_viewsets import (
     InvoiceResellerContentViewSet,
     InvoiceResellerViewSet,
     OfferGroupViewSet,
-    OfferViewSet,
     OrderContentViewSet,
     OrganicCertificateViewSet,
     ResellerViewSet,

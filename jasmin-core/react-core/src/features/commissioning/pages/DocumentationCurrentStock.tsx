@@ -17,8 +17,6 @@ import {
 import type {
   CommissioningCurrentStockComparisonListParams,
   CommissioningCurrentStockComparisonPartialUpdateBody,
-  InventoryEntry,
-  StockComparison,
 } from "@shared/api/generated/models";
 import { DaySelector, WeekSelector } from "@shared/selectors";
 import { StorageSelector } from "@features/commissioning/selectors";
@@ -41,7 +39,6 @@ import { useRoles } from "@shared/auth";
 
 import {
   useInvalidateAfterTableMutation,
-  currentWeek,
   useIsMobile,
   useNoteColumn,
   useNumberFormat,
@@ -55,17 +52,21 @@ import {
   useShareArticles,
 } from "@features/commissioning/hooks";
 
-const currentDay = dayjs().isoWeekday();
-
 const shareArticleFilters = {
   is_active: true,
 };
 
 export default function DocumentationCurrentStock() {
   const { isStaff } = useRoles();
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
-  const [selectedDay, setSelectedDay] = useState<number | null>(currentDay - 1);
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedWeek,
+    setSelectedWeek,
+  } = useYearWeekState();
+  const [selectedDay, setSelectedDay] = useState<number | null>(
+    () => dayjs().isoWeekday() - 1,
+  );
   const [selectedStorage, setSelectedStorage] = useState<string | null>(null);
   const isPast = useMemo(
     () => isWeekInPast(selectedYear, selectedWeek),
@@ -113,7 +114,7 @@ export default function DocumentationCurrentStock() {
   const listParams = useMemo<CommissioningCurrentStockComparisonListParams>(
     () => ({
       year: selectedYear,
-      delivery_week: selectedWeek!,
+      delivery_week: selectedWeek,
       day_number: selectedDay!,
       ...(selectedStorage ? { storage: selectedStorage } : {}),
     }),
@@ -125,11 +126,7 @@ export default function DocumentationCurrentStock() {
   const { data: rawData, isFetching } =
     useCommissioningCurrentStockComparisonList(listParams);
   const data = useMemo<TableRecord[]>(
-    () =>
-      ((rawData ?? []) as StockComparison[]).map((item) => ({
-        ...item,
-        key: item.id,
-      })) as unknown as TableRecord[],
+    () => (rawData ?? []).map((item) => ({ ...item, key: item.id })),
     [rawData],
   );
   const invalidateData = useCallback(() => {
@@ -143,7 +140,7 @@ export default function DocumentationCurrentStock() {
   const currentDate = useMemo(() => {
     return dateForWeekDayNumber(
       selectedYear,
-      selectedWeek ?? currentWeek,
+      selectedWeek,
       selectedDay ?? 0,
     );
   }, [selectedYear, selectedWeek, selectedDay]);
@@ -170,7 +167,7 @@ export default function DocumentationCurrentStock() {
         cleaned: bool(transformedData.cleaned),
         date: toApiDate(currentDate)!,
         year: selectedYear,
-        delivery_week: selectedWeek ?? currentWeek,
+        delivery_week: selectedWeek,
         day_number: selectedDay ?? 0,
         storage: selectedStorage ?? undefined,
       };
@@ -208,7 +205,7 @@ export default function DocumentationCurrentStock() {
       const unit = row.unit ?? "None";
       const size = row.size ?? "None";
       const storageId = row.storage ?? selectedStorage ?? "None";
-      return `${shareArticleId}_${unit}_${size}_${storageId}_${selectedYear}_${selectedWeek ?? currentWeek}_${selectedDay ?? 0}`;
+      return `${shareArticleId}_${unit}_${size}_${storageId}_${selectedYear}_${selectedWeek}_${selectedDay ?? 0}`;
     },
     [selectedYear, selectedWeek, selectedDay, selectedStorage],
   );
@@ -218,11 +215,12 @@ export default function DocumentationCurrentStock() {
       const compositeId =
         key === -1 ? buildCompositeId(transformedRow) : String(key);
       // ``composite_id`` is the PATH param, not a query param.
-      const result = await commissioningCurrentStockComparisonPartialUpdate(
+      const entry = await commissioningCurrentStockComparisonPartialUpdate(
         String(compositeId),
-        transformedRow as unknown as CommissioningCurrentStockComparisonPartialUpdateBody,
+        // The table hands the whole row untyped, slot fields from customSave
+        // included; the server reads only the body's fields from it.
+        transformedRow as CommissioningCurrentStockComparisonPartialUpdateBody,
       );
-      const entry = result as InventoryEntry;
       return { ...entry, key: entry.id };
     },
     [buildCompositeId],
@@ -349,7 +347,7 @@ export default function DocumentationCurrentStock() {
         <DaySelector
           selectedDay={selectedDay}
           setSelectedDay={setSelectedDay}
-          selectedWeek={selectedWeek ?? currentWeek}
+          selectedWeek={selectedWeek}
           selectedYear={selectedYear}
           days={[0, 1, 2, 3, 4, 5, 6]}
         />
@@ -370,7 +368,7 @@ export default function DocumentationCurrentStock() {
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningCurrentStockBulkFinalizeCreate({
-                ids: payload.ids as string[],
+                ids: payload.ids,
               })
             }
             buttonText={t("commissioning.finalize")}
@@ -387,7 +385,7 @@ export default function DocumentationCurrentStock() {
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningCurrentStockBulkSetAsExpectedCreate({
-                ids: payload.ids as string[],
+                ids: payload.ids,
               })
             }
             buttonText={t("commissioning.set_as_expected_stock")}
@@ -400,7 +398,7 @@ export default function DocumentationCurrentStock() {
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningCurrentStockBulkSetToZeroCreate({
-                ids: payload.ids as string[],
+                ids: payload.ids,
               })
             }
             buttonText={t("commissioning.set_to_zero")}

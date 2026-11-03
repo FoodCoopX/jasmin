@@ -20,7 +20,9 @@ import { useTranslation } from "react-i18next";
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: "blue",
-  EXPORTED: "green",
+  // Sent to the bank, still open to refunds; settled once that window passed.
+  EXPORTED: "gold",
+  SETTLED: "green",
   CANCELLED: "default",
 };
 
@@ -38,9 +40,11 @@ export default function DebitsAbos() {
     data: runsData,
     isFetching,
     error,
-  } = usePaymentsBillingRunsList({
-    year: selectedYear,
-  });
+  } = usePaymentsBillingRunsList(
+    { year: selectedYear },
+    // The effect below reports a failed load in the page's own words.
+    { query: { meta: { silent: true } } },
+  );
 
   const runs = useMemo(
     () =>
@@ -86,8 +90,8 @@ export default function DebitsAbos() {
       await paymentsBillingRunsDestroy(run.id);
       notify.success(t("abos.debits_run_deleted"));
       await invalidateRuns();
-    } catch {
-      notify.error(t("abos.debits_run_delete_error"));
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, t("abos.debits_run_delete_error")));
     }
   };
 

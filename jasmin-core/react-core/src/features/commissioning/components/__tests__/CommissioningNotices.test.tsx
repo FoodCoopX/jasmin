@@ -33,6 +33,7 @@ vi.mock("@hooks/configuration/useTenant", async () => {
   return { useTenant: () => tenant };
 });
 
+import { TenantContext } from "@shared/contexts/TenantContext";
 import FinalizedNotice from "../FinalizedNotice";
 import ImportSharesModeBanner from "../ImportSharesModeBanner";
 import NoVariationColumnsBanner from "../NoVariationColumnsBanner";
@@ -77,6 +78,26 @@ describe("ImportSharesModeBanner", () => {
     expect(screen.getByRole("alert")).not.toHaveTextContent(
       /common\.import_shares_mode_banner(?!_link)/,
     );
+  });
+
+  it("explains the mode without a link where a host imports the amounts itself", () => {
+    tenantSettings.values = { uploads_weekly_share_amount: true };
+    const value = {
+      tenant: { capabilities: { manual_share_import: false } },
+    } as unknown as Parameters<typeof TenantContext.Provider>[0]["value"];
+
+    render(
+      <MemoryRouter>
+        <TenantContext.Provider value={value}>
+          <ImportSharesModeBanner />
+        </TenantContext.Provider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "common.import_shares_mode_banner",
+    );
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });
 

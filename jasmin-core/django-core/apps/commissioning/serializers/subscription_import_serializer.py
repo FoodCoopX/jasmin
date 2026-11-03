@@ -35,12 +35,23 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from ..errors import (
+    DeliveryDayNumberUnknown,
+    DeliveryStationDayAmbiguous,
+    DeliveryStationDayUnknown,
+    PaymentCycleUnknown,
+    ShareTypeNameAmbiguous,
+    ShareTypeNameUnknown,
+    ShareTypeVariationSizeAmbiguous,
+    ShareTypeVariationSizeUnknown,
+    SubscriptionAlreadyImported,
+    SubscriptionImportStationDayIncomplete,
+    SubscriptionImportTermPredecessorAmbiguous,
+    SubscriptionTermAlreadyImported,
     SubscriptionTermAlreadyRenewed,
     SubscriptionTermPredecessorAmbiguous,
 )
 from ..models import (
     DeliveryStationDay,
-    Member,
     PaymentCycle,
     SharesDeliveryDay,
     ShareType,
@@ -48,6 +59,7 @@ from ..models import (
     Subscription,
 )
 from ..models.managers import active_on_date_q
+from .import_natural_keys import resolve_member_by_number
 
 
 class SubscriptionImportSerializer(serializers.Serializer):
@@ -95,23 +107,16 @@ class SubscriptionImportSerializer(serializers.Serializer):
     is_trial = serializers.BooleanField(required=False, default=False)
     subscription_number = serializers.IntegerField(required=False, allow_null=True)
 
-    # ── FK resolvers (raise a per-field ValidationError the row loop catches) ──
-
-    @staticmethod
-    def _resolve_member(number: int) -> Member:
-        member = Member.objects.filter(member_number=number).first()
-        if member is None:
-            raise serializers.ValidationError(
-                {"member_number": f"No member with number {number}."}
-            )
-        return member
+    # ── FK resolvers (each raises a coded error the row loop reports) ──
 
     @staticmethod
     def _resolve_payment_cycle(choice: str) -> PaymentCycle:
         cycle = PaymentCycle.objects.filter(choice=choice).first()
         if cycle is None:
-            raise serializers.ValidationError(
-                {"payment_cycle": f"No payment cycle '{choice}'."}
+            raise PaymentCycleUnknown(
+                f"No payment cycle '{choice}'.",
+                field="payment_cycle",
+                details={"payment_cycle": choice},
             )
         return cycle
 
@@ -121,17 +126,17 @@ class SubscriptionImportSerializer(serializers.Serializer):
     ) -> ShareTypeVariation:
         share_types = list(ShareType.objects.filter(name=share_type_name))
         if not share_types:
-            raise serializers.ValidationError(
-                {"share_type": f"No share type named '{share_type_name}'."}
+            raise ShareTypeNameUnknown(
+                f"No share type named '{share_type_name}'.",
+                field="share_type",
+                details={"share_type": share_type_name},
             )
         if len(share_types) > 1:
-            raise serializers.ValidationError(
-                {
-                    "share_type": (
-                        f"Share type name '{share_type_name}' is ambiguous "
-                        f"({len(share_types)} matches)."
-                    )
-                }
+            raise ShareTypeNameAmbiguous(
+                f"Share type name '{share_type_name}' is ambiguous "
+                f"({len(share_types)} matches).",
+                field="share_type",
+                details={"share_type": share_type_name, "matches": len(share_types)},
             )
         share_type = share_types[0]
         matches = list(
@@ -139,23 +144,24 @@ class SubscriptionImportSerializer(serializers.Serializer):
                 active_on_date_q(on_date), share_type=share_type, size=size
             )
         )
+        details = {
+            "share_type": share_type_name,
+            "size": size,
+            "date": on_date.isoformat(),
+        }
         if not matches:
-            raise serializers.ValidationError(
-                {
-                    "size": (
-                        f"No '{share_type_name}' variation of size '{size}' "
-                        f"active on {on_date}."
-                    )
-                }
+            raise ShareTypeVariationSizeUnknown(
+                f"No '{share_type_name}' variation of size '{size}' "
+                f"active on {on_date}.",
+                field="size",
+                details=details,
             )
         if len(matches) > 1:
-            raise serializers.ValidationError(
-                {
-                    "size": (
-                        f"'{share_type_name}' / size '{size}' is ambiguous on "
-                        f"{on_date} ({len(matches)} active variations)."
-                    )
-                }
+            raise ShareTypeVariationSizeAmbiguous(
+                f"'{share_type_name}' / size '{size}' is ambiguous on "
+                f"{on_date} ({len(matches)} active variations).",
+                field="size",
+                details={**details, "matches": len(matches)},
             )
         return matches[0]
 
@@ -171,8 +177,10 @@ class SubscriptionImportSerializer(serializers.Serializer):
             .first()
         )
         if day is None:
-            raise serializers.ValidationError(
-                {"delivery_day": f"No delivery day {day_number} active on {on_date}."}
+            raise DeliveryDayNumberUnknown(
+                f"No delivery day {day_number} active on {on_date}.",
+                field="delivery_day",
+                details={"delivery_day": day_number, "date": on_date.isoformat()},
             )
         # ``short_name`` is NOT unique, so resolve the station-day directly by
         # joining on it (rather than picking one station with ``.first()``): the
@@ -184,29 +192,30 @@ class SubscriptionImportSerializer(serializers.Serializer):
                 delivery_day=day,
             )
         )
+        details = {
+            "delivery_station": station_name,
+            "delivery_day": day_number,
+            "date": on_date.isoformat(),
+        }
         if not matches:
-            raise serializers.ValidationError(
-                {
-                    "delivery_station": (
-                        f"No station '{station_name}' with day {day_number} "
-                        f"active on {on_date}."
-                    )
-                }
+            raise DeliveryStationDayUnknown(
+                f"No station '{station_name}' with day {day_number} "
+                f"active on {on_date}.",
+                field="delivery_station",
+                details=details,
             )
         if len(matches) > 1:
-            raise serializers.ValidationError(
-                {
-                    "delivery_station": (
-                        f"Station '{station_name}' / day {day_number} is "
-                        f"ambiguous on {on_date} ({len(matches)} active matches)."
-                    )
-                }
+            raise DeliveryStationDayAmbiguous(
+                f"Station '{station_name}' / day {day_number} is "
+                f"ambiguous on {on_date} ({len(matches)} active matches).",
+                field="delivery_station",
+                details={**details, "matches": len(matches)},
             )
         return matches[0]
 
     def validate(self, attrs):
         valid_from = attrs["valid_from"]
-        attrs["_member"] = self._resolve_member(attrs["member_number"])
+        attrs["_member"] = resolve_member_by_number(attrs["member_number"])
         attrs["_payment_cycle"] = self._resolve_payment_cycle(attrs["payment_cycle"])
         attrs["_variation"] = self._resolve_variation(
             attrs["share_type"], attrs["size"], valid_from
@@ -217,12 +226,8 @@ class SubscriptionImportSerializer(serializers.Serializer):
         if station and day is not None:
             attrs["_station_day"] = self._resolve_station_day(station, day, valid_from)
         elif station or day is not None:
-            raise serializers.ValidationError(
-                {
-                    "delivery_station": (
-                        "Provide BOTH delivery_station and delivery_day, or neither."
-                    )
-                }
+            raise SubscriptionImportStationDayIncomplete(
+                missing="delivery_day" if station else "delivery_station"
             )
         else:
             attrs["_station_day"] = None
@@ -243,14 +248,10 @@ class SubscriptionImportSerializer(serializers.Serializer):
                 valid_from=valid_from,
             ).exists()
         ):
-            raise serializers.ValidationError(
-                {
-                    "subscription_number": (
-                        f"Subscription {subscription_number} starting {valid_from} "
-                        f"already exists for member {attrs['member_number']} — "
-                        "skipped (already imported)."
-                    )
-                }
+            raise SubscriptionAlreadyImported(
+                subscription_number=subscription_number,
+                valid_from=valid_from.isoformat(),
+                member_number=attrs["member_number"],
             )
         attrs["_previous_subscription"] = (
             None if attrs["is_trial"] else self._resolve_previous_term(attrs)
@@ -272,24 +273,12 @@ class SubscriptionImportSerializer(serializers.Serializer):
             )
         except SubscriptionTermAlreadyRenewed as exc:
             if exc.details["renewal_valid_from"] == valid_from.isoformat():
-                message = (
-                    f"Subscription {exc.details['predecessor']} already continues "
-                    f"with {exc.details['renewal']} from {valid_from} — skipped "
-                    "(imported before, or drafted by the renewal; delete that "
-                    "draft first if this row should replace it)."
-                )
-            else:
-                message = exc.message
-            raise serializers.ValidationError({"valid_from": message}) from exc
-        except SubscriptionTermPredecessorAmbiguous as exc:
-            raise serializers.ValidationError(
-                {
-                    "subscription_number": (
-                        f"{exc.message} Give this row the subscription_number of "
-                        "the one it continues."
-                    )
-                }
+                raise SubscriptionTermAlreadyImported(**exc.details) from exc
+            raise SubscriptionTermAlreadyRenewed(
+                **exc.details, field="valid_from"
             ) from exc
+        except SubscriptionTermPredecessorAmbiguous as exc:
+            raise SubscriptionImportTermPredecessorAmbiguous(**exc.details) from exc
 
     def create(self, validated_data) -> Subscription:
         # Draft only — no capacity reservation, no live guards, no

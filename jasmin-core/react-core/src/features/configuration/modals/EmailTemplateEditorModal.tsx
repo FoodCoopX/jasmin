@@ -19,7 +19,10 @@ import { useTranslation } from "react-i18next";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 
-import type { EmailTemplateUpdate, TestSend } from "@shared/api/generated/models";
+import type {
+  PatchedEmailTemplateUpdate,
+  TestSend,
+} from "@shared/api/generated/models";
 import {
   getNotificationsEmailTemplatesListQueryKey,
   getNotificationsEmailTemplatesRetrieveQueryKey,
@@ -144,7 +147,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
     }
   }, [detail, labelByName]);
 
-  const buildPayload = (): EmailTemplateUpdate => ({
+  const buildPayload = (): PatchedEmailTemplateUpdate => ({
     subject: chipsToPlainText(subjectHtml),
     body_html: chipsToPlaceholders(bodyHtml),
     body_text: detail?.body_text ?? "",
@@ -152,6 +155,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
 
   const saveMutation = useNotificationsEmailTemplatesPartialUpdate({
     mutation: {
+      meta: { silent: true },
       onSuccess: (data) => {
         notify.success(t("email_templates.saved"));
         queryClient.setQueryData(
@@ -162,15 +166,13 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
           queryKey: getNotificationsEmailTemplatesListQueryKey(),
         });
       },
-      onError: () =>
-        notify.error(
-          t("email_templates.save_error"),
-        ),
+      onError: () => notify.error(t("email_templates.save_error")),
     },
   });
 
   const resetMutation = useNotificationsEmailTemplatesReset({
     mutation: {
+      meta: { silent: true },
       onSuccess: (data) => {
         setSubjectHtml(plainTextToChips(data.subject, labelByName));
         setBodyHtml(placeholdersToChips(data.body_html, labelByName));
@@ -181,24 +183,17 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
         queryClient.invalidateQueries({
           queryKey: getNotificationsEmailTemplatesListQueryKey(),
         });
-        notify.success(
-          t("email_templates.reset_done"),
-        );
+        notify.success(t("email_templates.reset_done"));
       },
-      onError: () =>
-        notify.error(
-          t("email_templates.reset_error"),
-        ),
+      onError: () => notify.error(t("email_templates.reset_error")),
     },
   });
 
   const testMutation = useNotificationsEmailTemplatesTestSend({
     mutation: {
+      meta: { silent: true },
       onSuccess: (data) => notify.success(data.detail),
-      onError: () =>
-        notify.error(
-          t("email_templates.test_error"),
-        ),
+      onError: () => notify.error(t("email_templates.test_error")),
     },
   });
 
@@ -234,7 +229,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
       width={1100}
       title={
         detail
-          ? `${localizedLabel} (${detail.slug})`
+          ? t("email_templates.editor_title", { label: localizedLabel })
           : t("email_templates.editor")
       }
       footer={[
@@ -256,8 +251,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
           type="primary"
           loading={saveMutation.isPending}
           onClick={() =>
-            slug &&
-            saveMutation.mutate({ slug, data: buildPayload() })
+            slug && saveMutation.mutate({ slug, data: buildPayload() })
           }
         >
           {t("common.save")}
@@ -308,9 +302,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                     key: "default",
                     label: (
                       <Space size={8}>
-                        <Text strong>
-                          {t("email_templates.show_default")}
-                        </Text>
+                        <Text strong>{t("email_templates.show_default")}</Text>
                         <Tag>{detail.language.toUpperCase()}</Tag>
                       </Space>
                     ),
@@ -350,7 +342,10 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                             readOnly
                             modules={{ toolbar: false }}
                             formats={QUILL_FORMATS}
-                            style={{ background: "var(--color-bg-elevated)", marginTop: 4 }}
+                            style={{
+                              background: "var(--color-bg-elevated)",
+                              marginTop: 4,
+                            }}
                           />
                         </div>
                       </Space>
@@ -384,10 +379,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
           </Col>
 
           <Col span={8}>
-            <Card
-              size="small"
-              title={t("email_templates.variables")}
-            >
+            <Card size="small" title={t("email_templates.variables")}>
               <Paragraph
                 type="secondary"
                 style={{ marginBottom: 8, fontSize: 12 }}

@@ -15,6 +15,7 @@ import type {
 import { ToolTipIcon } from "@shared/ui";
 import { editableOnlyOnCreate, renderNumber } from "@shared/utils";
 import { parseDecimalInput } from "@shared/utils/numberFormat";
+import { roundHalfUp } from "@shared/utils/lineNetto";
 import { useCurrency } from "@hooks/configuration/useCurrency";
 import type { useOffersData } from "../useOffersData";
 import { useCrates } from "../useCrates";
@@ -30,7 +31,7 @@ type OffersData = ReturnType<typeof useOffersData>;
 
 /** A tier price: the base less the offer group's discount percent, in cents. */
 const discountedPrice = (base: number, discountPercent: number): number =>
-  Math.round(base * (100 - discountPercent)) / 100;
+  roundHalfUp((base * (100 - discountPercent)) / 100);
 
 export function useOffersColumns({
   shareArticleFilters,
@@ -136,7 +137,6 @@ export function useOffersColumns({
                       ] as number) || 0;
                     break;
                   case "PCS":
-                  case "PIECES":
                     defaultPrice =
                       (shareArticleFields[
                         `net_price_for_orders_pieces_${index + 1}`
@@ -236,7 +236,11 @@ export function useOffersColumns({
   const columns = useMemo<EditableColumnConfig<TableRecord>[]>(() => {
     const baseColumns = [
       finalColumn,
-      ...washingCleaningColumns,
+      // A published offer lets only its available amount change.
+      ...washingCleaningColumns.map((column) => ({
+        ...column,
+        disabled: (record: TableRecord) => record.is_finalized === true,
+      })),
       {
         ...shareArticleColumn,
         disabled: editableOnlyOnCreate,
@@ -303,17 +307,22 @@ export function useOffersColumns({
         dataIndex: "amount",
         key: "amount",
         width: "8em",
-        inputType: "positive_integer",
+        inputType: "positive_decimal3",
         required: true,
         align: "center",
         suffix: t("commissioning.pu"),
         render: (_: unknown, record: TableRecord) => {
           const amount = record.amount ? Number(record.amount) : 0;
-          const color = amount === 0 ? "darkred" : "darkgreen";
+          const amountClass =
+            amount === 0 ? "amount-none-left" : "amount-left";
+          // An order leaves a fraction of a PU behind; show the digits it
+          // has (up to the column's 3), so "2,500" can't read as thousands.
+          const fractionDigits =
+            String(Number(amount.toFixed(3))).split(".")[1]?.length ?? 0;
 
           return (
-            <span style={{ color }}>
-              {format(amount, 0)} {t("commissioning.pu")}
+            <span className={amountClass}>
+              {format(amount, fractionDigits)} {t("commissioning.pu")}
             </span>
           );
         },
@@ -355,6 +364,7 @@ export function useOffersColumns({
         ...noteColumn,
         inputType: "optional",
         width: "25em",
+        disabled: (record: TableRecord) => record.is_finalized === true,
       },
     ];
 

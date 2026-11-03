@@ -10,6 +10,7 @@ import {
   gdprAdminResellersSubjectAccessRetrieve,
 } from "@shared/api/generated/gdpr/gdpr";
 import { useRoles } from "@shared/auth";
+import { useCapability } from "@hooks/index";
 import { downloadBlob, notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 
@@ -97,7 +98,8 @@ export function MemberDataProtectionCard({ memberId }: { memberId: string }) {
   const { t } = useTranslation();
   const { isAdmin } = useRoles();
   const queryClient = useQueryClient();
-  if (!isAdmin) return null;
+  const offersGdpr = useCapability("gdpr");
+  if (!isAdmin || !offersGdpr) return null;
 
   return (
     <Card
@@ -127,7 +129,8 @@ export function ResellerDataProtection({
 }) {
   const { t } = useTranslation();
   const { isAdmin } = useRoles();
-  if (!isAdmin || !reseller?.id) return null;
+  const offersGdpr = useCapability("gdpr");
+  if (!isAdmin || !offersGdpr || !reseller?.id) return null;
 
   return (
     <>

@@ -2,13 +2,22 @@ from typing import TypedDict
 
 from rest_framework import serializers
 
-from ..errors import OfferGroupNotFound, ShareTypeVariationNotFound
+from ..constants import PURCHASE_DAY
+from ..errors import (
+    HarvestAlreadyDocumented,
+    OfferGroupNotFound,
+    PurchaseAlreadyDocumented,
+    PurchaseWithoutSellerAlreadyDocumented,
+    ShareTypeVariationNotFound,
+    WasteAlreadyDocumented,
+)
 from ..models import (
     Forecast,
     Harvest,
     OfferGroup,
     Plot,
     Purchase,
+    Reseller,
     ShareTypeVariation,
     Waste,
 )
@@ -18,6 +27,7 @@ from .serializers_mixin import (
     DeletableMixin,
     NameFieldMixin,
     StorageFieldsMixin,
+    UniqueConstraintErrorsMixin,
 )
 
 
@@ -52,35 +62,16 @@ class ForecastSerializer(NameFieldMixin, DeletableMixin, serializers.ModelSerial
         )
 
     def to_representation(self, instance):
-        """
-        Handle both model instances and dictionary data from the service
-        """
-        if isinstance(instance, dict):
-            # Convert dictionary back to model instance
-            if "id" in instance:
-                try:
-                    # Get the actual model instance
-                    model_instance = self.Meta.model.objects.get(id=instance["id"])
-                    # Use the model instance for serialization
-                    instance = model_instance
-                except self.Meta.model.DoesNotExist:
-                    # Fallback: create a temporary instance with the dict data
-                    # This won't work for SerializerMethodFields that need database access
-                    return instance
-            else:
-                # No ID available, return dict as-is (SerializerMethodFields won't work)
-                return instance
-
-        # Now we always have a model instance
         data = super().to_representation(instance)
 
-        # Add variation fields.
+        # The link rows' foreign-key ids, not the linked objects: no route
+        # prefetches the linked objects, so reaching through to one would cost
+        # a query per link.
         for variation_rel in instance.forecastsharetypevariation_set.all():
-            data[f"variation_{variation_rel.share_type_variation.id}"] = True
+            data[f"variation_{variation_rel.share_type_variation_id}"] = True
 
-        # Add offer group fields.
         for offer_group_rel in instance.forecastoffergroup_set.all():
-            data[f"offer_group_{offer_group_rel.offer_group.id}"] = True
+            data[f"offer_group_{offer_group_rel.offer_group_id}"] = True
 
         return data
 
@@ -121,11 +112,21 @@ class ForecastSerializer(NameFieldMixin, DeletableMixin, serializers.ModelSerial
         data = super().validate(data)
 
         # Validate variation + offer-group ids unconditionally — a bogus id
-        # must be rejected even when its flag is falsey (deselected).
-        for key in data:
-            if key.startswith("variation_"):
-                variation_id = key.replace("variation_", "")
-                if not ShareTypeVariation.objects.filter(id=variation_id).exists():
+        # must be rejected even when its flag is falsey (deselected). One
+        # lookup per kind, since a payload carries a flag per variation.
+        variation_ids = {
+            key.removeprefix("variation_"): key
+            for key in data
+            if key.startswith("variation_")
+        }
+        if variation_ids:
+            known = set(
+                ShareTypeVariation.objects.filter(id__in=variation_ids).values_list(
+                    "id", flat=True
+                )
+            )
+            for variation_id, key in variation_ids.items():
+                if variation_id not in known:
                     # Typed 404 with a stable code (matches the service-layer
                     # check + the sibling OfferGroupNotFound), instead of a
                     # generic 400 / a bare ValueError → 500.
@@ -135,9 +136,19 @@ class ForecastSerializer(NameFieldMixin, DeletableMixin, serializers.ModelSerial
                         details={"variation_id": variation_id},
                     )
 
-            elif key.startswith("offer_group_"):
-                offer_group_id = key.replace("offer_group_", "")
-                if not OfferGroup.objects.filter(id=offer_group_id).exists():
+        offer_group_ids = {
+            key.removeprefix("offer_group_"): key
+            for key in data
+            if key.startswith("offer_group_")
+        }
+        if offer_group_ids:
+            known = set(
+                OfferGroup.objects.filter(id__in=offer_group_ids).values_list(
+                    "id", flat=True
+                )
+            )
+            for offer_group_id, key in offer_group_ids.items():
+                if offer_group_id not in known:
                     raise OfferGroupNotFound(
                         f"OfferGroup with id {offer_group_id} does not exist",
                         field=key,
@@ -147,7 +158,22 @@ class ForecastSerializer(NameFieldMixin, DeletableMixin, serializers.ModelSerial
         return data
 
 
-class PurchaseSerializer(StorageFieldsMixin, serializers.ModelSerializer):
+class PurchaseSerializer(
+    UniqueConstraintErrorsMixin, StorageFieldsMixin, serializers.ModelSerializer
+):
+    UNIQUE_CONSTRAINT_ERRORS = {
+        "purchase_unique_year_week_day_article_unit_size_seller_storage": (
+            PurchaseAlreadyDocumented,
+            "This article in this unit and size is already documented as a "
+            "purchase from this supplier for this week and storage.",
+        ),
+        "purchase_unique_no_seller_year_week_day_article_unit_size_storage": (
+            PurchaseWithoutSellerAlreadyDocumented,
+            "This article in this unit and size is already documented as a "
+            "purchase without a supplier for this week and storage.",
+        ),
+    }
+
     seller_first_name = serializers.CharField(read_only=True)
     seller_last_name = serializers.CharField(read_only=True)
     seller_company_name = serializers.CharField(read_only=True)
@@ -157,6 +183,8 @@ class PurchaseSerializer(StorageFieldsMixin, serializers.ModelSerializer):
         fields = "__all__"
         # ``created_by`` is stamped by ``PurchaseViewSet.create``.
         read_only_fields = AUDIT_READONLY_FIELDS
+        # Uniqueness is checked by ``UniqueConstraintErrorsMixin``.
+        validators: list = []
 
     def validate(self, attrs):
         from isoweek import Week
@@ -165,6 +193,9 @@ class PurchaseSerializer(StorageFieldsMixin, serializers.ModelSerializer):
         from ..models import OrganicCertificate, ShareArticle
         from ..models.managers import active_on_date_q
 
+        if self.instance is None and attrs.get("day_number") is None:
+            # Purchases are weekly: a new one takes the slot its plan uses.
+            attrs["day_number"] = PURCHASE_DAY
         attrs = super().validate(attrs)
 
         status = attrs.get(
@@ -198,24 +229,64 @@ class PurchaseSerializer(StorageFieldsMixin, serializers.ModelSerializer):
             )
         return attrs
 
+    def _unique_candidate(self, model, attrs):
+        """A new purchase landing on an empty planning placeholder fills it
+        (``GenericDocumentationService.create_purchase_with_related_objects``),
+        so the placeholder is the row it is checked as."""
+        candidate = super()._unique_candidate(model, attrs)
+        if self.instance is None:
+            from ..services.documentation_service import GenericDocumentationService
 
-class HarvestSerializer(StorageFieldsMixin, serializers.ModelSerializer):
+            placeholder = GenericDocumentationService.empty_purchase_placeholder(attrs)
+            if placeholder is not None:
+                candidate.pk = placeholder.pk
+                candidate._state.adding = False
+        return candidate
+
+
+class HarvestSerializer(
+    UniqueConstraintErrorsMixin, StorageFieldsMixin, serializers.ModelSerializer
+):
+    UNIQUE_CONSTRAINT_ERRORS = {
+        "harvest_unique_year_week_day_article_unit_size_storage": (
+            HarvestAlreadyDocumented,
+            "This article in this unit and size is already documented as "
+            "harvest for this day and storage.",
+        ),
+    }
+
     class Meta:
         model = Harvest
         fields = "__all__"
         # Harvests are finalized through ``/bulk_finalize/``; ``created_by`` is
         # stamped by ``HarvestViewSet.create``.
         read_only_fields = (*AUDIT_READONLY_FIELDS, *FINALIZATION_READONLY_FIELDS)
+        # Uniqueness is checked by ``UniqueConstraintErrorsMixin``.
+        validators: list = []
 
 
-class WasteSerializer(StorageFieldsMixin, NameFieldMixin, serializers.ModelSerializer):
+class WasteSerializer(
+    UniqueConstraintErrorsMixin,
+    StorageFieldsMixin,
+    NameFieldMixin,
+    serializers.ModelSerializer,
+):
     NAME_FIELDS = ["share_article_name"]
+    UNIQUE_CONSTRAINT_ERRORS = {
+        "waste_unique_year_week_day_article_unit_size_storage": (
+            WasteAlreadyDocumented,
+            "This article in this unit and size is already documented as "
+            "waste for this day and storage.",
+        ),
+    }
 
     class Meta:
         model = Waste
         fields = "__all__"
         # ``created_by`` is stamped by ``WasteViewSet.create``.
         read_only_fields = AUDIT_READONLY_FIELDS
+        # Uniqueness is checked by ``UniqueConstraintErrorsMixin``.
+        validators: list = []
 
 
 class DocumentationAggregationItemSerializer(serializers.Serializer):
@@ -241,6 +312,11 @@ class PurchaseBulkSetAsExpectedItemSerializer(serializers.Serializer):
     theoretical_purchase_unit = serializers.CharField()
     theoretical_purchase_size = serializers.CharField()
     storage = serializers.CharField()
+    # The selected row's seller (null for a row without one). Left out, the
+    # slot's empty row is taken.
+    seller = serializers.PrimaryKeyRelatedField(
+        queryset=Reseller.objects.all(), required=False, allow_null=True
+    )
 
 
 class PurchaseBulkSetAsExpectedRequestSerializer(serializers.Serializer):

@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
 import {
   Alert,
   Button,
@@ -9,7 +8,6 @@ import {
   Flex,
   Space,
   Spin,
-  Table,
   Tag,
   Upload,
 } from "antd";
@@ -17,7 +15,9 @@ import { InboxOutlined } from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
 
 import { WeekSelector } from "@shared/selectors";
+import { useYearWeekState } from "@hooks/useYearWeekState";
 import { ExplainerText } from "@shared/ui";
+import { ReadOnlyReportTable } from "@shared/tables";
 import { ExternalCodeMappingsModal } from "@features/commissioning/modals";
 import {
   commissioningShareImportBatchesApplyCreate,
@@ -100,11 +100,8 @@ function failedBatchFromError(err: unknown): ShareImportBatch | null {
 export default function ImportShares() {
   const { t } = useTranslation();
 
-  const now = dayjs();
-  const [selectedYear, setSelectedYear] = useState<number>(now.isoWeekYear());
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(
-    now.isoWeek(),
-  );
+  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
+    useYearWeekState();
 
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [activeBatch, setActiveBatch] = useState<ShareImportBatch | null>(null);
@@ -238,9 +235,7 @@ export default function ImportShares() {
         title={`${title} (${rows.length})`}
         style={{ marginTop: 12 }}
       >
-        <Table
-          size="small"
-          className="custom-jasmin-table"
+        <ReadOnlyReportTable
           rowKey={(r) => `${r.variation_id}|${r.delivery_station_day_id}`}
           columns={cols}
           dataSource={rows}
@@ -349,9 +344,7 @@ export default function ImportShares() {
 
           {errorRows.length > 0 && (
             <Card size="small" title={t("import_shares.errors")}>
-              <Table
-                size="small"
-                className="custom-jasmin-table"
+              <ReadOnlyReportTable
                 rowKey="row"
                 columns={[
                   {
@@ -399,9 +392,7 @@ export default function ImportShares() {
 
       <Card title={t("import_shares.history")} style={{ marginTop: 16 }}>
         <Spin spinning={loading}>
-          <Table
-            size="small"
-            className="custom-jasmin-table"
+          <ReadOnlyReportTable
             rowKey="id"
             dataSource={batches}
             onRow={(record) => ({

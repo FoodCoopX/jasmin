@@ -1,30 +1,51 @@
 .with-orders {
-  color: green !important;
+  color: var(--color-success-text) !important;
 }
 
 .without-orders {
-  color: rgb(67, 66, 66) !important;
-  /* color: inherit; */
+  color: var(--color-text-secondary) !important;
 }
 .day-select-differs .ant-select-selector {
-  border-color: red !important;
+  border-color: var(--color-error) !important;
 }
 
 /* Day selects with violet border */
 .day-select-violet .ant-select-selector {
-  border-color: #743984 !important; /* violet */
+  border-color: var(--color-order-day-border) !important;
   border-width: 2px !important;
 }
 
 .day-select-violet.ant-select-focused .ant-select-selector {
-  border-color: #743984 !important;
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2) !important;
+  border-color: var(--color-order-day-border) !important;
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--color-order-day-border) 20%, transparent) !important;
 }
 
 .day-select-violet.ant-select-disabled .ant-select-selector {
-  border-color: #807d83 !important; /* lighter violet when disabled */
+  border-color: var(--color-text-muted) !important;
 }
 
+/* The four order day selects above the Orders tables. */
+.order-day-selectors {
+  margin: 1.5em 0;
+  display: flex;
+  gap: 1em;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.order-day-selector {
+  gap: 0.25em;
+}
+
+.order-day-selector .ant-select {
+  width: 80px;
+}
+
+.order-day-label-differs {
+  color: var(--color-error-text);
+  font-weight: bold;
+}
 
 .bold-select .ant-select-selection-item,
 .bold-select .ant-select-selection-placeholder {
@@ -34,11 +55,11 @@
 
 .week-selector-select .ant-select-selector {
   border-color: var(--color-primary) !important;
-  box-shadow: 
-  0 2px 4px rgba(34, 108, 71, 0.1),
-  0 4px 8px rgba(34, 108, 71, 0.15),
-  0 8px 16px rgba(34, 108, 71, 0.1),
-  0 16px 32px rgba(34, 108, 71, 0.05);
+  box-shadow:
+    0 2px 4px rgba(34, 108, 71, 0.1),
+    0 4px 8px rgba(34, 108, 71, 0.15),
+    0 8px 16px rgba(34, 108, 71, 0.1),
+    0 16px 32px rgba(34, 108, 71, 0.05);
 }
 
 .week-selector-select:hover .ant-select-selector {
@@ -52,11 +73,11 @@
 
 .week-selector-small-buttons {
   border-color: var(--color-primary) !important;
-  box-shadow: 
-  0 2px 4px rgba(34, 108, 71, 0.1),
-  0 4px 8px rgba(34, 108, 71, 0.15),
-  0 8px 16px rgba(34, 108, 71, 0.1),
-  0 16px 32px rgba(34, 108, 71, 0.05);
+  box-shadow:
+    0 2px 4px rgba(34, 108, 71, 0.1),
+    0 4px 8px rgba(34, 108, 71, 0.15),
+    0 8px 16px rgba(34, 108, 71, 0.1),
+    0 16px 32px rgba(34, 108, 71, 0.05);
 }
 
 /* Storage-logging date range picker: subtle border and text from the
@@ -68,4 +89,58 @@
 
 .logging-storage-range-picker .ant-picker-input > input {
   color: var(--color-text-primary);
+}
+
+/* The storage selector's own left margin is pulled back so the filter row
+   starts flush with the page; the date row below keeps it. */
+.logging-storage-filters {
+  margin-bottom: 1em;
+  margin-left: -2em;
+}
+
+.logging-storage-date-row {
+  margin-top: 1em;
+  margin-left: 2em;
+}
+
+.documentation-source-select {
+  width: 12em;
+}
+/* Widths and spacing of the entity selectors in a page's filter row. */
+.delivery-station-selector {
+  width: 18em;
+  margin-inline: 2em;
+}
+
+.delivery-station-day-selector {
+  width: 18em;
+}
+
+.tour-selector {
+  width: 8em;
+  margin-top: 1em;
+  margin-bottom: 1.5em;
+}
+
+.reseller-selector,
+.share-article-selector {
+  width: 22em;
+}
+
+.reseller-selector--seller {
+  margin-left: 2em;
+}
+
+.offer-group-selector {
+  width: 12em;
+  margin-top: 2em;
+}
+
+.storage-selector {
+  width: 15em;
+  margin-inline: 2em;
+}
+
+.share-type-selector--outdented {
+  margin-left: -1em;
 }

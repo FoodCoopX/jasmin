@@ -151,7 +151,7 @@ export default function ConfigurationUsers() {
   }, [queryClient]);
 
   // ---- Resend invitation -----------------------------------------------
-  const handleResend = async (userId: string) => {
+  const handleResend = useCallback(async (userId: string) => {
     setResendingId(userId);
     try {
       await authAdminUsersResendInvitationCreate(userId);
@@ -162,11 +162,11 @@ export default function ConfigurationUsers() {
     } finally {
       setResendingId(null);
     }
-  };
+  }, [t, fetchUsers]);
 
   // ---- Cancel invitation ------------------------------------------------
   // Revokes the emailed link; the account stays and a resend undoes it.
-  const handleCancelInvitation = async (userId: string) => {
+  const handleCancelInvitation = useCallback(async (userId: string) => {
     setCancellingId(userId);
     try {
       await authAdminUsersCancelInvitationCreate(userId);
@@ -177,10 +177,10 @@ export default function ConfigurationUsers() {
     } finally {
       setCancellingId(null);
     }
-  };
+  }, [t, fetchUsers]);
 
   // ---- Toggle active/inactive -------------------------------------------
-  const handleToggleActive = async (u: UserRow) => {
+  const handleToggleActive = useCallback(async (u: UserRow) => {
     const next = u.account_status === "active" ? "inactive" : "active";
     try {
       await authAdminUsersPartialUpdate(u.id, { account_status: next });
@@ -198,12 +198,7 @@ export default function ConfigurationUsers() {
         ),
       );
     }
-  };
-
-  // ---- Edit roles -------------------------------------------------------
-  const openRoleEditor = (u: UserRow) => {
-    setRoleEditUser(u);
-  };
+  }, [t, fetchUsers]);
 
   // ---- Splitting users into three buckets ------------------------------
   const { staffUsers, customerUsers, memberOnlyUsers } = useMemo(() => {
@@ -295,7 +290,7 @@ export default function ConfigurationUsers() {
                 size="small"
                 icon={<EditOutlined />}
                 aria-label={t("users.edit_roles")}
-                onClick={() => openRoleEditor(u)}
+                onClick={() => setRoleEditUser(u)}
               />
               <RoleTags roles={u.roles} />
             </Space>
@@ -438,8 +433,17 @@ export default function ConfigurationUsers() {
         },
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, formatDate, resendingId, cancellingId, onboardingMode, smtpConfigured],
+    [
+      t,
+      formatDate,
+      resendingId,
+      cancellingId,
+      onboardingMode,
+      smtpConfigured,
+      handleResend,
+      handleCancelInvitation,
+      handleToggleActive,
+    ],
   );
 
   const columns = useMemo(() => buildColumns(), [buildColumns]);

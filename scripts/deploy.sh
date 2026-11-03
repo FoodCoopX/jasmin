@@ -4,17 +4,26 @@
 # on the server, as the non-root user (must be in the 'docker' group).
 #
 # It:
-#   1. validates .env (exists, no CHANGE_ME left, required vars set)
+#   1. validates .env (exists, no CHANGE_ME left, required vars set) and,
+#      with APP_DB_USER set, that the app's database role owns the database
 #   2. issues the wildcard TLS cert if it isn't in the volume yet
 #   3. pulls the newest build of every image tag, builds the images and tags
 #      them as a release (scripts/rollback.sh)
 #   4. takes an encrypted snapshot of the database before it is migrated
 #   5. brings up the CORE stack (skips glitchtip/uptime — Phase 5)
 #   6. waits for the backend to migrate + report healthy
-#   7. smoke-tests HTTPS
+#   7. prunes untagged images and build cache unused for 30 days; the release
+#      tags keep the images scripts/rollback.sh switches back to
+#   8. smoke-tests readiness over HTTPS: https://<domain>/health/ready/ answers
+#      200 only while the backend reaches the database and Redis takes writes
 #
 # Idempotent: re-run any time to rebuild + roll the stack. The cert is only
 # issued once (skipped when already present).
+#
+# Exit status: a failed readiness probe never stops the deploy. It is reported
+# with what to check next, and the script exits 1 at the very end, after every
+# step has run. Any other non-zero exit is a step that failed and stopped the
+# script there.
 #
 #   ./scripts/deploy.sh
 # =============================================================================
@@ -33,8 +42,10 @@ command -v docker >/dev/null 2>&1 || die "docker not found — run scripts/boots
 docker info >/dev/null 2>&1 || die "can't talk to docker (add your user to the 'docker' group and re-login)."
 [ -f "$ENV_FILE" ] || die ".env not found — restore the production .env from the password manager."
 
-# Read a value from .env (keeps everything after the first '=').
-envval() { grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2-; }
+# Read a value from .env (keeps everything after the first '='). A missing key
+# reads as empty: under pipefail, grep finding no line would fail the
+# assignment, and set -e would end the script without a message.
+envval() { grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- || true; }
 
 # 1a. no unfilled placeholders (the platform SMTP is a hard boot requirement).
 # Match "=CHANGE_ME" (value assignments) only — the file's comments mention the
@@ -57,15 +68,58 @@ fi
 # 1b. required vars present (compose fails to parse otherwise; the backend
 #     refuses to boot without the email/secret ones)
 REQUIRED="COMPOSE_PROJECT_NAME FRONTEND_DOMAIN DJANGO_ALLOWED_HOSTS \
-DJANGO_SECRET_KEY FIELD_ENCRYPTION_KEY POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD \
+DJANGO_SECRET_KEY FIELD_ENCRYPTION_KEY INVOICE_HASH_KEY \
+POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD \
 REDIS_PASSWORD BACKUP_ENCRYPTION_KEY EMAIL_HOST EMAIL_ADMIN \
-GLITCHTIP_DOMAIN GLITCHTIP_DB_PASSWORD GLITCHTIP_SECRET_KEY \
-DJANGO_SUPERUSER_EMAIL DJANGO_SUPERUSER_PASSWORD"
+GLITCHTIP_DOMAIN GLITCHTIP_DB_PASSWORD GLITCHTIP_SECRET_KEY"
 missing=""
 for v in $REQUIRED; do
     [ -n "$(envval "$v")" ] || missing="$missing $v"
 done
 [ -z "$missing" ] || die "missing/empty required .env vars:$missing"
+
+# 1b-bis. backend and huey log in as the app's own database role (APP_DB_USER,
+# no superuser) and fall back to the superuser while it is unset. Half a pair
+# would log in with the wrong password.
+APP_DB_USER_VALUE="$(envval APP_DB_USER)"
+APP_DB_PASSWORD_VALUE="$(envval APP_DB_PASSWORD)"
+if [ -n "$APP_DB_USER_VALUE" ] && [ -z "$APP_DB_PASSWORD_VALUE" ]; then
+    die "APP_DB_USER is set but APP_DB_PASSWORD is empty — set both, or neither."
+fi
+if [ -z "$APP_DB_USER_VALUE" ] && [ -n "$APP_DB_PASSWORD_VALUE" ]; then
+    die "APP_DB_PASSWORD is set but APP_DB_USER is empty — set both, or neither."
+fi
+if [ -n "$APP_DB_USER_VALUE" ] && [ "$APP_DB_USER_VALUE" = "$(envval POSTGRES_USER)" ]; then
+    die "APP_DB_USER names the superuser POSTGRES_USER — the app's role has to be a role of its own."
+fi
+if [ -z "$APP_DB_USER_VALUE" ]; then
+    log "WARN: the app logs in as the database superuser — give it its own role as the header of postgres/app_db_role.sh describes"
+else
+    # The app can't start until its role owns the database. Checked with this
+    # checkout's script, which the running postgres container may not have
+    # mounted yet, passed as an argument: a script read from stdin that never
+    # arrived would pass as an empty one. A first deploy has no database to
+    # check, and postgres creates the role along with it.
+    pg_cid="$(docker compose ps -q postgres 2>/dev/null || true)"
+    if [ -n "$pg_cid" ] && \
+       [ "$(docker inspect -f '{{.State.Running}}' "$pg_cid" 2>/dev/null)" = "true" ]; then
+        app_db_role_script="$(cat postgres/app_db_role.sh)"
+        docker compose exec -T -e APP_DB_USER="$APP_DB_USER_VALUE" postgres \
+            sh -c "$app_db_role_script" app_db_role.sh --check \
+            || die "the database isn't handed to ${APP_DB_USER_VALUE} yet (above) — nothing deployed."
+    fi
+fi
+
+# 1b-ter. the origin gate's secrets become nginx map keys, and the gateway
+# refuses to start on one it can't use (nginx/render_config.sh) — checked here,
+# before anything restarts.
+for v in BUNNY_ORIGIN_SECRET BUNNY_ORIGIN_SECRET_NEXT; do
+    value="$(envval "$v")"
+    [ -z "$value" ] || [[ "$value" =~ ^[A-Za-z0-9]{32,64}$ ]] || \
+        die "$v must be 32 to 64 letters and digits (openssl rand -hex 32)."
+done
+[ -n "$(envval BUNNY_ORIGIN_SECRET)" ] || [ -z "$(envval BUNNY_ORIGIN_SECRET_NEXT)" ] || \
+    die "BUNNY_ORIGIN_SECRET_NEXT is set but BUNNY_ORIGIN_SECRET is empty."
 
 PROJECT="$(envval COMPOSE_PROJECT_NAME)"
 DOMAIN="$(envval FRONTEND_DOMAIN)"
@@ -178,6 +232,12 @@ if [ -n "$plain_dumps" ]; then
 fi
 
 # ── 5. bring up the core stack (glitchtip/uptime deferred to Phase 5) ───────
+# The Bunny edges whose X-Forwarded-For the origin gate trusts (only while
+# BUNNY_ORIGIN_SECRET is set). A failed fetch keeps the list already there.
+log "refreshing the Bunny edge list"
+./scripts/refresh_bunny_edge_ips.sh --no-reload \
+    || log "WARN: Bunny edge list not refreshed (above) — the gateway keeps the one it has"
+
 log "starting core services"
 docker compose up -d postgres redis backend huey frontend gateway certbot backup
 
@@ -202,10 +262,80 @@ if [ "$healthy" -ne 1 ]; then
     log "WARN: backend not healthy yet. Tail logs with: docker compose logs -f backend"
 fi
 
-# ── 7. smoke test (best-effort) ──────────────────────────────────────────────
-# curl prints 000 itself when it gets no answer.
-code="$(curl -ksS -o /dev/null -w '%{http_code}' "https://${DOMAIN}/health/" 2>/dev/null || true)"
-log "https://${DOMAIN}/health/ -> HTTP ${code} (expect 200)"
+# ── 7. reclaim disk space ────────────────────────────────────────────────────
+# The --pull and the pull above leave each image they replace behind, untagged,
+# and every build adds to the build cache; nothing else removes either from the
+# disk Postgres, Redis and the backups share. Pruned here, once the containers
+# run the new images and no longer hold the old ones: untagged images, and build
+# cache unused for 30 days. `image prune -a` or `system prune -a` would also
+# delete the release-tagged images scripts/rollback.sh switches back to. A
+# failed prune never fails the deploy.
+log "pruning untagged images and build cache unused for 30 days"
+docker image prune -f \
+    || log "WARN: docker image prune failed — untagged images stay on disk (docker system df)"
+docker builder prune -f --filter until=720h \
+    || log "WARN: docker builder prune failed — old build cache stays on disk (docker system df)"
+
+# ── 8. readiness smoke test ──────────────────────────────────────────────────
+# /health/ready/ answers 200 only while the backend reaches the database and
+# Redis takes writes. /health/, the containers' healthcheck, stays 200 through
+# an outage of either, so "healthy" above doesn't mean "serving". A failure
+# stops nothing: it is reported here, and the script exits 1 at the very end.
+
+# Prints the HTTP code of URL $1. No answer yet (000, the gateway restarted a
+# moment ago) and 5xx are retried a few times; --max-time keeps a hung backend
+# from stalling the deploy. curl prints 000 itself when it gets no answer.
+probe() {
+    local attempt code
+    for attempt in 1 2 3 4 5 6; do
+        code="$(curl -ksS -o /dev/null --max-time 10 -w '%{http_code}' "$1" 2>/dev/null || true)"
+        code="${code:-000}"
+        case "$code" in
+            000 | 5??) ;;
+            *) break ;;
+        esac
+        [ "$attempt" -eq 6 ] || sleep 5
+    done
+    echo "$code"
+}
+
+# What a failed readiness probe means and where to look next. $1: the URL,
+# $2: the HTTP code it answered.
+warn_not_ready() {
+    local meaning
+    case "$2" in
+        503) meaning="The backend answers but can't reach the database or can't write to Redis." ;;
+        502 | 504) meaning="The gateway can't reach the backend." ;;
+        000) meaning="No answer: the gateway is down, TLS or DNS fails, or the backend hangs." ;;
+        *) meaning="The readiness probe never answers that: is this the right host and release?" ;;
+    esac
+    cat >&2 <<EOF
+
+⚠️  ==========================================================================
+⚠️  NOT READY: $1 -> HTTP $2
+⚠️  ${meaning}
+⚠️  The containers may still report healthy: their healthcheck, /health/, touches
+⚠️  neither the database nor Redis. Real requests are failing.
+⚠️  Next:
+⚠️    docker compose ps                     # postgres, redis, backend up and healthy?
+⚠️    docker compose logs --tail=200 backend
+⚠️        # "health.ready.unavailable component=..." names what failed, the
+⚠️        # traceback below it says why
+⚠️    docker compose logs --tail=100 postgres redis gateway
+⚠️    docker compose exec redis sh -c 'redis-cli -a "\$REDIS_PASSWORD" --no-auth-warning info memory'
+⚠️        # used_memory over maxmemory: Redis refuses writes
+⚠️  Check again with: curl -k $1
+⚠️  If this release is the cause: ./scripts/rollback.sh
+⚠️  ==========================================================================
+EOF
+}
+
+READY_URL="https://${DOMAIN}/health/ready/"
+ready_code="$(probe "$READY_URL")"
+log "${READY_URL} -> HTTP ${ready_code} (expect 200)"
+if [ "$ready_code" != "200" ]; then
+    warn_not_ready "$READY_URL" "$ready_code"
+fi
 
 echo ""
 echo "✅ Deploy run complete."
@@ -213,5 +343,14 @@ echo "   Next (see the runbook, Phase 2.5+):"
 echo "   1. Add your IP to nginx/super_admin_allowed_ips.conf, then:"
 echo "        docker compose restart gateway"
 echo "   2. Log in at https://${ADMIN_HOST}.${DOMAIN} and create your tenants."
+echo "      While BUNNY_ORIGIN_SECRET is set, add each new tenant host to the Bunny"
+echo "      pull zone first: the gateway gives a host that bypasses Bunny no answer."
 echo "   3. Configure EACH tenant's own SMTP before inviting its users."
 echo "   4. Wire off-host backups (Phase 3), then run scripts/restore_drill.sh."
+
+# The readiness verdict, after every step has run.
+if [ "$ready_code" != "200" ]; then
+    echo "" >&2
+    echo "❌ The stack is up but NOT READY: ${READY_URL} answered HTTP ${ready_code} (see the warning above)." >&2
+    exit 1
+fi

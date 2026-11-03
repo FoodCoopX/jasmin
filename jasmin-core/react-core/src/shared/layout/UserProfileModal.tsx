@@ -19,11 +19,23 @@ import { authPartialUpdate } from "@shared/api/generated/auth/auth";
 import { gdprRequestDeletionCreate } from "@shared/api/generated/gdpr/gdpr";
 import { useAuth } from "@shared/contexts/AuthContext";
 import { RoleTags, useRoles } from "@shared/auth";
+import { useCapability } from "@hooks/index";
 import { notify } from "@shared/utils";
+import { getServerErrorMessage } from "@shared/utils/apiError";
 import TwoFactorPanel from "@shared/profile/TwoFactorPanel";
 import MyDataTab from "./MyDataTab";
 
 const { Paragraph } = Typography;
+
+/** AntD's ``validateFields`` rejects with ``{ errorFields, ... }``; the form
+ * already marks those fields, so a toast on top would only repeat them. */
+function isFormValidationError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    Array.isArray((err as { errorFields?: unknown }).errorFields)
+  );
+}
 
 export type UserProfileTab = "profile" | "my_data" | "two_factor";
 
@@ -46,6 +58,8 @@ export default function UserProfileModal({
   const { t } = useTranslation();
   const { user, logout, updateUser } = useAuth();
   const { roles } = useRoles();
+  const offersUserAccounts = useCapability("user_accounts");
+  const offersGdpr = useCapability("gdpr");
 
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -66,9 +80,10 @@ export default function UserProfileModal({
       });
       notify.success(t("profile.saved"));
       setEditMode(false);
-    } catch (error) {
-      console.error("Operation failed:", error);
-      notify.error(t("profile.save_error"));
+    } catch (err) {
+      if (!isFormValidationError(err)) {
+        notify.error(getServerErrorMessage(err) ?? t("profile.save_error"));
+      }
     } finally {
       setSaving(false);
     }
@@ -81,8 +96,10 @@ export default function UserProfileModal({
       setDeleteConfirmVisible(false);
       onClose();
       await logout();
-    } catch (error) {
-      console.error("Operation failed:", error);
+    } catch (err) {
+      notify.error(
+        getServerErrorMessage(err) ?? t("gdpr.request_deletion_failed"),
+      );
       setDeleting(false);
     }
   };
@@ -90,8 +107,8 @@ export default function UserProfileModal({
   const handleOpen = () => {
     if (user) {
       form.setFieldsValue({
-        first_name: (user as Record<string, unknown>).first_name || "",
-        last_name: (user as Record<string, unknown>).last_name || "",
+        first_name: user.first_name ?? "",
+        last_name: user.last_name ?? "",
       });
     }
   };
@@ -101,13 +118,13 @@ export default function UserProfileModal({
       {!editMode ? (
         <Descriptions column={1} bordered size="small">
           <Descriptions.Item label={t("profile.email")}>
-            {(user as Record<string, unknown> | null)?.email as string}
+            {user?.email}
           </Descriptions.Item>
           <Descriptions.Item label={t("profile.first_name")}>
-            {(user as Record<string, unknown> | null)?.first_name as string}
+            {user?.first_name}
           </Descriptions.Item>
           <Descriptions.Item label={t("profile.last_name")}>
-            {(user as Record<string, unknown> | null)?.last_name as string}
+            {user?.last_name}
           </Descriptions.Item>
           <Descriptions.Item label={t("profile.role")}>
             <RoleTags roles={roles} />
@@ -131,7 +148,7 @@ export default function UserProfileModal({
           </Form.Item>
         </Form>
       )}
-      <div className="flex-end" style={{ marginTop: 16 }}>
+      <div className="flex-end mt-16">
         {editMode ? (
           <Space>
             <Button onClick={() => setEditMode(false)}>
@@ -175,25 +192,37 @@ export default function UserProfileModal({
         defaultActiveKey={initialTab}
         key={`${open ? "open" : "closed"}-${initialTab}`}
         items={[
-          {
-            key: "profile",
-            label: t("profile.tab_profile"),
-            children: profileTab,
-          },
-          {
-            key: "my_data",
-            label: t("profile.tab_my_data"),
-            children: (
-              <MyDataTab
-                onRequestDeletion={() => setDeleteConfirmVisible(true)}
-              />
-            ),
-          },
-          {
-            key: "two_factor",
-            label: t("profile.tab_two_factor"),
-            children: <TwoFactorPanel />,
-          },
+          ...(offersUserAccounts
+            ? [
+                {
+                  key: "profile",
+                  label: t("profile.tab_profile"),
+                  children: profileTab,
+                },
+              ]
+            : []),
+          ...(offersGdpr
+            ? [
+                {
+                  key: "my_data",
+                  label: t("profile.tab_my_data"),
+                  children: (
+                    <MyDataTab
+                      onRequestDeletion={() => setDeleteConfirmVisible(true)}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(offersUserAccounts
+            ? [
+                {
+                  key: "two_factor",
+                  label: t("profile.tab_two_factor"),
+                  children: <TwoFactorPanel />,
+                },
+              ]
+            : []),
         ]}
       />
 
@@ -227,7 +256,7 @@ export default function UserProfileModal({
           description={t("gdpr.deletion_warning_description")}
           type="error"
           showIcon
-          style={{ marginBottom: 16 }}
+          className="mb-16"
         />
         <Paragraph>{t("gdpr.deletion_consequences")}</Paragraph>
       </Modal>

@@ -6,6 +6,8 @@ import type { DefaultOptionType } from "antd/es/select";
 export interface SelectorOption<V> {
   value: V;
   label: ReactNode;
+  /** Class on the option in the open list. */
+  className?: string;
 }
 
 export interface BaseEntitySelectorProps<V> {
@@ -44,7 +46,23 @@ export interface BaseEntitySelectorProps<V> {
   autoSelectFirst?: boolean;
   /** Keep the current selection if it still exists in options. */
   preserveSelection?: boolean;
+  /**
+   * With `preserveSelection`: the value the pick becomes once the list has
+   * loaded empty, so no pick from an earlier list stays shown. Left unset, an
+   * empty list keeps the pick — the only choice for a value type without an
+   * empty value.
+   */
+  emptyValue?: V;
 }
+
+// AntD Select treats a `null` value as "nothing picked" and shows the
+// placeholder, so a `null` option (an "all" entry) goes through the Select
+// under this stand-in value instead.
+const NULL_OPTION_VALUE = "__base-entity-selector-null__";
+
+const toSelectValue = <V extends string | number | null>(
+  value: V,
+): string | number => (value === null ? NULL_OPTION_VALUE : value);
 
 const matchesOptionLabel = (
   input: string,
@@ -75,10 +93,17 @@ export default function BaseEntitySelector<V extends string | number | null>({
   optionFilterProp,
   autoSelectFirst = false,
   preserveSelection = false,
+  emptyValue,
 }: BaseEntitySelectorProps<V>) {
   // Auto-select / preserve-selection logic
   useEffect(() => {
-    if (loading || !options.length) return;
+    if (loading) return;
+    if (!options.length) {
+      if (preserveSelection && emptyValue !== undefined && value !== emptyValue) {
+        onValueChange(emptyValue);
+      }
+      return;
+    }
     if (!autoSelectFirst && !preserveSelection) return;
 
     const currentExists = options.some((o) => o.value === value);
@@ -94,14 +119,34 @@ export default function BaseEntitySelector<V extends string | number | null>({
     onValueChange,
     autoSelectFirst,
     preserveSelection,
+    emptyValue,
   ]);
 
+  const selectOptions = useMemo<DefaultOptionType[]>(
+    () =>
+      options.map((option) => ({
+        value: toSelectValue(option.value),
+        label: option.label,
+        className: option.className,
+      })),
+    [options],
+  );
+
+  const selectValue =
+    value === null && options.some((option) => option.value === null)
+      ? NULL_OPTION_VALUE
+      : (value ?? undefined);
+
   const handleChange = useCallback(
-    (next: V) => {
-      onValueChange(next);
-      onChange?.(next);
+    (next: string | number) => {
+      const picked = options.find(
+        (option) => toSelectValue(option.value) === next,
+      );
+      if (!picked) return;
+      onValueChange(picked.value);
+      onChange?.(picked.value);
     },
-    [onValueChange, onChange],
+    [options, onValueChange, onChange],
   );
 
   const effectiveFilterOption = useMemo(() => {
@@ -110,13 +155,13 @@ export default function BaseEntitySelector<V extends string | number | null>({
   }, [showSearch, filterOption]);
 
   return (
-    <Select
-      value={value ?? undefined}
+    <Select<string | number>
+      value={selectValue}
       style={style}
       className={className}
       size={size}
       onChange={handleChange}
-      options={options as DefaultOptionType[]}
+      options={selectOptions}
       placeholder={placeholder}
       aria-label={ariaLabel ?? placeholder}
       loading={loading}

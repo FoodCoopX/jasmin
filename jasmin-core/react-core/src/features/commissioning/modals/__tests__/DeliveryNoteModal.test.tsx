@@ -433,6 +433,8 @@ describe("DeliveryNoteModal cells", () => {
 
     expect(screen.getByTestId("lines-line-1-amount")).toHaveTextContent("2,50");
     expect(screen.getByTestId("lines-line-2-amount")).toHaveTextContent("12,0");
+    const amount = grid("lines").columns.find((c) => c.dataIndex === "amount");
+    expect(amount?.inputType).toBe("positive_decimal3");
   });
 
   it("shows no VAT column, so the rate is only corrected on the invoice", () => {
@@ -792,7 +794,7 @@ describe("DeliveryNoteModal crate lines", () => {
     const { show } = renderModal();
     await waitFor(() => expect(crateRows()).toHaveLength(1));
 
-    await user.click(screen.getByRole("button", { name: /table\.add_plus_icon/ }));
+    await user.click(screen.getByRole("button", { name: /table\.add_record/ }));
     await pickCrateType(user, "Large");
     await user.type(within(editingRow()).getByLabelText(AMOUNT), "2");
     // Meanwhile a large-crate line was added to the note elsewhere.

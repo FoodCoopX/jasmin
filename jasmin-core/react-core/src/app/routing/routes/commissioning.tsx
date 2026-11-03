@@ -1,4 +1,4 @@
-import { RequireRole } from "@shared/auth";
+import { RequireCapability, RequireRole } from "@shared/auth";
 import { lazy } from "react";
 import type { AppRoute } from "../types";
 
@@ -222,9 +222,11 @@ export const commissioningRoutes: AppRoute[] = [
   {
     path: "/commissioning/delivery-tours",
     element: (
-      <RequireRole flag="isStaff">
-        <DeliveryTours />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isStaff">
+          <DeliveryTours />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
@@ -388,33 +390,41 @@ export const commissioningRoutes: AppRoute[] = [
   {
     path: "/commissioning/list-delivery-stations",
     element: (
-      <RequireRole flag="isStaff">
-        <ListDeliveryStations />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isStaff">
+          <ListDeliveryStations />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
     path: "/commissioning/delivery-station-fees",
     element: (
-      <RequireRole flag="isOffice">
-        <DeliveryStationFees />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isOffice">
+          <DeliveryStationFees />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
     path: "/commissioning/delivery-stations-overview",
     element: (
-      <RequireRole flag="isStaff">
-        <DeliveryStationsOverview />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isStaff">
+          <DeliveryStationsOverview />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
     path: "/commissioning/delivery-stations-details",
     element: (
-      <RequireRole flag="isStaff">
-        <DeliveryStationsDetails />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isStaff">
+          <DeliveryStationsDetails />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
@@ -496,9 +506,11 @@ export const commissioningRoutes: AppRoute[] = [
   {
     path: "/commissioning/import-shares",
     element: (
-      <RequireRole flag="isOffice">
-        <ImportShares />
-      </RequireRole>
+      <RequireCapability name="manual_share_import">
+        <RequireRole flag="isOffice">
+          <ImportShares />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
 ];

@@ -11,6 +11,8 @@
  *   - ``isReadOnly = isPastWeek || isOrderingClosed`` is computed and
  *     passed through to ``useCustomerOrderColumns`` and ``-Mutations``
  *   - the deadline tag is rendered when ``orderingDeadline`` is set
+ *   - ``setsPrice`` follows the caller's roles: the office prices the lines
+ *     it saves, the server a customer's
  *   - the reseller-edit modal flow (open → submit) hits the PATCH
  *     endpoint and closes the modal
  *   - render-loop smoke: a real setState-in-render loop produces
@@ -42,8 +44,10 @@ vi.mock("react-i18next", () => ({
 }));
 
 const logoutMock = vi.fn();
+// Read at render time, so a test can set the caller's roles before mounting.
+let authUser: { id: string; roles?: string[] } = { id: "u-1" };
 vi.mock("@shared/contexts/AuthContext", () => ({
-  useAuth: () => ({ user: { id: "u-1" }, logout: logoutMock }),
+  useAuth: () => ({ user: authUser, logout: logoutMock }),
 }));
 
 // ``CustomerOrderPage`` resolves its price tiers via ``useOfferTiers`` (which
@@ -61,13 +65,9 @@ vi.mock("@hooks/index", async () => {
     logoUrl: "https://example.test/logo.png",
     getSetting: (_key: string, defaultValue?: unknown) => defaultValue,
   });
-  const { useYearWeekState, currentYear, currentWeek } = await import(
-    "@hooks/useYearWeekState"
-  );
+  const { useYearWeekState } = await import("@hooks/useYearWeekState");
   return {
     useYearWeekState,
-    currentYear,
-    currentWeek,
     useTenant: () => tenant,
     useCurrency: () => ({
       currencySymbol: "€",
@@ -214,7 +214,11 @@ function lastColumnsParams() {
 }
 function lastMutationsParams() {
   const calls = useCustomerOrderMutationsMock.mock.calls;
-  return calls[calls.length - 1][0] as { selectedYear: number; selectedWeek: number };
+  return calls[calls.length - 1][0] as {
+    selectedYear: number;
+    selectedWeek: number;
+    setsPrice: boolean;
+  };
 }
 
 beforeEach(() => {
@@ -244,6 +248,7 @@ beforeEach(() => {
   });
 
   logoutMock.mockReset();
+  authUser = { id: "u-1" };
 });
 
 afterEach(() => {
@@ -350,6 +355,31 @@ describe("orderDayNumbers effect", () => {
       expect((params as unknown as { selectedDay: number }).selectedDay).toBe(2);
     });
   });
+});
+
+// ── Who prices the lines ────────────────────────────────────────────────────
+
+describe("setsPrice", () => {
+  it("leaves a customer's line prices to the server", async () => {
+    authUser = { id: "u-1", roles: ["customer"] };
+
+    renderPage();
+    await screen.findByTestId("order-header");
+
+    expect(lastMutationsParams().setsPrice).toBe(false);
+  });
+
+  it.each(["office", "admin", "management"])(
+    "lets %s price the lines it saves",
+    async (role) => {
+      authUser = { id: "u-1", roles: [role] };
+
+      renderPage({ route: "/customer/r-1" });
+      await screen.findByTestId("order-header");
+
+      expect(lastMutationsParams().setsPrice).toBe(true);
+    },
+  );
 });
 
 // ── Render-loop smoke ───────────────────────────────────────────────────────

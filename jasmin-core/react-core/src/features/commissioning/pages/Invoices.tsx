@@ -5,7 +5,7 @@ import {
   TableOutlined,
 } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Flex, Radio, Tag, Typography } from "antd";
+import { Button, Card, Flex, Radio, Typography } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,6 +24,7 @@ import type {
   CommissioningOrdersOverviewListParams,
 } from "@shared/api/generated/models";
 import BulkSendDocumentsButton from "@features/commissioning/components/BulkSendDocumentsButton";
+import InvoiceNumberCell from "@features/commissioning/components/InvoiceNumberCell";
 import { InvoiceModal } from "@features/commissioning/modals";
 import StornoInvoiceModal from "@features/commissioning/modals/StornoInvoiceModal";
 // ``InvoicePDFButtons`` is light (no @react-pdf import) — safe to
@@ -43,6 +44,7 @@ import { getErrorMessage } from "@shared/utils/apiError";
 import { EditableTable, READ_ONLY_PERMISSION } from "@shared/tables";
 import type {
   EditableColumnConfig,
+  EditableTableProps,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import {
@@ -60,8 +62,6 @@ import {
 } from "@hooks/index";
 
 const { Text } = Typography;
-
-const currentYear = dayjs().year();
 
 const GROUPING_MODES = {
   NONE: "none",
@@ -93,7 +93,7 @@ export default function Invoices() {
     onSelectedRowsChange: handleRowSelectionChange,
     rowSelection: rowSelectionConfig,
   } = useTableRowSelection();
-  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedYear, setSelectedYear] = useState(() => dayjs().year());
   const { t } = useTranslation();
   const { getSetting, tenant, logoUrl, bioLogoUrl } = useTenant();
   const { formatCurrency } = useCurrency();
@@ -110,7 +110,9 @@ export default function Invoices() {
     string | null
   >(null);
   const [stornoTargetLabel, setStornoTargetLabel] = useState("");
-  const createStornoMutation = useCommissioningInvoicesCreateStornoCreate();
+  const createStornoMutation = useCommissioningInvoicesCreateStornoCreate({
+    mutation: { meta: { silent: true } },
+  });
 
   const { formatDate } = useDateFormat();
 
@@ -161,21 +163,13 @@ export default function Invoices() {
         .filter((r) => r.success && r.invoice_id)
         .map((r) => r.invoice_id!);
 
-      if (invoiceIds.length === 0) {
-        console.warn(
-          "[FINALIZE] No invoice IDs found - skipping PDF generation",
-        );
-        invalidateData();
-        return;
-      }
-
       await uploadPdfsWarningOnFailure(
         invoiceIds.map(
           (id) => () =>
             generateAndUploadInvoicePDF(
               id,
               t,
-              tenant as Record<string, unknown>,
+              tenant,
               getSetting,
               logoUrl,
               bioLogoUrl,
@@ -197,14 +191,13 @@ export default function Invoices() {
   // only ones that can have an e-PDF to bundle into the bulk ZIP.
   const selectedFinalizedInvoiceIds = useMemo(
     () =>
-      data
-        .filter(
-          (item) =>
-            selectedRowKeys.includes(item.id) &&
-            item.has_finalized_invoice &&
-            item.invoice_id,
-        )
-        .map((item) => item.invoice_id as string),
+      data.flatMap((item) =>
+        selectedRowKeys.includes(item.id) &&
+        item.has_finalized_invoice &&
+        item.invoice_id
+          ? [item.invoice_id]
+          : [],
+      ),
     [data, selectedRowKeys],
   );
 
@@ -289,8 +282,8 @@ export default function Invoices() {
     return sortedGroups;
   }, [filteredData, groupingMode, t, data]);
 
-  const handleOpenModal = useCallback((record: Record<string, unknown>) => {
-    setSelectedInvoiceId(record.invoice_id as string);
+  const handleOpenModal = useCallback((record: CombinedOrderOverview) => {
+    setSelectedInvoiceId(record.invoice_id);
     setModalVisible(true);
   }, []);
 
@@ -303,9 +296,9 @@ export default function Invoices() {
   }, [invalidateData]);
 
   const handleOpenStornoModal = useCallback(
-    (record: Record<string, unknown>) => {
-      setStornoTargetInvoiceId(record.invoice_id as string);
-      setStornoTargetLabel((record.invoice_number as string) ?? "");
+    (record: CombinedOrderOverview) => {
+      setStornoTargetInvoiceId(record.invoice_id);
+      setStornoTargetLabel(record.invoice_number ?? "");
       setStornoModalVisible(true);
     },
     [],
@@ -329,7 +322,7 @@ export default function Invoices() {
             await generateAndUploadInvoicePDF(
               stornoId,
               t,
-              tenant as Record<string, unknown>,
+              tenant,
               getSetting,
               logoUrl,
               bioLogoUrl,
@@ -361,7 +354,7 @@ export default function Invoices() {
     ],
   );
 
-  const normalColumns = useMemo<EditableColumnConfig<TableRecord>[]>(
+  const normalColumns = useMemo<EditableColumnConfig<InvoiceOverviewRow>[]>(
     () => [
       {
         title: t("resellers.delivery_note_date"),
@@ -372,7 +365,7 @@ export default function Invoices() {
 
         sortable: true,
 
-        render: (value: unknown) => formatDate(value as string),
+        render: (_: unknown, record) => formatDate(record.delivery_note_date),
       },
       {
         title: t("resellers.delivery_note_number"),
@@ -383,9 +376,9 @@ export default function Invoices() {
 
         sortable: true,
 
-        render: (value: unknown, record: Record<string, unknown>) => (
+        render: (_: unknown, record) => (
           <span className="dn-number-cell">
-            {(record.delivery_note_is_finalized as boolean) ? (
+            {record.delivery_note_is_finalized ? (
               <>
                 <CheckOutlined aria-hidden className="icon-check-success" />
                 <span className="sr-only">{t("commissioning.finalized")}</span>
@@ -395,15 +388,15 @@ export default function Invoices() {
                 {t("commissioning.not_finalized")}
               </span>
             )}
-            {value as string}
-            {(record.delivery_note_id as string | null | undefined) && (
+            {record.delivery_note_number}
+            {record.delivery_note_id && (
               <DeliveryNotePDFButtons
-                deliveryNoteId={record.delivery_note_id as string}
+                deliveryNoteId={record.delivery_note_id}
                 buttonSize="small"
                 buttonType="text"
                 buttonText=""
                 ariaLabel={t("commissioning.download_delivery_note_n", {
-                  number: record.delivery_note_number as string,
+                  number: record.delivery_note_number,
                 })}
                 icon={<DownloadOutlined />}
                 className="dn-number-download"
@@ -424,7 +417,7 @@ export default function Invoices() {
         disabled: true,
         sortable: true,
 
-        render: (value: unknown) => formatDate(value as string),
+        render: (_: unknown, record) => formatDate(record.order_date),
       },
       {
         title: <>{t("resellers.order_number")}</>,
@@ -438,9 +431,9 @@ export default function Invoices() {
         disabled: true,
         sortable: true,
 
-        render: (value: unknown, record: Record<string, unknown>) => (
+        render: (_: unknown, record) => (
           <>
-            {(record.order_is_finalized as boolean) ? (
+            {record.order_is_finalized ? (
               <>
                 <CheckOutlined aria-hidden className="icon-check-success" />
                 <span className="sr-only">{t("commissioning.finalized")}</span>
@@ -450,7 +443,7 @@ export default function Invoices() {
                 {t("commissioning.not_finalized")}
               </span>
             )}
-            {value as string}
+            {record.order_number}
           </>
         ),
       },
@@ -465,7 +458,7 @@ export default function Invoices() {
 
         disabled: true,
         sortable: true,
-        render: (value: unknown) => formatDate(value as string),
+        render: (_: unknown, record) => formatDate(record.invoice_date),
       },
       {
         title: t("commissioning.invoice_number"),
@@ -475,29 +468,7 @@ export default function Invoices() {
         inputType: "text",
 
         sortable: true,
-        render: (value: unknown, record: Record<string, unknown>) => (
-          <>
-            {(record.has_finalized_invoice as boolean) ? (
-              <>
-                <CheckOutlined aria-hidden className="icon-check-success" />
-                <span className="sr-only">{t("commissioning.finalized")}</span>
-              </>
-            ) : (
-              <span className="sr-only">
-                {t("commissioning.not_finalized")}
-              </span>
-            )}
-            {value as string}
-            {record.invoice_cancelled_by ? (
-              <Tag color="red" bordered={false}>
-                {t("commissioning.storno_short")}
-                {record.invoice_storno_number
-                  ? ` ${record.invoice_storno_number as string}`
-                  : ""}
-              </Tag>
-            ) : null}
-          </>
-        ),
+        render: (_: unknown, record) => <InvoiceNumberCell row={record} />,
       },
       {
         title: t("commissioning.invoice_total_amount_netto"),
@@ -506,8 +477,8 @@ export default function Invoices() {
         width: "8em",
         align: "right",
         sortable: true,
-        render: (value: unknown) =>
-          formatCurrency(parseFloat((value as string) || "0")),
+        render: (_: unknown, record) =>
+          formatCurrency(parseFloat(record.sum_netto || "0")),
       },
       {
         title: "",
@@ -516,7 +487,7 @@ export default function Invoices() {
         readOnly: true,
         disabled: true,
         width: "32em",
-        render: (_: unknown, record: Record<string, unknown>) => (
+        render: (_: unknown, record) => (
           <div className="button-row">
             <>
               {record.has_invoice && (
@@ -527,37 +498,43 @@ export default function Invoices() {
               )}
               {!record.has_finalized_invoice && record.has_invoice && (
                 <BulkActionButton
-                  selectedIds={[record.id as string]}
+                  selectedIds={[record.id]}
                   apiFunction={(payload) =>
                     commissioningBulkFinalizeDocumentsCreate({
-                      ids: payload.ids as string[],
+                      ids: payload.ids,
                       model: "invoice" as const,
                     })
                   }
                   buttonText={t("commissioning.finalize_invoice")}
-                  buttonProps={{ type: "primary", danger: false }}
+                  buttonProps={{
+                    type: "primary",
+                    danger: false,
+                    className: "bulk-action-button--flush",
+                  }}
                   onSuccess={handleFinalizeInvoicesSuccess}
-                  style={{ marginTop: "0em" }}
                 />
               )}
               {!record.has_finalized_invoice && record.has_invoice && (
                 <BulkActionButton
-                  selectedIds={[record.id as string]}
+                  selectedIds={[record.id]}
                   apiFunction={(payload) =>
                     commissioningBulkDeleteDocumentsCreate({
-                      ids: payload.ids as string[],
+                      ids: payload.ids,
                       model: "invoice" as const,
                     })
                   }
                   buttonText={t("commissioning.delete_invoice")}
-                  buttonProps={{ type: "primary", danger: true }}
+                  buttonProps={{
+                    type: "primary",
+                    danger: true,
+                    className: "bulk-action-button--flush",
+                  }}
                   onSuccess={invalidateData}
-                  style={{ marginTop: "0em" }}
                 />
               )}
               {record.has_finalized_invoice && (
                 <InvoicePDFButtons
-                  invoiceId={record.invoice_id as string}
+                  invoiceId={record.invoice_id}
                   buttonText={t("commissioning.pdf")}
                   buttonSize="small"
                 />
@@ -573,24 +550,26 @@ export default function Invoices() {
               )}
               {record.invoice_storno_id && (
                 <InvoicePDFButtons
-                  invoiceId={record.invoice_storno_id as string}
-                  buttonText={`${t("commissioning.storno_pdf")} ${(record as unknown as CombinedOrderOverview).invoice_storno_number || ""}`}
+                  invoiceId={record.invoice_storno_id}
+                  buttonText={`${t("commissioning.storno_pdf")} ${record.invoice_storno_number || ""}`}
                   buttonSize="small"
                 />
               )}
               {!record.has_invoice && (
                 <BulkActionButton
-                  selectedIds={[record.id as string]}
+                  selectedIds={[record.id]}
                   apiFunction={(payload) =>
                     commissioningBulkCreateDocumentsFromOrdersCreate({
-                      ids: payload.ids as string[],
+                      ids: payload.ids,
                       model: "invoice" as const,
                     })
                   }
                   buttonText={t("commissioning.create_invoice")}
-                  buttonProps={{ type: "primary" }}
+                  buttonProps={{
+                    type: "primary",
+                    className: "bulk-action-button--flush",
+                  }}
                   onSuccess={invalidateData}
-                  style={{ marginTop: "0em" }}
                 />
               )}
             </>
@@ -643,7 +622,7 @@ export default function Invoices() {
     {
       key,
       ...extra
-    }: { key?: string } & Partial<Parameters<typeof EditableTable>[0]> = {},
+    }: { key?: string } & Partial<EditableTableProps<InvoiceOverviewRow>> = {},
   ) => (
     <EditableTable
       key={key}
@@ -667,11 +646,10 @@ export default function Invoices() {
       {Object.entries(groupedData).map(([groupKey, group]) => (
         <Card
           key={groupKey}
-          className="invoice-group-card"
-          style={{ marginBottom: 16 }}
+          className="invoice-group-card mb-16"
           classNames={{ header: "invoice-group-card-header" }}
           title={
-            <div className="flex-center-y" style={{ gap: "4em" }}>
+            <div className="flex-center-y invoice-group-card__title">
               <span>{group.name}</span>
               <Flex align="center" gap={16}>
                 <Text>{t("commissioning.sum")}</Text>
@@ -705,7 +683,7 @@ export default function Invoices() {
         setSelectedYear={setSelectedYear}
       />
 
-      <div style={{ marginBottom: "1em", marginTop: "1em" }}>
+      <div className="mt-1em mb-1em">
         {/* Every active reseller stays selectable: this page is also where an
             already-invoiced reseller's invoice gets cancelled (storno),
             re-downloaded or re-sent, and the orders table below only loads
@@ -757,7 +735,7 @@ export default function Invoices() {
           <ToolTipIcon title={t("tooltip.grouping_mode_date")} />
         </div>
       </div>
-      <div style={{ marginTop: "2em", marginBottom: "-2em" }}>
+      <div className="invoices__selection-label">
         <strong>{t("commissioning.for_selected")}</strong>
       </div>
       <div className="button-row">
@@ -766,7 +744,7 @@ export default function Invoices() {
           selectedIds={selectedRowKeys}
           apiFunction={(payload) =>
             commissioningBulkCreateSummaryInvoiceFromOrdersCreate({
-              ids: payload.ids as string[],
+              ids: payload.ids,
             })
           }
           buttonText={t("commissioning.create_summary_invoice_for_selected")}
@@ -785,7 +763,7 @@ export default function Invoices() {
           selectedIds={selectedRowKeys}
           apiFunction={(payload) =>
             commissioningBulkCreateDocumentsFromOrdersCreate({
-              ids: payload.ids as string[],
+              ids: payload.ids,
               model: "invoice" as const,
             })
           }
@@ -802,19 +780,12 @@ export default function Invoices() {
         />
         <ToolTipIcon title={t("tooltip.create_invoice_for_selected")} />
       </div>
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          flexWrap: "wrap",
-          marginTop: "-20px",
-        }}
-      >
+      <div className="invoices__button-row">
         <BulkActionButton
           selectedIds={selectedRowKeys}
           apiFunction={(payload) =>
             commissioningBulkDeleteDocumentsCreate({
-              ids: payload.ids as string[],
+              ids: payload.ids,
               model: "invoice" as const,
             })
           }
@@ -839,7 +810,7 @@ export default function Invoices() {
           selectedIds={selectedRowKeys}
           apiFunction={(payload) =>
             commissioningBulkFinalizeDocumentsCreate({
-              ids: payload.ids as string[],
+              ids: payload.ids,
               model: "invoice" as const,
             })
           }
@@ -857,18 +828,10 @@ export default function Invoices() {
         />
         <ToolTipIcon title={t("tooltip.finalize_invoices")} />
       </div>
-      <div style={{ marginTop: "2em", marginBottom: "-2em" }}>
+      <div className="invoices__selection-label">
         <strong>{t("resellers.for_selected_finalized")}</strong>
       </div>
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          flexWrap: "wrap",
-          marginBottom: "16px",
-          marginTop: "-20px",
-        }}
-      >
+      <div className="invoices__button-row mb-16">
         <BulkSendDocumentsButton
           model="invoice"
           rows={data}

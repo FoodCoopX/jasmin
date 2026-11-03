@@ -4,7 +4,6 @@
   "no": "No",
   "cancel_confirm": "Discard changes?",
   "delete_confirm": "Delete this item?",
-  "add_plus_icon": "",
   "cancel": "Cancel",
   "save": "Save",
   "edit": "Edit",
@@ -28,5 +27,6 @@
   "load_failed_title": "Loading failed",
   "load_failed_hint": "Please try again.",
   "retry": "Try again",
-  "bulk_partial_skipped": "{{skipped}} of {{total}} row(s) skipped: {{reason}}"
+  "bulk_partial_skipped": "{{skipped}} of {{total}} row(s) skipped: {{reason}}",
+  "bulk_select_at_least_one": "Please select at least one row."
 }

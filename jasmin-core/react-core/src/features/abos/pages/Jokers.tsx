@@ -2,7 +2,7 @@ import {
   useBoxCombinationColumns,
   usePlanningAxes,
 } from "@features/commissioning/hooks";
-import { currentWeek, useTenant, useYearWeekState } from "@hooks/index";
+import { useTenant, useYearWeekState } from "@hooks/index";
 import { useCommissioningShareDeliveryBoxCombinationMatrixRetrieve } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningShareDeliveryBoxCombinationMatrixRetrieveParams,
@@ -10,8 +10,8 @@ import type {
   WeeklyComboMatrixRow,
 } from "@shared/api/generated/models";
 import { WeekSelector } from "@shared/selectors";
-import { EmptyHint, ExplainerText, LabeledSwitch } from "@shared/ui";
-import { Table } from "antd";
+import { ExplainerText, LabeledSwitch } from "@shared/ui";
+import { ReadOnlyReportTable } from "@shared/tables";
 import type { ColumnsType } from "antd/es/table";
 import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
@@ -66,8 +66,12 @@ export default function Jokers() {
   const { getSetting } = useTenant();
   const usesJokers = getSetting("uses_jokers", true);
 
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedWeek,
+    setSelectedWeek,
+  } = useYearWeekState();
 
   const [showTours, setShowTours] = useState(false);
   const [showDeliveryStations, setShowDeliveryStations] = useState(false);
@@ -75,7 +79,7 @@ export default function Jokers() {
   // Only needed to decide whether the "show tours" switch is meaningful.
   const { toursExist } = usePlanningAxes({
     year: selectedYear,
-    week: selectedWeek ?? currentWeek,
+    week: selectedWeek,
     requireStations: true,
     needTours: true,
   });
@@ -155,16 +159,14 @@ export default function Jokers() {
     rows: BoxMatrixRow[],
     loading: boolean,
   ) => (
-    <Table
+    <ReadOnlyReportTable
       columns={columns}
       dataSource={rows}
       pagination={false}
-      size="small"
       loading={loading}
       className="custom-jasmin-table w-max"
       rowKey="id"
       bordered
-      locale={{ emptyText: <EmptyHint>{t("table.no_data")}</EmptyHint> }}
     />
   );
 

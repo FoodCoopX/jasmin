@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useRoles, type RoleFlags } from "@shared/auth";
 import { useNavigation } from "@shared/contexts/NavigationContext";
-import { useIsMobile, useTenant } from "@hooks/index";
+import { useCapability, useIsMobile, useTenant } from "@hooks/index";
 import HelpButton from "./HelpButton";
 import ModalToggle from "./ModalToggle";
 import SidebarToggle from "./SidebarToggle";
@@ -23,6 +23,7 @@ function PrimaryNavigation() {
   const { logoUrl, tenantName } = useTenant();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
+  const offersSupportTickets = useCapability("support_tickets");
 
   return (
     <Header
@@ -80,8 +81,8 @@ function PrimaryNavigation() {
             style={{ height: "24px", margin: "0 0px" }}
           />
         )}
-        <HelpButton />
-        {!isMobile && (
+        {offersSupportTickets && <HelpButton />}
+        {offersSupportTickets && !isMobile && (
           <Divider
             type="vertical"
             style={{ height: "24px", margin: "0 0px" }}
@@ -219,8 +220,11 @@ function SecondaryNavigation() {
           <nav> generates no box — the Menu stays the flex child between the
           spacers and the layout is unchanged. */}
       <nav aria-label={t("nav.main")} style={{ display: "contents" }}>
+        {/* ``disabledOverflow``: every section stays visible instead of
+            folding into a "…" menu when the bar is narrow. */}
         <Menu
           mode="horizontal"
+          disabledOverflow
           selectedKeys={[activeSection]}
           items={topMenuItems}
           onSelect={({ key }) => switchSection(key as typeof activeSection)}

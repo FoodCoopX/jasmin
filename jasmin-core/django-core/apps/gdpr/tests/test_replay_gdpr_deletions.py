@@ -25,6 +25,7 @@ from django.core.management.base import CommandError
 from django.db import connection
 from django.utils import timezone
 
+from apps.authz.roles import Role
 from apps.commissioning.tests.factories import (
     CoopShareFactory,
     JasminUserFactory,
@@ -196,6 +197,28 @@ class TestReplayAfterRestore:
 
         assert "1 tenant not in the restored data" in output
 
+    def test_a_member_erased_without_its_login_spares_the_login_again(
+        self, tenant, tmp_path
+    ):
+        """The retention sweep erases an ex-member alone when its login holds
+        a staff role, and releases the login. The backup has them linked."""
+        admin = JasminUserFactory(email="kept.admin@example.com", roles=[Role.ADMIN])
+        member = MemberFactory(user=admin, first_name="Linked")
+        entry = _entry(tenant, "LoGkEpTlOgN1", member_pk=member.pk)
+
+        output = _replay(_ledger(tmp_path, entry))
+
+        admin.refresh_from_db()
+        member.refresh_from_db()
+        assert admin.email == "kept.admin@example.com"
+        assert admin.account_status == "active"
+        assert admin.roles == [Role.ADMIN]
+        assert member.first_name == "Gelöscht"
+        assert member.user_id is None
+        log = DeletionLog.objects.get(pk="LoGkEpTlOgN1")
+        assert (log.user_pk, log.member_pk) == ("", member.pk)
+        assert "1 erased again" in output
+
 
 @pytest.mark.django_db
 class TestEntriesWithoutSubjectIds:
@@ -275,9 +298,14 @@ class TestLedgerExportFormat:
         if not BACKUP_SH.is_file():
             pytest.skip("backups/backup.sh is not in this checkout")
         script = BACKUP_SH.read_text()
-        start = script.index("printf '%s' \"") + len("printf '%s' \"")
-        template = script[start : script.index('"\n}', start)]
-        sql = template.replace("$1", tenant.schema_name).replace('\\"', '"')
+        start = script.index("SELECT ((to_jsonb(t)")
+        end = script.index("gdpr_deletionlog t;", start) + len("gdpr_deletionlog t")
+        # psql fills in the variable ``schema``, quoted; here the test does.
+        sql = (
+            script[start:end]
+            .replace(":'schema'", f"'{tenant.schema_name}'")
+            .replace(':"schema"', f'"{tenant.schema_name}"')
+        )
 
         member = MemberFactory(user=None)
         log = DeletionLog.objects.create(

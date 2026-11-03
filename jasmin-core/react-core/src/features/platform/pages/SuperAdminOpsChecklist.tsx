@@ -22,11 +22,11 @@ import {
   Modal,
   Space,
   Spin,
-  Table,
   Tag,
   Tooltip,
   Typography,
 } from "antd";
+import { ReadOnlyReportTable } from "@shared/tables";
 import {
   CheckCircleOutlined,
   CopyOutlined,
@@ -173,6 +173,7 @@ export default function SuperAdminOpsChecklist() {
   };
 
   const markDoneMutation = useMutation({
+    meta: { silent: true },
     mutationFn: async (item: OpsChecklistItem) => {
       await axiosService.post<OpsChecklistItem>(
         SUPER_ADMIN_ENDPOINTS.opsChecklistMarkDone(item.id),
@@ -336,12 +337,11 @@ export default function SuperAdminOpsChecklist() {
       {loading ? (
         <Spin size="large" />
       ) : (
-        <Table<OpsChecklistItem>
+        <ReadOnlyReportTable<OpsChecklistItem>
           rowKey="id"
           dataSource={sortedItems}
           columns={columns}
           pagination={false}
-          size="small"
         />
       )}
 

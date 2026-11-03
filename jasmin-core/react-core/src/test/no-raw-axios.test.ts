@@ -60,10 +60,6 @@ const ALLOWED: ReadonlyArray<{ path: string; why: string }> = [
   // Content-Type per request + a raw FormData body, so each call site
   // talks to ``axiosInstance`` directly.
   {
-    path: "src/shared/ui/DownloadCsvTemplateButton.tsx",
-    why: "Multipart CSV upload.",
-  },
-  {
     path: "src/shared/ui/usePictureUpload.ts",
     why: "Shared multipart picture-upload hook (Content-Type + raw FormData body).",
   },
@@ -87,15 +83,11 @@ const ALLOWED: ReadonlyArray<{ path: string; why: string }> = [
     path: "src/shared/tables/BasicEditableTable/useEditableTable.ts",
     why: "Generic table CRUD hook — same ``apiEndpoints`` contract as EditableTable.",
   },
-  {
-    path: "src/shared/ui/BulkActionButton.tsx",
-    why: "Generic bulk-action button: caller passes the endpoint + HTTP method.",
-  },
   // Super-admin app — still on the pre-generated-client pattern; the
   // super-admin URLs don't fully flow through orval yet.
   {
     path: "src/features/platform/pages/SuperAdminDashboard.tsx",
-    why: "Super-admin dashboard (tenants list + backup trigger); not yet routed through generated clients.",
+    why: "Super-admin dashboard (tenants list); not yet routed through generated clients.",
   },
   {
     path: "src/features/platform/pages/SuperAdminLoginPage.tsx",

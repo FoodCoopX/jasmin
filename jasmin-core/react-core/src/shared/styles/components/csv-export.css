@@ -1,0 +1,23 @@
+/* CSV export and import dialogs. */
+
+/* ExportCsvAtDateModal. */
+.csv-export-at-date__loading {
+  text-align: center;
+  padding: 24px;
+}
+
+.csv-export-at-date__loaded {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+/* The CSV import's result dialog (DownloadCsvTemplateButton). */
+.csv-import-result__dry-run {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.csv-import-result__errors-heading {
+  margin-top: 1em;
+  font-weight: 500;
+}

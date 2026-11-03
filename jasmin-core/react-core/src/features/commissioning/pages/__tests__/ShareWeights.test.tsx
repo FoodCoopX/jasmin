@@ -9,9 +9,9 @@
  * update stores the weights the way the backend does, echoing the saved
  * share. The browser download is recorded, not saved.
  *
- * The clock is frozen on Tuesday 6 October 2026 (ISO week 41). The page's
- * week state reads "today" once when its module loads, so the clock is set
- * before the imports run as well as before every test.
+ * The clock is frozen on Tuesday 6 October 2026 (ISO week 41), before the
+ * imports run as well as before every test. The page's week state reads
+ * "today" when the page mounts.
  */
 
 import { QueryClient, QueryClientProvider, onlineManager } from "@tanstack/react-query";
@@ -759,7 +759,7 @@ describe("ShareWeights roles", () => {
     renderPage();
     await screen.findByText(SMALL);
 
-    expect(screen.queryByRole("button", { name: /table\.add_plus_icon/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /table\.add_record/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "table.delete" })).not.toBeInTheDocument();
     await userEvent.keyboard("+");
 
