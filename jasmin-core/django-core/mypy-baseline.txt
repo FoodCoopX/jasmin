@@ -2,7 +2,7 @@
 # Managed by scripts/mypy_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/mypy_baseline.py freeze
-# 305 finding(s).
+# 303 finding(s).
 
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
@@ -252,8 +252,6 @@ apps/commissioning/viewsets/resellers_viewsets.py: Cannot infer type of lambda  
 apps/commissioning/viewsets/resellers_viewsets.py: Cannot infer type of lambda  [misc]
 apps/commissioning/viewsets/resellers_viewsets.py: Incompatible default for parameter "pk" (default has type "None", parameter has type "str")  [assignment]
 apps/commissioning/viewsets/resellers_viewsets.py: Incompatible default for parameter "pk" (default has type "None", parameter has type "str")  [assignment]
-apps/commissioning/viewsets/resellers_viewsets.py: Incompatible types in assignment (expression has type "QuerySet[Any, Any]", variable has type "FinalizedProtectedQuerySet[Offer, Offer]")  [assignment]
-apps/commissioning/viewsets/resellers_viewsets.py: Incompatible types in assignment (expression has type "QuerySet[Offer, Offer]", variable has type "FinalizedProtectedQuerySet[Offer, Offer]")  [assignment]
 apps/commissioning/viewsets/shares_viewsets.py: "ShareDelivery" has no attribute "name"  [attr-defined]
 apps/commissioning/viewsets/shares_viewsets.py: "ShareDelivery" has no attribute "quantity"  [attr-defined]
 apps/commissioning/viewsets/shares_viewsets.py: "ShareDelivery" has no attribute "share_type_variation_id"  [attr-defined]

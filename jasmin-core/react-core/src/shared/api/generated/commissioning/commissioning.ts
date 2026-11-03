@@ -16725,7 +16725,12 @@ const {mutation: mutationOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
-    export const commissioningOffersDestroy = (
+    /**
+ * Delete an offer, finalized or not, while nobody can have acted on it;
+refused with offer.already_ordered or offer.already_sent (409)
+otherwise.
+ */
+export const commissioningOffersDestroy = (
     id: string,
  ) => {
       

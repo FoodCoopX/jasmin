@@ -108,6 +108,7 @@ _EXPECTED_VIEW_MODULES = frozenset(
         "apps.commissioning.viewsets.imports_viewsets",
         "apps.commissioning.viewsets.logs_viewsets",
         "apps.commissioning.viewsets.members_viewsets",
+        "apps.commissioning.viewsets.offers_viewsets",
         "apps.commissioning.viewsets.resellers_viewsets",
         "apps.commissioning.viewsets.share_content_viewsets",
         "apps.commissioning.viewsets.shares_viewsets",

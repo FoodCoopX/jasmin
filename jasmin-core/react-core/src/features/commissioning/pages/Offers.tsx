@@ -73,8 +73,13 @@ export default function Offers() {
     () => ({
       ...gatedByPermission(isOffice && !isPast),
       canAdd: isOffice && !isPast && selectedOfferGroup !== null,
+      // The backend decides: finalized or not, an offer goes while nothing is
+      // ordered from it and it hasn't been sent by email. A row without the
+      // flag falls back to "nothing ordered".
       canDeleteRecord: (record: TableRecord) =>
-        !((record.amount_ordered as number) > 0),
+        typeof record.can_be_deleted === "boolean"
+          ? record.can_be_deleted
+          : !((record.amount_ordered as number) > 0),
     }),
     [isOffice, isPast, selectedOfferGroup],
   );
@@ -354,12 +359,14 @@ export default function Offers() {
       <JobProgressDrawer
         jobId={activeJobId}
         onClose={() => {
-          // Closing the drawer refreshes the sending-status table —
-          // when the job is done, OfferSending rows just got written
-          // and the office expects to see the "Sent ✓" markers
-          // immediately. Cheap if no rows changed; covers both the
-          // happy and failure paths.
+          // Closing the drawer refreshes the sending-status table and
+          // the offers — when the job is done, OfferSending rows just
+          // got written: the office expects to see the "Sent ✓" markers
+          // immediately, and an offer that went out may no longer be
+          // deleted. Cheap if no rows changed; covers both the happy
+          // and failure paths.
           invalidateSendingStatus();
+          invalidateData();
           setActiveJobId(null);
         }}
         title={t("commissioning.send_offers")}

@@ -13227,6 +13227,10 @@ paths:
           description: Error response.
     delete:
       operationId: commissioning_offers_destroy
+      description: |-
+        Delete an offer, finalized or not, while nobody can have acted on it;
+        refused with offer.already_ordered or offer.already_sent (409)
+        otherwise.
       parameters:
       - in: path
         name: id
@@ -36252,6 +36256,9 @@ components:
           type: string
           readOnly: true
           nullable: true
+        can_be_deleted:
+          type: boolean
+          readOnly: true
         expected_amount:
           type: string
           format: decimal
@@ -39948,6 +39955,9 @@ components:
           type: string
           readOnly: true
           nullable: true
+        can_be_deleted:
+          type: boolean
+          readOnly: true
         expected_amount:
           type: string
           format: decimal

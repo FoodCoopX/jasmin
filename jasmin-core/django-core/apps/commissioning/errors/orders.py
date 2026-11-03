@@ -68,6 +68,20 @@ class OfferAmountChanged(ConflictError):
     code = "offer.amount_changed"
 
 
+class OfferAlreadyOrdered(ConflictError):
+    """The office asked to delete an offer that order lines point at: deleting
+    it would take them along."""
+
+    code = "offer.already_ordered"
+
+
+class OfferAlreadySent(ConflictError):
+    """The office asked to delete an offer whose week has gone out by email to a
+    reseller it is for: that reseller may already be looking at it."""
+
+    code = "offer.already_sent"
+
+
 # --------------------------------------------------------------------------- #
 # Orders / delivery notes / invoices                                          #
 # --------------------------------------------------------------------------- #

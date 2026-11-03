@@ -43,16 +43,13 @@ from ..errors import (
     OrderContentItemChangeForbidden,
     ResellerEmailMissing,
     ResellerInvoiceEmailDisabled,
-    ResellerNotFound,
 )
 from ..models import (
     CrateContentInvoiceReseller,
     DeliveryNoteContent,
     DeliveryNoteReseller,
-    Forecast,
     InvoiceReseller,
     InvoiceResellerContent,
-    Offer,
     OfferGroup,
     Order,
     OrderContent,
@@ -67,7 +64,6 @@ from ..schemas import (
     get_delivery_note_id_parameter,
     get_delivery_week_parameter,
     get_invoice_id_parameter,
-    get_offer_group_parameter,
     get_order_id_parameter,
     get_reseller_parameter,
     get_year_parameter,
@@ -77,7 +73,6 @@ from ..scoping import (
     enforce_privileged,
     is_privileged,
     own_reseller_id,
-    scope_to_offer_group,
     scope_to_reseller,
 )
 from ..serializers import (
@@ -94,7 +89,6 @@ from ..serializers import (
     InvoiceSentToAccountingSerializer,
     InvoiceSentToResellerSerializer,
     OfferGroupSerializer,
-    OfferSerializer,
     OrderContentItemSerializer,
     OrderContentListResponseSerializer,
     OrderContentSerializer,
@@ -104,7 +98,6 @@ from ..serializers import (
 from ..services import (
     CrateOrderContentService,
     InvoiceService,
-    OfferService,
     OrderContentService,
     ResellerAndDeliveryStationService,
 )
@@ -117,7 +110,6 @@ from ..services.einvoice_upload import validate_finalized_pdf_upload
 from ..services.order_content_service import AMOUNT_NOT_SENT
 from ..services.tier_price import set_customer_line_price
 from ..utils import get_contact_annotations
-from ..utils.lookup import get_or_404
 from ..utils.optional_filters import apply_optional_filters
 from ..utils.query_params import PARAM_CATALOGUE, validate_query_params
 
@@ -777,141 +769,6 @@ class OrderContentViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
-
-
-class OfferViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
-    read_permission = IsStaffOrCustomer
-    write_permission = IsOffice
-    serializer_class = OfferSerializer
-    # An offer group's week can hold hundreds of offers, each annotated with
-    # correlated order-volume subqueries. ``?limit=`` bounds the payload; a
-    # caller that sends neither limit nor offset still gets the plain array.
-    pagination_class = OptionalLimitOffsetPagination
-
-    @extend_schema(
-        parameters=[
-            get_year_parameter(required=True),
-            get_delivery_week_parameter(required=True),
-            get_offer_group_parameter(
-                description=(
-                    "Offer group ID (Jasmin ID format). Ignored whenever the "
-                    "scope resolves from a reseller: that reseller's own offer "
-                    "group wins. A caller without an office/admin/management "
-                    "role is always scoped to their own linked reseller, so "
-                    "for them this parameter never applies, sent or not."
-                ),
-            ),
-            get_reseller_parameter(
-                description=(
-                    "Reseller ID (Jasmin ID format). Also scopes the "
-                    "amount_ordered totals to this reseller. Its own offer "
-                    "group wins over an offer_group sent alongside it, and a "
-                    "reseller with no offer group matches no offer. A caller "
-                    "without an office/admin/management role is forced to "
-                    "their own linked reseller whether or not this is sent."
-                ),
-            ),
-        ],
-    )
-    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        return super().list(request, *args, **kwargs)
-
-    def get_queryset(self) -> QuerySet[Offer]:
-        # Schema generation calls this with no request behind it, where the
-        # required week scope below would raise.
-        if getattr(self, "swagger_fake_view", False):
-            return Offer.objects.none()
-
-        queryset = Offer.objects.all()
-
-        list_route = self.action == "list"
-        params = validate_query_params(
-            self.request,
-            # The week scope is required on the list route, as the schema has
-            # always declared it: without it every offer of every year is read
-            # and annotated. A detail route (retrieve/update/destroy) reaches
-            # this method with no query string at all, so there the two stay
-            # optional.
-            required=["year", "delivery_week"] if list_route else [],
-            optional=(
-                ["offer_group", "reseller"]
-                if list_route
-                else ["year", "delivery_week", "offer_group", "reseller"]
-            ),
-        )
-        year = params["year"]
-        delivery_week = params["delivery_week"]
-        offer_group = params["offer_group"]
-        reseller_id = params["reseller"]
-
-        # Object scoping (IDOR): the ``amount_ordered`` annotation exposes a
-        # reseller's per-article order volume. A non-privileged caller (customer)
-        # may only see their OWN reseller's totals — reject a ?reseller= pointing
-        # at a peer in the same offer_group, and force their own reseller when the
-        # param is omitted (else the annotation sums the whole group's orders).
-        # Mirrors OrderContentViewSet.list; privileged staff bypass.
-        if not is_privileged(self.request, privileged_roles=IsStaff.required_roles):
-            own_id = own_reseller_id(self.request)
-            if own_id is None:
-                return Offer.objects.none()
-            if reseller_id and str(reseller_id) != own_id:
-                raise ForbiddenError("Cannot view offers for another reseller.")
-            reseller_id = own_id
-
-        if year is not None:
-            queryset = queryset.filter(year=year)
-        if delivery_week is not None:
-            queryset = queryset.filter(delivery_week=delivery_week)
-
-        if reseller_id is not None:
-            reseller = get_or_404(
-                Reseller, reseller_id, "Reseller", error_cls=ResellerNotFound
-            )
-            # A reseller only ever gets its own group's offers, so its group is
-            # the effective one: it takes precedence over an ``offer_group``
-            # the caller sent alongside it, and a reseller with no group at all
-            # matches no offer. Resolving it into ``offer_group`` lets the
-            # single filter below do the work.
-            if reseller.offer_group_id is None:
-                return Offer.objects.none()
-            offer_group = reseller.offer_group_id
-
-        if offer_group is not None:
-            queryset = queryset.filter(offer_group=offer_group)
-
-        queryset = OfferService.annotate_offers_with_ordered_amounts(
-            queryset=queryset,
-            year=year,
-            delivery_week=delivery_week,
-            reseller=reseller_id,
-        )
-
-        queryset = queryset.annotate(
-            share_article_name=F("share_article__name"),
-            forecast_exists=Exists(
-                Forecast.objects.filter(
-                    year=OuterRef("year"),
-                    delivery_week=OuterRef("delivery_week"),
-                    share_article=OuterRef("share_article"),
-                    unit=OuterRef("unit"),
-                    size=OuterRef("size"),
-                )
-            ),
-        )
-        # Same set as the ``is_privileged`` guard above, or that guard empties
-        # the result before this scope is applied.
-        queryset = scope_to_offer_group(
-            queryset,
-            self.request,
-            path="offer_group_id",
-            privileged_roles=IsStaff.required_roles,
-        )
-        # ``OfferSerializer.organic_status`` reads ``share_article.organic_status``
-        # per row — select_related the FK so the list isn't N+1 (the
-        # ``share_article_name`` annotation only pulls the name column via JOIN,
-        # it does not populate the related instance). Locked by
-        # ``test_query_count_locks.test_offers_list_is_scale_invariant``.
-        return queryset.select_related("share_article").order_by("share_article_name")
 
 
 class OfferGroupViewSet(RolePermissionsMixin, viewsets.ModelViewSet):

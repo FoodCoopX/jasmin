@@ -282,7 +282,9 @@
     "in_use": "This storage is still in use (by forecasts or documentation entries, say) and can't be deleted."
   },
   "offer": {
-    "amount_changed": "The available amount of this offer has changed in the meantime — please reload the page and enter the amount again."
+    "amount_changed": "The available amount of this offer has changed in the meantime — please reload the page and enter the amount again.",
+    "already_ordered": "This offer has already been ordered from, so it can't be deleted.",
+    "already_sent": "This offer has already been sent to resellers by email, so it can't be deleted."
   },
   "offer_group": {
     "not_found": "Offer group not found.",

@@ -282,7 +282,9 @@
     "in_use": "Dieses Lager wird noch verwendet (etwa von Prognosen oder Dokumentationseinträgen) und kann nicht gelöscht werden."
   },
   "offer": {
-    "amount_changed": "Die verfügbare Menge dieses Angebots hat sich inzwischen geändert — bitte die Seite neu laden und die Menge erneut eintragen."
+    "amount_changed": "Die verfügbare Menge dieses Angebots hat sich inzwischen geändert — bitte die Seite neu laden und die Menge erneut eintragen.",
+    "already_ordered": "Aus diesem Angebot wurde schon bestellt, deshalb kann es nicht mehr gelöscht werden.",
+    "already_sent": "Dieses Angebot wurde schon per E-Mail an Wiederverkäufer verschickt, deshalb kann es nicht mehr gelöscht werden."
   },
   "offer_group": {
     "not_found": "Angebotsgruppe nicht gefunden.",

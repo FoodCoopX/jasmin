@@ -3,6 +3,7 @@ from typing import Any
 from rest_framework import serializers
 
 from ..models import Offer
+from ..services.offer_deletion import offer_deletion_blocker
 from ..services.offer_update import update_offer
 from .serializers_mixin import FINALIZATION_READONLY_FIELDS
 
@@ -17,6 +18,9 @@ class OfferSerializer(serializers.ModelSerializer):
     organic_status = serializers.CharField(
         source="share_article.organic_status", read_only=True, allow_null=True
     )
+    # Whether the office may still delete the offer, finalized or not; the
+    # offers page shows its delete button by it.
+    can_be_deleted = serializers.SerializerMethodField()
     expected_amount = serializers.DecimalField(
         max_digits=9,
         decimal_places=3,
@@ -36,6 +40,9 @@ class OfferSerializer(serializers.ModelSerializer):
         fields = "__all__"
         # Offers are finalized only through ``/bulk_finalize/``.
         read_only_fields = FINALIZATION_READONLY_FIELDS
+
+    def get_can_be_deleted(self, obj: Offer) -> bool:
+        return offer_deletion_blocker(obj) is None
 
     def create(self, validated_data: dict[str, Any]) -> Offer:
         validated_data.pop("expected_amount", None)

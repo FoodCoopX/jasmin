@@ -531,7 +531,7 @@ describe("Offers creation", () => {
 // ── Editing and permissions ─────────────────────────────────────────────────
 
 describe("Offers editing", () => {
-  it("lets the office edit the current week but not delete an offer that was already ordered", async () => {
+  it("lets the office edit the current week but not delete an offer that was already ordered or sent", async () => {
     renderPage();
     await pickOfferGroup();
 
@@ -544,6 +544,9 @@ describe("Offers editing", () => {
     ) => boolean;
     expect(canDeleteRecord({ key: "offer-1", amount_ordered: "0.000" })).toBe(true);
     expect(canDeleteRecord({ key: "offer-2", amount_ordered: "15.000" })).toBe(false);
+    // The backend's flag wins: a finalized offer may go, one sent by email not.
+    expect(canDeleteRecord({ key: "offer-3", is_finalized: true, can_be_deleted: true })).toBe(true);
+    expect(canDeleteRecord({ key: "offer-4", amount_ordered: "0.000", can_be_deleted: false })).toBe(false);
   });
 
   it("shows and takes an available amount in PU fractions", async () => {
