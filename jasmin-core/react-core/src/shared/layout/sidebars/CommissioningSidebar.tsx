@@ -1,17 +1,12 @@
-import { useShareTypes, useTenant } from "@hooks/index";
+import { useTenant } from "@hooks/index";
 import { useCommissioningDeliveryStationsList } from "@shared/api/generated/commissioning/commissioning";
 import { filterByRole, useRoles, type RoleGatedItem } from "@shared/auth";
-import {
-  governingShareType,
-  PLANNING_SHARE_OPTIONS,
-} from "@shared/planning/planningShareOptions";
-import { toApiDate } from "@shared/utils/apiDate";
-import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import SidebarShell from "./SidebarShell";
 import { useCommissioningEntryFilter } from "./useCommissioningEntryFilter";
 import { usePackingListVisibility } from "./usePackingListVisibility";
+import { usePlanningNavItems } from "./usePlanningNavItems";
 
 import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import BubbleChartIcon from "@mui/icons-material/BubbleChart";
@@ -34,85 +29,8 @@ export default function CommissioningSidebar({
   const { t } = useTranslation();
   const flags = useRoles();
 
-  // Planning nav is derived from the currently-active ShareTypes: an option
-  // whose active share type is complex-planned gets a per-week (Base) link AND
-  // a long-term link; a simple option gets only a long-term link in the
-  // "additional" section. Order follows PLANNING_SHARE_OPTIONS.
-  const planningToday = toApiDate(dayjs())!;
-  const { shareTypes: activePlanningShareTypes } = useShareTypes({
-    active_at_date: planningToday,
-    // Current + upcoming share types, so an option whose season hasn't started
-    // yet still gets its planning nav.
-    include_future: true,
-  });
-  // Group by option, then classify each by its GOVERNING share type (the one
-  // active today, else the upcoming one) — a future successor must not change
-  // today's section.
-  const shareTypesByOption = new Map<string, typeof activePlanningShareTypes>();
-  for (const st of activePlanningShareTypes) {
-    if (!st.share_option) continue;
-    const group = shareTypesByOption.get(st.share_option) ?? [];
-    group.push(st);
-    shareTypesByOption.set(st.share_option, group);
-  }
-  const complexByOption = new Map<string, boolean>();
-  for (const [option, group] of shareTypesByOption) {
-    const governing = governingShareType(group, planningToday);
-    complexByOption.set(
-      option,
-      governing ? (governing.needs_complex_planning ?? true) : true,
-    );
-  }
-  const activePlanningConfigs = PLANNING_SHARE_OPTIONS.filter((c) =>
-    complexByOption.has(c.shareOption),
-  );
-  const complexPlanningOptions = activePlanningConfigs.filter((c) =>
-    complexByOption.get(c.shareOption),
-  );
-  const simplePlanningOptions = activePlanningConfigs.filter(
-    (c) => !complexByOption.get(c.shareOption),
-  );
-
-  const planningComplexItems: RoleGatedItem[] = complexPlanningOptions.map(
-    (c) => ({
-      key: `commissioning-planning-${c.slug}`,
-      requireRole: "isOffice",
-      label: (
-        <Link to={`/commissioning/planning/${c.slug}`}>
-          {t(c.complexSidebarKey)}
-        </Link>
-      ),
-    }),
-  );
-  const planningLongTermItems: RoleGatedItem[] = complexPlanningOptions.map(
-    (c) => ({
-      key: `commissioning-planning-${c.slug}-long-term`,
-      requireRole: "isOffice",
-      label: (
-        <Link to={`/commissioning/planning/${c.slug}/long-term`}>
-          {/* When the option has no distinct long-term label (additional
-              shares reuse one key for both modes), mark it "long-term" so a
-              complex option's two links don't read identically. */}
-          {c.complexSidebarKey === c.longTermSidebarKey
-            ? t("commissioning.long_term_planning_of", {
-                label: t(c.longTermSidebarKey),
-              })
-            : t(c.longTermSidebarKey)}
-        </Link>
-      ),
-    }),
-  );
-  const additionalLongTermItems: RoleGatedItem[] = simplePlanningOptions.map(
-    (c) => ({
-      key: `commissioning-planning-${c.slug}-long-term`,
-      requireRole: "isOffice",
-      label: (
-        <Link to={`/commissioning/planning/${c.slug}/long-term`}>
-          {t(c.longTermSidebarKey)}
-        </Link>
-      ),
-    }),
-  );
+  const { planningComplexItems, planningLongTermItems, additionalLongTermItems } =
+    usePlanningNavItems();
 
   const has_markets = getSetting("has_markets", true);
   const sells_to_resellers = getSetting("sells_to_resellers", true);
