@@ -17,5 +17,5 @@ export interface HostCapabilities {
   readonly legal_notice?: boolean;
   readonly web_app?: boolean;
   readonly manual_share_import?: boolean;
-  readonly pickup_lists?: boolean;
+  readonly delivery_stations?: boolean;
 }

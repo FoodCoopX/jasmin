@@ -31,7 +31,7 @@ CAPABILITIES = (
     "legal_notice",
     "web_app",
     "manual_share_import",
-    "pickup_lists",
+    "delivery_stations",
 )
 EVERYTHING_OFFERED = dict.fromkeys(CAPABILITIES, True)
 NOTHING_OFFERED = dict.fromkeys(CAPABILITIES, False)

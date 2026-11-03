@@ -222,9 +222,11 @@ export const commissioningRoutes: AppRoute[] = [
   {
     path: "/commissioning/delivery-tours",
     element: (
-      <RequireRole flag="isStaff">
-        <DeliveryTours />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isStaff">
+          <DeliveryTours />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
@@ -388,31 +390,37 @@ export const commissioningRoutes: AppRoute[] = [
   {
     path: "/commissioning/list-delivery-stations",
     element: (
-      <RequireRole flag="isStaff">
-        <ListDeliveryStations />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isStaff">
+          <ListDeliveryStations />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
     path: "/commissioning/delivery-station-fees",
     element: (
-      <RequireRole flag="isOffice">
-        <DeliveryStationFees />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isOffice">
+          <DeliveryStationFees />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
     path: "/commissioning/delivery-stations-overview",
     element: (
-      <RequireRole flag="isStaff">
-        <DeliveryStationsOverview />
-      </RequireRole>
+      <RequireCapability name="delivery_stations">
+        <RequireRole flag="isStaff">
+          <DeliveryStationsOverview />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
     path: "/commissioning/delivery-stations-details",
     element: (
-      <RequireCapability name="pickup_lists">
+      <RequireCapability name="delivery_stations">
         <RequireRole flag="isStaff">
           <DeliveryStationsDetails />
         </RequireRole>

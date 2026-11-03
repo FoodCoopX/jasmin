@@ -33,6 +33,14 @@ const items = [
       { key: "commissioning-delivery-stations-details" },
     ],
   },
+  {
+    key: "commissioning-data",
+    children: [
+      { key: "commissioning-list-storages" },
+      { key: "commissioning-list-delivery-stations" },
+      { key: "commissioning-delivery-tours" },
+    ],
+  },
 ];
 
 function shownKeys(): string[] {
@@ -54,7 +62,7 @@ describe("useCommissioningEntryFilter", () => {
     expect(shownKeys()).toContain("commissioning-delivery-stations-details");
   });
 
-  it("offers the share import and the pickup lists in the import-shares mode on its own", () => {
+  it("offers the share import and the delivery stations in the import-shares mode on its own", () => {
     deployment.importsShares = true;
 
     expect(shownKeys()).toEqual([
@@ -64,21 +72,25 @@ describe("useCommissioningEntryFilter", () => {
       "commissioning-delivery-stations",
       "commissioning-delivery-stations-overview",
       "commissioning-delivery-stations-details",
+      "commissioning-data",
+      "commissioning-list-storages",
+      "commissioning-list-delivery-stations",
+      "commissioning-delivery-tours",
     ]);
   });
 
-  it("drops both inside a host that imports the amounts and prints its own pickup lists", () => {
+  it("drops the share import, the delivery-station section, the station list and the tours inside a host that keeps them", () => {
     deployment.importsShares = true;
     deployment.capabilities = {
       manual_share_import: false,
-      pickup_lists: false,
+      delivery_stations: false,
     };
 
     expect(shownKeys()).toEqual([
       "commissioning-amounts",
       "commissioning-forecast",
-      "commissioning-delivery-stations",
-      "commissioning-delivery-stations-overview",
+      "commissioning-data",
+      "commissioning-list-storages",
     ]);
   });
 });

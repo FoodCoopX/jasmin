@@ -79,8 +79,10 @@ def host_capabilities() -> dict[str, bool]:
     * ``manual_share_import`` — the office's own upload of the weekly share
       amounts; Tapir imports them on every visit, and a manual import there
       would compete with it.
-    * ``pickup_lists`` — the pickup lists per delivery station; Tapir knows the
-      members and prints its own.
+    * ``delivery_stations`` — jasmin's delivery-station pages: the station list,
+      the delivery tours, the tour and pickup lists and the station fees. Tapir
+      syncs its pickup locations into jasmin, knows the members at each and
+      handles them itself.
     """
     standalone = jasmin_host() == STANDALONE
     return {
@@ -91,7 +93,7 @@ def host_capabilities() -> dict[str, bool]:
         "legal_notice": standalone,
         "web_app": standalone,
         "manual_share_import": standalone,
-        "pickup_lists": standalone,
+        "delivery_stations": standalone,
     }
 
 

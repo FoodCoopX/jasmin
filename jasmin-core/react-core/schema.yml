@@ -34589,7 +34589,7 @@ components:
         manual_share_import:
           type: boolean
           readOnly: true
-        pickup_lists:
+        delivery_stations:
           type: boolean
           readOnly: true
     InventoryEntry:

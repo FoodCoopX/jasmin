@@ -90,7 +90,7 @@ class HostCapabilitiesSerializer(serializers.Serializer):
     legal_notice = serializers.BooleanField(read_only=True)
     web_app = serializers.BooleanField(read_only=True)
     manual_share_import = serializers.BooleanField(read_only=True)
-    pickup_lists = serializers.BooleanField(read_only=True)
+    delivery_stations = serializers.BooleanField(read_only=True)
 
 
 class _HostCapabilitiesMixin:
