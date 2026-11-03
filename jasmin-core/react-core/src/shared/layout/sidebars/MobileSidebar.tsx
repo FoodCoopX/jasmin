@@ -1,4 +1,5 @@
 import { MenuOutlined } from "@ant-design/icons";
+import { useTenant } from "@hooks/index";
 import { Drawer, Menu } from "antd";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,7 +9,9 @@ import { usePackingListVisibility } from "./usePackingListVisibility";
 export default function MobileSidebar() {
   const [visible, setVisible] = useState(false);
   const { t } = useTranslation();
+  const { getSetting } = useTenant();
   const { showBoxesPackingList } = usePackingListVisibility();
+  const sells_to_resellers = getSetting("sells_to_resellers", true);
 
   const menuItemsCommissioning = [
     {
@@ -52,17 +55,11 @@ export default function MobileSidebar() {
         </Link>
       ),
     },
-    // Box packing only, as in the desktop sidebar.
+    // As in the desktop sidebar: the commissioning lists before the packing
+    // list, box packing only for the packing ones, the resellers' list only
+    // where the farm sells to resellers.
     ...(showBoxesPackingList
       ? [
-          {
-            key: "commissioning-packing-lists",
-            label: (
-              <Link to="/commissioning/packing-list-boxes">
-                {t("commissioning.packing_lists")}
-              </Link>
-            ),
-          },
           {
             key: "commissioning-commissioning-list-packing",
             label: (
@@ -73,14 +70,30 @@ export default function MobileSidebar() {
           },
         ]
       : []),
-    {
-      key: "commissioning-commissioning-list-resellers",
-      label: (
-        <Link to="/commissioning/commissioning-list-resellers">
-          {t("commissioning.commissioning_list_resellers_short")}
-        </Link>
-      ),
-    },
+    ...(sells_to_resellers
+      ? [
+          {
+            key: "commissioning-commissioning-list-resellers",
+            label: (
+              <Link to="/commissioning/commissioning-list-resellers">
+                {t("commissioning.commissioning_list_resellers_short")}
+              </Link>
+            ),
+          },
+        ]
+      : []),
+    ...(showBoxesPackingList
+      ? [
+          {
+            key: "commissioning-packing-lists",
+            label: (
+              <Link to="/commissioning/packing-list-boxes">
+                {t("commissioning.packing_lists")}
+              </Link>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (

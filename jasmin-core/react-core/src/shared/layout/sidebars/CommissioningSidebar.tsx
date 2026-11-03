@@ -1,16 +1,14 @@
-import { useTenant } from "@hooks/index";
-import { useCommissioningDeliveryStationsList } from "@shared/api/generated/commissioning/commissioning";
+import { useCapability, useTenant } from "@hooks/index";
 import { filterByRole, useRoles, type RoleGatedItem } from "@shared/auth";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import SidebarShell from "./SidebarShell";
-import { useCommissioningEntryFilter } from "./useCommissioningEntryFilter";
+import { useDeliveryStationNavItems } from "./useDeliveryStationNavItems";
 import { usePackingListVisibility } from "./usePackingListVisibility";
 import { usePlanningNavItems } from "./usePlanningNavItems";
 
 import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import BubbleChartIcon from "@mui/icons-material/BubbleChart";
-import DirectionsBikeIcon from "@mui/icons-material/DirectionsBike";
 import EggIcon from "@mui/icons-material/Egg";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import GrainIcon from "@mui/icons-material/Grain";
@@ -34,23 +32,12 @@ export default function CommissioningSidebar({
 
   const has_markets = getSetting("has_markets", true);
   const sells_to_resellers = getSetting("sells_to_resellers", true);
+  const weekly_upload = getSetting("uploads_weekly_share_amount", false);
+  const offersManualShareImport = useCapability("manual_share_import");
   const { packingMode, showBulkPackingList, showBoxesPackingList } =
     usePackingListVisibility();
-  const withoutHiddenEntries = useCommissioningEntryFilter();
-
-  // The station-fee billing is only relevant for solawis that actually charge
-  // pickup-station fees. Fetch stations only for office users (the only ones who
-  // could see the entry) and gate on any non-zero net fee.
-  const { data: stationsForFeeGate } = useCommissioningDeliveryStationsList(
-    {},
-    { query: { enabled: flags.isOffice } },
-  );
-  const has_station_fees = (stationsForFeeGate ?? []).some(
-    (station) =>
-      Number(station.fee_per_box_net) > 0 ||
-      Number(station.fee_per_month_net) > 0 ||
-      Number(station.fee_per_year_net) > 0,
-  );
+  const { deliveryStationSection, deliveryStationListItems } =
+    useDeliveryStationNavItems();
 
   const baseMenuItems = [
     {
@@ -155,17 +142,22 @@ export default function CommissioningSidebar({
             </Link>
           ),
         },
-        // Shown in the import-shares mode only (useCommissioningEntryFilter).
-        {
-          key: "commissioning-import-shares",
+        // The share import exists in the import-shares mode, but not where a
+        // host imports the amounts on every visit.
+        ...(weekly_upload && offersManualShareImport
+          ? [
+              {
+                key: "commissioning-import-shares",
 
-          requireRole: "isOffice",
-          label: (
-            <Link to="/commissioning/import-shares">
-              {t("commissioning.import_shares")}
-            </Link>
-          ),
-        },
+                requireRole: "isOffice",
+                label: (
+                  <Link to="/commissioning/import-shares">
+                    {t("commissioning.import_shares")}
+                  </Link>
+                ),
+              },
+            ]
+          : []),
 
         {
           key: "commissioning-amount-share-type-variations",
@@ -347,6 +339,35 @@ export default function CommissioningSidebar({
             </Link>
           ),
         },
+        // The commissioning lists come before the packing lists.
+        ...(showBoxesPackingList
+          ? [
+              {
+                key: "commissioning-commissioning-list-packing",
+
+                requireRole: "isStaff",
+                label: (
+                  <Link to="/commissioning/commissioning-list-packing">
+                    {t("commissioning.commissioning_list_packing")}
+                  </Link>
+                ),
+              },
+            ]
+          : []),
+        ...(sells_to_resellers
+          ? [
+              {
+                key: "commissioning-commissioning-list-resellers",
+
+                requireRole: "isStaff",
+                label: (
+                  <Link to="/commissioning/commissioning-list-resellers">
+                    {t("commissioning.commissioning_list_resellers_short")}
+                  </Link>
+                ),
+              },
+            ]
+          : []),
         ...(showBulkPackingList
           ? [
               {
@@ -388,81 +409,11 @@ export default function CommissioningSidebar({
                   </Link>
                 ),
               },
-              {
-                key: "commissioning-commissioning-list-packing",
-
-                requireRole: "isStaff",
-                label: (
-                  <Link to="/commissioning/commissioning-list-packing">
-                    {t("commissioning.commissioning_list_packing")}
-                  </Link>
-                ),
-              },
-            ]
-          : []),
-
-        {
-          key: "commissioning-commissioning-list-resellers",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/commissioning-list-resellers">
-              {t("commissioning.commissioning_list_resellers_short")}
-            </Link>
-          ),
-        },
-      ],
-    },
-    {
-      key: "commissioning-delivery-stations",
-
-      requireRole: "isStaff",
-      icon: <DirectionsBikeIcon />,
-      label: (
-        <div className="sidebar-section-header">
-          {t("commissioning.delivery_stations")}
-        </div>
-      ),
-      children: [
-        {
-          key: "commissioning-delivery-stations-overview",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/delivery-stations-overview">
-              {t("commissioning.tour_lists")}
-            </Link>
-          ),
-        },
-        {
-          key: "commissioning-delivery-stations-details",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/delivery-stations-details">
-              {t("commissioning.pickup_lists")}
-            </Link>
-          ),
-        },
-
-        // Only when at least one station actually charges a fee — most solawis
-        // don't, so hide the billing entirely for them.
-        ...(has_station_fees
-          ? [
-              {
-                key: "commissioning-delivery-station-fees",
-
-                requireRole: "isOffice",
-                label: (
-                  <Link to="/commissioning/delivery-station-fees">
-                    {t("commissioning.station_fees")}
-                  </Link>
-                ),
-              },
             ]
           : []),
       ],
     },
+    ...deliveryStationSection,
     {
       key: "commissioning-data",
 
@@ -522,26 +473,7 @@ export default function CommissioningSidebar({
             </Link>
           ),
         },
-        {
-          key: "commissioning-list-delivery-stations",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/list-delivery-stations">
-              {t("commissioning.list_delivery_stations")}
-            </Link>
-          ),
-        },
-        {
-          key: "commissioning-delivery-tours",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/delivery-tours">
-              {t("commissioning.delivery_tours")}
-            </Link>
-          ),
-        },
+        ...deliveryStationListItems,
 
         ...(sells_to_resellers
           ? [
@@ -607,10 +539,7 @@ export default function CommissioningSidebar({
   return (
     <SidebarShell
       header={t("nav.commissioning")}
-      items={filterByRole(
-        withoutHiddenEntries(baseMenuItems as unknown as RoleGatedItem[]),
-        flags,
-      )}
+      items={filterByRole(baseMenuItems as unknown as RoleGatedItem[], flags)}
       openKeys={Array.isArray(openKeys) ? openKeys : []}
       onOpenChange={onOpenChange}
     />
