@@ -523,3 +523,95 @@ describe("useHarvestingListColumns PDF columns", () => {
     expect(hasColumn(build().pdfColumns, "computed_to_harvest")).toBe(false);
   });
 });
+
+describe("useHarvestingListColumns on a farm that doesn't sell to resellers", () => {
+  beforeEach(() => {
+    tenantState.settings = { show_size_column: true, sells_to_resellers: false };
+  });
+
+  const shareAmounts = [
+    "theoretical_harvest_amount_share_content",
+    "computed_still_in_stock_share_content",
+    "computed_to_harvest_share_content",
+    "amount_share_content",
+    "computed_amount_combined_share_content",
+  ];
+
+  it("turns every amount group into its share-content column alone", () => {
+    expect(columnIds(columnsFor())).toEqual([
+      "share_article_name",
+      "unit",
+      "size",
+      ...shareAmounts,
+      "amount_per_pu",
+      "harvesting_crate_name",
+      "note",
+    ]);
+  });
+
+  it("titles each such column after its group and gives it the pair's width", () => {
+    const columns = columnsFor();
+
+    expect(titleText(findColumn(columns, "computed_to_harvest_share_content").title)).toBe(
+      "commissioning.to_harvest",
+    );
+    expect(findColumn(columns, "computed_to_harvest_share_content").width).toBe("9em");
+    expect(
+      titleText(findColumn(columns, "computed_amount_combined_share_content").title),
+    ).toBe("commissioning.amount_harvesting_list");
+    expect(findColumn(columns, "computed_amount_combined_share_content").width).toBe(
+      "16em",
+    );
+  });
+
+  it("keeps the additional harvest editable", () => {
+    const column = findColumn(columnsFor(), "amount_share_content");
+
+    expect(column.inputType).toBe("negative_integer");
+    expect(isDisabled(column, carrotRow)).toBe(false);
+  });
+
+  it("shows only the share-content amount flat, without the share qualifier", () => {
+    const columns = columnsFor(gardener);
+
+    expect(columnIds(columns)).toEqual([
+      "share_article_name",
+      "unit",
+      "size",
+      "amount_share_content_flat",
+      "amount_per_pu",
+      "harvesting_crate_name",
+      "note",
+    ]);
+    expect(titleText(findColumn(columns, "amount_share_content_flat").title)).toBe(
+      "commissioning.amount_harvesting_list",
+    );
+  });
+
+  it("prints only the share-content amount, titled as the harvesting amount", () => {
+    const { pdfColumns } = build();
+
+    expect(columnIds(pdfColumns)).toEqual([
+      "share_article_name",
+      "amount_share_content_flat",
+      "amount_per_pu_pdf",
+      "harvesting_crate_pdf",
+      "note_pdf",
+      "done_pdf",
+    ]);
+    expect(findColumn(pdfColumns, "amount_share_content_flat").pdf).toMatchObject({
+      title: "commissioning.amount_harvesting_list",
+    });
+  });
+
+  it("fills the printed page, the note taking the resellers' amount's width", () => {
+    const widthOf = (columns: ReturnType<typeof build>["pdfColumns"]) =>
+      columns.reduce((sum, column) => sum + parseFloat(String(column.pdf?.width)), 0);
+
+    expect(widthOf(build().pdfColumns)).toBe(100);
+    expect(findColumn(build().pdfColumns, "note_pdf").pdf).toMatchObject({ width: "37%" });
+
+    tenantState.settings = { show_size_column: true, sells_to_resellers: true };
+    expect(widthOf(build().pdfColumns)).toBe(100);
+  });
+});
