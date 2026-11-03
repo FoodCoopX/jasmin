@@ -704,23 +704,10 @@ def alert_on_low_disk_space() -> dict[str, int]:
     }
 
 
-# Keep the rate-limit ledger well beyond the widest guard window (7 days) so a
-# little history remains for forensic review, but bounded so the table can't
-# grow without limit.
-_ACTION_RATE_LOG_RETENTION = datetime.timedelta(days=30)
-
-
 @db_periodic_task(crontab(hour="4", minute="30"), retries=2, retry_delay=600)
 def prune_old_action_rate_log() -> int:
-    """Delete ``ActionRateLog`` rows older than the retention window.
+    """Prune the rate-limit ledger, see ``rate_limits.prune_action_rate_log``.
+    Returns the number of rows removed (for the dev/QA runner)."""
+    from apps.shared.tenants.rate_limits import prune_action_rate_log
 
-    ``ActionRateLog`` is a public-schema (SHARED_APPS) table holding every
-    tenant's rate-limited-action events, so a single delete prunes all tenants
-    at once. Returns the number of rows removed (for the dev/QA runner).
-    """
-    from apps.shared.tenants.models import ActionRateLog
-
-    cutoff = timezone.now() - _ACTION_RATE_LOG_RETENTION
-    deleted, _ = ActionRateLog.objects.filter(created_at__lt=cutoff).delete()
-    log.info("action_rate_log.prune.done deleted=%s cutoff=%s", deleted, cutoff)
-    return deleted
+    return prune_action_rate_log()

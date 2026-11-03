@@ -424,7 +424,7 @@ def test_override_is_read_only_on_the_tenant_facing_serializer(tenant):
 
 
 def test_prune_deletes_rows_past_the_retention_window(tenant):
-    from apps.shared.tenants.tasks import prune_old_action_rate_log
+    from apps.shared.tenants.rate_limits import prune_action_rate_log
 
     _set_override(tenant, weekly=100, per_minute=100)
     enforce_action_quota(INV, tenant=tenant)
@@ -434,6 +434,6 @@ def test_prune_deletes_rows_past_the_retention_window(tenant):
     ActionRateLog.objects.filter(pk=old.pk).update(
         created_at=timezone.now() - timedelta(days=31)
     )
-    deleted = prune_old_action_rate_log.call_local()
+    deleted = prune_action_rate_log()
     assert deleted == 1
     assert _count(tenant) == 1
