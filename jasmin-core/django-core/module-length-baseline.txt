@@ -18,7 +18,7 @@ apps/commissioning/services/order_content_service.py: 1025
 apps/commissioning/views/reseller_views.py: 1442
 apps/commissioning/viewsets/members_viewsets.py: 1836
 apps/commissioning/viewsets/resellers_viewsets.py: 1557
-apps/commissioning/viewsets/shares_viewsets.py: 2293
+apps/commissioning/viewsets/shares_viewsets.py: 2287
 apps/notifications/registry.py: 1051
 apps/payments/services.py: 1233
 apps/shared/super_admin/viewsets.py: 1161

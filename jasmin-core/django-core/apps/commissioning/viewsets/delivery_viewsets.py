@@ -26,6 +26,7 @@ from apps.authz.permissions import (
     has_any_role,
 )
 from apps.authz.scoping import enforce_owner
+from apps.shared.iso_week_filters import iso_week_bound
 from core.serializers import ErrorResponseSerializer
 
 from ..errors import (
@@ -618,19 +619,16 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             stranded = (
                 ShareDelivery.objects.filter(delivery_station_day=instance)
                 .filter(
-                    Q(share__year__gt=vu_week.year)
-                    | Q(
-                        share__year=vu_week.year,
-                        share__delivery_week__gt=vu_week.week,
-                    )
+                    iso_week_bound((vu_week.year, vu_week.week), "gt", prefix="share__")
                 )
                 .count()
             )
             stranded += (
                 CapacityReservation.objects.filter(delivery_station_day=instance)
                 .filter(
-                    Q(year__gt=vu_week.year)
-                    | Q(year=vu_week.year, week__gt=vu_week.week)
+                    iso_week_bound(
+                        (vu_week.year, vu_week.week), "gt", week_field="week"
+                    )
                 )
                 .count()
             )
@@ -693,19 +691,16 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             stranded = (
                 ShareDelivery.objects.filter(delivery_station_day=instance)
                 .filter(
-                    Q(share__year__lt=vf_week.year)
-                    | Q(
-                        share__year=vf_week.year,
-                        share__delivery_week__lt=vf_week.week,
-                    )
+                    iso_week_bound((vf_week.year, vf_week.week), "lt", prefix="share__")
                 )
                 .count()
             )
             stranded += (
                 CapacityReservation.objects.filter(delivery_station_day=instance)
                 .filter(
-                    Q(year__lt=vf_week.year)
-                    | Q(year=vf_week.year, week__lt=vf_week.week)
+                    iso_week_bound(
+                        (vf_week.year, vf_week.week), "lt", week_field="week"
+                    )
                 )
                 .count()
             )
@@ -838,10 +833,8 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 ShareDelivery.objects.filter(subscription__member=member)
                 .filter(subscription__cancelled_at__isnull=True)
                 .filter(
-                    Q(share__year__gt=current_week.year)
-                    | Q(
-                        share__year=current_week.year,
-                        share__delivery_week__gte=current_week.week,
+                    iso_week_bound(
+                        (current_week.year, current_week.week), "gte", prefix="share__"
                     )
                 )
                 .filter(delivery_station_day__isnull=False)

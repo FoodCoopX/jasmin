@@ -4,7 +4,7 @@ import datetime
 from typing import Any
 
 from django.db import transaction
-from django.db.models import F, Q, QuerySet
+from django.db.models import F, QuerySet
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
@@ -12,6 +12,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.authz.permissions import IsStaff, RolePermissionsMixin
+from apps.shared.iso_week_filters import iso_week_window
 from apps.shared.request_utils import auth_user
 from core.pagination import OptionalLimitOffsetPagination
 
@@ -60,9 +61,9 @@ class _TheoreticalBaseViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 # this list is unpaginated unless the caller asks for a limit.
                 cutoff = today - datetime.timedelta(weeks=_DEFAULT_WEEKS_BACK)
                 cutoff_year, cutoff_week = cutoff.isocalendar()[:2]
+                # Week 53 ends every ISO year, of 52 weeks or of 53.
                 queryset = queryset.filter(
-                    Q(year=current_year)
-                    | Q(year=cutoff_year, delivery_week__gte=cutoff_week)
+                    iso_week_window((cutoff_year, cutoff_week), (current_year, 53))
                 )
             elif year == current_year:
                 # Same N-week floor for an explicitly requested current year,

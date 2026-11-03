@@ -21,6 +21,8 @@ from apps.commissioning.tests.factories import (
 # Monday of ISO week 1, 2027. The two-week cutoff lands on 2026-W52 — in the
 # PREVIOUS ISO year — which is the case the window has to span.
 EARLY_JANUARY = datetime(2027, 1, 4, 12, 0)
+# Wednesday of ISO week 29, 2026: the cutoff lands on week 27 of the same year.
+MID_JULY = datetime(2026, 7, 15, 12, 0)
 
 THEORETICAL_LISTS = [
     ("theoretical_harvests", TheoreticalHarvestFactory),
@@ -64,6 +66,29 @@ class TestTheoreticalListRecencyWindow:
         )
 
         resp = api_client.get(reverse(f"{basename}-list"))
+
+        assert resp.status_code == status.HTTP_200_OK
+        ids = _row_ids(resp)
+        assert current.id in ids
+        assert at_cutoff.id in ids
+        assert before_cutoff.id not in ids
+
+    def test_mid_year_the_window_starts_at_the_cutoff_week(
+        self, api_client, tenant, basename, factory
+    ):
+        """With the cutoff in the current year, the weeks of that year before
+        it stay out too."""
+        with time_machine.travel(MID_JULY, tick=False):
+            share_content = ShareContentFactory()
+            current = factory(year=2026, delivery_week=29, share_content=share_content)
+            at_cutoff = factory(
+                year=2026, delivery_week=27, share_content=share_content
+            )
+            before_cutoff = factory(
+                year=2026, delivery_week=20, share_content=share_content
+            )
+
+            resp = api_client.get(reverse(f"{basename}-list"))
 
         assert resp.status_code == status.HTTP_200_OK
         ids = _row_ids(resp)

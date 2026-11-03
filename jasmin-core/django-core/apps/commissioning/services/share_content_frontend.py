@@ -11,6 +11,7 @@ from typing import Any
 from django.db.models import QuerySet
 from isoweek import Week
 
+from apps.shared.iso_week_filters import iso_week_window
 from apps.shared.money import round_money
 
 from ..models import (
@@ -24,7 +25,6 @@ from ..models.choices import UnitOptions
 from ..utils import sort_share_articles
 from ..utils.composite_id_utils import compose_slot_id
 from ..utils.iso_week_utils import (
-    iso_week_window,
     previous_day_stock_coordinates,
     previous_monday,
     weeks_in_range,

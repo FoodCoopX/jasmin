@@ -17,6 +17,7 @@ from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 
 from apps.shared.csv_safety import CsvEchoBuffer, escape_csv_row
+from apps.shared.iso_week_filters import iso_week_window_for_dates
 from core.tenant_db import connection
 
 from ..errors import InvalidExportDates  # re-exported for back-compat
@@ -266,10 +267,7 @@ class DocumentationExportService:
         return (
             config["model"]
             .objects.select_related(*config["select_related"])
-            .filter(
-                year__gte=start.isocalendar()[0],
-                year__lte=end.isocalendar()[0],
-            )
+            .filter(iso_week_window_for_dates(start, end))
             .order_by("year", "delivery_week", "day_number", "share_article__name")
         )
 

@@ -8,11 +8,8 @@ from __future__ import annotations
 
 import datetime as dt
 
-from django.db.models import Q
-
 from apps.commissioning.utils.iso_week_utils import (
     iso_week_range,
-    iso_week_window,
     next_iso_week,
     next_monday,
     next_sunday,
@@ -43,22 +40,6 @@ class TestIsoWeekRange:
 
     def test_zero_weeks_is_empty(self):
         assert iso_week_range(2026, 10, 0) == []
-
-
-class TestIsoWeekWindow:
-    def test_within_one_year(self):
-        assert iso_week_window((2026, 15), (2026, 16)) == Q(
-            year=2026, delivery_week__gte=15, delivery_week__lte=16
-        )
-
-    def test_across_years_takes_the_first_years_tail_and_the_last_years_head(
-        self,
-    ):
-        assert iso_week_window((2024, 50), (2026, 2), prefix="share__") == (
-            Q(share__year=2024, share__delivery_week__gte=50)
-            | Q(share__year__gt=2024, share__year__lt=2026)
-            | Q(share__year=2026, share__delivery_week__lte=2)
-        )
 
 
 class TestWeekdayAlignment:

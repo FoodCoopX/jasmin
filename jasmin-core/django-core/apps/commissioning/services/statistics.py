@@ -3,17 +3,84 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, QuerySet
 from django.db.models.functions import TruncMonth, TruncWeek, TruncYear
 from django.utils import timezone
 
+from apps.shared.iso_week_filters import iso_week_bound, iso_week_window_for_dates
 from apps.shared.money import round_money
 
-from ..models import Member, Share, ShareContent, ShareTypeVariation
+from ..models import (
+    DeliveryStationDay,
+    Member,
+    Share,
+    ShareContent,
+    ShareTypeVariation,
+)
 from ..models.choices import UnitOptions, VegetableSizeOptions
-from ..utils.iso_week_utils import iso_week_window
 from ..utils.sort_order import share_type_ranks, size_order_annotation
 from ..utils.weight import mean_weight, quantize_weight
+
+# The ShareArticle factor that turns a piece or a bunch of each size into kg,
+# named as the ``.values()`` key the averages' scan reads.
+_KG_PER_FIELD = {
+    (UnitOptions.PCS, VegetableSizeOptions.S): "share_article__kg_per_piece_S",
+    (UnitOptions.PCS, VegetableSizeOptions.M): "share_article__kg_per_piece_M",
+    (UnitOptions.PCS, VegetableSizeOptions.L): "share_article__kg_per_piece_L",
+    (UnitOptions.BUNCH, VegetableSizeOptions.S): "share_article__kg_per_bunch_S",
+    (UnitOptions.BUNCH, VegetableSizeOptions.M): "share_article__kg_per_bunch_M",
+    (UnitOptions.BUNCH, VegetableSizeOptions.L): "share_article__kg_per_bunch_L",
+}
+
+# A station's place in the averages: (delivery day, variation, delivery station).
+_StationKey = tuple[str, str, str]
+
+
+def _kg_of(record: dict[str, Any]) -> Decimal:
+    """A ShareContent row's amount in kg; 0 for a unit without a factor.
+    ``amount`` and the ``kg_per_*`` columns are DecimalFields — coerced via
+    ``Decimal(str(...))`` (never ``Decimal(float)``) and multiplied in Decimal."""
+    amount = Decimal(str(record["amount"] or 0))
+    if record["unit"] == UnitOptions.KG:
+        return amount
+    factor_field = _KG_PER_FIELD.get((record["unit"], record["size"]))
+    if factor_field is None:
+        return Decimal("0")
+    return amount * Decimal(str(record[factor_field] or 0))
+
+
+def _station_averages(records) -> dict[_StationKey, Decimal]:
+    """Per station, the mean over the weeks it received the variation of that
+    week's kilos, rounded to two decimals."""
+    weekly: dict[_StationKey, dict[tuple[int, int], Decimal]] = defaultdict(
+        lambda: defaultdict(Decimal)
+    )
+    for record in records:
+        station = (
+            record["share__delivery_day__id"],
+            record["share__share_type_variation_id"],
+            record["delivery_station__id"],
+        )
+        week = (record["share__year"], record["share__delivery_week"])
+        weekly[station][week] += _kg_of(record)
+    return {
+        station: round_money(sum(weeks.values(), Decimal("0")) / len(weeks))
+        for station, weeks in weekly.items()
+    }
+
+
+def _tour_numbers(stations) -> dict[tuple[str, str], int]:
+    """The tour of each (delivery station, delivery day) of ``stations``, in one
+    query."""
+    station_days = {(station_id, day_id) for day_id, _, station_id in stations}
+    rows = DeliveryStationDay.objects.filter(
+        delivery_station_id__in=[station_id for station_id, _ in station_days],
+        delivery_day_id__in=[day_id for _, day_id in station_days],
+    ).values("delivery_station_id", "delivery_day_id", "tour_number")
+    return {
+        (row["delivery_station_id"], row["delivery_day_id"]): row["tour_number"]
+        for row in rows
+    }
 
 
 def _compute_variation_averages(
@@ -29,7 +96,7 @@ def _compute_variation_averages(
     3. Day level: day_X_variation_Y (aggregated from stations)
 
     Args:
-        share_type_variation: ShareTypeVariation instance
+        share_type_variation_ids: ShareTypeVariation IDs
         year: Current year
         delivery_week: Current week number
         years_back: Number of years to look back (default: 2)
@@ -42,191 +109,39 @@ def _compute_variation_averages(
             'day_abc_variation_xyz': 12.5,  # Day level average (sum of stations)
         }
     """
-    # Calculate date range
-    start_year = year - years_back
-
-    # Get all relevant planning records - ONLY include data BEFORE the current week
-    queryset = ShareContent.objects.filter(
+    # The weeks before the current one, back to the start of ``years_back``
+    # years ago.
+    records = ShareContent.objects.filter(
+        iso_week_bound((year, delivery_week), "lt", prefix="share__"),
         share__share_type_variation_id__in=share_type_variation_ids,
-        share__year__gte=start_year,
-    ).filter(
-        # Include all years before current year
-        Q(share__year__lt=year)
-        |
-        # OR current year but before current week
-        Q(share__year=year, share__delivery_week__lt=delivery_week)
-    )
-
-    # Structure to hold sums PER WEEK at station level
-    # Key: (week, year, station_key) -> amount
-    # Quantities (amount, kg-per-piece/bunch) are DecimalFields — keep the
-    # aggregation in Decimal end-to-end and float only at the response
-    # boundary (return), so intermediate sums don't accrue binary-fp drift.
-    weekly_station_amounts = defaultdict(lambda: defaultdict(Decimal))
-
-    # Track all unique station keys
-    all_station_keys = set()
-
-    # Track station to tour/day mappings - key is (station_id, day_id)
-    station_day_to_tour = {}
-
-    # Get all records with their related data
-    records = queryset.select_related(
-        "share_article",
-        "share",
-        "share__delivery_day",
-        "delivery_station",
+        share__year__gte=year - years_back,
     ).values(
-        "id",
+        "amount",
         "unit",
         "size",
-        "amount",
-        "share_article__kg_per_piece_S",
-        "share_article__kg_per_piece_M",
-        "share_article__kg_per_piece_L",
-        "share_article__kg_per_bunch_S",
-        "share_article__kg_per_bunch_M",
-        "share_article__kg_per_bunch_L",
+        *_KG_PER_FIELD.values(),
         "share__delivery_day__id",
         "share__delivery_week",
         "share__year",
         "share__share_type_variation_id",
         "delivery_station__id",
     )
+    station_averages = _station_averages(records)
+    tours = _tour_numbers(station_averages)
 
-    processed_count = 0
-
-    # Process each record - aggregate by week first
-    for record_data in records:
-        amount = record_data.get("amount") or 0
-
-        variation_id = record_data["share__share_type_variation_id"]
-        day_id = record_data["share__delivery_day__id"]
-        station_id = record_data["delivery_station__id"]
-        week = record_data["share__delivery_week"]
-        record_year = record_data["share__year"]
-
-        # Convert to kg. ``amount`` and the ``kg_per_*`` columns are all
-        # DecimalFields — coerce via ``Decimal(str(...))`` (never
-        # ``Decimal(float)``) and multiply in Decimal.
-        amount_dec = Decimal(str(amount))
-        kg_amount = Decimal("0")
-        unit = record_data["unit"]
-        size = record_data["size"]
-
-        _kg_per_field = {
-            (UnitOptions.PCS, VegetableSizeOptions.S): "share_article__kg_per_piece_S",
-            (UnitOptions.PCS, VegetableSizeOptions.M): "share_article__kg_per_piece_M",
-            (UnitOptions.PCS, VegetableSizeOptions.L): "share_article__kg_per_piece_L",
-            (
-                UnitOptions.BUNCH,
-                VegetableSizeOptions.S,
-            ): "share_article__kg_per_bunch_S",
-            (
-                UnitOptions.BUNCH,
-                VegetableSizeOptions.M,
-            ): "share_article__kg_per_bunch_M",
-            (
-                UnitOptions.BUNCH,
-                VegetableSizeOptions.L,
-            ): "share_article__kg_per_bunch_L",
-        }.get((unit, size))
-
-        if unit == UnitOptions.KG:
-            kg_amount = amount_dec
-        elif _kg_per_field is not None:
-            kg_amount = amount_dec * Decimal(str(record_data[_kg_per_field] or 0))
-
-        # Station level aggregation: day_X_variation_Y_station_Z
-        station_key = f"day_{day_id}_variation_{variation_id}_station_{station_id}"
-        week_key = (record_year, week)
-
-        # Sum up amounts per week per station (even if kg_amount is 0)
-        weekly_station_amounts[week_key][station_key] += kg_amount
-        all_station_keys.add(station_key)
-        processed_count += 1
-
-    # Now calculate averages: sum of weekly totals / number of weeks
-    station_totals = defaultdict(lambda: {"sum": Decimal("0"), "count": 0})
-
-    for _week_key, station_amounts in weekly_station_amounts.items():
-        for station_key, amount in station_amounts.items():
-            station_totals[station_key]["sum"] += amount
-            station_totals[station_key]["count"] += 1
-
-    # Get tour information from DeliveryStationDay
-    from ..models import DeliveryStationDay
-
-    # Get all unique (station_id, day_id) combinations from station_totals
-    station_day_combinations = set()
-    for station_key in all_station_keys:
-        # Parse: day_{day_id}_variation_{variation_id}_station_{station_id}
-        parts = station_key.split("_")
-        day_id = parts[1]
-        station_id = parts[5]
-        station_day_combinations.add((station_id, day_id))
-
-    # Fetch tour numbers for all combinations in one query
-    delivery_station_days = DeliveryStationDay.objects.filter(
-        delivery_station_id__in=[
-            station_id for station_id, _ in station_day_combinations
-        ],
-        delivery_day_id__in=[
-            delivery_day_id for _, delivery_day_id in station_day_combinations
-        ],
-    ).values("delivery_station_id", "delivery_day_id", "tour_number")
-
-    # Build the lookup dictionary
-    for delivery_station_day in delivery_station_days:
-        key = (
-            delivery_station_day["delivery_station_id"],
-            delivery_station_day["delivery_day_id"],
-        )
-        station_day_to_tour[key] = delivery_station_day["tour_number"]
-
-    # Calculate station-level averages
-    station_averages = {}
-    for field_name, data in station_totals.items():
-        if data["count"] > 0:
-            avg = round_money(data["sum"] / data["count"])
-            station_averages[field_name] = avg
-
-    # Now aggregate from station level to tour and day levels
-    tour_totals = defaultdict(Decimal)
-    day_totals = defaultdict(Decimal)
-
-    for station_key, avg_value in station_averages.items():
-        # Parse the station key to get day_id, variation_id, station_id
-        # Format: day_{day_id}_variation_{variation_id}_station_{station_id}
-        parts = station_key.split("_")
-        day_id = parts[1]
-        var_id = parts[3]
-        station_id = parts[5]
-
-        # Aggregate to day level
-        day_key = f"day_{day_id}_variation_{var_id}"
-        day_totals[day_key] += avg_value
-
-        # Aggregate to tour level if tour mapping exists
-        lookup_key = (station_id, day_id)
-        if lookup_key in station_day_to_tour:
-            tour_number = station_day_to_tour[lookup_key]
-            tour_key = f"day_{day_id}_variation_{var_id}_tour_{tour_number}"
-            tour_totals[tour_key] += avg_value
-
-    # Combine all averages
-    averages = {}
-
-    # Station level (already calculated)
-    averages.update(station_averages)
-
-    # Tour level (rounded)
-    for tour_key, total in tour_totals.items():
-        averages[tour_key] = round_money(total)
-
-    # Day level (rounded)
-    for day_key, total in day_totals.items():
-        averages[day_key] = round_money(total)
+    # Quantities stay Decimal until the response; tours and days add up their
+    # stations' rounded averages.
+    averages: dict[str, Decimal] = {}
+    tour_totals: dict[str, Decimal] = defaultdict(Decimal)
+    day_totals: dict[str, Decimal] = defaultdict(Decimal)
+    for (day_id, variation_id, station_id), average in station_averages.items():
+        day_key = f"day_{day_id}_variation_{variation_id}"
+        averages[f"{day_key}_station_{station_id}"] = average
+        day_totals[day_key] += average
+        if (station_id, day_id) in tours:
+            tour_totals[f"{day_key}_tour_{tours[(station_id, day_id)]}"] += average
+    averages.update({key: round_money(total) for key, total in tour_totals.items()})
+    averages.update({key: round_money(total) for key, total in day_totals.items()})
 
     # Float only at the response boundary — the values were accumulated in
     # Decimal above; ``float`` here keeps the wire contract (JSON numbers)
@@ -422,14 +337,12 @@ def calculate_share_weights_by_week(
     """
     if start_date > end_date:
         return []
-    # The weeks the bounds fall in count whole, a range starting mid-week too.
-    first_year, first_week, _ = start_date.isocalendar()
-    last_year, last_week, _ = end_date.isocalendar()
 
     # Only a box is weighed: a virtual variation is made of physical ones, and
     # a variation packed in bulk is never a box.
     shares = Share.objects.filter(
-        iso_week_window((first_year, first_week), (last_year, last_week)),
+        # The weeks the bounds fall in count whole, a mid-week start too.
+        iso_week_window_for_dates(start_date, end_date),
         share_type_variation__variation_type=ShareTypeVariation.VariationType.PHYSICAL,
         share_type_variation__is_packed_bulk=False,
     )

@@ -918,10 +918,10 @@ Located in `jasmin-core/django-core/apps/`:
 `apps/shared/` also holds standalone always-shared utility modules (importable
 from `commissioning`): `auth_cookies.py`, `csp_report.py`, `csv_safety.py`,
 `deferred_email.py`, `iban_validator.py`, `image_upload.py`, `invitations.py`,
-`languages.py`, `model_fields.py`, `money.py`, `openapi_params.py`,
-`pii_logging.py`, `pii_masking.py`, `query_params.py`, `request_utils.py`,
-`retention.py`, `sepa_mandate_hooks.py`, `smtp_host_validator.py`,
-`subscription_hooks.py`, `tenant_urls.py`.
+`iso_week_filters.py`, `languages.py`, `model_fields.py`, `money.py`,
+`openapi_params.py`, `pii_logging.py`, `pii_masking.py`, `query_params.py`,
+`request_utils.py`, `retention.py`, `sepa_mandate_hooks.py`,
+`smtp_host_validator.py`, `subscription_hooks.py`, `tenant_urls.py`.
 
 **Key Django patterns:**
 

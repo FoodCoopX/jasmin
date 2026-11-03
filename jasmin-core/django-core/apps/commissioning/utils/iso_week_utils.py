@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime as _dt
 from typing import NamedTuple
 
-from django.db.models import Q
 from django.utils import timezone
 from isoweek import Week
 
@@ -216,24 +215,3 @@ def weeks_in_range(
         iso_year, iso_week, _ = (valid_from + _dt.timedelta(days=offset)).isocalendar()
         weeks.add((iso_year, iso_week))
     return weeks
-
-
-def iso_week_window(
-    first: tuple[int, int], last: tuple[int, int], prefix: str = ""
-) -> Q:
-    """A filter on ``<prefix>year`` and ``<prefix>delivery_week`` for the ISO
-    weeks from ``first`` to ``last`` (``(year, week)``, both included). ISO
-    weeks order like their ``(year, week)`` tuples, so the window is a
-    lexicographic range: unlike a ``year__in`` × ``delivery_week__in`` filter,
-    it selects no week of another year."""
-    year, week = f"{prefix}year", f"{prefix}delivery_week"
-    (first_year, first_week), (last_year, last_week) = first, last
-    if first_year == last_year:
-        return Q(
-            **{year: first_year, f"{week}__gte": first_week, f"{week}__lte": last_week}
-        )
-    return (
-        Q(**{year: first_year, f"{week}__gte": first_week})
-        | Q(**{f"{year}__gt": first_year, f"{year}__lt": last_year})
-        | Q(**{year: last_year, f"{week}__lte": last_week})
-    )

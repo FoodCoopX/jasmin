@@ -42,6 +42,7 @@ from apps.authz.permissions import (
     RolePermissionsMixin,
 )
 from apps.shared.csv_safety import CsvEchoBuffer, escape_csv_row
+from apps.shared.iso_week_filters import iso_week_bound, iso_week_window_for_dates
 from apps.shared.request_utils import auth_user, body
 from core.errors import ForbiddenError
 from core.pagination import OptionalLimitOffsetPagination
@@ -114,7 +115,7 @@ from ..services import (
 )
 from ..services.share_delivery_service import JokerScope
 from ..utils.composite_id_utils import parse_slot_id
-from ..utils.iso_week_utils import iso_week_window, week_day_to_date
+from ..utils.iso_week_utils import week_day_to_date
 from ..utils.lookup import get_or_404
 from ..utils.query_params import validate_query_params
 from ..utils.sort_order import size_order_annotation
@@ -1095,15 +1096,15 @@ class ShareDeliveryViewSet(
             target_delivery_day = new_delivery_station_day.delivery_day
             future_deliveries = (
                 ShareDelivery.objects.filter(
+                    iso_week_bound(
+                        (original_share.year, original_share.delivery_week),
+                        "gte",
+                        prefix="share__",
+                    ),
                     subscription=instance.subscription,
                     share__delivery_day=original_share.delivery_day,
-                    share__year__gte=original_share.year,
                 )
                 .exclude(pk=instance.pk)
-                .exclude(
-                    share__year=original_share.year,
-                    share__delivery_week__lt=original_share.delivery_week,
-                )
                 .select_related("share", "share__delivery_day")
             )
 
@@ -1415,9 +1416,6 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         start = params["date_from"]
         end = params["date_to"]
 
-        start_iso = start.isocalendar()
-        end_iso = end.isocalendar()
-
         # Narrow to the (ISO year, ISO week) window in SQL: Share.year /
         # delivery_week are ISO (week_day_to_date reads them as ISO), so the
         # window is a safe superset of the exact day-level filter applied
@@ -1426,11 +1424,7 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             Share.objects.select_related(
                 "share_type_variation__share_type",
             )
-            .filter(
-                iso_week_window(
-                    (start_iso.year, start_iso.week), (end_iso.year, end_iso.week)
-                )
-            )
+            .filter(iso_week_window_for_dates(start, end))
             .order_by("year", "delivery_week")
         )
 
