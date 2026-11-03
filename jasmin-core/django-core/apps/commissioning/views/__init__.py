@@ -49,6 +49,7 @@ from .statistic_views import (
     member_dashboard_statistics,
     member_growth_statistics,
     purchase_cost_by_week,
+    share_weights_by_week,
 )
 from .stock_bulk_views import (
     bulk_finalize_current_stock,

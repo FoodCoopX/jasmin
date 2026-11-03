@@ -65,3 +65,37 @@ class PurchaseCostByWeekSerializer(serializers.Serializer):
     amount = serializers.CharField(
         help_text="Total purchase cost for the week, 2dp string."
     )
+
+
+class ShareWeightsByWeekSerializer(serializers.Serializer):
+    """One (ISO week, share type variation) point for the weight statistics:
+    the average weight of the variation's shares weighed that week against its
+    target weight, both in kg as 3dp strings. ``average_weight`` is null for a
+    week in which no share of the variation was weighed, ``target_weight`` for
+    a variation without one."""
+
+    year = serializers.IntegerField()
+    week = serializers.IntegerField()
+    share_type_variation = serializers.CharField()
+    share_type = serializers.CharField()
+    share_type_name = serializers.CharField()
+    share_type_rank = serializers.IntegerField(
+        help_text="The share type's place among the response's share types: "
+        "base share types first, then additional ones, each by its first "
+        "variation's sort_order and size."
+    )
+    size = serializers.CharField()
+    variation_rank = serializers.IntegerField(
+        help_text="The variation's place among the response's variations: by "
+        "share type rank, then sort_order, then size."
+    )
+    target_weight = serializers.DecimalField(
+        max_digits=5, decimal_places=3, allow_null=True
+    )
+    weighed_shares = serializers.IntegerField(
+        help_text="How many of the variation's shares (one per delivery day) "
+        "were weighed that week."
+    )
+    average_weight = serializers.DecimalField(
+        max_digits=10, decimal_places=3, allow_null=True
+    )

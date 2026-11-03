@@ -1,12 +1,15 @@
+import dayjs from "dayjs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   activeAtDateForWeek,
   dateForWeekDayNumber,
+  formatWeekKey,
   hasWeekBegun,
   isWeekInPast,
   mondayOfIsoWeek,
   nextIsoWeek,
+  termWeekKeys,
 } from "../weekRange";
 
 // The ISO weeks around New Year belong to the year they mostly lie in, not to
@@ -100,5 +103,22 @@ describe("activeAtDateForWeek", () => {
 
     expect(activeAtDateForWeek(2027, 1)).toBe("2027-01-09");
     expect(activeAtDateForWeek(2026, 53)).toBe("2027-01-02");
+  });
+});
+
+describe("termWeekKeys", () => {
+  it("keys every ISO week a range touches, across New Year", () => {
+    // A Wednesday start counts its whole week.
+    expect(termWeekKeys(dayjs("2025-12-24"), dayjs("2026-01-11"))).toEqual([
+      "2025-52",
+      "2026-1",
+      "2026-2",
+    ]);
+  });
+});
+
+describe("formatWeekKey", () => {
+  it("reads a week key as week/year", () => {
+    expect(formatWeekKey("2026-30")).toBe("30/2026");
   });
 });

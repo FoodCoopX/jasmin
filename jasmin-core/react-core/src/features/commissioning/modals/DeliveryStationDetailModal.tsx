@@ -23,9 +23,9 @@ import {
 import {
   capacityFloorParams,
   capacityFloorWeekKeys,
-  formatWeekKey,
   stationDayTermCapacity,
 } from "@features/abos/utils/stationCapacity";
+import { formatWeekKey } from "@shared/utils/weekRange";
 import type { CapacityWeekEntry } from "@features/abos/utils/stationCapacity";
 import {
   useShareDeliveryDays,

@@ -34,8 +34,12 @@ export default function CommissioningSidebar({
   const sells_to_resellers = getSetting("sells_to_resellers", true);
   const weekly_upload = getSetting("uploads_weekly_share_amount", false);
   const offersManualShareImport = useCapability("manual_share_import");
-  const { packingMode, showBulkPackingList, showBoxesPackingList } =
-    usePackingListVisibility();
+  const {
+    packingMode,
+    showBulkPackingList,
+    showBoxesPackingList,
+    showWeightStatistics,
+  } = usePackingListVisibility();
   const { deliveryStationSection, deliveryStationListItems } =
     useDeliveryStationNavItems();
 
@@ -192,6 +196,20 @@ export default function CommissioningSidebar({
             </Link>
           ),
         },
+        ...(showWeightStatistics
+          ? [
+              {
+                key: "commissioning-statistics-share-weights",
+
+                requireRole: "isOffice",
+                label: (
+                  <Link to="/commissioning/statistics-share-weights">
+                    {t("commissioning.statistics_share_weights")}
+                  </Link>
+                ),
+              },
+            ]
+          : []),
         ...planningLongTermItems,
       ],
     },
@@ -395,17 +413,6 @@ export default function CommissioningSidebar({
                     {packingMode === "MIXED"
                       ? t("commissioning.packing_list_boxes")
                       : t("commissioning.packing_list")}
-                  </Link>
-                ),
-              },
-
-              {
-                key: "commissioning-share-weights",
-
-                requireRole: "isStaff",
-                label: (
-                  <Link to="/commissioning/share-weights">
-                    {t("commissioning.share_weights")}
                   </Link>
                 ),
               },

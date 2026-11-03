@@ -23,8 +23,8 @@ import { WaitingListOfferButton } from "@features/abos/components/WaitingListOff
 import {
   capacityWindowParams,
   termCapacity,
-  termWeekKeys,
 } from "@features/abos/utils/stationCapacity";
+import { termWeekKeys } from "@shared/utils/weekRange";
 import { offerErrorMessage } from "@features/abos/utils/offerErrorMessage";
 import { EditableTable, wrapApiFunctions } from "@shared/tables";
 import type {

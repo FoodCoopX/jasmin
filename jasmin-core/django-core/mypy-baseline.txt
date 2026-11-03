@@ -2,7 +2,7 @@
 # Managed by scripts/mypy_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/mypy_baseline.py freeze
-# 303 finding(s).
+# 302 finding(s).
 
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
@@ -261,7 +261,6 @@ apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "active_at_date" o
 apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "active_at_date" of "CurrentActiveManagerMixin" has incompatible type "Any | str"; expected "date"  [arg-type]
 apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "active_at_date" of "CurrentActiveManagerMixin" has incompatible type "Any | str"; expected "date"  [arg-type]
 apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "active_at_date" of "CurrentActiveManagerMixin" has incompatible type "str"; expected "date"  [arg-type]
-apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "append" of "list" has incompatible type "Decimal | float"; expected "float"  [arg-type]
 apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "get_days" of "ShareViewSet" has incompatible type "Request"; expected "ShareViewSet"  [arg-type]
 apps/commissioning/viewsets/shares_viewsets.py: Incompatible return value type (got "ShareDeliveryQuerySet[Model, Any]", expected "QuerySet[ShareDelivery, ShareDelivery]")  [return-value]
 apps/commissioning/viewsets/shares_viewsets.py: Incompatible types in assignment (expression has type "Share | None", variable has type "Share")  [assignment]

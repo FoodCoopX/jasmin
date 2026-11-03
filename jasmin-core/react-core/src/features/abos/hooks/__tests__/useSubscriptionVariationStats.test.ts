@@ -14,10 +14,8 @@ vi.mock("@shared/contexts/LocaleContext", () => ({
   useIsDarkTheme: () => theme.isDark,
 }));
 
-import {
-  useSubscriptionVariationStats,
-  VARIATION_PALETTE,
-} from "../useSubscriptionVariationStats";
+import { VARIATION_PALETTE } from "@shared/utils/variationPalette";
+import { useSubscriptionVariationStats } from "../useSubscriptionVariationStats";
 
 // Deliberately out of numeric order and with a two-digit id, to prove the
 // palette order is by numeric id — not array order, not lexicographic.

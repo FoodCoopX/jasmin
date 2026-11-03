@@ -92,27 +92,6 @@ export function stationDayTermCapacity(
 export const termCapacity = stationDayTermCapacity;
 export type TermCapacity = StationDayTermCapacity;
 
-/** ISO week keys ("<iso-year>-<iso-week>") spanning ``[from, until]`` inclusive,
- * matching the keys in ``capacity_by_week``. Open-ended terms (invalid/absent
- * ``until``) fall back to the fetched-window depth (104 weeks) from ``from`` —
- * so a full week further than a year out is still seen (the backend's peak is
- * unbounded; weeks past the fetched window simply have no key and read as free).
- * Shared by the station-day and variation option builders so the term→weeks
- * expansion can't drift between the two axes. */
-export function termWeekKeys(
-  from: dayjs.Dayjs,
-  until: dayjs.Dayjs | null | undefined,
-): string[] {
-  const keys: string[] = [];
-  const end = until && until.isValid() ? until : from.add(104, "week");
-  let cursor = from.startOf("isoWeek");
-  while (cursor.isSameOrBefore(end, "day")) {
-    keys.push(`${cursor.isoWeekYear()}-${cursor.isoWeek()}`);
-    cursor = cursor.add(1, "week");
-  }
-  return keys;
-}
-
 /** Forward-looking capacity-floor window: current ISO week, 156 weeks ahead.
  * Used when the question is "how low may the office set capacity?" — the
  * floor is the busiest CURRENT-OR-FUTURE week's occupancy (mirrors the
@@ -142,10 +121,4 @@ export function capacityFloorWeekKeys(): string[] {
     cursor = cursor.add(1, "week");
   }
   return keys;
-}
-
-/** "2026-30" -> "30/2026" for user-facing week labels. */
-export function formatWeekKey(weekKey: string): string {
-  const [year, week] = weekKey.split("-");
-  return `${week}/${year}`;
 }

@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from django.db.models import Count, Q, QuerySet
 from django.db.models.functions import TruncMonth, TruncWeek, TruncYear
@@ -8,8 +9,11 @@ from django.utils import timezone
 
 from apps.shared.money import round_money
 
-from ..models import Member, ShareContent
+from ..models import Member, Share, ShareContent, ShareTypeVariation
 from ..models.choices import UnitOptions, VegetableSizeOptions
+from ..utils.iso_week_utils import iso_week_window
+from ..utils.sort_order import share_type_ranks, size_order_annotation
+from ..utils.weight import mean_weight, quantize_weight
 
 
 def _compute_variation_averages(
@@ -399,3 +403,101 @@ def calculate_member_growth_statistics(
             }
         )
     return result
+
+
+def calculate_share_weights_by_week(
+    start_date: date, end_date: date
+) -> list[dict[str, Any]]:
+    """One row per ISO week in ``[start_date, end_date]`` and share type
+    variation packed in boxes delivered that week: the variation's target
+    weight, how many of its shares (one per delivery day) were weighed, and
+    their average weight. Each row also places its variation: the share type's
+    rank (``share_type_ranks``), and the variation's rank by share type,
+    ``sort_order`` and size; the rows of a week follow that order.
+
+    A share's weight and the week's average are both ``mean_weight``s, as in
+    the share-weights CSV export. ``average_weight`` is ``None`` for a week in
+    which no share of the variation was weighed. Weights stay Decimal and are
+    quantized to 3dp.
+    """
+    if start_date > end_date:
+        return []
+    # The weeks the bounds fall in count whole, a range starting mid-week too.
+    first_year, first_week, _ = start_date.isocalendar()
+    last_year, last_week, _ = end_date.isocalendar()
+
+    # Only a box is weighed: a virtual variation is made of physical ones, and
+    # a variation packed in bulk is never a box.
+    shares = Share.objects.filter(
+        iso_week_window((first_year, first_week), (last_year, last_week)),
+        share_type_variation__variation_type=ShareTypeVariation.VariationType.PHYSICAL,
+        share_type_variation__is_packed_bulk=False,
+    )
+    share_weights = shares.values_list(
+        "year",
+        "delivery_week",
+        "share_type_variation_id",
+        "weight1",
+        "weight2",
+        "weight3",
+        "weight4",
+    ).order_by()
+    # Every delivered (week, variation) gets a row, weighed or not.
+    averages: dict[tuple[int, int, str], list[Decimal]] = defaultdict(list)
+    for year, week, variation_id, *weights in share_weights:
+        share_weight = mean_weight(weights)
+        shares_of_week = averages[(year, week, variation_id)]
+        if share_weight is not None:
+            shares_of_week.append(share_weight)
+
+    variations = list(
+        ShareTypeVariation.objects.filter(
+            pk__in={variation_id for _, _, variation_id in averages}
+        )
+        .select_related("share_type")
+        .annotate(size_order=size_order_annotation())
+    )
+    share_type_rank = share_type_ranks(
+        (variation.share_type, variation.sort_order, variation.size_order)
+        for variation in variations
+    )
+    variations.sort(
+        key=lambda variation: (
+            share_type_rank[variation.share_type_id],
+            variation.sort_order,
+            variation.size_order,
+            variation.pk,
+        )
+    )
+    variation_rank = {variation.pk: index for index, variation in enumerate(variations)}
+    by_id = {variation.pk: variation for variation in variations}
+
+    rows = []
+    for (year, week, variation_id), share_averages in sorted(
+        averages.items(),
+        key=lambda item: (item[0][0], item[0][1], variation_rank[item[0][2]]),
+    ):
+        variation = by_id[variation_id]
+        week_average = mean_weight(share_averages)
+        rows.append(
+            {
+                "year": year,
+                "week": week,
+                "share_type_variation": variation_id,
+                "share_type": variation.share_type_id,
+                "share_type_name": variation.share_type.name or "",
+                "share_type_rank": share_type_rank[variation.share_type_id],
+                "size": variation.size,
+                "variation_rank": variation_rank[variation_id],
+                "target_weight": (
+                    quantize_weight(variation.average_weight)
+                    if variation.average_weight
+                    else None
+                ),
+                "weighed_shares": len(share_averages),
+                "average_weight": (
+                    quantize_weight(week_average) if week_average is not None else None
+                ),
+            }
+        )
+    return rows

@@ -68,7 +68,7 @@ export const functionLengthPins = {
   "src/features/configuration/pages/ConfigurationGeneral.tsx": 451,
   "src/features/members/modals/CoopSharesModal.tsx": 467,
   "src/features/members/pages/Members.tsx": 768,
-  "src/shared/layout/sidebars/CommissioningSidebar.tsx": 471,
+  "src/shared/layout/sidebars/CommissioningSidebar.tsx": 479,
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 810,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 472,
   "src/shared/tables/BasicEditableTable/useEditableTable.ts": 536,

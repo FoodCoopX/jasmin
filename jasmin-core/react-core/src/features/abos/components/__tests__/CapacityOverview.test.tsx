@@ -12,7 +12,7 @@ import dayjs from "dayjs";
 
 import type { DeliveryStationDayOption } from "@hooks/useDeliveryStationDays";
 import type { ShareTypeVariationOption } from "@hooks/useAllShareTypeVariations";
-import { termWeekKeys } from "@features/abos/utils/stationCapacity";
+import { termWeekKeys } from "@shared/utils/weekRange";
 import { CapacityOverview } from "../CapacityOverview";
 
 vi.mock("react-i18next", () => ({

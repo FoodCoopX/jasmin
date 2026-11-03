@@ -24,6 +24,7 @@ from ..models.choices import UnitOptions
 from ..utils import sort_share_articles
 from ..utils.composite_id_utils import compose_slot_id
 from ..utils.iso_week_utils import (
+    iso_week_window,
     previous_day_stock_coordinates,
     previous_monday,
     weeks_in_range,
@@ -516,15 +517,10 @@ class ShareContentFrontendData(ShareContentStock):
         if not weeks:
             return []
 
-        years = {year for year, _ in weeks}
-        week_numbers = {week for _, week in weeks}
-
-        share_contents = [
-            share_content
-            for share_content in ShareContent.active.for_period(is_past=is_past)
+        share_contents = list(
+            ShareContent.active.for_period(is_past=is_past)
             .filter(
-                share__year__in=years,
-                share__delivery_week__in=week_numbers,
+                iso_week_window(min(weeks), max(weeks), prefix="share__"),
                 share_article__is_purchased=True,
             )
             .select_related(
@@ -532,10 +528,7 @@ class ShareContentFrontendData(ShareContentStock):
                 "share__delivery_day",
                 "share_article",
             )
-            # A plain (years × weeks) cross-product over-selects at year
-            # boundaries — keep only the weeks actually in the range.
-            if (share_content.share.year, share_content.share.delivery_week) in weeks
-        ]
+        )
 
         # One batched demand scan for the whole span (backend-agnostic:
         # subscription or external demand), plus the missing-price fallback.

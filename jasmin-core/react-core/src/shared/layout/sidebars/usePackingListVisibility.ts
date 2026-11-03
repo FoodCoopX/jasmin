@@ -9,6 +9,10 @@ import { todayApiDate } from "@shared/utils/apiDate";
  * upcoming physical variation is packed in bulk, since in that mode it lists
  * those alone. Every navigation that links them reads this one rule, so the
  * desktop sidebar and the phone drawer can't disagree.
+ *
+ * The weight statistics follow the boxes, as only boxes are weighed: box
+ * packing, or ``MIXED`` while a current or upcoming physical variation is
+ * packed in boxes.
  */
 export function usePackingListVisibility() {
   const { getSetting } = useTenant();
@@ -24,11 +28,17 @@ export function usePackingListVisibility() {
   const packsSomeVariationInBulk = (physicalVariations ?? []).some(
     (variation) => variation.is_packed_bulk,
   );
+  const packsSomeVariationInBoxes = (physicalVariations ?? []).some(
+    (variation) => !variation.is_packed_bulk,
+  );
   return {
     packingMode,
     showBulkPackingList:
       packingMode === "BULK" ||
       (packingMode === "MIXED" && packsSomeVariationInBulk),
     showBoxesPackingList: packingMode === "BOXES" || packingMode === "MIXED",
+    showWeightStatistics:
+      packingMode === "BOXES" ||
+      (packingMode === "MIXED" && packsSomeVariationInBoxes),
   };
 }

@@ -15472,7 +15472,7 @@ paths:
         page's per-week\n    purchase figure (price_per_unit × amount × variation
         demand), aggregated\n    server-side so only the per-week points cross the
         wire. Office only.\n\n    The range is bounded: `start_date` must be on or
-        before `end_date`, and\n    the two may span at most 5 years.\n    "
+        before `end_date`, and the two may span at most 5 years.\n    "
       summary: Get purchase cost per week
       parameters:
       - in: query
@@ -19607,6 +19607,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Error response.
+  /api/commissioning/share_weights_by_week/:
+    get:
+      operationId: commissioning_share_weights_by_week_list
+      description: "\n    Average weight of the shares weighed per ISO week and share
+        type variation\n    over a date range, next to each variation's target weight,
+        for the weight\n    statistics. A share's weight is the mean of the weights
+        taken of it, a\n    week's the mean over its weighed shares. Every variation
+        delivered in a\n    week gets a point, with a null average when none of its
+        shares was\n    weighed. Only the variations packed in boxes, physical and
+        not packed in\n    bulk, as only they are weighed. Office only.\n\n    The
+        range is bounded: `start_date` must be on or before `end_date`, and the two
+        may span at most 5 years.\n    "
+      summary: Get share weights per week
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Inclusive range end (YYYY-MM-DD). At most 5 years after `start_date`.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: Inclusive range start (YYYY-MM-DD)
+        required: true
+      tags:
+      - commissioning
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ShareWeightsByWeek'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
   /api/commissioning/shares/:
     get:
       operationId: commissioning_shares_list
@@ -19634,6 +19687,17 @@ paths:
           Week52:
             value: 52
             summary: Week 52
+      - in: query
+        name: is_packed_bulk
+        schema:
+          type: boolean
+        description: Only the shares of the variations with this bulk-packing flag.
+          Only meaningful in MIXED packing mode.
+      - in: query
+        name: physical
+        schema:
+          type: boolean
+        description: Only the shares of physical variations.
       - in: query
         name: share_type
         schema:
@@ -46318,6 +46382,62 @@ components:
             $ref: '#/components/schemas/ShareTypeVariationTotalRow'
       required:
       - variations
+    ShareWeightsByWeek:
+      type: object
+      description: |-
+        One (ISO week, share type variation) point for the weight statistics:
+        the average weight of the variation's shares weighed that week against its
+        target weight, both in kg as 3dp strings. ``average_weight`` is null for a
+        week in which no share of the variation was weighed, ``target_weight`` for
+        a variation without one.
+      properties:
+        year:
+          type: integer
+        week:
+          type: integer
+        share_type_variation:
+          type: string
+        share_type:
+          type: string
+        share_type_name:
+          type: string
+        share_type_rank:
+          type: integer
+          description: 'The share type''s place among the response''s share types:
+            base share types first, then additional ones, each by its first variation''s
+            sort_order and size.'
+        size:
+          type: string
+        variation_rank:
+          type: integer
+          description: 'The variation''s place among the response''s variations: by
+            share type rank, then sort_order, then size.'
+        target_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,3})?$
+          nullable: true
+        weighed_shares:
+          type: integer
+          description: How many of the variation's shares (one per delivery day) were
+            weighed that week.
+        average_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          nullable: true
+      required:
+      - average_weight
+      - share_type
+      - share_type_name
+      - share_type_rank
+      - share_type_variation
+      - size
+      - target_weight
+      - variation_rank
+      - week
+      - weighed_shares
+      - year
     SharesDeliveryDay:
       type: object
       properties:

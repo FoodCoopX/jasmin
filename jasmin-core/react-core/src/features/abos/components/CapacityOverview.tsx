@@ -28,10 +28,9 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import {
-  formatWeekKey,
   termCapacity,
-  termWeekKeys,
 } from "@features/abos/utils/stationCapacity";
+import { formatWeekKey, termWeekKeys } from "@shared/utils/weekRange";
 
 interface CapacityOverviewProps {
   variations: ShareTypeVariationOption[];

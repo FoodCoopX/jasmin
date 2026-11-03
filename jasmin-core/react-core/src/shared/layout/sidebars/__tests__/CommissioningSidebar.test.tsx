@@ -4,9 +4,10 @@
  * import-shares mode, unless a host imports the amounts itself), the
  * resellers' commissioning list (a farm that sells to resellers), the
  * delivery-station pages (unless a host keeps its pickup locations itself),
- * among them the station-fee billing (a station that charges a fee), and the
- * bulk packing list (bulk packing, or mixed packing with a variation that is
- * packed in bulk).
+ * among them the station-fee billing (a station that charges a fee), the bulk
+ * packing list (bulk packing, or mixed packing with a variation that is packed
+ * in bulk) and the weight statistics (box packing, or mixed packing with a
+ * variation that is packed in boxes, as only boxes are weighed).
  *
  * Each route is asserted on both sides of its condition: "no link with this
  * href" only proves something once the same href is proven to exist.
@@ -141,6 +142,7 @@ beforeEach(() => {
 });
 
 const stationFees = "/commissioning/delivery-station-fees";
+const weightStatistics = "/commissioning/statistics-share-weights";
 const packedInBulk = { id: "v-bulk", is_packed_bulk: true };
 const packedInBoxes = { id: "v-box", is_packed_bulk: false };
 const chargingStation = {
@@ -229,6 +231,26 @@ describe("CommissioningSidebar", () => {
     capabilities.delivery_stations = false;
 
     expect(linkedRoutes().has(stationFees)).toBe(false);
+  });
+
+  it("links the weight statistics where shares are packed in boxes", () => {
+    settings.packing_mode = "BOXES";
+    expect(linkedRoutes().has(weightStatistics)).toBe(true);
+
+    settings.packing_mode = "MIXED";
+    physical.variations = [packedInBoxes, packedInBulk];
+    expect(linkedRoutes().has(weightStatistics)).toBe(true);
+  });
+
+  it("drops the weight statistics where every share is packed in bulk", () => {
+    settings.packing_mode = "BULK";
+    const routes = linkedRoutes();
+    expect(routes.has(weightStatistics)).toBe(false);
+    expect(routes.has("/commissioning/statistics-purchase")).toBe(true);
+
+    settings.packing_mode = "MIXED";
+    physical.variations = [packedInBulk];
+    expect(linkedRoutes().has(weightStatistics)).toBe(false);
   });
 
   it("lists the commissioning lists before the packing lists", () => {

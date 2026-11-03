@@ -48,6 +48,7 @@ from .statistics import (
     calculate_historical_share_type_variation_averages,
     calculate_member_dashboard_statistics,
     calculate_member_growth_statistics,
+    calculate_share_weights_by_week,
 )
 from .stock_service import StockService
 from .subscription_service import SubscriptionService

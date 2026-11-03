@@ -658,6 +658,57 @@ class TestShareViewSet:
         assert resp.status_code == status.HTTP_200_OK
         assert len(resp.data) >= 1
 
+    def test_filter_by_bulk_packing(self, api_client, tenant):
+        day = SharesDeliveryDayFactory()
+        boxed = ShareFactory(
+            year=2026,
+            delivery_week=15,
+            delivery_day=day,
+            share_type_variation=ShareTypeVariationFactory(is_packed_bulk=False),
+        )
+        bulk = ShareFactory(
+            year=2026,
+            delivery_week=15,
+            delivery_day=day,
+            share_type_variation=ShareTypeVariationFactory(is_packed_bulk=True),
+        )
+        params = {"year": 2026, "delivery_week": 15, "delivery_day": day.pk}
+
+        def listed(**extra):
+            resp = api_client.get(self.URL, {**params, **extra})
+            assert resp.status_code == status.HTTP_200_OK
+            return {row["id"] for row in resp.data}
+
+        assert listed() == {boxed.pk, bulk.pk}
+        assert listed(is_packed_bulk="false") == {boxed.pk}
+        assert listed(is_packed_bulk="true") == {bulk.pk}
+
+    def test_filter_to_physical_variations(self, api_client, tenant):
+        day = SharesDeliveryDayFactory()
+        physical = ShareFactory(
+            year=2026,
+            delivery_week=15,
+            delivery_day=day,
+            share_type_variation=ShareTypeVariationFactory(),
+        )
+        virtual = ShareFactory(
+            year=2026,
+            delivery_week=15,
+            delivery_day=day,
+            share_type_variation=ShareTypeVariationFactory(variation_type="virtual"),
+        )
+        params = {"year": 2026, "delivery_week": 15, "delivery_day": day.pk}
+
+        def listed(**extra):
+            resp = api_client.get(self.URL, {**params, **extra})
+            assert resp.status_code == status.HTTP_200_OK
+            return {row["id"] for row in resp.data}
+
+        assert listed() == {physical.pk, virtual.pk}
+        assert listed(physical="true") == {physical.pk}
+        # Only an explicit true filters, as on the variation list.
+        assert listed(physical="false") == {physical.pk, virtual.pk}
+
     def test_get_days_action(self, api_client, tenant):
         _share = ShareFactory(year=2026, delivery_week=15)
         url = reverse("share-get-days")
