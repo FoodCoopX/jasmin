@@ -49,6 +49,18 @@ the matching section of Part 1.
 ## Working agreements
 
 - **DO NOT commit.** The user commits manually.
+- **No commit message before the code review and `make check`.** Before
+  suggesting a commit message or saying a change can be committed, run the
+  `code-reviewer` agent over the whole uncommitted diff and `make check`, both on
+  the code as it will be committed. Fix the failures and the blocking and
+  should-fix findings, and name any finding left for the user to decide. A small
+  fix made after them needs only the checks it touches — the affected tests and
+  gates, and a look at the changed lines; a larger one, or one that reaches into
+  other code, means running both again. Report what ran and its result alongside
+  the message; if something couldn't run or still fails, say so instead of
+  giving the message.
+  They can run side by side as long as the reviewer reads only: a second test
+  run would clobber the suite's schema.
 - **Never guess paths.** Always check which ones this repository actually uses —
   no reverse-engineering a plausible path.
 - **Production is LIVE — always assume dev AND prod.** Backward compatibility
@@ -144,7 +156,7 @@ file.
 | `APIView`-style endpoints | `views.py` or a `views/` package |
 | Serializers | `serializers` (**plural**) — never singular `serializer/` |
 | Services | `services.py` or a `services/` package |
-| Errors | `errors.py` (every app that raises one has it; the `cultivation` / `economics` stubs don't) |
+| Errors | `errors.py` or an `errors/` package (every app that raises one has it; the `economics` stub doesn't) |
 
 Within a `services/` package, modules that expose a `*Service` class take the
 `_service.py` suffix (the dominant pattern); function-only helper / operation
@@ -190,7 +202,9 @@ basename (`logout-all/`, `step-up/`, `admin-users`) against snake URL `name=`
 ### Errors
 
 Use the errors in `errors.py` whenever possible, or write new ones there where
-necessary. New errors go in the corresponding app's `errors.py` and subclass
+necessary. New errors go in the corresponding app's `errors.py` (in `commissioning`,
+the matching module of the `errors/` package, re-exported with `__all__` from its
+`__init__.py`) and subclass
 `JasminError` (`core/errors.py`), with a stable per-case `code` — never a bare
 DRF `ValidationError` or a hand-built `Response`.
 
@@ -206,10 +220,11 @@ Every `JasminError` code needs `de` **and** `en` entries in the locale
 **OpenAPI query params come from the catalogue — never hand-roll
 `OpenApiParameter` in `@extend_schema`.** A query parameter is declared ONCE as
 a `ParamSpec` (defined in `apps/shared/query_params.py`) inside the app's OWN
-catalogue — there are five: `PARAM_CATALOGUE` in
+catalogue — there are six: `PARAM_CATALOGUE` in
 `apps/commissioning/utils/query_params.py`, `apps/notifications/query_params.py`
 and `apps/shared/super_admin/query_params.py`, `STAFF_PARAM_CATALOGUE` in
-`apps/staff/query_params.py`, and payments' inline one in
+`apps/staff/query_params.py`, `CULTIVATION_PARAM_CATALOGUE` in
+`apps/cultivation/query_params.py`, and payments' inline one in
 `apps/payments/viewsets.py`. Reach for your app's, never another's. That
 catalogue is what `validate_query_params(...)`
 actually enforces at runtime, so the schema must be derived from it rather than
@@ -493,7 +508,7 @@ equivalent exists is a defect, not a shortcut.
 | Table | `EditableTable` for anything editable; `CrudListPage` / `useCrudListPage` for a standard CRUD list page; `ReadOnlyReportTable` for read-only, server-paginated or custom-action tables (`READ_ONLY_PERMISSION` gates an EditableTable read-only) |
 | Column defs | the `use*Column(s)` hooks — `useTimeBoundColumns`, `useActiveStatusColumn`, `useSellerColumn`, `useShareArticleColumn`, `useNoteColumn`, … |
 | Date-range picker | AntD `RangePicker` + `useDateRangePresets` |
-| Date display/format | `useDateFormat` — `dateFormat` (picker), `formatDate` (cells), `formatDateForAPI` (`YYYY-MM-DD` payloads). Never hardcode a date format. It is a hook (it reads tenant settings through `useTenant`), so it cannot be called from a plain service — format in the component and pass the string down, or hand the formatter in. |
+| Date display/format | `useDateFormat` — `dateFormat` (picker), `formatDate` (cells), `formatDateForAPI` (`YYYY-MM-DD` payloads). Never hardcode a date format. It is a hook (it reads tenant settings through `useTenant`), so it cannot be called from a plain service — format in the component and pass the string down, or hand the formatter in. Wire dates outside a component come from `@shared/utils/apiDate`: `toApiDate`, `formatApiDate`, and `todayApiDate` for today's local date (never `toISOString().slice(0, 10)`, which is the UTC date). |
 | CSV | `buildCsvString` + `downloadCsvBlob` (`src/shared/utils/csv.ts`), or `ExportCsvDateRangeModal` for a date-range export honoring the tenant `csv_format`. The export-modal shells live in `src/features/commissioning/modals/csv/`, not `shared`. |
 | Money / currency | `useCurrency` |
 | Selectors | `src/shared/selectors/*` — Year/Week/Month/Day/Member/Reseller/ShareType |
@@ -535,6 +550,13 @@ before the group's open row — in the backend's own words (`errors.time_bound.*
 and lets a later row succeed the open one. Don't hand-roll period checks with
 `uniqueCheck` combinations or in `customSave`.
 
+**Row keys.** A table of server rows names the field holding the row's id —
+`rowKey="id"`, or `"delivery_station_day_id"` where the payload calls it that; a
+`rowKey` function only builds a composite key and never takes AntD's deprecated
+row index. `EditableTable` keys its rows on `id` itself, and an id names one
+record for as long as the table is mounted — a page whose ids repeat across the
+views it switches between gives each view its own `key`.
+
 ### Structure & imports
 
 **Domain-first.** There is no single global modals folder. A modal that is
@@ -567,6 +589,9 @@ cards/sections are co-located in `src/features/<app>/components/`. See
   `npm run lint`, `npm run build`, `npm run test:run`. type-check skips `.jsx`
   files + `vi.mock()` strings, so **the build is the real oracle** for `.jsx`;
   tests catch stale `vi.mock` paths and the `no-raw-axios` allowlist.
+- **Every `eslint-disable` says why**, in ESLint's own syntax on the directive:
+  `// eslint-disable-next-line <rule> -- <reason>`. A comment elsewhere in the
+  function doesn't count. `src/test/eslint-disable-reasons.test.ts` enforces it.
 
 ### Data fetching
 
@@ -610,6 +635,12 @@ their incompleteness is a deliberate, deferred gap (they degrade to `de` via
 `fallbackLng`). Keep `de` complete (mandatory) and add `en` alongside it; only
 `de` must never miss a key.
 
+**German copy never uses the formal "Sie/Ihr".** Prefer a passive or impersonal
+phrasing ("Für diese Seite fehlt die Berechtigung.", "Bitte erneut versuchen.");
+where addressing the reader is unavoidable — the registration wizard, the
+privacy texts about the reader's own data — use "du". A "sie" that means "they"
+or "it" is not address.
+
 **English copy follows one house style.** Sentence case for all UI chrome —
 titles, buttons, labels, menu entries, column headers — while names keep their
 own capitals ("SEPA Direct Debit", day and month names). American spelling,
@@ -630,15 +661,27 @@ Fixing copy changes the value; the key never changes.
 
 ## Testing rules
 
+**Style conventions stop at the test files.** The naming, abbreviation and
+building-block rules above are for app code; in test code they are optional,
+and an audit or review leaves them out. The rules below still hold in tests,
+because breaking one hides a failure: discovery, frozen clocks, random order,
+the fixtures that make a gate actually run.
+
 ### Backend testing
 
 **Tests run in random order** (pytest-randomly), so a test may rely on nothing
-another test leaves behind. Two traps catch it:
+another test leaves behind. Three traps catch it:
 
-- `@pytest.mark.django_db(transaction=True)` commits, and the shared
-  `test_pytest` schema isn't flushed between tests, so those rows outlive the
-  test. Don't assume an empty table — measure from what is there, as
-  `test_member_numbering_concurrency.py` does.
+- `@pytest.mark.django_db(transaction=True)` commits, and nothing is flushed
+  after it — the commissioning conftest turns pytest-django's flush off, which
+  would otherwise wipe the session tenants on the public schema — so those
+  rows outlive the test. Don't assume an empty table — measure from what is
+  there, as `test_member_numbering_concurrency.py` does.
+- A routed request leaves the connection on the schema its host resolved
+  (`TenantMainMiddleware` never switches back). `apps/conftest.py` puts every
+  test back on the public schema afterwards, so a test that touches tenant
+  data asks for the `tenant` fixture instead of inheriting a schema from the
+  test before.
 - Change settings through `override_settings` or through pytest-django's
   `settings` fixture, never both in one test: the fixture's teardown restores
   the decorator's layer, whose value then stays for every later test
@@ -646,6 +689,11 @@ another test leaves behind. Two traps catch it:
 
 A failing run prints `Using --randomly-seed=N` at its top; replay that order
 with `--randomly-seed=N`, or run in file order with `-p no:randomly`.
+
+**Test classes are plain pytest classes**: `class TestSomething:` under
+`@pytest.mark.django_db`, with the `tenant` fixture as a test argument. No
+Django `TestCase`. pytest collects only `Test*` classes, so a plain class
+named `SomethingTests` silently never runs.
 
 **Test both the present AND absent case of an optional/nullable FK** (or any
 presence-guarded branch). A guard like `x.seller.name if x.seller else ""`
@@ -769,8 +817,8 @@ vi.mock("react-i18next", () => ({
   initialises). A variable dereferenced LAZILY — behind a `() => ...mock(...)`
   arrow, read only at call/render time — is safe as a plain module-scope `const`.
   Reference: `src/shared/ui/__tests__/BulkActionButton.test.tsx`.
-- **Don't hand-roll a partial `useTenant` stub** — a partial one is a recorded
-  breakage. Use `makeUseTenantMock` (`src/test/tenantMock.ts`), as 15 suites do.
+- **`makeUseTenantMock`** (`src/test/tenantMock.ts`) builds a complete `useTenant`
+  stub; a hand-rolled one breaks as soon as the component reads a field it lacks.
 - **`getErrorMessage` only inspects errors that look like axios errors** — mocks
   must include `isAxiosError: true` alongside `response.data`.
 - **Render-loop smoke test pattern:** use `profileRenders()` from
@@ -845,7 +893,7 @@ Located in `jasmin-core/django-core/apps/`:
 | `accounts` | User authentication, profiles, roles (member, staff, admin) |
 | `authz` | Authorization, role-based permissions, tenant-bound JWT authentication |
 | `commissioning` | Members, subscriptions, shares and weekly deliveries, stations and tours, resellers and orders, warehouse/stock |
-| `cultivation` | Stub — no models, migrations or endpoints; `solver/config_solver.py` holds bed-planner constants only. The `src/features/cultivation/` pages are placeholders too. |
+| `cultivation` | Vegetables, plant families, bed types, plots, cultivation batches and planting history, seed/seedling vendors; a CP-SAT placement planner (`optimizer/`, OR-Tools) run as a Huey job, its candidate plans and solver settings. Writes gated by `CanEditCultivation` (gardener, office, admin). The legacy `.jsx` pages under `src/features/cultivation/pages/` are still placeholders. |
 | `economics` | Chart of accounts — `Account` / `AccountValue` (monthly debit/credit). No API surface. Invoicing lives in `commissioning`, billing in `payments`. |
 | `gdpr` | Data export/deletion for GDPR compliance |
 | `notifications` | Email templates, notification dispatch, background jobs (via Huey) |
@@ -968,6 +1016,7 @@ make dev-up                      # Start dev stack (postgres, redis, backend, fr
 make dev-down                    # Stop dev stack
 make dev-logs                    # Tail logs
 make dev-rebuild                 # Rebuild images without cache
+make dev-sync-deps               # Install lock changes into the dev containers' venv / node_modules
 make dev-reset                   # Full reset (down -v, then up -d --build)
 make dev-seed                    # Re-seed the test tenant
 make dev-bash                    # Shell into backend container
@@ -1060,10 +1109,49 @@ npm run test:run                 # Run tests
 npm run type-check               # TypeScript check (no emit)
 ```
 
+**E2E tests (Playwright):**
+
+```bash
+make e2e-install                     # once: npm ci + Chromium in jasmin-core/e2e
+make e2e                             # seed_e2e, then the suite (dev stack must be up)
+make e2e E2E_ARGS="--repeat-each=3"  # extra Playwright args
+make e2e-ui                          # Playwright UI mode
+```
+
+`jasmin-core/e2e/` is a package of its own (pinned `@playwright/test`, its own
+`npm run type-check`), outside react-core's lint, type-check and tests. It runs
+against the dev stack in its own `e2e` / `e2e_other` tenants, never in `test`.
+CI runs it nightly and on demand (`.github/workflows/e2e.yml`), not on PRs. Its
+README holds the details; the rules:
+
+- Select by role and accessible name; a `data-testid` only where none fits.
+- The E2E tenants run in English. Assert copy through `t("ns.key")` from
+  `support/i18n.ts` (react-core's `en` locale files), never as a literal.
+- No `waitForTimeout`: wait for a visible result or a response.
+- The stack runs on the real clock: compute weeks and dates at run time.
+- Every test creates the rows it changes, with a unique run id.
+- `workers: 1`. A flaky test is fixed or removed within the week.
+- Mail-reading flows use `support/mailhog.ts` with a per-run address. The
+  super-admin login is throttled to 10 an hour per IP, so the setup project
+  logs in once per run (`test.use({ superAdmin: true })` reuses it); the
+  README has the Redis command that resets the throttle — never
+  `cache.clear()`.
+- The dev `backend` reloads on code changes, the `huey` container doesn't:
+  restart it (`docker compose -f docker-compose.dev.yml restart huey`) after
+  pulling backend changes.
+
 ### Linting & code quality
 
-`make check` runs the whole CI gate in one shot: black, ruff, import-contracts,
-module-length, mypy, pytest, type-check, lint, lint-pins, test-frontend, size.
+`make check` runs everything CI checks except the image builds and the nginx
+config check, in the dev containers (`make dev-up` first): deps-check, lock-check,
+secrets, black, ruff, import-contracts, module-length, mypy, migrations-check,
+schema-check, type-check, lint, lint-pins, audit, test-local, test-frontend, size.
+The backend suite runs on the host (`test-local`), as in CI's checkout: some
+tests read repo files outside `django-core` that the backend container doesn't
+mount. `deps-check` comes first because the containers' venv and `node_modules`
+are named volumes a lock change never reaches; when it fails, `make
+dev-sync-deps` installs the locks into them (the host venv: `poetry sync`). `secrets` (`scripts/secret_scan.sh`) runs CI's
+gitleaks over the files a commit would carry, not the gitignored ones.
 
 Much of it also runs on `git commit` through pre-commit (once you have run
 `pre-commit install`): gitleaks secret scanning, `ruff --fix` and `black` over
@@ -1093,7 +1181,7 @@ selected rule set is `E,F,B,BLE,UP,I` plus the hygiene rules `N,C901,PLR0913,
 PLR0915` (gated against `ruff-baseline.txt`, see [Hygiene gates](#hygiene-gates)),
 with `__init__.py` re-exports, conftest
 fixtures, Django settings star-imports, generated migrations, and the
-`apps/cultivation/solver/**` research code allow-listed.
+`apps/cultivation/optimizer/**` solver code allow-listed.
 
 **Frontend:**
 
@@ -1104,11 +1192,16 @@ npm run lint:fix                 # Auto-fix issues
 
 **CI/CD** — configured in `.github/workflows/ci.yml`:
 
-- Runs on all pushes to main and all PRs; five jobs
+- Runs on all pushes to main and all PRs, and weekly on main so the dependency
+  audits catch new advisories between pushes; six jobs
 - Frontend: type-check, lint, `lint:pins`, vitest, production build, bundle-size
-  budget, npm audit
+  budget, npm audit (fails closed when npm returns no audit report)
 - Backend: black, ruff baseline, mypy baseline, import contracts, pytest (with a
   Postgres service for django-tenants tests)
+- Production images: builds the backend runtime, frontend nginx and backup
+  images from `docker-compose.yml`, boots them on production settings with the
+  app logged in as its own database role, and takes a backup through a restore
+  (`docker-smoke` boots the dev image)
 - Two "you forgot to regenerate" gates fail PRs most often: `makemigrations
   --check --dry-run`, and the schema-freshness diff (`spectacular` then
   `git diff --exit-code` on `schema.yml`)
@@ -1122,9 +1215,18 @@ idempotent: validates `.env`, issues the wildcard cert, pulls the newest build
 of every image tag and builds, tags the build as a release (`<UTC time>-<git
 hash>`, the last five kept), snapshots the database, brings the core stack up,
 waits for backend health, migrates.
-`scripts/update.sh` is the "I pushed — now what?" wrapper around it.
+`scripts/update.sh` is the "I pushed — now what?" wrapper around it, and it
+deploys only a commit CI passed: before it fast-forwards it asks the GitHub API
+(no token — the repository is public) for the newest CI run of that commit's
+push to `main`, and anything but `success` — still running, red, cancelled, no
+run, no answer — stops it. `--skip-ci-check` (or `SKIP_CI_CHECK=1`) is the
+emergency override for a GitHub outage.
 `scripts/rollback.sh` switches back to a kept release whose migrations are a
-prefix of those the database has applied.
+prefix of those the database has applied. Both end by probing
+`https://<domain>/health/ready/`, which answers 200 only while the backend
+reaches the database and Redis takes writes — `/health/`, the containers'
+healthcheck, is liveness only and stays 200 through an outage of either. A
+failed probe stops nothing, but makes the script exit 1 at the very end.
 
 **Database backups:** the `backup` service runs them — a nightly GPG-encrypted
 `pg_dump` plus a media archive (`backups/backup.sh`), with an rclone off-host
@@ -1132,6 +1234,20 @@ push scaffold; deploy.sh adds a DB-only `predeploy` dump before every deploy.
 `BACKUP_ENCRYPTION_KEY` is required; compose refuses to start without it.
 Don't hand-roll `pg_dump`; that skips the encrypted path. The restore procedure
 is in the header of `backups/restore.sh`.
+
+**Database roles:** backend and huey log in as the app's own role,
+`APP_DB_USER`, which owns the database and everything in it but is no
+superuser; the superuser `POSTGRES_USER` serves backups, restores and psql.
+`postgres/app_db_role.sh` creates the role with a new data volume, and its
+header has the steps for moving a running database over; a restore loads the
+dump as the role. While `APP_DB_USER` is unset, the app logs in as the
+superuser. A migration that needs a superuser fails in CI's production-images
+job. The role owns `public` and may create schemas, so it could plant an
+operator, function or view for a superuser session to run: every superuser
+session in the scripts pins `search_path` to `pg_catalog`, quotes names, and
+reads plain tables only, each locked before it is checked. A superuser's own
+psql there pins it too (`PGOPTIONS='-c search_path=pg_catalog' psql …`), and SQL
+built from the app's data quotes it.
 
 **Stack components** (`docker-compose.yml`):
 
@@ -1142,7 +1258,11 @@ is in the header of `backups/restore.sh`.
 - `frontend`: React + Nginx (built SPA); keeps the hashed assets of the last
   three releases on the `frontend_assets` volume, so a tab still running an
   older release can lazy-load its chunks after a deploy
-- `gateway`: Public Nginx with TLS, routes to backend/frontend
+- `gateway`: Public Nginx with TLS, routes to backend/frontend. While
+  `BUNNY_ORIGIN_SECRET` is set, the tenant hosts serve only requests that came
+  through the Bunny pull zone and take the client's IP from Bunny's
+  `X-Forwarded-For` (`nginx/render_config.sh`) — so a new tenant's hostname
+  has to be in the pull zone before it gets any answer
 - `certbot`: Let's Encrypt renewal (wildcard certs via Linode DNS plugin)
 - `backup`: nightly encrypted DB dump + media archive
 
@@ -1156,24 +1276,27 @@ their schemas themselves. In production, run them in the backend container
 
 | Command | Where | What it does, and when to run it |
 | ------- | ----- | -------------------------------- |
-| `createsuperadmin` | both | Creates a platform super-admin login in the public schema, asking for the password; `--update-if-exists` resets an existing one. `make dev-superuser EMAIL=…` in dev. |
+| `createsuperadmin` | both | Creates a platform super-admin login in the public schema, asking for the password; `--update-if-exists` resets an existing one's password and re-activates it — the only way to do that from the shell. `make dev-superuser EMAIL=…` in dev. Every backend/huey start runs `--bootstrap` from `DJANGO_SUPERUSER_*`, which creates one only while none exists and never touches an existing account. |
 | `check_invoice_hashes` | prod | Checks one tenant's finalized invoices against their sealed hashes; exits 1 on drift and logs `invoice.hash_drift` to the security log. Huey's `nightly_invoice_hash_check` checks every tenant at 03:00 and emails the operator, so run this for an on-demand check. |
 | `reconcile_current_stock` | prod | Compares one tenant's stock balances and snapshots with the movement ledger; `--fix` rebuilds the rows that drifted. Run when stock figures look wrong. |
+| `normalize_ibans` | prod, once after its deploy | Rewrites every billing profile's IBAN into the canonical form the SEPA export needs (no spaces, upper-case), in all active tenants or in `--tenant <schema>`; preview with `--dry-run`. Idempotent. An IBAN that is invalid even then is left unchanged and listed by member number for the office to correct. Run it once after the deploy that brought it; afterwards only when stored IBANs look wrong. |
 | `regenerate_charge_schedules` | prod | Re-plans every billable subscription's charges, in all active tenants or in `--tenant <schema>`. A subscription change re-plans its own charges and the office can regenerate its tenant's; run this when every tenant needs it, e.g. after a billing change. |
 | `recompute_donation_joker_shares` | prod, one-shot | Recomputes the shares in weeks with a donation joker, for rows built while donation jokers still counted as production demand. Idempotent; `--tenant <schema>` for one tenant. |
+| `clear_legacy_crate_notes` | prod, one-shot | Clears the "+N" / "-N" notes the crate amount adjustment used to write on order, delivery-note and invoice crate rows, which the crate summaries would now show as the office's own. Only a note that is exactly a sign and a number goes; a finalized row, or one of a finalized document, keeps its note and is counted. Idempotent; `--dry-run`, `--tenant <schema>` for one tenant. |
 | `prune_orphan_support_tickets` | prod | Deletes the support tickets of tenants that no longer exist. Huey runs it nightly at 04:45; run it by hand right after a tenant teardown. |
 | `replay_gdpr_deletions` | prod, after a restore | Re-applies the GDPR erasures a backup restore undid, from the deletion ledger kept outside the database (`--ledger`, `--dry-run`). Run it after the restore and before the app serves requests again; the module docstring has the command line. |
 | `rotate_django_secret`, `rotate_db_password` | prod | Generate a new secret and print the steps to apply it; they change nothing themselves. |
 | `rotate_email_creds` | prod | Clears every tenant's stored SMTP password, so each office has to re-enter it before mail goes out again. Preview with `--dry-run`. |
-| `rotate_bunny_token` | prod | Prints the BunnyCDN token rotation steps; there is nothing to rotate in code. |
+| `rotate_bunny_token` | prod | Prints the rotation steps for the Bunny account's API key and for the origin secret (`BUNNY_ORIGIN_SECRET`); both are changed by hand. |
 | `rotate_field_encryption` | prod | Re-encrypts every encrypted field with the first key in `FIELD_ENCRYPTION_KEY` — step 3 of the key rotation its docstring describes. `--dry-run`, `--schema`. |
 | `run_periodic_tasks_now` | dev, QA | Runs every Huey periodic task once, in-process (`--only`, `--skip`). Nothing stops it in production, where it does at once what the schedule would. |
 | `seed_dev_tenant` | dev | Creates or refreshes the `test` tenant at `test.localhost` with an admin and the persona logins (`make dev-seed`). |
+| `seed_e2e` | dev | Creates or refreshes the E2E suite's `e2e` and `e2e_other` tenants (`e2e.localhost`, `e2e-other.localhost`) with the persona logins; in `e2e` the commissioning data the flows use (`seed_e2e_commissioning`: share type, day, station, order-day defaults, a share article, a confirmed subscription for the member persona), SMTP to MailHog and the `de` CSV format; and the platform super-admin `e2e-superadmin@example.com`. `--reset` drops and recreates those two tenants only. `make e2e` runs it. |
 | `seed_test_users` | dev | Creates or resets the `test-*@example.com` persona logins, password `Test-Test-2026`. |
 | `seed_user_status_demo` | dev | Seeds members and resellers in every account status, for the status-button demos (`--schema`, `--clean`). |
 
 Every `rotate_*` command but `rotate_field_encryption` shares its code with the
-super-admin "Run rotation" buttons. The three seed commands refuse to run with
+super-admin "Run rotation" buttons. The seed commands refuse to run with
 `DEBUG=False`.
 
 ## Test fixtures & patterns
@@ -1210,9 +1333,6 @@ e.g. `MemberFactory(user=user)` creates a Member with a linked `JasminUser`.
 - Time travel: the `time-machine` library for date/time testing (see
   [Backend testing](#backend-testing) for the mandatory freeze rule)
 - Mock external calls (email, Huey, payments) with `unittest.mock`
-- Several `commissioning/tests/` subdirectories contain an `OVERVIEW.txt` mapping
-  test classes and methods (not all do — e.g. `tests_services` currently lacks
-  one) — consult it when present before adding tests in that dir
 - `apps/commissioning/services/recompute.py` provides `recompute_shares()` and
   `recompute_order_contents()` — call these at the end of any service operation
   that mutates `ShareContent`, `ShareDelivery`, or `Forecast`
@@ -1247,8 +1367,10 @@ across all three + `tsconfig.json`.
 **Environment** — `.env.dev.example` (dev template — `cp .env.dev.example
 .env.dev`) and `.env.example` (prod template → `.env`)
 
-- Required in prod: `DJANGO_SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, `POSTGRES_*`,
-  `FRONTEND_DOMAIN`
+- Required in prod: `DJANGO_SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, `INVOICE_HASH_KEY`
+  (the key of the invoices' tamper hash, an HMAC; losing it leaves every sealed
+  hash unverifiable, and `INVOICE_HASH_KEY_FALLBACKS` keeps an old one during a
+  rotation), `POSTGRES_*`, `FRONTEND_DOMAIN`
 - Development defaults use insecure values (for convenience)
 
 ## Common workflows

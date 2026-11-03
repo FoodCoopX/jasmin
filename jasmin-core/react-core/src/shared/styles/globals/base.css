@@ -49,6 +49,11 @@
   flex-direction: column;
 }
 
+/* Plain flex row; pair with a gap util. */
+.flex-row {
+  display: flex;
+}
+
 /* Right-aligned action rows (modal footers). */
 .flex-end {
   display: flex;
@@ -72,6 +77,10 @@
   gap: 16px;
 }
 
+.gap-1em {
+  gap: 1em;
+}
+
 /* Sizing, spacing and alignment utilities for one-declaration needs that
    would otherwise go inline. */
 .w-full {
@@ -84,6 +93,38 @@
 
 .mb-1em {
   margin-bottom: 1em;
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
+}
+
+.mb-3em {
+  margin-bottom: 3em;
+}
+
+.mt-0-5em {
+  margin-top: 0.5em;
+}
+
+.mt-12 {
+  margin-top: 12px;
+}
+
+.mt-16 {
+  margin-top: 16px;
+}
+
+.mt-1em {
+  margin-top: 1em;
+}
+
+.mt-2em {
+  margin-top: 2em;
 }
 
 .text-center {

@@ -26,7 +26,14 @@ vi.mock("@hooks/configuration/useTenant", async () => {
   return { useTenant: () => tenant };
 });
 
-const saveHarvest = vi.hoisted(() => vi.fn());
+const { saveHarvest, notify } = vi.hoisted(() => ({
+  saveHarvest: vi.fn(),
+  notify: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
+vi.mock("@shared/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@shared/utils")>()),
+  notify,
+}));
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   commissioningHarvestPartialUpdate: (id: string, body: unknown) =>
     saveHarvest(id, body),
@@ -45,7 +52,6 @@ function HarvestConfirmation({ row }: { row: TableRecord }) {
     selectedYear: 2026,
     selectedWeek: 41,
     selectedDay: TUESDAY,
-    fallbackWeek: 41,
     onSaved: () => {},
   });
   return (
@@ -78,14 +84,15 @@ const leeksExpecting = (expected: number): TableRecord => ({
 
 beforeEach(() => {
   saveHarvest.mockReset().mockResolvedValue({});
+  Object.values(notify).forEach((fn) => fn.mockReset());
 });
 
 describe("confirming the expected harvest untouched", () => {
   it.each([
-    ["an expected amount summed in floats", 10.2 - 3.4, "6,80", 6.8],
-    ["an expected amount planned to three decimals", 0.875, "0,88", 0.88],
+    ["an expected amount summed in floats", 10.2 - 3.4, "6,80", "6.80"],
+    ["an expected amount planned to three decimals", 0.875, "0,88", "0.88"],
     // Half up on the decimals the field shows, not on the float: 1.005 is 1.00499… as a float.
-    ["an expected amount on a half", 1.005, "1,01", 1.01],
+    ["an expected amount on a half", 1.005, "1,01", "1.01"],
   ])("starts from %s at two decimals, as the field shows it, and saves that", async (_case, expected, shown, saved) => {
     const user = userEvent.setup();
     render(<HarvestConfirmation row={leeksExpecting(expected)} />);
@@ -102,5 +109,40 @@ describe("confirming the expected harvest untouched", () => {
       delivery_week: 41,
       day_number: TUESDAY,
     });
+  });
+});
+
+describe("a refused confirmation", () => {
+  async function confirmLeeks() {
+    const user = userEvent.setup();
+    render(<HarvestConfirmation row={leeksExpecting(4)} />);
+    await user.click(screen.getByRole("button", { name: "Confirm the harvest" }));
+    const dialog = await screen.findByRole("dialog", { name: CONFIRM });
+    await user.click(within(dialog).getByRole("button", { name: SET_AS_EXPECTED }));
+    await waitFor(() => expect(notify.error).toHaveBeenCalledTimes(1));
+    return dialog;
+  }
+
+  it("tells the user the server's reason and keeps the dialog open", async () => {
+    saveHarvest.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 400, data: { message: "Week is read-only." } },
+    });
+
+    const dialog = await confirmLeeks();
+
+    expect(notify.error).toHaveBeenCalledWith("Week is read-only.");
+    // The dialog may still be in its opening animation; a closed one never
+    // becomes visible again.
+    await waitFor(() => expect(dialog).toBeVisible());
+    expect(within(dialog).getByRole("spinbutton", { name: CONFIRM })).toHaveValue("4,00");
+  });
+
+  it("says the amount wasn't saved when the server gives no reason", async () => {
+    saveHarvest.mockRejectedValue(new Error("Network Error"));
+
+    await confirmLeeks();
+
+    expect(notify.error).toHaveBeenCalledWith("commissioning.harvest_save_failed");
   });
 });

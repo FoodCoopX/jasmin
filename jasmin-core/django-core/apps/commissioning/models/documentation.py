@@ -10,22 +10,21 @@ from .fields import delivery_week_field, size_vegetable_field, unit_field
 from .mixin import ArchivableMixin, CreatedMixin, FinalizableMixin
 
 
-def documentation_daily_unique(name: str) -> models.UniqueConstraint:
+def documentation_daily_unique(
+    name: str, *, per_storage: bool = False
+) -> models.UniqueConstraint:
     """The per-(year, week, DAY, article, unit, size) uniqueness shared by the
     five plain documentation daily tables (Waste, WashAmount, CleanAmount and
     the additional-theoretical wash/clean variants). Only enforced when
     ``day_number`` is set. Callers pass their own ``name`` so each constraint
-    keeps its existing DB identity.
+    keeps its existing DB identity. ``per_storage`` adds the storage to the key,
+    for a table whose rows are recorded per storage (Waste).
     """
+    fields = ["year", "delivery_week", "day_number", "share_article", "unit", "size"]
+    if per_storage:
+        fields.append("storage")
     return models.UniqueConstraint(
-        fields=[
-            "year",
-            "delivery_week",
-            "day_number",
-            "share_article",
-            "unit",
-            "size",
-        ],
+        fields=fields,
         condition=models.Q(day_number__isnull=False),
         name=name,
     )
@@ -291,7 +290,10 @@ class Harvest(
 class Waste(JasminModel, DocumentationMixin, CreatedMixin, ArchivableMixin):
     class Meta:
         constraints = [
-            documentation_daily_unique("waste_unique_year_week_day_article_unit_size"),
+            documentation_daily_unique(
+                "waste_unique_year_week_day_article_unit_size_storage",
+                per_storage=True,
+            ),
         ]
         indexes = documentation_year_week_indexes()
 
@@ -384,18 +386,19 @@ class Purchase(JasminModel, DocumentationMixin, CreatedMixin, ArchivableMixin):
                     "unit",
                     "size",
                     "seller",
+                    "storage",
                 ],
                 condition=models.Q(day_number__isnull=False, seller__isnull=False),
-                name="purchase_unique_year_week_day_article_unit_size_seller",
+                name="purchase_unique_year_week_day_article_unit_size_seller_storage",
             ),
-            # No-seller upsert key. bulk_set_purchase_as_expected and
-            # _ensure_purchase_placeholder both upsert on this tuple while
-            # leaving ``seller`` NULL, but the seller-scoped constraint above
-            # only fires when seller IS NOT NULL — so concurrent upserts could
-            # double-insert (MultipleObjectsReturned + double-counted stock).
-            # Both stamp ``day_number=PURCHASE_DAY``; ``nulls_distinct=False``
-            # (PG15+, Django 5.0+) makes any legacy NULL-day rows (never
-            # back-filled) still de-dupe under this constraint.
+            # No-seller key. bulk_set_purchase_as_expected and
+            # _ensure_purchase_placeholder upsert a row without a seller on this
+            # tuple, which the seller-scoped constraint above doesn't cover — so
+            # concurrent upserts could double-insert (MultipleObjectsReturned +
+            # double-counted stock). Both stamp ``day_number=PURCHASE_DAY``;
+            # ``nulls_distinct=False`` (PG15+, Django 5.0+) makes any legacy
+            # NULL-day rows (never back-filled) still de-dupe under this
+            # constraint.
             models.UniqueConstraint(
                 fields=[
                     "year",

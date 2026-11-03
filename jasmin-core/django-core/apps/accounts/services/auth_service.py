@@ -24,7 +24,7 @@ from ..errors import (
     TenantMismatch,
     TwoFactorEnrolmentRequired,
 )
-from . import two_factor_service
+from . import login_lockout, two_factor_service
 
 JasminUser = get_user_model()
 logger = logging.getLogger("authentication")
@@ -68,6 +68,9 @@ class TwoFactorChallenge:
 def authenticate_for_tenant(
     *, request, email: str, password: str, tenant
 ) -> LoginResult | TwoFactorChallenge:
+    # Before the password is checked, so a refused attempt is never counted
+    # and can't push the end of the lock further out.
+    login_lockout.refuse_if_locked(request, email)
     user = authenticate(request, username=email, password=password)
     if not user:
         raise InvalidCredentials("Invalid credentials")
@@ -76,8 +79,9 @@ def authenticate_for_tenant(
     # for a correct password — account-status (pending / deactivated / check
     # email), a 2FA challenge, or a 403 carrying a short-lived enrolment token.
     # That is a deliberate account-state / 2FA-state oracle: it is reachable
-    # ONLY after the right password, behind django-axes lockout (5 fails) + the
-    # 20/min login throttle, and the enrolment token is step-scoped + expires in
+    # ONLY after the right password, behind the 20/min login throttle and, with
+    # LOGIN_LOCKOUT_ENABLED on, the (email, IP) lockout after 5 failures; the
+    # enrolment token is step-scoped + expires in
     # TWO_FACTOR_ENROLMENT_LIFETIME (15m), so an attacker who already knows the
     # password gains only the ability to start a TOTP enrolment (which still
     # can't mint a session). We keep the descriptive responses because they
@@ -114,6 +118,9 @@ def authenticate_for_tenant(
             },
         )
 
+    # Only a completed sign-in clears the failed attempts — here, and after a
+    # verified 2FA code — never a right password still waiting for its code.
+    login_lockout.clear_failures(request, email)
     return _issue_login_tokens(user=user, tenant=tenant)
 
 
@@ -142,15 +149,24 @@ def _issue_login_tokens(*, user: JasminUser, tenant) -> LoginResult:
     user_roles = user.roles or ["member"]
     access["user_role"] = user_roles[0]
 
-    member_profile = getattr(user, "member_profile", None)
-    linked_reseller = getattr(user, "linked_reseller", None)
-
+    member_id, reseller_id = _linked_record_ids(user)
     return LoginResult(
         user=user,
         access=str(access),
         refresh=str(refresh),
-        member_id=member_profile.id if member_profile else None,
-        reseller_id=linked_reseller.id if linked_reseller else None,
+        member_id=member_id,
+        reseller_id=reseller_id,
+    )
+
+
+def _linked_record_ids(user: JasminUser) -> tuple[str | None, str | None]:
+    """The ids of the member and the reseller the user's login belongs to,
+    ``None`` for each the user has none of."""
+    member_profile = getattr(user, "member_profile", None)
+    linked_reseller = getattr(user, "linked_reseller", None)
+    return (
+        member_profile.id if member_profile else None,
+        linked_reseller.id if linked_reseller else None,
     )
 
 
@@ -165,7 +181,9 @@ def refresh_access_token(
     tenant_schema: str | None,
     tenant_name: str | None = None,
 ) -> dict:
-    """Validate refresh token, rotate, return access + new refresh strings."""
+    """Validate refresh token, rotate, return access + new refresh strings,
+    and the user with the ids of their member and reseller, so the client can
+    rebuild the signed-in user without logging in again."""
     try:
         refresh = RefreshToken(refresh_token)
     except TokenError as exc:
@@ -190,11 +208,11 @@ def refresh_access_token(
     if not _refresh_iat_still_valid(refresh):
         raise InvalidToken("Session has been revoked. Please log in again.")
 
-    # Re-validate the account on every refresh. The iat cut-off
-    # above only rejects tokens minted before an EXPLICIT revoke (password reset
-    # / logout-all, which stamp ``sessions_revoked_at``); a mid-session admin
-    # deactivation stamps nothing, so without this a deactivated user could keep
-    # refreshing for the full refresh lifetime. Mirrors the super-admin refresh.
+    # Re-validate the account on every refresh. The iat cut-off above covers
+    # the revocations that stamp ``sessions_revoked_at`` (password reset,
+    # logout-all, an account leaving ``active``); ``is_active`` is what decides
+    # whether this login may hold a session at all. Mirrors the super-admin
+    # refresh.
     user = JasminUser.objects.filter(pk=refresh.get("user_id")).first()
     if user is None or not user.is_active:
         raise InvalidToken("User is no longer active. Please log in again.")
@@ -219,9 +237,13 @@ def refresh_access_token(
         refresh.set_iat()
         new_refresh = refresh
 
+    member_id, reseller_id = _linked_record_ids(user)
     return {
         "access": str(access),
         "refresh": str(new_refresh) if new_refresh is not None else None,
+        "user": user,
+        "member_id": member_id,
+        "reseller_id": reseller_id,
     }
 
 
@@ -285,8 +307,9 @@ def revoke_all_sessions(user: JasminUser) -> None:
       timestamp already covers the rotated-current-token that isn't
       outstanding). Best-effort; never the sole guarantee.
 
-    Access tokens already issued keep working until they expire (short-lived,
-    ≤ ACCESS_TOKEN_LIFETIME) — that's the inherent JWT window, not widened here.
+    Access tokens issued before the stamp are refused too:
+    ``TenantBoundJWTAuthentication`` compares their ``iat`` with it, in whole
+    seconds, so a token minted in the same second still works.
     """
     from django.utils import timezone
 

@@ -42,6 +42,16 @@ class NoValidSepaMandates(BadRequestError):
     code = "billing_run.no_valid_mandates"
 
 
+class BillingRunChargesBeingReplanned(ConflictError):
+    """A re-plan (a subscription change, a pause edit, "Regenerate charges")
+    holds charges of the run being created, exported or deleted. Created anyway,
+    the run would leave them out without a word; an export or a delete would
+    have to wait for the re-plan, which can deadlock. Trying again once the
+    re-plan has committed goes through."""
+
+    code = "billing_run.charges_being_replanned"
+
+
 class BillingRunNotDraft(ConflictError):
     """Tried to export a run that is no longer DRAFT — a state conflict,
     not bad input. Re-exporting an EXPORTED run would re-issue charges."""
@@ -95,6 +105,14 @@ class IbanLocked(BadRequestError):
     code = "billing_profile.iban_locked"
 
 
+class BillingProfileIbanInvalid(BadRequestError):
+    """The IBAN is not a valid IBAN, even with its spaces removed and its
+    letters upper-cased: wrong length for its country, or wrong check digits.
+    Raised by the mandate import, which reports it per row."""
+
+    code = "billing_profile.iban_invalid"
+
+
 class SepaMandateSignedInFuture(BadRequestError):
     """``sepa_mandate_signed_at`` lies in the future. A mandate cannot be signed
     after today, and such a value aborts the entire pain.008 batch at export
@@ -133,11 +151,45 @@ class SepaMandateTextNotCurrent(BadRequestError):
     code = "billing_profile.sepa_mandate_text_not_current"
 
 
+class BillingProfileAlreadyExists(ConflictError):
+    """The mandate import names a member who already has a billing profile. The
+    import only creates: a live mandate at the bank must never be redirected by
+    a CSV row, so the member's existing profile is left as it is."""
+
+    code = "billing_profile.already_exists"
+
+
+class MandateReferenceTaken(ConflictError):
+    """The mandate import names a SEPA mandate reference another billing profile
+    already carries. The bank identifies a mandate by its reference, so two
+    members cannot share one."""
+
+    code = "billing_profile.mandate_reference_taken"
+
+
+class SepaMandateIncomplete(BadRequestError):
+    """An active SEPA Direct Debit profile lacks a detail collection needs: the
+    IBAN, the account holder, the mandate reference or the date the mandate was
+    signed. ``details["fields"]`` names the missing columns; ``field`` names the
+    one when only one is missing. The reference is minted on save once an IBAN
+    is there, so in practice it is the other three."""
+
+    code = "billing_profile.sepa_details_missing"
+
+
+class SepaFirstUseBeforeSigned(BadRequestError):
+    """``sepa_mandate_first_use_at`` lies before ``sepa_mandate_signed_at``: a
+    mandate cannot be collected against before it was signed."""
+
+    code = "billing_profile.first_use_before_signed"
+
+
 __all__ = [
     "BillingRunInvalidPeriod",
     "BillingRunInvalidCollectionDate",
     "NoEligibleCharges",
     "NoValidSepaMandates",
+    "BillingRunChargesBeingReplanned",
     "BillingRunNotDraft",
     "BillingRunHasNoCharges",
     "SepaExportInvalid",
@@ -148,4 +200,8 @@ __all__ = [
     "SepaMandateAlreadyUsed",
     "SepaMandateDeactivated",
     "SepaMandateTextNotCurrent",
+    "BillingProfileAlreadyExists",
+    "MandateReferenceTaken",
+    "SepaMandateIncomplete",
+    "SepaFirstUseBeforeSigned",
 ]

@@ -24,13 +24,16 @@ from apps.commissioning.models import (
     ShareTypeVariationGrossPrice,
     VirtualVariationComponent,
 )
+from apps.commissioning.serializers import ShareSerializer
 from apps.commissioning.services.share_demand_service import ExternalDemandBackend
+from apps.commissioning.services.shares_day_change_service import SHARE_DAY_FIELDS
 from apps.commissioning.tests.factories import (
     DeliveryStationDayFactory,
     DeliveryStationFactory,
     JasminUserFactory,
     MemberFactory,
     ShareArticleFactory,
+    ShareContentFactory,
     ShareDeliveryFactory,
     ShareFactory,
     SharesDeliveryDayFactory,
@@ -661,6 +664,53 @@ class TestShareViewSet:
         resp = api_client.get(url, {"year": 2026, "delivery_week": 15})
         assert resp.status_code == status.HTTP_200_OK
 
+    def test_delete_is_refused(self, api_client, tenant):
+        """A Share is a planning unit that recompute and the delivery services
+        build; a direct delete would cascade its contents and deliveries away
+        without the snapshot, virtual-share and billing follow-ups."""
+        day = SharesDeliveryDayFactory()
+        station_day = DeliveryStationDayFactory(delivery_day=day)
+        variation = ShareTypeVariationFactory()
+        share = ShareFactory(delivery_day=day, share_type_variation=variation)
+        delivery = ShareDeliveryFactory(
+            share=share,
+            delivery_station_day=station_day,
+            subscription=SubscriptionFactory(
+                share_type_variation=variation,
+                default_delivery_station_day=station_day,
+            ),
+        )
+
+        resp = api_client.delete(reverse("share-detail", kwargs={"pk": share.pk}))
+
+        assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+        assert Share.objects.filter(pk=share.pk).exists()
+        assert ShareDelivery.objects.filter(pk=delivery.pk).exists()
+
+    def test_create_is_refused(self, api_client, tenant):
+        """Shares are built by recompute and the delivery services; a share
+        created by hand would have no contents, deliveries or movements."""
+        delivery_day = SharesDeliveryDayFactory()
+        variation = ShareTypeVariationFactory()
+        before = Share.objects.count()
+
+        resp = api_client.post(
+            self.URL,
+            {
+                "year": 2026,
+                "delivery_week": 15,
+                "delivery_day": delivery_day.pk,
+                "share_type_variation": variation.pk,
+            },
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+        assert Share.objects.count() == before
+        assert not Share.objects.filter(
+            delivery_day=delivery_day, share_type_variation=variation
+        ).exists()
+
 
 # ---------------------------------------------------------------------------
 # ShareViewSet — the weekday columns belong to SharesDayChangeService
@@ -670,7 +720,7 @@ class TestShareDayFieldsLockedOnUpdate:
     """Moving a day rebuilds the week's theoretical objects and movements and
     is refused for a past week — both live in ``SharesDayChangeService``, behind
     ``/shares/bulk_update/``. A plain PATCH drops the day keys instead of
-    writing them straight to the column; create still sets them.
+    writing them straight to the column.
     """
 
     def test_patch_drops_the_day_keys(self, api_client, tenant):
@@ -700,28 +750,12 @@ class TestShareDayFieldsLockedOnUpdate:
         assert share.changed_day_number is None
         assert share.weight1 == Decimal("2.500")
 
-    def test_create_still_sets_the_day_fields(self, api_client, tenant):
-        """``ShareDays.tsx`` creates rows through this endpoint, so the lock is
-        update-only."""
-        delivery_day = SharesDeliveryDayFactory()
-        variation = ShareTypeVariationFactory()
-        resp = api_client.post(
-            reverse("share-list"),
-            {
-                "year": 2026,
-                "delivery_week": 15,
-                "delivery_day": delivery_day.pk,
-                "share_type_variation": variation.pk,
-                "harvesting_day": 3,
-                "changed_day_number": 4,
-            },
-            format="json",
-        )
+    def test_the_day_fields_are_read_only_without_an_instance_too(self):
+        # The API creates no shares, so the schema documents the day fields as
+        # read-only in every request body, not only in an update's.
+        fields = ShareSerializer().fields
 
-        assert resp.status_code == status.HTTP_201_CREATED
-        share = Share.objects.get(pk=resp.data["id"])
-        assert share.harvesting_day == 3
-        assert share.changed_day_number == 4
+        assert all(fields[name].read_only for name in SHARE_DAY_FIELDS)
 
 
 # ---------------------------------------------------------------------------
@@ -909,6 +943,127 @@ class TestShareExportCsvAction:
         # The in-range week appears as a column; the out-of-range week does not.
         assert f"{in_week.week}/{in_week.year}" in body
         assert f"{out_week.week}/{out_week.year}" not in body
+
+
+# ---------------------------------------------------------------------------
+# ShareContentViewSet — the crew reads finalized share contents, the office writes
+# ---------------------------------------------------------------------------
+@pytest.mark.django_db
+class TestShareContentWritePermissions:
+    """Finalized share contents are what members get in their box, and every
+    write recomputes the share. The office plans and finalizes them, so
+    gardener, staff and management read them but never add, change or delete
+    one."""
+
+    CREW_ROLES = ["gardener", "staff", "management"]
+    LIST = reverse("share_contents-list")
+    RECOMPUTE_SHARES = "apps.commissioning.services.recompute.recompute_shares"
+
+    @staticmethod
+    def _client(role: str) -> APIClient:
+        client = APIClient()
+        client.force_authenticate(user=JasminUserFactory(roles=[role]))
+        return client
+
+    @staticmethod
+    def _detail(share_content) -> str:
+        return reverse("share_contents-detail", kwargs={"pk": share_content.pk})
+
+    @staticmethod
+    def _new_row(share) -> dict:
+        return {
+            "share": share.pk,
+            "share_article": ShareArticleFactory().pk,
+            "delivery_station": DeliveryStationFactory().pk,
+            "amount": "5.000",
+            "unit": "KG",
+            "size": "M",
+        }
+
+    @pytest.mark.parametrize("role", CREW_ROLES)
+    def test_crew_reads_a_finalized_share_content(self, tenant, role):
+        share_content = ShareContentFactory(is_finalized=True)
+
+        resp = self._client(role).get(self._detail(share_content))
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert resp.data["id"] == share_content.pk
+
+    @pytest.mark.parametrize("role", CREW_ROLES)
+    def test_crew_patch_is_refused_and_changes_nothing(self, tenant, role):
+        share_content = ShareContentFactory(
+            is_finalized=True, price_per_unit=Decimal("2.50")
+        )
+
+        with mock.patch(self.RECOMPUTE_SHARES) as recompute_shares:
+            resp = self._client(role).patch(
+                self._detail(share_content),
+                {"amount": "0", "price_per_unit": "0"},
+                format="json",
+            )
+
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        recompute_shares.assert_not_called()
+        share_content.refresh_from_db()
+        assert share_content.amount == Decimal("5.000")
+        assert share_content.price_per_unit == Decimal("2.50")
+
+    @pytest.mark.parametrize("role", CREW_ROLES)
+    def test_crew_delete_is_refused_and_keeps_the_row(self, tenant, role):
+        share_content = ShareContentFactory(is_finalized=True)
+
+        with mock.patch(self.RECOMPUTE_SHARES) as recompute_shares:
+            resp = self._client(role).delete(self._detail(share_content))
+
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        recompute_shares.assert_not_called()
+        assert ShareContent.objects.filter(pk=share_content.pk).exists()
+
+    @pytest.mark.parametrize("role", CREW_ROLES)
+    def test_crew_create_is_refused_and_adds_no_row(self, tenant, role):
+        share = ShareFactory()
+
+        with mock.patch(self.RECOMPUTE_SHARES) as recompute_shares:
+            resp = self._client(role).post(
+                self.LIST, self._new_row(share), format="json"
+            )
+
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        recompute_shares.assert_not_called()
+        assert not ShareContent.objects.filter(share_id=share.pk).exists()
+
+    def test_office_adds_a_share_content(self, api_client, tenant):
+        share = ShareFactory()
+
+        with mock.patch(self.RECOMPUTE_SHARES) as recompute_shares:
+            resp = api_client.post(self.LIST, self._new_row(share), format="json")
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        recompute_shares.assert_called_once_with([share.pk])
+        assert ShareContent.objects.filter(share_id=share.pk).count() == 1
+
+    def test_office_changes_a_finalized_share_content(self, api_client, tenant):
+        share_content = ShareContentFactory(is_finalized=True)
+
+        with mock.patch(self.RECOMPUTE_SHARES) as recompute_shares:
+            resp = api_client.patch(
+                self._detail(share_content), {"amount": "2.000"}, format="json"
+            )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        recompute_shares.assert_called_once_with([share_content.share_id])
+        share_content.refresh_from_db()
+        assert share_content.amount == Decimal("2.000")
+
+    def test_office_deletes_a_finalized_share_content(self, api_client, tenant):
+        share_content = ShareContentFactory(is_finalized=True)
+
+        with mock.patch(self.RECOMPUTE_SHARES) as recompute_shares:
+            resp = api_client.delete(self._detail(share_content))
+
+        assert resp.status_code == status.HTTP_204_NO_CONTENT
+        recompute_shares.assert_called_once_with([share_content.share_id])
+        assert not ShareContent.objects.filter(pk=share_content.pk).exists()
 
 
 # ---------------------------------------------------------------------------
@@ -2031,6 +2186,57 @@ class TestShareDeliveryCrossDayMove:
             delivery_day=day_b,
             share_type_variation=variation,
         ).exists()
+
+
+@pytest.mark.django_db
+class TestShareDeliveryWeekMove:
+    """Reassigning a delivery to another week's Share on the same weekday
+    recomputes the Share it left as well as the one it joined."""
+
+    @pytest.fixture(autouse=True)
+    def _frozen_clock(self):
+        with time_machine.travel(datetime.datetime(2026, 3, 2, 12, 0), tick=False):
+            yield
+
+    def test_the_old_weeks_share_is_recomputed(self, api_client, tenant):
+        day = SharesDeliveryDayFactory(day_number=4)
+        variation = ShareTypeVariationFactory()
+        station_day = DeliveryStationDayFactory(delivery_day=day)
+        share_week_15, share_week_16 = (
+            ShareFactory(
+                year=2026,
+                delivery_week=week,
+                delivery_day=day,
+                share_type_variation=variation,
+            )
+            for week in (15, 16)
+        )
+        subscription = SubscriptionFactory(
+            share_type_variation=variation, default_delivery_station_day=station_day
+        )
+        delivery = ShareDeliveryFactory(
+            share=share_week_15,
+            delivery_station_day=station_day,
+            subscription=subscription,
+        )
+
+        with mock.patch(
+            "apps.commissioning.services.recompute.recompute_shares"
+        ) as recompute:
+            resp = api_client.patch(
+                reverse("share_delivery-detail", args=[delivery.pk]),
+                {"share": share_week_16.id},
+                format="json",
+            )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        delivery.refresh_from_db()
+        assert delivery.share_id == share_week_16.id
+        recompute.assert_called_once()
+        assert set(recompute.call_args.args[0]) == {
+            share_week_15.id,
+            share_week_16.id,
+        }
 
 
 @pytest.mark.django_db

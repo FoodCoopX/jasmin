@@ -6,9 +6,9 @@ from unittest import mock
 
 import pytest
 
-from apps.commissioning.tasks import nightly_invoice_hash_check
+from apps.commissioning.services.scheduled_upkeep import check_all_invoice_hashes
 
-FIND_DRIFTED = "apps.commissioning.tasks.InvoiceService.find_drifted_invoices"
+FIND_DRIFTED = "apps.commissioning.services.scheduled_upkeep.find_drifted_invoices"
 
 
 @pytest.mark.django_db
@@ -21,7 +21,7 @@ class TestInvoiceHashDriftAlert:
             mock.patch(FIND_DRIFTED, return_value=drifted),
             django_capture_on_commit_callbacks(execute=True),
         ):
-            nightly_invoice_hash_check.call_local()
+            check_all_invoice_hashes()
 
         assert len(mailoutbox) == 1
         assert "invoice RE7 (id inv-1)" in mailoutbox[0].body
@@ -33,6 +33,6 @@ class TestInvoiceHashDriftAlert:
             mock.patch(FIND_DRIFTED, return_value=[]),
             django_capture_on_commit_callbacks(execute=True),
         ):
-            nightly_invoice_hash_check.call_local()
+            check_all_invoice_hashes()
 
         assert mailoutbox == []

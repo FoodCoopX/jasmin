@@ -1,9 +1,11 @@
 from io import BytesIO
 
 from django.core.files.base import ContentFile
+from drf_spectacular.utils import extend_schema_field
 from PIL import Image, UnidentifiedImageError
 from rest_framework import serializers
 
+from apps.shared.host_capabilities import host_capabilities, share_demand_is_imported
 from apps.shared.image_upload import normalize_uploaded_picture, strict_image_decoding
 from apps.shared.languages import LanguageChoices
 
@@ -71,7 +73,34 @@ def _merged_settings_dict(obj: Tenant, current_overlay: dict) -> dict:
         "organic_control_number": obj.organic_control_number,
     }
     merged.update(current_overlay)
+    # The mode in effect, which a host can fix whatever the row stores.
+    merged["uploads_weekly_share_amount"] = share_demand_is_imported(
+        bool(current_overlay.get("uploads_weekly_share_amount", False))
+    )
     return merged
+
+
+class HostCapabilitiesSerializer(serializers.Serializer):
+    """What this deployment offers (``apps.shared.host_capabilities``)."""
+
+    support_tickets = serializers.BooleanField(read_only=True)
+    gdpr = serializers.BooleanField(read_only=True)
+    user_accounts = serializers.BooleanField(read_only=True)
+    operating_mode_choice = serializers.BooleanField(read_only=True)
+    legal_notice = serializers.BooleanField(read_only=True)
+    web_app = serializers.BooleanField(read_only=True)
+    manual_share_import = serializers.BooleanField(read_only=True)
+    delivery_stations = serializers.BooleanField(read_only=True)
+
+
+class _HostCapabilitiesMixin:
+    """The ``capabilities`` getter every tenant payload shares. They are a fact
+    about the deployment, not the tenant, and reveal nothing about it, so the
+    anonymous payload carries them too: the frontend needs them before login."""
+
+    @extend_schema_field(HostCapabilitiesSerializer)
+    def get_capabilities(self, obj: Tenant) -> dict[str, bool]:
+        return host_capabilities()
 
 
 class _TenantSettingsOverlayMixin:
@@ -93,7 +122,9 @@ class _TenantSettingsOverlayMixin:
         return _merged_settings_dict(obj, self._settings_overlay(obj))
 
 
-class TenantSerializer(_TenantSettingsOverlayMixin, serializers.ModelSerializer):
+class TenantSerializer(
+    _HostCapabilitiesMixin, _TenantSettingsOverlayMixin, serializers.ModelSerializer
+):
     """Full tenant payload — staff-only on read, admin-only on write.
 
     Read by:
@@ -117,6 +148,7 @@ class TenantSerializer(_TenantSettingsOverlayMixin, serializers.ModelSerializer)
 
     current_settings = serializers.SerializerMethodField()
     settings = serializers.SerializerMethodField()
+    capabilities = serializers.SerializerMethodField()
     # A model PROPERTY, so ``fields = "__all__"`` would not pick it up on its
     # own. It has to ride along here too: this is the payload
     # ``refreshTenantFull()`` swaps in after login, and without the field the
@@ -320,7 +352,7 @@ class TenantSerializer(_TenantSettingsOverlayMixin, serializers.ModelSerializer)
 
 
 class TenantNonStaffReadSerializer(
-    _TenantSettingsOverlayMixin, serializers.ModelSerializer
+    _HostCapabilitiesMixin, _TenantSettingsOverlayMixin, serializers.ModelSerializer
 ):
     """Narrowed tenant payload for non-staff reads (member, customer).
 
@@ -362,6 +394,7 @@ class TenantNonStaffReadSerializer(
 
     current_settings = serializers.SerializerMethodField()
     settings = serializers.SerializerMethodField()
+    capabilities = serializers.SerializerMethodField()
     # Members and customers see the installed app icon too — this serializer is
     # what their session gets after login, so dropping the field here would
     # leave every non-staff install on the platform fallback.
@@ -416,6 +449,7 @@ class TenantNonStaffReadSerializer(
             # Settings overlay
             "settings",
             "current_settings",
+            "capabilities",
         ]
 
 
@@ -533,12 +567,30 @@ class TenantEmailConfigSerializer(serializers.ModelSerializer):
             )
         return attrs
 
+    # A test send vouches only for the connection it went through, so a new
+    # password or a change to any of these drops the verified mark until the
+    # next test send succeeds. Resending a stored value is no change: the
+    # settings page autosaves the whole form on every edit.
+    _CONNECTION_FIELDS = (
+        "smtp_host",
+        "smtp_port",
+        "smtp_username",
+        "smtp_use_tls",
+        "smtp_use_ssl",
+    )
+
     def update(self, instance, validated_data):
         smtp_password = validated_data.pop("smtp_password", None)
+        connection_changed = any(
+            field in validated_data
+            and validated_data[field] != getattr(instance, field)
+            for field in self._CONNECTION_FIELDS
+        )
 
         if smtp_password:
             instance.smtp_password = smtp_password
-            instance.is_verified = False  # reset verification on credential change
+        if smtp_password or connection_changed:
+            instance.is_verified = False
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -547,7 +599,7 @@ class TenantEmailConfigSerializer(serializers.ModelSerializer):
         return instance
 
 
-class CurrentTenantSerializer(serializers.ModelSerializer):
+class CurrentTenantSerializer(_HostCapabilitiesMixin, serializers.ModelSerializer):
     """Pre-login bootstrap payload — **anonymous endpoint**.
 
     Served at ``GET /api/tenants/current/`` with no authentication. The
@@ -567,7 +619,8 @@ class CurrentTenantSerializer(serializers.ModelSerializer):
         — anonymous callers must not be able to enumerate internal
         schema identifiers; the auth-gated ``TenantSerializer`` keeps it)
       * Branding: ``logo``, ``bio_logo``
-      * i18n / locale bootstrap: ``tenant_language``, ``date_format``
+      * i18n / locale bootstrap: ``tenant_language``, ``date_format``,
+        ``number_locale``
       * Tenant-disabled UX: ``is_active``
       * Public legal-notice / GDPR contact block: ``address``,
         ``zip_code``, ``city``, ``country``, ``email``, ``phone_number``,
@@ -644,6 +697,7 @@ class CurrentTenantSerializer(serializers.ModelSerializer):
     min_weeks_from_creation_to_start_delivery = serializers.SerializerMethodField()
     allows_solidarity_pricing = serializers.SerializerMethodField()
     allows_waiting_list_for_subscriptions = serializers.SerializerMethodField()
+    capabilities = serializers.SerializerMethodField()
 
     class Meta:
         model = Tenant
@@ -656,6 +710,9 @@ class CurrentTenantSerializer(serializers.ModelSerializer):
             "app_icon_version",
             "tenant_language",
             "date_format",
+            # The registration wizard shows and reads numbers in the farm's
+            # format; the anonymous payload carries no settings overlay.
+            "number_locale",
             "currency",
             "is_active",
             # Public legal-notice ("Impressum") + privacy-policy controller
@@ -713,6 +770,8 @@ class CurrentTenantSerializer(serializers.ModelSerializer):
             # waiting-list-able or simply unavailable (the anon payload has no
             # settings overlay, so the modal can't read it from getSetting).
             "allows_waiting_list_for_subscriptions",
+            # What this deployment offers; the frontend hides the rest.
+            "capabilities",
         ]
 
     def _overlay(self, obj: Tenant) -> dict:

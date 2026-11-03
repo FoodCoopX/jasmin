@@ -9,7 +9,6 @@
 import { SendOutlined } from "@ant-design/icons";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { Button, Checkbox, Flex } from "antd";
-import dayjs from "dayjs";
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -46,20 +45,21 @@ import type {
 } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText, PastWarningMessage, ToolTipIcon } from "@shared/ui";
 import { AddShareArticleEntry } from "@features/commissioning/components";
-import { useTableRowSelection, useTenantSettingToggle } from "@hooks/index";
+import {
+  useTableRowSelection,
+  useTenantSettingToggle,
+  useYearWeekState,
+} from "@hooks/index";
 import { useOffersColumns, useOffersData } from "@features/commissioning/hooks";
 import { isWeekInPast, notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 import OfferSendingStatusTable from "@features/commissioning/components/OfferSendingStatusTable";
 import OffersBulkActions from "@features/commissioning/components/OffersBulkActions";
 
-const currentYear = dayjs().isoWeekYear();
-const nextWeek = dayjs().isoWeek();
-
 export default function Offers() {
   const { isOffice } = useRoles();
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [selectedWeek, setSelectedWeek] = useState(nextWeek);
+  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
+    useYearWeekState();
   const [selectedOfferGroup, setSelectedOfferGroup] = useState<string | null>(
     null,
   );
@@ -67,13 +67,21 @@ export default function Offers() {
     () => isWeekInPast(selectedYear, selectedWeek),
     [selectedYear, selectedWeek],
   );
+  // A new offer is stamped with the picked offer group, so adding waits for
+  // one to be picked.
   const permissions = useMemo(
     () => ({
       ...gatedByPermission(isOffice && !isPast),
+      canAdd: isOffice && !isPast && selectedOfferGroup !== null,
+      // The backend decides: finalized or not, an offer goes while nothing is
+      // ordered from it and it hasn't been sent by email. A row without the
+      // flag falls back to "nothing ordered".
       canDeleteRecord: (record: TableRecord) =>
-        !((record.amount_ordered as number) > 0),
+        typeof record.can_be_deleted === "boolean"
+          ? record.can_be_deleted
+          : !((record.amount_ordered as number) > 0),
     }),
-    [isOffice, isPast],
+    [isOffice, isPast, selectedOfferGroup],
   );
   const [isSendOffersModalOpen, setIsSendOffersModalOpen] = useState(false);
   // ID of the active Huey-backed offer-send job; ``null`` when no
@@ -164,7 +172,12 @@ export default function Offers() {
         form.setFieldsValue(defaultValues);
         return { ...record, ...defaultValues };
       }
-      return record;
+      // Orders move the available amount while the page shows it. With the
+      // amount the row opened with, the server keeps the stock as it is when
+      // the office left the amount alone, and refuses a new amount once orders
+      // have moved the stock since. Taken now, not at the save: a refetch
+      // while the row is open updates the row, but not its open form.
+      return { ...record, expected_amount: record.amount };
     },
     [],
   );
@@ -264,7 +277,7 @@ export default function Offers() {
         selectedYear={selectedYear}
         setSelectedYear={setSelectedYear}
         selectedWeek={selectedWeek}
-        setSelectedWeek={(v) => v !== null && setSelectedWeek(v)}
+        setSelectedWeek={setSelectedWeek}
       />
       <div className="section-divider">
         <Button
@@ -284,9 +297,8 @@ export default function Offers() {
         selectedOfferGroup={selectedOfferGroup}
         setSelectedOfferGroup={setSelectedOfferGroup}
         onOfferGroupChange={setSelectedOfferGroup}
-        include_null_option={true}
       />
-      <div style={{ marginTop: "1em" }}>
+      <div className="mt-1em">
         <strong>{t("commissioning.reseller_in_this_offer_group")}</strong>{" "}
         <br />
         {currentOfferGroup?.reseller_names}
@@ -347,12 +359,14 @@ export default function Offers() {
       <JobProgressDrawer
         jobId={activeJobId}
         onClose={() => {
-          // Closing the drawer refreshes the sending-status table —
-          // when the job is done, OfferSending rows just got written
-          // and the office expects to see the "Sent ✓" markers
-          // immediately. Cheap if no rows changed; covers both the
-          // happy and failure paths.
+          // Closing the drawer refreshes the sending-status table and
+          // the offers — when the job is done, OfferSending rows just
+          // got written: the office expects to see the "Sent ✓" markers
+          // immediately, and an offer that went out may no longer be
+          // deleted. Cheap if no rows changed; covers both the happy
+          // and failure paths.
           invalidateSendingStatus();
+          invalidateData();
           setActiveJobId(null);
         }}
         title={t("commissioning.send_offers")}
@@ -362,12 +376,7 @@ export default function Offers() {
         onSuccess={() => refetchShareArticles()}
       />
 
-      <div
-        className="flex-col gap-8"
-        style={{
-          margin: "16px 0",
-        }}
-      >
+      <div className="flex-col gap-8 mt-16 mb-16">
         <Flex align="center" gap="8px" component="label">
           <Checkbox
             checked={pricesPerPU}
@@ -384,7 +393,7 @@ export default function Offers() {
           <ToolTipIcon title={t("tooltip.use_personalized_offers")} />
         </Flex>
       </div>
-      <div style={{ marginBottom: 16, marginTop: 16 }}>
+      <div className="mt-16 mb-16">
         {selectedOfferGroup && data.length > 0 && allFinalized && (
           <>
             <Suspense
@@ -405,7 +414,7 @@ export default function Offers() {
           </>
         )}
       </div>
-      <div style={{ marginBottom: 16, marginTop: 16 }}>
+      <div className="mt-16 mb-16">
         <Button
           icon={<SendOutlined />}
           onClick={handleSendOffers}

@@ -113,7 +113,9 @@ gen_alnum()  {                                                # human-typable su
 
 DJANGO_SECRET_KEY="$(gen_django)"
 FIELD_ENCRYPTION_KEY="$(gen_fernet)"
+INVOICE_HASH_KEY="$(gen_hex)"
 POSTGRES_PASSWORD="$(gen_hex)"
+APP_DB_PASSWORD="$(gen_hex)"
 REDIS_PASSWORD="$(gen_hex)"
 BACKUP_ENCRYPTION_KEY="$(gen_hex)"
 GLITCHTIP_DB_PASSWORD="$(gen_hex)"
@@ -143,9 +145,16 @@ TRUSTED_PROXY_COUNT=1
 # --- core secrets (generated) ---
 DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
 FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY}
+# Key of the invoices' tamper hash. Store it with the other secrets: losing it
+# leaves every sealed invoice hash unverifiable.
+INVOICE_HASH_KEY=${INVOICE_HASH_KEY}
 POSTGRES_DB=jasmin
 POSTGRES_USER=jasmin
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+# The role backend and huey log in as: it owns the database, but is no
+# superuser (postgres/app_db_role.sh). POSTGRES_USER serves backups and psql.
+APP_DB_USER=jasmin_app
+APP_DB_PASSWORD=${APP_DB_PASSWORD}
 REDIS_PASSWORD=${REDIS_PASSWORD}
 
 # --- PLATFORM email = OPS ALERTS ONLY (mail_admins). NOT a fallback for tenant
@@ -166,9 +175,21 @@ EMAIL_ADMIN=${ADMIN_EMAIL}
 # gateway, and the frontend build must all agree — keep the two below equal.
 SUPER_ADMIN_SUBDOMAIN=${SUPER_ADMIN_SUBDOMAIN}
 VITE_SUPER_ADMIN_SUBDOMAIN=${SUPER_ADMIN_SUBDOMAIN}
-# The entrypoint auto-creates this SuperAdmin on first boot. SAVE THE PASSWORD.
+# The entrypoint creates this SuperAdmin on first boot, only while none exists;
+# later edits here change nothing. SAVE THE PASSWORD, and rotate it in the
+# admin UI after the first login — then this line may be deleted.
 DJANGO_SUPERUSER_EMAIL=${ADMIN_EMAIL}
 DJANGO_SUPERUSER_PASSWORD=${SUPERUSER_PASSWORD}
+
+# --- origin gate: tenant hosts only through the Bunny pull zone ---
+# Empty until every tenant pull zone has the edge rule that sends this value as
+# the X-Origin-Secret request header: once set, the tenant hosts refuse every
+# request without it. 32 to 64 letters and digits (openssl rand -hex 32); the
+# NEXT one is accepted beside it while the secret changes. Check a change with
+# ./scripts/validate_gateway_config.sh, then apply it with
+# 'docker compose up -d gateway'. nginx/render_config.sh has the details.
+BUNNY_ORIGIN_SECRET=
+BUNNY_ORIGIN_SECRET_NEXT=
 
 # --- backups ---
 BACKUP_ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY}

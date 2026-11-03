@@ -46,7 +46,7 @@
  * whenever the ZUGFeRD profile or the CII field mapping changes.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TFunction } from "i18next";
 import {
   generateZUGFeRDXML,
@@ -237,6 +237,25 @@ describe("ZUGFeRD / EN 16931 structural conformance", () => {
     );
     expect(addr.getElementsByTagName("ram:CountryID")[0]?.textContent).toBe(
       "AT",
+    );
+  });
+
+  it("drops characters XML forbids, so a name carrying one still parses", () => {
+    // The upload refuses an e-invoice that does not parse, and no escape makes
+    // a control character or U+FFFF legal XML.
+    const xml = generateZUGFeRDXML(
+      {
+        ...sampleInput,
+        invoice: { ...sampleInvoice, reseller_name: "Bio\u000BMarkt\u0000 Wien\uFFFF" },
+      },
+      sampleBankDetails,
+      sampleTenant,
+      t,
+    );
+
+    const buyer = findFirst(parse(xml), "ram:BuyerTradeParty");
+    expect(buyer!.getElementsByTagName("ram:Name")[0]?.textContent).toBe(
+      "BioMarkt Wien",
     );
   });
 
@@ -827,5 +846,35 @@ describe("weight-based article line keeps full 3-decimal BilledQuantity", () => 
     const allowance = Number(lineText("ram:ActualAmount") || "0");
     const lineTotal = Number(lineText("ram:LineTotalAmount"));
     expect(Math.abs(netPrice * qty - allowance - lineTotal)).toBeLessThan(0.005);
+  });
+});
+
+describe("an invoice without an invoice_date", () => {
+  beforeEach(() => {
+    vi.stubEnv("TZ", "Europe/Berlin");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // 00:30 in Berlin on 16 October is still 15 October in UTC.
+    vi.setSystemTime(new Date("2026-10-15T22:30:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it("is dated today in local time, and due from there (BT-2, BT-9)", () => {
+    const doc = parse(
+      generateZUGFeRDXML(
+        { ...sampleInput, invoice: { ...sampleInvoice, invoice_date: "" } },
+        sampleBankDetails,
+        { ...sampleTenant, payment_terms_reseller_in_days: 14 },
+        t,
+      ),
+    );
+    const due = findFirst(doc, "ram:DueDateDateTime")
+      ?.getElementsByTagName("udt:DateTimeString")[0]?.textContent;
+
+    expect(textOf(doc, "udt:DateTimeString")).toBe("20261016");
+    expect(due).toBe("20261030");
   });
 });

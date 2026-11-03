@@ -29,6 +29,7 @@ import { getErrorMessage } from "@shared/utils/apiError";
 import { getWeekdayChoices } from "@shared/utils/weekdayChoices";
 import type { ShareDelivery } from "@shared/api/generated/models";
 import { useMemberSelfService } from "@shared/auth";
+import { todayApiDate } from "@shared/utils/apiDate";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -77,8 +78,11 @@ const MemberDetail = () => {
     useState<ShareDelivery | null>(null);
   const { logoShape, logoAspectRatio } = useLogoShape(logoUrl);
 
-  const currentWeek = dayjs().isoWeek();
-  const currentYear = dayjs().isoWeekYear();
+  // Read once, when the page mounts, so every render asks for the same week.
+  const [{ currentWeek, currentYear }] = useState(() => {
+    const now = dayjs();
+    return { currentWeek: now.isoWeek(), currentYear: now.isoWeekYear() };
+  });
 
   const { data: member, isLoading: memberLoading } =
     useCommissioningMembersRetrieve(id!, {
@@ -108,6 +112,7 @@ const MemberDetail = () => {
     variables: togglingOptinVariables,
   } = useCommissioningShareDeliveryToggleOptinCreate({
     mutation: {
+      meta: { silent: true },
       onSuccess: () => {
         queryClient.invalidateQueries({
           queryKey: getCommissioningShareDeliveryListQueryKey(),
@@ -155,7 +160,7 @@ const MemberDetail = () => {
   // ActiveSubscriptionsCard recomputes its own "currently active" set.
   const confirmedSubscriptions = useMemo(() => {
     if (!subscriptions?.length) return [];
-    const today = dayjs().format("YYYY-MM-DD");
+    const today = todayApiDate();
     return subscriptions.filter(
       (sub) =>
         sub.admin_confirmed && (!sub.valid_until || sub.valid_until >= today),

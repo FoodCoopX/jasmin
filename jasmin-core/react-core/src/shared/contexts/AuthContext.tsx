@@ -10,13 +10,14 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 
-import axiosInstance, { performRefresh } from "@shared/services/api";
+import axiosInstance, { inRefreshTurn, performRefresh } from "@shared/services/api";
 import {
   SUPER_ADMIN_AUTH_ENDPOINTS,
   TENANT_AUTH_ENDPOINTS,
   type AuthEndpoints,
 } from "@shared/services/authEndpoints";
 import { isSuperAdminHostname as isSuperAdminHost } from "@shared/auth/superAdminHost";
+import i18n from "@shared/i18n";
 import { getErrorMessage } from "@shared/utils/apiError";
 import type {
   LoginOrChallengeResponse,
@@ -41,6 +42,9 @@ import { TenantContext } from "./TenantContext";
  */
 interface AuthUser {
   id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
   roles?: string[];
   user_language?: string;
   theme?: string;
@@ -157,33 +161,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const tenantCtx = useContext(TenantContext);
 
   // Keep React state in sync with the underlying tokenStore.
-  // If the token is cleared from outside (e.g. api.ts response interceptor
-  // after a failed silent refresh), also drop the cached user metadata so
-  // pages reading `user` flip to the logged-out state immediately — without
-  // requiring a hard browser reload.
+  // If the token is cleared from outside (e.g. api.ts after a failed silent
+  // refresh), also drop this tab's user so pages reading `user` flip to the
+  // logged-out state immediately — without requiring a hard browser reload.
+  // The stored metadata stays: every tab shares it, and api.ts drops it when
+  // the server ended the session for all of them.
   useEffect(() => {
     return subscribeAccessToken((t) => {
       setAccessTokenState(t);
       if (t !== null) setSessionNotice(null);
-      if (t === null) {
-        setMeta(null);
-        try {
-          localStorage.removeItem("auth");
-        } catch {
-          /* no-op */
-        }
-      }
+      if (t === null) setMeta(null);
     });
   }, []);
 
   // Hydrate user metadata from localStorage and attempt silent refresh on boot.
   useEffect(() => {
     let hadSession = false;
+    let hadUser = false;
     try {
       const storedMeta = localStorage.getItem("auth");
       if (storedMeta) {
-        setMeta(JSON.parse(storedMeta) as AuthMetadata);
+        const parsed = JSON.parse(storedMeta) as AuthMetadata;
+        setMeta(parsed);
         hadSession = true;
+        hadUser = !!parsed.user;
       }
     } catch (err) {
       console.error("Failed to parse stored auth metadata:", err);
@@ -202,7 +203,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        await performRefresh();
+        const { user } = await performRefresh();
+        // The cookie can outlive the stored metadata: a tab on an older bundle
+        // drops the metadata when its refresh loses a race, and clearing the
+        // site's storage keeps the cookie. Without a user, JasminApp has no
+        // roles to route on, so the refresh answer's user (the tenant realm
+        // sends one) takes the stored one's place.
+        if (user && !hadUser && !cancelled) {
+          const restored: AuthMetadata = { user: { ...user } };
+          setMeta(restored);
+          try {
+            localStorage.setItem("auth", JSON.stringify(restored));
+          } catch {
+            /* the tab keeps the user in memory */
+          }
+        }
         // Silent refresh succeeded → we're authenticated. We deliberately do
         // NOT enrich the tenant context here. The deterministic effect in
         // TenantContext (keyed on the tenant id) owns post-refresh enrichment:
@@ -333,7 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await _completePostLoginSuccess(response.data);
         return response.data;
       } catch (err) {
-        setError(getErrorMessage(err, "Login failed"));
+        setError(getErrorMessage(err, i18n.t("auth.login_card.login_failed")));
         throw err;
       } finally {
         setLoading(false);
@@ -362,7 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await _completePostLoginSuccess(response.data);
         return response.data;
       } catch (err) {
-        setError(getErrorMessage(err, "Two-factor verification failed"));
+        setError(getErrorMessage(err, i18n.t("auth.two_factor.error_verify")));
         throw err;
       } finally {
         setLoading(false);
@@ -386,7 +401,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // approved), so there is no session to seed here.
         return response.data;
       } catch (err) {
-        setError(getErrorMessage(err, "Registration failed"));
+        setError(getErrorMessage(err, i18n.t("auth.apply.error")));
         throw err;
       } finally {
         setLoading(false);
@@ -399,30 +414,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const endpoints = getEndpoints();
       // Empty body — refresh cookie carries the token. AllowAny on backend
-      // means this still works even with an expired access token.
-      await axiosInstance.post(endpoints.logout, {});
+      // means this still works even with an expired access token. Sent in
+      // the refresh lock's turn, so it logs out the cookie a refresh in
+      // flight in another tab is about to set.
+      await inRefreshTurn(() => axiosInstance.post(endpoints.logout, {}));
     } catch (err) {
       // Logout failures are non-fatal.
       console.error("Logout API call failed:", err);
     } finally {
+      // Clearing the token also empties the query cache
+      // (app/clearCacheOnSessionEnd.ts), so the next user on this device
+      // sees none of this one's data.
       clearAccessToken();
       persistMeta(null);
       setError(null);
-      // Wipe any cached API responses held by the service worker. Without
-      // this, a NetworkFirst response that succeeded earlier could still be
-      // served from cache to the next user on the same device.
-      if (typeof window !== "undefined" && "caches" in window) {
-        try {
-          const names = await caches.keys();
-          await Promise.all(
-            names
-              .filter((n) => n.includes("api-cache") || n.includes("auth"))
-              .map((n) => caches.delete(n)),
-          );
-        } catch (err) {
-          console.warn("Failed to clear SW caches on logout:", err);
-        }
-      }
       // Both realms (tenant + super-admin) mount the login route at /login.
       navigate("/login");
     }
@@ -430,7 +435,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshAccessToken = useCallback(async (): Promise<string> => {
     try {
-      return await performRefresh();
+      return (await performRefresh()).access;
     } catch (err) {
       console.error("Manual refresh failed:", err);
       clearAccessToken();

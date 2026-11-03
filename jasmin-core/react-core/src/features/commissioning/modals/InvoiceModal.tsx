@@ -13,7 +13,6 @@ import {
   useCommissioningInvoicesRetrieve,
 } from "@shared/api/generated/commissioning/commissioning";
 import type { CommissioningCrateContentsInvoiceDestroyParams } from "@shared/api/generated/models/commissioningCrateContentsInvoiceDestroyParams";
-import type { CrateContentInvoiceReseller } from "@shared/api/generated/models/crateContentInvoiceReseller";
 import type { CrateInvoiceContentWriteRequest } from "@shared/api/generated/models/crateInvoiceContentWriteRequest";
 import type { InvoiceResellerContent } from "@shared/api/generated/models/invoiceResellerContent";
 import {
@@ -42,7 +41,6 @@ import {
   computeTaxBreakdown,
   taxBreakdownFromBackend,
   totalsFromBreakdown,
-  type LineItemBase,
   type TaxBreakdownItem,
 } from "../pdfs/forResellers/pdfBase";
 import { EditableTable, gatedByPermission, wrapApiFunctions } from "@shared/tables";
@@ -55,7 +53,6 @@ import { DiffCell, ToolTipIcon } from "@shared/ui";
 import { useRoles } from "@shared/auth";
 
 type InvoiceContentRecord = InvoiceResellerContent & TableRecord;
-type CrateContentRecord = CrateContentInvoiceReseller & TableRecord;
 
 interface InvoiceModalProps {
   visible: boolean;
@@ -73,7 +70,7 @@ export default function InvoiceModal({
   const { getSetting } = useTenant();
   // The setting gates crate CREATION (backend). The table shows when the tenant
   // puts crates on documents OR the invoice already HAS crate rows (see the
-  // ``|| lineItemsCrates.length`` at the render site) — so existing crates,
+  // ``|| crate_items?.length`` at the render site) — so existing crates,
   // incl. on finalized/immutable invoices, still show and reconcile to the total.
   const showCratesOnDocuments = Boolean(
     getSetting("crates_should_be_on_documents", true),
@@ -92,10 +89,6 @@ export default function InvoiceModal({
 
   const lineItems = useMemo(
     () => (invoiceData?.line_items ?? []) as InvoiceContentRecord[],
-    [invoiceData],
-  );
-  const lineItemsCrates = useMemo(
-    () => (invoiceData?.crate_items ?? []) as unknown as CrateContentRecord[],
     [invoiceData],
   );
   const isFinalized = invoiceData?.is_finalized ?? false;
@@ -217,7 +210,7 @@ export default function InvoiceModal({
         title: <span className="text-xs">{t("commissioning.ust")}</span>,
         dataIndex: "tax_rate",
         key: "tax_rate",
-        inputType: "positive_integer",
+        inputType: "positive_decimal2",
         required: false,
         align: "center",
         width: "6em",
@@ -253,25 +246,23 @@ export default function InvoiceModal({
 
   const apiFunctionsCrates = useMemo<ApiFunctions>(
     () =>
-      wrapApiFunctions<CrateInvoiceContentWriteRequest & TableRecord>({
+      wrapApiFunctions<
+        CrateInvoiceContentWriteRequest & TableRecord,
+        Record<string, string>,
+        CommissioningCrateContentsInvoiceDestroyParams
+      >({
         create: (data) => commissioningCrateContentsInvoiceCreate(data),
         update: (id, data) =>
-          commissioningCrateContentsInvoicePartialUpdate(
-            id,
-            data as unknown as CrateContentInvoiceReseller,
-          ),
+          commissioningCrateContentsInvoicePartialUpdate(id, data),
         delete: (id, data) =>
-          commissioningCrateContentsInvoiceDestroy(
-            id,
-            data as unknown as CommissioningCrateContentsInvoiceDestroyParams,
-          ),
+          commissioningCrateContentsInvoiceDestroy(id, data),
       }),
     [],
   );
 
   const { rows: liveCrateItems, tableProps: crateTableProps } =
     useDocumentCrateTable({
-      crateItems: lineItemsCrates,
+      crateItems: invoiceData?.crate_items,
       documentField: "invoice_id",
       documentId: invoiceId,
       canWrite: !isFinalized && isOffice,
@@ -348,8 +339,8 @@ export default function InvoiceModal({
         line_netto: computeLineNetto(row as LineNettoInput),
       }));
     return computeTaxBreakdown(
-      withFreshNetto(liveLineItems) as unknown as LineItemBase[],
-      withFreshNetto(liveCrateItems) as unknown as LineItemBase[],
+      withFreshNetto(liveLineItems),
+      withFreshNetto(liveCrateItems),
     );
   }, [isFinalized, invoiceData?.tax_breakdown, liveLineItems, liveCrateItems]);
   const liveTotals = useMemo(
@@ -437,7 +428,7 @@ export default function InvoiceModal({
             onSaveSuccess={handleSaveSuccess}
             onDeleteSuccess={handleDeleteSuccess}
           />
-          {(showCratesOnDocuments || lineItemsCrates.length > 0) && (
+          {(showCratesOnDocuments || !!invoiceData.crate_items?.length) && (
             <>
               <div
                 style={{

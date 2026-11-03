@@ -1,14 +1,14 @@
 import { useShareTypes } from "@hooks/index";
 import { activeAtDateForWeek } from "@shared/utils/weekRange";
-import type { CSSProperties } from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import BaseEntitySelector, { type SelectorOption } from "./BaseEntitySelector";
 
 interface ShareTypeSelectorProps {
   selectedShareType: string | null;
-  setSelectedShareType: (value: string) => void;
-  onShareTypeChange?: ((value: string) => void) | null;
+  /** Gets `null` once the list loads empty, so no stale share type stays picked. */
+  setSelectedShareType: (value: string | null) => void;
+  onShareTypeChange?: ((value: string | null) => void) | null;
   include_null_option?: boolean;
   autoSelectFirst?: boolean;
   /**
@@ -25,7 +25,8 @@ interface ShareTypeSelectorProps {
   /** When provided, only these share type ids appear as options. Used by the
    *  packing pages to restrict the list to bulk- vs. box-packed share types. */
   allowedShareTypeIds?: Set<string> | null;
-  style?: CSSProperties;
+  /** Added to the selector's own classes, e.g. to place it in a page. */
+  className?: string;
 }
 
 const ShareTypeSelector = ({
@@ -38,7 +39,7 @@ const ShareTypeSelector = ({
   year = null,
   delivery_week = null,
   allowedShareTypeIds = null,
-  style,
+  className,
 }: ShareTypeSelectorProps) => {
   const { t } = useTranslation();
 
@@ -51,8 +52,8 @@ const ShareTypeSelector = ({
     activeAtDate ? { active_at_date: activeAtDate } : {},
   );
 
-  const options = useMemo<SelectorOption<string>[]>(() => {
-    const opts: SelectorOption<string>[] = [];
+  const options = useMemo<SelectorOption<string | null>[]>(() => {
+    const opts: SelectorOption<string | null>[] = [];
     if (include_null_option) opts.push({ value: "none", label: "-" });
     shareTypes
       .filter((st) => !allowedShareTypeIds || allowedShareTypeIds.has(st.value))
@@ -61,16 +62,21 @@ const ShareTypeSelector = ({
   }, [shareTypes, include_null_option, allowedShareTypeIds]);
 
   return (
-    <BaseEntitySelector<string>
+    <BaseEntitySelector<string | null>
       value={selectedShareType}
       onValueChange={setSelectedShareType}
       onChange={onShareTypeChange}
       options={options}
       loading={loading}
       placeholder={t("placeholder.share_type_selector")}
-      style={style}
+      className={
+        className
+          ? `bold-select week-selector-select ${className}`
+          : undefined
+      }
       autoSelectFirst={autoSelectFirst}
       preserveSelection={preserveSelection}
+      emptyValue={null}
     />
   );
 };

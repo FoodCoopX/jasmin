@@ -13,8 +13,12 @@
  */
 
 import { useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
-import { activeAtDateForWeek, formatAmountForUnit } from "@shared/utils";
+import {
+  activeAtDateForWeek,
+  dateForWeekDayNumber,
+  formatAmountForUnit,
+  nextIsoWeek,
+} from "@shared/utils";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -35,8 +39,6 @@ import { useVegetableSizeOptions } from "@hooks/useVegetableSizeOptions";
 import { useUnitOptions } from "@hooks/useUnitOptions";
 import type { ShareDeliveryDayOption } from "./useShareDeliveryDays";
 import { useShareDeliveryDays } from "./useShareDeliveryDays";
-
-const currentWeekFallback = dayjs().isoWeek();
 
 function parseNumber(value: unknown): number {
   const num = parseFloat(value as string);
@@ -77,7 +79,7 @@ export function useHarvestingListData({
   roundUpToFullPU,
 }: {
   selectedYear: number;
-  selectedWeek: number | null;
+  selectedWeek: number;
   selectedDay: number | null;
   isPast: boolean;
   isGardenerView: boolean;
@@ -91,8 +93,10 @@ export function useHarvestingListData({
 
   // ── Related days + variations totals for the selected harvest day ──
 
+  // The selected week is the harvest's week.
+  const harvestWeek = selectedWeek;
   const { getRelatedDays, isLoaded: daysLoaded } = useCurrentDays(
-    selectedWeek ?? currentWeekFallback,
+    harvestWeek,
     selectedYear,
   );
 
@@ -103,40 +107,77 @@ export function useHarvestingListData({
     return getRelatedDays.getDeliveryDaysForHarvesting(selectedDay);
   }, [daysLoaded, getRelatedDays, selectedDay]);
 
-  // Resolve all delivery_days for the selected harvest day to their DB ids
-  // so VariationsTotalsCard can fetch & aggregate totals across them.
+  // A harvest on a later weekday than its delivery serves the next week's
+  // delivery — Saturday's harvest for Monday — the rule by which the server
+  // files such a harvest in the week before its delivery.
+  const nextWeek = useMemo(
+    () => nextIsoWeek(selectedYear, harvestWeek),
+    [selectedYear, harvestWeek],
+  );
+  const deliveryWeekOf = useCallback(
+    (deliveryDay: number) =>
+      selectedDay !== null && selectedDay > deliveryDay
+        ? nextWeek
+        : { year: selectedYear, week: harvestWeek },
+    [selectedDay, nextWeek, selectedYear, harvestWeek],
+  );
+  const deliveryDateOf = useCallback(
+    (deliveryDay: number) => {
+      const { year, week } = deliveryWeekOf(deliveryDay);
+      return dateForWeekDayNumber(year, week, deliveryDay);
+    },
+    [deliveryWeekOf],
+  );
+
+  // Resolve all delivery_days for the selected harvest day to their DB ids,
+  // each against the delivery days of its own week, so VariationsTotalsCard
+  // can fetch & aggregate totals across them.
   const shareDeliveryDaysParams =
     useMemo<CommissioningSharesDeliveryDaysListParams>(
+      () => ({ active_at_date: activeAtDateForWeek(selectedYear, harvestWeek) }),
+      [selectedYear, harvestWeek],
+    );
+  const nextWeekShareDeliveryDaysParams =
+    useMemo<CommissioningSharesDeliveryDaysListParams>(
       () => ({
-        active_at_date: activeAtDateForWeek(selectedYear, selectedWeek),
+        active_at_date: activeAtDateForWeek(nextWeek.year, nextWeek.week),
       }),
-      [selectedYear, selectedWeek],
+      [nextWeek],
     );
   const { shareDeliveryDays } = useShareDeliveryDays(shareDeliveryDaysParams);
+  const { shareDeliveryDays: nextWeekShareDeliveryDays } = useShareDeliveryDays(
+    nextWeekShareDeliveryDaysParams,
+  );
   const variationsTotalsFilters = useMemo(() => {
     if (deliveryDaysForHarvesting.length === 0) return undefined;
-    const ids = deliveryDaysForHarvesting
-      .map((dayNumber) => {
-        const match = shareDeliveryDays.find(
-          (d: ShareDeliveryDayOption) =>
-            Number(d.day_number) === Number(dayNumber),
-        );
-        return match?.id;
-      })
-      .filter((id): id is string => !!id);
-    if (ids.length === 0) return undefined;
+    const deliveryDays = deliveryDaysForHarvesting.flatMap((dayNumber) => {
+      const { year, week } = deliveryWeekOf(dayNumber);
+      const daysOfWeek =
+        week === nextWeek.week && year === nextWeek.year
+          ? nextWeekShareDeliveryDays
+          : shareDeliveryDays;
+      const match = daysOfWeek.find(
+        (d: ShareDeliveryDayOption) =>
+          Number(d.day_number) === Number(dayNumber),
+      );
+      return match?.id ? [{ id: match.id, year, delivery_week: week }] : [];
+    });
+    if (deliveryDays.length === 0) return undefined;
     return {
       year: selectedYear,
-      delivery_week: selectedWeek ?? currentWeekFallback,
-      delivery_day: ids,
+      delivery_week: harvestWeek,
+      delivery_day: deliveryDays,
       sending_share_type_id: true,
       physical_share_type_variations: true,
     };
   }, [
     deliveryDaysForHarvesting,
+    deliveryWeekOf,
+    nextWeek,
     shareDeliveryDays,
+    nextWeekShareDeliveryDays,
     selectedYear,
-    selectedWeek,
+    harvestWeek,
   ]);
 
   // Same totals the on-screen ``VariationsTotalsCard`` shows; pulled here
@@ -156,7 +197,7 @@ export function useHarvestingListData({
     useMemo<CommissioningDocumentationSummarySummaryRetrieveParams>(
       () => ({
         year: selectedYear,
-        delivery_week: selectedWeek!,
+        delivery_week: selectedWeek,
         day_number: selectedDay!,
         is_past: isPast,
         model: "harvest",
@@ -251,7 +292,7 @@ export function useHarvestingListData({
 
       const amountPerPuText =
         amountPerPu > 0
-          ? `${format(amountPerPu, 1)} ${unitLabel}/${puLabel}`
+          ? `${formatAmountForUnit(amountPerPu, record.unit as string, format)} ${unitLabel}/${puLabel}`
           : "";
 
       const noteParts: string[] = [];
@@ -410,6 +451,7 @@ export function useHarvestingListData({
     plotGroupFirstIds,
     crateSummary,
     deliveryDaysForHarvesting,
+    deliveryDateOf,
     variationsTotalsFilters,
     variationsTotals,
     invalidateData,

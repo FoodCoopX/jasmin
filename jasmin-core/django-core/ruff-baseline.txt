@@ -2,7 +2,7 @@
 # Managed by scripts/ruff_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/ruff_baseline.py freeze
-# 190 finding(s).
+# 183 finding(s).
 
 apps/accounts/backends.py: N806 Variable `UserModel` in function should be lowercase
 apps/accounts/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
@@ -50,7 +50,6 @@ apps/commissioning/services/documentation_summary_service.py: C901 `get_summary`
 apps/commissioning/services/documentation_summary_service.py: PLR0913 Too many arguments in function definition (15 > 5)
 apps/commissioning/services/documentation_summary_service.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/commissioning/services/documentation_summary_service.py: PLR0913 Too many arguments in function definition (6 > 5)
-apps/commissioning/services/documentation_summary_service.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/commissioning/services/documentation_summary_service.py: PLR0913 Too many arguments in function definition (7 > 5)
 apps/commissioning/services/documentation_summary_service.py: PLR0913 Too many arguments in function definition (9 > 5)
 apps/commissioning/services/documentation_summary_service.py: PLR0913 Too many arguments in function definition (9 > 5)
@@ -74,8 +73,7 @@ apps/commissioning/services/offer_service.py: C901 `_convert_amount` is too comp
 apps/commissioning/services/offer_service.py: C901 `bulk_send_offers_via_email` is too complex (14 > 10)
 apps/commissioning/services/offer_service.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/commissioning/services/offer_service.py: PLR0913 Too many arguments in function definition (9 > 5)
-apps/commissioning/services/order_content_service.py: C901 `create_order_with_content_and_crates` is too complex (18 > 10)
-apps/commissioning/services/order_content_service.py: C901 `get_offers_and_order_content` is too complex (12 > 10)
+apps/commissioning/services/order_content_service.py: C901 `create_order_with_content_and_crates` is too complex (12 > 10)
 apps/commissioning/services/order_content_service.py: C901 `update_order_content` is too complex (11 > 10)
 apps/commissioning/services/order_content_service.py: PLR0913 Too many arguments in function definition (12 > 5)
 apps/commissioning/services/packing_list_boxes_matrix_service.py: C901 `get_weekly_combination_matrix` is too complex (12 > 10)
@@ -157,19 +155,14 @@ apps/commissioning/views/stock_views.py: C901 `patch` is too complex (14 > 10)
 apps/commissioning/views/stock_views.py: PLR0915 Too many statements (54 > 50)
 apps/commissioning/viewsets/basics_viewsets.py: C901 `get_queryset` is too complex (11 > 10)
 apps/commissioning/viewsets/delivery_viewsets.py: C901 `_migrate_succession_children` is too complex (14 > 10)
-apps/commissioning/viewsets/resellers_viewsets.py: C901 `_verify_einvoice_xml_matches` is too complex (15 > 10)
-apps/commissioning/viewsets/resellers_viewsets.py: N817 CamelCase `ElementTree` imported as acronym `ET`
 apps/commissioning/viewsets/shares_viewsets.py: C901 `export_csv` is too complex (15 > 10)
 apps/commissioning/viewsets/shares_viewsets.py: C901 `perform_update` is too complex (11 > 10)
 apps/commissioning/viewsets/shares_viewsets.py: PLR0915 Too many statements (54 > 50)
-apps/cultivation/models/basics.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
+apps/cultivation/models/base.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
 apps/gdpr/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
 apps/gdpr/tests/test_field_classification_guard.py: C901 `_gather_pii_field_violations` is too complex (11 > 10)
 apps/payments/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
-apps/payments/services.py: C901 `_build_pain008_xml` is too complex (12 > 10)
-apps/payments/services.py: C901 `create_run` is too complex (12 > 10)
 apps/payments/services.py: C901 `export` is too complex (11 > 10)
-apps/payments/services.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/payments/services.py: PLR0913 Too many arguments in function definition (8 > 5)
 apps/payments/tests/test_cancel_subscription.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/payments/tests/test_cancel_subscription.py: PLR0913 Too many arguments in function definition (6 > 5)

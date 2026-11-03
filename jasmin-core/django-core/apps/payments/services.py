@@ -11,11 +11,10 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from dateutil.relativedelta import relativedelta
 from django.core.files.base import ContentFile
-from django.db import transaction
-from django.db.models import Q
+from django.db import OperationalError, transaction
+from django.db.models import Q, QuerySet
 from django.utils import timezone
-from sepaxml import SepaDD
-from sepaxml.validation import ValidationError as SepaXmlValidationError
+from psycopg2.errors import LockNotAvailable
 
 from apps.commissioning.models import (
     ConsentDocument,
@@ -26,14 +25,17 @@ from apps.commissioning.models import (
 )
 from apps.commissioning.models.choices import PaymentCycleOptions
 from apps.commissioning.services.consent_service import ConsentService
+from apps.commissioning.services.subscription_term import effective_term_end
 from apps.commissioning.utils.iso_week_utils import share_delivery_date
 from apps.shared.money import round_money as _money
 from apps.shared.tenants.models import RateLimitedAction, Tenant, TenantSettings
 from apps.shared.tenants.rate_limits import enforce_action_quota
+from core.db_locks import acquire_advisory_xact_lock
 from core.tenant_db import connection
 
 from .constants import BillingRunStatus, ChargeStatus, PaymentMethodOptions
 from .errors import (
+    BillingRunChargesBeingReplanned,
     BillingRunHasNoCharges,
     BillingRunInvalidCollectionDate,
     BillingRunInvalidPeriod,
@@ -47,6 +49,7 @@ from .errors import (
     SepaMandateTextNotCurrent,
 )
 from .models import BillingProfile, BillingRun, ChargeSchedule
+from .sepa_export import build_pain008_xml
 from .serializers import normalized_iban
 
 logger = logging.getLogger(__name__)
@@ -236,10 +239,12 @@ class ChargeScheduleService:
         if billing is None:
             billing = _BillingConfig.for_tenant(tenant)
         cycle_choice = subscription.payment_cycle.choice
+        # The charges stop at the effective end, never past ``valid_until``: the
+        # member exit's force-end stamps ``cancelled_effective_at`` and keeps
+        # ``valid_until``.
+        term_end = min(valid_until, effective_term_end(subscription) or valid_until)
 
-        ChargeScheduleService._lock_and_unbundle_stale_planned(
-            subscription, valid_until
-        )
+        ChargeScheduleService._lock_and_unbundle_stale_planned(subscription, term_end)
 
         locked, locked_total, failed_periods = (
             ChargeScheduleService._resolve_locked_periods(subscription)
@@ -255,22 +260,29 @@ class ChargeScheduleService:
             billing_run__isnull=True,
         ).delete()
 
-        periods = list(
-            _iter_cycle_periods(subscription.valid_from, valid_until, cycle_choice)
-        )
+        # The periods run to ``valid_until`` and plan 0 after ``term_end``, so an
+        # exit before ``valid_from`` re-plans its rows instead of taking the
+        # inverted-term return above. The period holding ``term_end`` ends on it,
+        # as a truncated ``valid_until`` ends it: the unbundle above takes a row
+        # running past ``term_end`` out of every DRAFT run that bundles it.
+        periods = [
+            (
+                _Period(period.start, term_end)
+                if period.start <= term_end < period.end
+                else period
+            )
+            for period in _iter_cycle_periods(
+                subscription.valid_from, valid_until, cycle_choice
+            )
+        ]
 
         delivery_dates = ChargeScheduleService._billable_delivery_dates(
-            subscription, deliveries, valid_until, billing
+            subscription, deliveries, term_end, billing
         )
 
-        # SMOOTHED splits only the REMAINING term total (the recomputed total
-        # minus what the locked ISSUED/PAID/... rows already collected) across
-        # ONLY the still-unlocked periods, assigned by position among them.
-        # Splitting the FULL total across ALL periods (locked included) would
-        # double-count the locked amounts and break the sum==total invariant
-        # whenever any charge has already left PLANNED (over- or
-        # under-collecting the difference).
-        smoothed_unlocked: list[Decimal] = []
+        # SMOOTHED splits only the REMAINING total over the unlocked periods; the
+        # FULL total over ALL periods would double-count what locked rows hold.
+        smoothed_unlocked: dict[date, Decimal] = {}
         if billing.strategy == TenantSettings.BILLING_STRATEGY_SMOOTHED:
             smoothed_unlocked = ChargeScheduleService._smoothed_unlocked_amounts(
                 subscription, delivery_dates, periods, locked, locked_total
@@ -292,12 +304,12 @@ class ChargeScheduleService:
     # ------------------------------------------------------------------ #
     @staticmethod
     def _lock_and_unbundle_stale_planned(
-        subscription: Subscription, valid_until: date
+        subscription: Subscription, term_end: date
     ) -> None:
         """Lock this subscription's PLANNED rows and unbundle stale DRAFT rows.
 
-        Side-effecting only: takes the row lock and issues the two unbundle
-        updates. Must run before the snapshot/delete/recreate below.
+        Side-effecting only: takes the row lock and issues the unbundle update.
+        Must run before the snapshot/delete/recreate below.
         """
         # Serialize against ``BillingRunService.create_run`` on THIS
         # subscription's PLANNED charge rows before we snapshot/delete/recreate
@@ -308,46 +320,28 @@ class ChargeScheduleService:
         # ``(subscription, period_start)`` — which hits the
         # ``chargeschedule_unique_subscription_period`` constraint and raises an
         # IntegrityError that rolls back the triggering subscription change.
-        # ``create_run`` locks with ``skip_locked=True`` (services.py), so while
-        # we hold these rows it simply skips this subscription and bundles the
-        # freshly-recreated PLANNED rows on a later run — no deadlock cycle.
-        # ``of=("self",)`` locks only the ChargeSchedule rows, not any join.
+        # A billing run never waits for these locks: ``create_run`` skips the
+        # rows (``skip_locked``), and exporting or deleting a run locks its
+        # charges with ``nowait`` (``BillingRunService.lock_charges``). Finding
+        # one held, each refuses as retryable, rather than leave this
+        # subscription out of a run or deadlock with a re-plan of several
+        # subscriptions. ``of=("self",)`` locks only the ChargeSchedule rows.
         list(
             ChargeSchedule.objects.select_for_update(of=("self",))
             .filter(subscription=subscription, status=ChargeStatus.PLANNED)
+            .order_by("pk")
             .values_list("pk", flat=True)
         )
 
-        # A cancellation can truncate ``valid_until`` below a PLANNED row an
-        # operator already bundled into a DRAFT run for a now-removed future
-        # period. That row sits OUTSIDE the regenerated term, so the loop below
-        # never reconciles it, and the "keep bundled rows" lock would
-        # otherwise let it reach export and SEPA-debit a cancelled period.
-        # Unbundle DRAFT-bundled PLANNED rows whose period starts after the
-        # (possibly truncated) term so the delete below drops them. Only DRAFT
-        # runs + PLANNED rows are touched — ISSUED / exported charges are never
-        # unbundled.
+        # A PLANNED row already in a DRAFT run whose period runs past ``term_end`` —
+        # starting after it, or straddling it — is held by the "keep bundled rows"
+        # lock at its stored amount and would SEPA-debit deliveries after the end.
+        # Unbundle it so the delete below drops it and the loop re-plans its period
+        # from the deliveries up to the end. ISSUED / exported charges stay untouched.
         ChargeSchedule.objects.filter(
             subscription=subscription,
             status=ChargeStatus.PLANNED,
-            period_start__gt=valid_until,
-            billing_run__status=BillingRunStatus.DRAFT,
-        ).update(billing_run=None)
-
-        # The cut can also land INSIDE a DRAFT-bundled period
-        # (period_start <= valid_until < period_end) — a "straddling" row. Left
-        # bundled it stays locked at its FULL, un-prorated amount and would
-        # SEPA-debit both the served AND the now-cancelled portion. Unbundle it
-        # too so the delete below drops it and the loop recreates it at the
-        # clamped period [period_start, valid_until] with a prorated amount.
-        # Same DRAFT-only / PLANNED-only safety; only a truncated term leaves a
-        # bundled period straddling ``valid_until``, so otherwise this matches
-        # no row.
-        ChargeSchedule.objects.filter(
-            subscription=subscription,
-            status=ChargeStatus.PLANNED,
-            period_start__lte=valid_until,
-            period_end__gt=valid_until,
+            period_end__gt=term_end,
             billing_run__status=BillingRunStatus.DRAFT,
         ).update(billing_run=None)
 
@@ -419,13 +413,13 @@ class ChargeScheduleService:
     def _billable_delivery_dates(
         subscription: Subscription,
         deliveries: list[ShareDelivery] | None,
-        valid_until: date,
+        term_end: date,
         billing: _BillingConfig,
     ) -> list[date]:
         """Resolve the billable delivery dates for this subscription's term.
 
         Pre-fetches deliveries when the bulk path didn't supply them, applies
-        the joker + opt-in filters, then clamps to the enumerated term.
+        the joker + opt-in filters, then clamps to ``[valid_from, term_end]``.
         """
         # Pre-fetch all relevant deliveries once (the bulk path supplies them).
         if deliveries is None:
@@ -442,19 +436,18 @@ class ChargeScheduleService:
         # above because it's gated on the ``bills_joker_deliveries`` setting).
         deliveries = [d for d in deliveries if d.is_opted_in_for_delivery]
 
-        # Clamp to the enumerated term so EXACT and SMOOTHED bill the SAME
-        # set. Both consume ``delivery_dates`` — EXACT counts dates inside each
-        # period, SMOOTHED counts ``len(...)``. A date OUTSIDE [valid_from,
-        # valid_until] (e.g. a stray delivery past a truncated end) falls in no
-        # period (EXACT drops it) yet still inflates the SMOOTHED total. Filtering
-        # to the term makes ``len`` equal the sum of the per-period counts (the
-        # periods partition the term), so the two strategies agree.
+        # Clamp so EXACT and SMOOTHED bill the SAME set, none of it after the
+        # effective end. EXACT counts the dates inside each period, SMOOTHED counts
+        # ``len(...)``: a stray delivery past a truncated ``valid_until`` falls in no
+        # period yet inflates the SMOOTHED total, and one past a member exit can fall
+        # in a period after it, which EXACT would bill. The periods cover
+        # ``[valid_from, term_end]``, so ``len`` equals the sum of their counts.
         return [
             d
             for d in (
                 share_delivery_date(share_delivery) for share_delivery in deliveries
             )
-            if d and subscription.valid_from <= d <= valid_until
+            if d and subscription.valid_from <= d <= term_end
         ]
 
     @staticmethod
@@ -464,11 +457,11 @@ class ChargeScheduleService:
         periods: list[_Period],
         locked: set[date],
         locked_total: Decimal,
-    ) -> list[Decimal]:
-        """SMOOTHED per-period amounts for the still-unlocked periods.
+    ) -> dict[date, Decimal]:
+        """SMOOTHED amounts for the still-unlocked periods, by period start.
 
         Splits the REMAINING term total (recomputed total minus ``locked_total``)
-        across only the unlocked periods, by position among them.
+        over those starting by ``effective_term_end``, none after a cancellation.
         """
         term_total = ChargeScheduleService._term_total(subscription, delivery_dates)
         remaining = term_total - locked_total
@@ -494,8 +487,18 @@ class ChargeScheduleService:
                 locked_total - term_total,
             )
             remaining = Decimal("0.00")
-        n_unlocked = sum(1 for period in periods if period.start not in locked)
-        return ChargeScheduleService._largest_remainder_split(remaining, n_unlocked)
+        end = effective_term_end(subscription) or date.max
+        unlocked = [period.start for period in periods if period.start not in locked]
+        billed = [start for start in unlocked if start <= end]
+        if remaining > Decimal("0.00") and not billed:
+            logger.error(
+                "subscription %s SMOOTHED under-collection: %s owed but every period "
+                "up to the term end is locked; bill it out-of-band",
+                subscription.pk,
+                remaining,
+            )
+        split = ChargeScheduleService._largest_remainder_split(remaining, len(billed))
+        return dict(zip(billed, split, strict=True))
 
     @staticmethod
     def _persist_planned_periods(
@@ -506,16 +509,15 @@ class ChargeScheduleService:
         delivery_dates: list[date],
         locked: set[date],
         failed_periods: set[date],
-        smoothed_unlocked: list[Decimal],
+        smoothed_unlocked: dict[date, Decimal],
     ) -> int:
         """Create a PLANNED row per still-unlocked period; return total count.
 
         Locked periods are skipped (but counted); unlocked periods get their
-        SMOOTHED (by position among unlocked) or EXACT amount and a fresh row.
+        SMOOTHED (0 after the effective term end) or EXACT amount and a fresh row.
         """
         member = subscription.member
         created_count = 0
-        unlocked_index = 0
 
         for period in periods:
             if period.start in locked:
@@ -541,8 +543,7 @@ class ChargeScheduleService:
                 continue
 
             if billing.strategy == TenantSettings.BILLING_STRATEGY_SMOOTHED:
-                amount = smoothed_unlocked[unlocked_index]
-                unlocked_index += 1
+                amount = smoothed_unlocked.get(period.start, Decimal("0.00"))
             else:
                 amount = ChargeScheduleService._exact_amount_for_period(
                     subscription, delivery_dates, period
@@ -675,70 +676,6 @@ class ChargeScheduleService:
 
 
 # --------------------------------------------------------------------------- #
-# SEPA remittance text (the pain.008 ``Ustrd`` — what the member sees on their
-# bank statement). Operator-configurable per tenant; rendered at export time.
-# --------------------------------------------------------------------------- #
-
-# Used when ``Tenant.sepa_remittance_template`` is blank. Friendly + compact:
-# "<creditor> – <Month> <Year>" (e.g. "Marillenhof – Juni 2026") instead of the
-# internal ``ChargeSchedule.description`` (share label + ISO date range).
-# Plain hyphen (not en-dash) — the SEPA Latin charset excludes "–", and
-# sepaxml's clean=True would silently downgrade it to "-" anyway.
-_DEFAULT_SEPA_REMITTANCE_TEMPLATE = "{creditor} - {month}"
-
-# de is the platform's primary locale and the members are German-speaking, so
-# ``{month}`` renders German month names. Tenants wanting locale-neutral text
-# can use ``{period}`` (numeric dates) instead.
-_DE_MONTHS = (
-    "",
-    "Januar",
-    "Februar",
-    "März",
-    "April",
-    "Mai",
-    "Juni",
-    "Juli",
-    "August",
-    "September",
-    "Oktober",
-    "November",
-    "Dezember",
-)
-
-
-def _render_remittance(
-    template: str,
-    *,
-    creditor: str,
-    member: str,
-    period_start: date,
-    period_end: date,
-    amount: Decimal,
-) -> str:
-    """Render a tenant remittance template into the pain.008 ``Ustrd`` text.
-
-    Substitution is literal ``str.replace`` (NOT ``str.format``) so a stray
-    brace or an unknown ``{placeholder}`` in operator-entered text can never
-    raise — unknown tokens are simply left in place. Supported placeholders:
-    ``{creditor}``, ``{member}``, ``{month}``, ``{period}``, ``{amount}``.
-    Result is trimmed to the ISO 20022 140-char ``Ustrd`` limit.
-    """
-    month = f"{_DE_MONTHS[period_start.month]} {period_start.year}"
-    period = f"{period_start.strftime('%d.%m.%Y')}–{period_end.strftime('%d.%m.%Y')}"
-    replacements = {
-        "{creditor}": creditor,
-        "{member}": member,
-        "{month}": month,
-        "{period}": period,
-        "{amount}": f"{amount}",
-    }
-    text = template
-    for token, value in replacements.items():
-        text = text.replace(token, str(value))
-    return text.strip()[:140]
-
-
-# --------------------------------------------------------------------------- #
 # BillingRunService — bundles eligible charges and exports a SEPA pain.008 file
 # --------------------------------------------------------------------------- #
 
@@ -768,7 +705,7 @@ class BillingProfileService:
         """Issue a NEW SEPA mandate for ``profile``, pointing at ``iban``.
 
         A mandate is the pairing of a reference with the account the member
-        authorised. ``_build_pain008_xml`` reads that reference, the signature
+        authorised. ``build_pain008_xml`` reads that reference, the signature
         date and the IBAN off this single row, and derives the sequence type
         from ``sepa_mandate_first_use_at`` alone — so re-pointing an
         already-used reference at another account emits an RCUR quoting a
@@ -910,6 +847,9 @@ class BillingRunService:
 
         Eligible = status==PLANNED, due_date in [period_start, period_end],
         member has an active billing profile suited to `payment_method`.
+        Refuses with :class:`BillingRunChargesBeingReplanned` while a re-plan
+        holds eligible charges: created anyway, the run would leave them out
+        without a word.
         Caller still has to call :meth:`export` to produce files + flip status.
         """
         # Enforce the past-date invariant in the service itself, not just
@@ -942,51 +882,17 @@ class BillingRunService:
         # the public-schema Tenant, editable only by the super-admin platform.
         enforce_action_quota(RateLimitedAction.SEPA_CHARGE_GENERATION, actor=created_by)
 
-        # ``select_for_update(skip_locked=True, of=("self",))`` locks the
-        # eligible ChargeSchedule rows — and ONLY those (``of=("self",)``
-        # excludes the select_related member / billing_profile joins, so a
-        # locked member row can't make us skip an otherwise-free charge).
-        # Two concurrent ``create_run`` calls therefore can't bundle the same
-        # PLANNED charge into two different runs (which would double-charge a
-        # SEPA mandate): the loser skips the locked rows and bundles whatever
-        # is left — possibly nothing, surfacing as NoEligibleCharges. The lock
-        # is acquired when the queryset is materialised below, inside the
-        # method's @transaction.atomic.
-        eligible = (
-            ChargeSchedule.objects.select_related("member", "member__billing_profile")
-            .select_for_update(skip_locked=True, of=("self",))
-            .filter(
-                status=ChargeStatus.PLANNED,
-                due_date__gte=period_start,
-                due_date__lte=period_end,
-                billing_run__isnull=True,
-            )
-            # Only strictly-positive charges become payment lines: a SEPA
-            # pain.008 direct-debit of zero is invalid, and a NEGATIVE amount
-            # (a refund/over-collection) must never be debited or it fails the
-            # XSD / the bank rejects the batch. ``> 0`` covers both — defensive
-            # belt-and-braces alongside the regenerate clamp and the
-            # regenerate_all billable filter (manual/legacy 0-amount rows).
-            .filter(expected_amount__gt=Decimal("0.00"))
+        # One run at a time per tenant: a second ``create_run`` waits here
+        # until the first commits, then finds the charges it bundled taken.
+        # Two runs can therefore never bundle the same PLANNED charge (which
+        # would double-charge a SEPA mandate), and every row the lock below
+        # skips is held by a re-plan, never by another run.
+        acquire_advisory_xact_lock("billing_run:create")
+
+        due = BillingRunService._due_charges(period_start, period_end, payment_method)
+        eligible_charges = BillingRunService._lock_due_charges(
+            due, period_start=period_start, period_end=period_end
         )
-
-        if payment_method == PaymentMethodOptions.SEPA_DIRECT_DEBIT:
-            eligible = eligible.filter(
-                member__billing_profile__is_active=True,
-                member__billing_profile__payment_method=PaymentMethodOptions.SEPA_DIRECT_DEBIT,
-            )
-        elif payment_method == PaymentMethodOptions.BANK_TRANSFER:
-            # A BANK_TRANSFER run must only bundle charges whose member has an
-            # active BANK_TRANSFER billing profile. Without this, a SEPA
-            # member's PLANNED charge would be swept into the transfer run
-            # (and vice-versa) — and ``export`` would then try to direct-debit
-            # money the operator explicitly marked as bank transfer.
-            eligible = eligible.filter(
-                member__billing_profile__is_active=True,
-                member__billing_profile__payment_method=PaymentMethodOptions.BANK_TRANSFER,
-            )
-
-        eligible_charges = list(eligible)
         if not eligible_charges:
             # Diagnose the empty result so the operator isn't misled into
             # thinking the PERIOD is wrong: the common cause is members without
@@ -1070,6 +976,117 @@ class BillingRunService:
         )
         return run
 
+    @staticmethod
+    def _due_charges(
+        period_start: date, period_end: date, payment_method: str
+    ) -> QuerySet[ChargeSchedule]:
+        """The PLANNED charges a run for this period and payment method takes."""
+        due = ChargeSchedule.objects.filter(
+            status=ChargeStatus.PLANNED,
+            due_date__gte=period_start,
+            due_date__lte=period_end,
+            billing_run__isnull=True,
+            # Only strictly-positive charges become payment lines: a SEPA
+            # pain.008 direct-debit of zero is invalid, and a NEGATIVE amount
+            # (a refund/over-collection) must never be debited or it fails the
+            # XSD / the bank rejects the batch. ``> 0`` covers both — defensive
+            # belt-and-braces alongside the regenerate clamp and the
+            # regenerate_all billable filter (manual/legacy 0-amount rows).
+            expected_amount__gt=Decimal("0.00"),
+        )
+        if payment_method == PaymentMethodOptions.SEPA_DIRECT_DEBIT:
+            return due.filter(
+                member__billing_profile__is_active=True,
+                member__billing_profile__payment_method=PaymentMethodOptions.SEPA_DIRECT_DEBIT,
+            )
+        if payment_method == PaymentMethodOptions.BANK_TRANSFER:
+            # A BANK_TRANSFER run must only bundle charges whose member has an
+            # active BANK_TRANSFER billing profile. Without this, a SEPA
+            # member's PLANNED charge would be swept into the transfer run
+            # (and vice-versa) — and ``export`` would then try to direct-debit
+            # money the operator explicitly marked as bank transfer.
+            return due.filter(
+                member__billing_profile__is_active=True,
+                member__billing_profile__payment_method=PaymentMethodOptions.BANK_TRANSFER,
+            )
+        return due
+
+    @staticmethod
+    def _lock_due_charges(
+        due: QuerySet[ChargeSchedule], *, period_start: date, period_end: date
+    ) -> list[ChargeSchedule]:
+        """Lock the ``due`` charges, refusing while a re-plan holds any of them.
+
+        ``skip_locked`` passes over the rows a re-plan holds instead of waiting
+        for it (``regenerate_all`` holds every subscription's rows until it
+        commits). ``of=("self",)`` locks only the ChargeSchedule rows, so a
+        locked member or billing-profile row can't make us skip an
+        otherwise-free charge.
+        """
+        locked = list(
+            due.select_related("member", "member__billing_profile").select_for_update(
+                skip_locked=True, of=("self",)
+            )
+        )
+        # Whatever else the period holds now was skipped by the lock above, or
+        # was re-planned in since: charges the run would leave out without a
+        # word, and that nothing prompts the office to collect. Refuse the run
+        # instead; trying again once the re-plan has committed bundles them.
+        # Charges a re-plan is still inserting (a subscription being
+        # confirmed) can't be seen yet: they end up like those of a confirm
+        # committed just after the run, due in a period that already has one.
+        held_by_replan = due.exclude(pk__in=[charge.pk for charge in locked]).count()
+        if held_by_replan:
+            raise BillingRunChargesBeingReplanned(
+                f"{held_by_replan} charge(s) due between {period_start} and "
+                f"{period_end} are being re-planned right now. Try again in a "
+                "moment.",
+                details={"charges": held_by_replan},
+            )
+        return locked
+
+    @staticmethod
+    def lock_charges(run: BillingRun) -> list[ChargeSchedule]:
+        """Lock the charges of `run`, in pk order, without waiting for them.
+
+        A re-plan holding one makes this refuse with the retryable
+        :class:`BillingRunChargesBeingReplanned`. Waiting could deadlock: a
+        re-plan of several subscriptions (a pause edit, a member exit) locks
+        their charges one subscription after another, so it can hold one of
+        the run's charges and wait for another this lock already holds.
+        """
+        try:
+            return list(
+                run.charges.select_related("member", "member__billing_profile")
+                .select_for_update(of=("self",), nowait=True)
+                .order_by("pk")
+            )
+        except OperationalError as error:
+            if not isinstance(error.__cause__, LockNotAvailable):
+                raise
+            raise BillingRunChargesBeingReplanned(
+                f"Charges of billing run {run.pk} are being re-planned right "
+                "now. Try again in a moment.",
+                details={"billing_run": run.pk},
+            ) from error
+
+    @staticmethod
+    @transaction.atomic
+    def delete_draft(run: BillingRun) -> None:
+        """Delete the DRAFT `run`; its charges stay PLANNED, in no run.
+
+        Decides on the run under its row lock: ``run`` is an unlocked read, and
+        an export flipping it to EXPORTED in between would otherwise let an
+        exported run (its pain.008, its ISSUED charges) be deleted.
+        """
+        run = BillingRun.objects.select_for_update().get(pk=run.pk)
+        if run.status != BillingRunStatus.DRAFT:
+            raise BillingRunNotDraft("Only DRAFT billing runs can be deleted.")
+        # The delete unbundles the run's charges: lock them first, without
+        # waiting for a re-plan holding one (see ``lock_charges``).
+        BillingRunService.lock_charges(run)
+        run.delete()
+
     # ------------------------------------------------------------------ #
     @staticmethod
     @transaction.atomic
@@ -1099,11 +1116,11 @@ class BillingRunService:
         if run.status != BillingRunStatus.DRAFT:
             raise BillingRunNotDraft(f"Run already {run.status}, cannot re-export.")
 
-        charges = list(
-            run.charges.select_related("member", "member__billing_profile").order_by(
-                "pk"
-            )
-        )
+        # Locked, the charges stay as read until the export commits: a re-plan
+        # that drops or unbundles one (a cancellation, a pause edit) has
+        # either committed before, or refuses the export, so the file and the
+        # totals below hold exactly the charges still in the run.
+        charges = BillingRunService.lock_charges(run)
         if not charges:
             raise BillingRunHasNoCharges("Run has no charges.")
 
@@ -1184,15 +1201,17 @@ class BillingRunService:
                     },
                 )
 
-            xml_bytes = BillingRunService._build_pain008_xml(run, charges)
+            xml_bytes = build_pain008_xml(run, charges)
             run.sepa_xml_export.save(
                 f"billing_run_{run.pk}.xml", ContentFile(xml_bytes), save=False
             )
 
         # Mark charges as ISSUED + bump first-use date for SEPA mandates only.
+        # ``update_fields`` writes the flip alone: a plain save() whose UPDATE
+        # matched no row would INSERT the charge back.
         for charge in charges:
             charge.status = ChargeStatus.ISSUED
-            charge.save(allow_immutable_change=True)
+            charge.save(allow_immutable_change=True, update_fields=["status"])
 
             if is_sepa:
                 billing_profile = charge.member.billing_profile
@@ -1212,210 +1231,3 @@ class BillingRunService:
         run.status = BillingRunStatus.EXPORTED
         run.save()
         return run
-
-    # ------------------------------------------------------------------ #
-    @staticmethod
-    def _build_pain008_xml(run: BillingRun, charges: list[ChargeSchedule]) -> bytes:
-        """Build a pain.008.001.02 SEPA Direct Debit XML for the run.
-
-        Uses the ``sepaxml`` library so the generated document is
-        schema-validated against the bundled XSD before it leaves the
-        process — a malformed file can never reach the office. Missing
-        creditor / debtor fields raise :class:`SepaExportInvalid`
-        (a ``BadRequestError`` → HTTP 400 with the offending fields in
-        ``details``).
-
-        Rows are ordered ``(member_id, due_date, end_to_end_id)`` so
-        the file is deterministic across re-runs of the same set of
-        charges (locked by
-        ``apps/payments/tests/test_billing_run_pain008.py``).
-        """
-        tenant = connection.tenant
-
-        # --- Creditor identity (the farm / cooperative) -----------------
-        # The pain.008 export requires these fields. Fail loudly here rather
-        # than producing a half-built XML the bank would reject anyway.
-        creditor_name = tenant.sepa_creditor_name.strip()
-        creditor_id = tenant.sepa_creditor_id.strip()
-        creditor_iban = (tenant.iban or "").replace(" ", "")
-        # ``sepaxml`` requires BIC in its config even though
-        # pain.008.001.02 marks the field as optional in the actual
-        # XML. The library validates the config up-front and won't
-        # accept an empty BIC — so we require it here for parity.
-        creditor_bic = tenant.sepa_creditor_bic.strip().upper()
-        missing = [
-            name
-            for name, value in (
-                ("Tenant.sepa_creditor_name", creditor_name),
-                ("Tenant.sepa_creditor_id", creditor_id),
-                ("Tenant.iban", creditor_iban),
-                ("Tenant.sepa_creditor_bic", creditor_bic),
-            )
-            if not value
-        ]
-        if missing:
-            raise SepaExportInvalid(
-                "Cannot export SEPA XML: tenant is missing required "
-                "creditor fields: " + ", ".join(missing),
-                details={"missing_creditor_fields": missing},
-            )
-
-        config = {
-            "name": creditor_name,
-            "IBAN": creditor_iban,
-            "BIC": creditor_bic,
-            "batch": True,
-            "creditor_id": creditor_id,
-            "currency": "EUR",
-        }
-        sepa = SepaDD(config, schema="pain.008.001.02", clean=True)
-
-        # Operator-configurable bank-statement text (pain.008 ``Ustrd``). Blank
-        # → a friendly default ("{creditor} – {month}"). Rendered per charge
-        # below so each member sees readable text instead of the internal
-        # ``ChargeSchedule.description`` (share label + ISO date range).
-        remittance_template = (
-            tenant.sepa_remittance_template.strip() or _DEFAULT_SEPA_REMITTANCE_TEMPLATE
-        )
-
-        ordered = sorted(
-            charges,
-            key=lambda charge: (
-                charge.member_id,
-                charge.due_date,
-                charge.end_to_end_id or charge.pk,
-            ),
-        )
-        # Mandates already assigned their single FRST in THIS file. SEPA
-        # allows only one FRST per mandate, so a never-used mandate with
-        # several charges in one run gets FRST on the first transaction and
-        # RCUR on the rest (see the per-mandate sequence logic below).
-        frst_assigned: set = set()
-        today = timezone.localdate()
-        for charge in ordered:
-            billing_profile = getattr(charge.member, "billing_profile", None)
-            if billing_profile is None:
-                raise SepaExportInvalid(
-                    f"Charge {charge.pk}: member has no billing_profile; "
-                    "cannot include in SEPA XML.",
-                    details={"charge": str(charge.pk)},
-                )
-            mandate_ref = (billing_profile.sepa_mandate_reference or "").strip()
-            mandate_signed = billing_profile.sepa_mandate_signed_at
-            debtor_iban = billing_profile.iban.replace(" ", "")
-            debtor_name = billing_profile.account_holder.strip()
-            if not (mandate_ref and mandate_signed and debtor_iban and debtor_name):
-                raise SepaExportInvalid(
-                    f"Charge {charge.pk}: debtor missing mandate fields "
-                    "(mandate_reference, mandate_signed_at, IBAN, "
-                    "account_holder are all required).",
-                    details={"charge": str(charge.pk)},
-                )
-
-            # A mandate signed in the FUTURE (DtOfSgntr) is logically
-            # invalid and some banks reject the batch. sepaxml only checks it is a
-            # date instance, so guard it here before it reaches the file.
-            if mandate_signed > today:
-                raise SepaExportInvalid(
-                    f"Charge {charge.pk}: sepa_mandate_signed_at {mandate_signed} is in "
-                    "the future; a SEPA mandate cannot be dated after today.",
-                    details={
-                        "charge": str(charge.pk),
-                        "mandate_signed_at": str(mandate_signed),
-                    },
-                )
-
-            # pain.008 is EUR-only — the file's currency is hardcoded EUR above.
-            # A charge stamped with a non-EUR currency (tenant.currency is a
-            # free CharField) would otherwise be silently direct-debited as the
-            # same numeric amount in EUR. Fail loudly instead of emitting a
-            # wrong-currency debit.
-            if charge.currency != "EUR":
-                raise SepaExportInvalid(
-                    f"Charge {charge.pk}: currency {charge.currency} is not EUR; "
-                    "SEPA pain.008 is EUR-only.",
-                    details={"charge": str(charge.pk), "currency": charge.currency},
-                )
-
-            # FRST only for a mandate's very first-ever collection; RCUR
-            # otherwise. ``sepa_mandate_first_use_at`` (stamped by
-            # ``export()`` AFTER the file is built) covers PRIOR runs. But
-            # within THIS file a never-used mandate can carry several charges
-            # — only the first may be FRST, the rest must be RCUR, else the
-            # bank rejects the batch for a duplicate FRST sequence.
-            if billing_profile.sepa_mandate_first_use_at is not None:
-                sequence_type = "RCUR"
-            elif billing_profile.pk in frst_assigned:
-                sequence_type = "RCUR"
-            else:
-                sequence_type = "FRST"
-                frst_assigned.add(billing_profile.pk)
-
-            sepa.add_payment(
-                {
-                    "name": debtor_name[:70],  # ISO 20022 ``Nm`` max length
-                    "IBAN": debtor_iban,
-                    # ``amount`` is in CENTS (integer) per sepaxml's API.
-                    "amount": int(
-                        (charge.expected_amount * 100).quantize(
-                            Decimal("1"), rounding=ROUND_HALF_UP
-                        )
-                    ),
-                    "type": sequence_type,
-                    # RequestedCollectionDate is the operator-set run
-                    # collection_date (when the bank debits), NOT each charge's
-                    # due_date. Per-charge due_dates would ignore the field's
-                    # documented purpose and (with batch=True) fragment the
-                    # file into one PmtInf per distinct due_date.
-                    "collection_date": run.collection_date,
-                    "mandate_id": mandate_ref,
-                    "mandate_date": mandate_signed,
-                    # ISO 20022 ``Ustrd`` (≤140 chars) — the operator's
-                    # remittance template, falling back to the internal charge
-                    # description only if the rendered text comes out empty.
-                    "description": _render_remittance(
-                        remittance_template,
-                        creditor=creditor_name,
-                        member=debtor_name,
-                        period_start=charge.period_start,
-                        period_end=charge.period_end,
-                        amount=charge.expected_amount,
-                    )
-                    or (charge.description or f"Subscription {charge.subscription_id}")[
-                        :140
-                    ],
-                    "endtoend_id": str(charge.end_to_end_id or charge.pk)[:35],
-                }
-            )
-
-        # ``validate=True`` runs the bundled XSD against the generated
-        # document and raises if anything is off — a malformed file never
-        # reaches the office's download button. Translate sepaxml's opaque
-        # ValidationError into our SepaExportInvalid (a clean 4xx) carrying the
-        # failing element(s), so the office sees WHICH field is illegal (a
-        # creditor BIC / creditor-id, an out-of-charset debtor name, a past
-        # collection date, …) instead of an unhelpful 500.
-        try:
-            return sepa.export(validate=True)
-        except SepaXmlValidationError as exc:
-            # sepaxml validates via the ``xmlschema`` library; its
-            # XMLSchemaValidationError carries the failing element ``path`` +
-            # ``reason`` (NOT an lxml ``error_log``). Surface the offending field
-            # (e.g. "BIC: value doesn't match pattern …") so the office can fix
-            # the exact tenant/debtor field instead of guessing.
-            cause = exc.__cause__ or exc.__context__
-            reason = getattr(cause, "reason", None)
-            path = getattr(cause, "path", None)
-            field = path.rstrip("/").split("/")[-1].split("[")[0] if path else None
-            if field and reason:
-                detail = f"{field}: {reason}"
-            elif cause is not None:
-                detail = str(cause).strip().splitlines()[0]
-            else:
-                detail = str(exc)
-            raise SepaExportInvalid(
-                "The generated SEPA file failed validation. Check the creditor "
-                "fields (name / IBAN / BIC / creditor-id) and the debtor data. "
-                f"Details: {detail}",
-                details={"validation_errors": detail},
-            ) from exc

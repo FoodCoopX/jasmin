@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { RequireRole } from "@shared/auth";
+import { RequireCapability, RequireRole } from "@shared/auth";
 import type { AppRoute } from "../types";
 
 const DashboardConfiguration = lazy(
@@ -211,9 +211,11 @@ export const configurationRoutes: AppRoute[] = [
   {
     path: "/configuration/users",
     element: (
-      <RequireRole flag="isAdmin">
-        <ConfigurationUsers />
-      </RequireRole>
+      <RequireCapability name="user_accounts">
+        <RequireRole flag="isAdmin">
+          <ConfigurationUsers />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
 ];

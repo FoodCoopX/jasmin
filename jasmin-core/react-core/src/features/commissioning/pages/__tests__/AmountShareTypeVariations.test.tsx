@@ -8,9 +8,9 @@
  * TanStack queries around spies that answer from an in-memory farm with the
  * box-combination matrix the backend builds.
  *
- * The clock is frozen on Tuesday 6 October 2026 (ISO week 41). The week state
- * reads "today" once when its module loads, so the clock is set before the
- * imports run as well as before every test.
+ * The clock is frozen on Tuesday 6 October 2026 (ISO week 41), before the
+ * imports run as well as before every test. The week state reads "today" when
+ * the page mounts.
  */
 
 import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -547,6 +547,47 @@ describe("AmountShareTypeVariations splitting the days", () => {
     await waitFor(() => expect(rows()).toHaveLength(3));
     // No request ever asked for both splits.
     expect(api.boxMatrix.mock.calls.some(([params]) => params.for_tours && params.for_stations)).toBe(false);
+  });
+
+  it("counts whole days in a week of single-tour days though the tours were shown in the week before", async () => {
+    // Week 42 (from Saturday 17 October) is served by a single Tuesday tour.
+    api.deliveryDays.mockImplementation(async (params: { active_at_date: string }) =>
+      params.active_at_date === "2026-10-17" ? [TUESDAY_ONE_TOUR] : [...farm.deliveryDays],
+    );
+    renderPage();
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    await userEvent.click(toursSwitch()!);
+    await waitFor(() => expect(rows()).toHaveLength(3));
+
+    await userEvent.click(arrow(WEEK, "common.next"));
+
+    await waitFor(() => expect(rows()).toEqual([["commissioning.weekdays.1", "11", "31"]]));
+    expect(toursSwitch()).not.toBeInTheDocument();
+    expect(lastMatrixRequest()).toEqual(requestFor(42));
+    const week42Requests = api.boxMatrix.mock.calls.filter(([params]) => params.delivery_week === 42);
+    expect(week42Requests.some(([params]) => params.for_tours)).toBe(false);
+  });
+
+  it("waits for the next week's delivery days before counting it per tour", async () => {
+    const nextWeekDays = pending<SharesDeliveryDay[]>();
+    api.deliveryDays.mockImplementation((params: { active_at_date: string }) =>
+      params.active_at_date === "2026-10-17" ? nextWeekDays.promise : Promise.resolve([...farm.deliveryDays]),
+    );
+    renderPage();
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    await userEvent.click(toursSwitch()!);
+    await waitFor(() => expect(rows()).toHaveLength(3));
+
+    await userEvent.click(arrow(WEEK, "common.next"));
+
+    await waitFor(() => expect(isBusy()).toBe(true));
+    expect(screen.queryByText(NO_DELIVERIES)).not.toBeInTheDocument();
+    expect(api.boxMatrix.mock.calls.some(([params]) => params.delivery_week === 42)).toBe(false);
+
+    nextWeekDays.answer([TUESDAY_ONE_TOUR]);
+
+    await waitFor(() => expect(rows()).toEqual([["commissioning.weekdays.1", "11", "31"]]));
+    expect(api.boxMatrix.mock.calls.filter(([params]) => params.delivery_week === 42)).toEqual([[requestFor(42)]]);
   });
 
   it("goes back to whole days when the split is turned off", async () => {

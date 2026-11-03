@@ -11,9 +11,12 @@ import time_machine
 from django.urls import reverse
 from rest_framework import status
 
+from apps.commissioning.constants import PURCHASE_DAY
 from apps.commissioning.models import (
     AdditionalTheoreticalPurchase,
     Forecast,
+    ForecastOfferGroup,
+    ForecastShareTypeVariation,
     Harvest,
     MovementShareArticle,
     Purchase,
@@ -21,12 +24,15 @@ from apps.commissioning.models import (
 )
 from apps.commissioning.tests.factories import (
     ForecastFactory,
+    ForecastShareTypeVariationFactory,
     HarvestFactory,
     MovementShareArticleFactory,
+    OfferGroupFactory,
     PlotFactory,
     PurchaseFactory,
     ResellerFactory,
     ShareArticleFactory,
+    ShareTypeVariationFactory,
     StorageFactory,
     WasteFactory,
 )
@@ -145,6 +151,110 @@ class TestWasteViewSet:
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
         assert "storage" in resp.data["details"]
 
+    def _post_waste(self, api_client, article, storage):
+        return api_client.post(
+            self.URL,
+            {
+                "year": 2026,
+                "delivery_week": 28,
+                "day_number": 1,
+                "share_article": str(article.id),
+                "unit": "KG",
+                "size": "M",
+                "amount": "3",
+                "storage": str(storage.id),
+            },
+            format="json",
+        )
+
+    def test_same_article_on_the_same_day_in_another_storage_is_recorded(
+        self, api_client, tenant
+    ):
+        """The page lists one storage's waste, so a waste of the same article,
+        unit and size thrown away from another storage that day is its own
+        row."""
+        article = ShareArticleFactory()
+        WasteFactory(
+            year=2026,
+            delivery_week=28,
+            day_number=1,
+            share_article=article,
+            unit="KG",
+            size="M",
+            storage=StorageFactory(is_short_term_harvest_storage=True),
+        )
+        other_storage = StorageFactory()
+
+        resp = self._post_waste(api_client, article, other_storage)
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        assert Waste.objects.filter(share_article=article).count() == 2
+
+    def test_same_article_on_the_same_day_in_the_same_storage_is_refused(
+        self, api_client, tenant
+    ):
+        article = ShareArticleFactory()
+        storage = StorageFactory(is_short_term_harvest_storage=True)
+        WasteFactory(
+            year=2026,
+            delivery_week=28,
+            day_number=1,
+            share_article=article,
+            unit="KG",
+            size="M",
+            storage=storage,
+        )
+
+        resp = self._post_waste(api_client, article, storage)
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "waste.already_documented"
+        assert "non_field_errors" in resp.data["details"]
+        assert Waste.objects.filter(share_article=article).count() == 1
+
+    def test_moving_a_waste_onto_a_documented_one_is_refused(self, api_client, tenant):
+        article = ShareArticleFactory()
+        storage = StorageFactory(is_short_term_harvest_storage=True)
+        key = {
+            "year": 2026,
+            "delivery_week": 28,
+            "day_number": 1,
+            "share_article": article,
+            "unit": "KG",
+            "size": "M",
+        }
+        WasteFactory(**key, storage=storage)
+        other = WasteFactory(**key, storage=StorageFactory())
+
+        resp = api_client.patch(
+            reverse("waste-detail", args=[other.pk]),
+            {"storage": str(storage.id)},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "waste.already_documented"
+
+    def test_saving_a_waste_unchanged_is_not_a_duplicate_of_itself(
+        self, api_client, tenant
+    ):
+        waste = WasteFactory(
+            year=2026,
+            delivery_week=28,
+            day_number=1,
+            unit="KG",
+            size="M",
+            storage=StorageFactory(is_short_term_harvest_storage=True),
+        )
+
+        resp = api_client.patch(
+            reverse("waste-detail", args=[waste.pk]),
+            {"amount": "4", "storage": str(waste.storage_id)},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+
 
 # ---------------------------------------------------------------------------
 # HarvestViewSet
@@ -161,6 +271,91 @@ class TestHarvestViewSet:
         HarvestFactory()
         resp = api_client.get(self.URL)
         assert len(resp.data) >= 1
+
+    KEY = {
+        "year": 2026,
+        "delivery_week": 28,
+        "day_number": 1,
+        "unit": "KG",
+        "size": "M",
+    }
+
+    def _post_harvest(self, api_client, article, storage):
+        return api_client.post(
+            self.URL,
+            {
+                **self.KEY,
+                "share_article": str(article.id),
+                "amount": "3",
+                "storage": str(storage.id),
+            },
+            format="json",
+        )
+
+    def test_same_article_on_the_same_day_in_the_same_storage_is_refused(
+        self, api_client, tenant
+    ):
+        article = ShareArticleFactory()
+        storage = StorageFactory(is_short_term_harvest_storage=True)
+        HarvestFactory(**self.KEY, share_article=article, storage=storage)
+
+        resp = self._post_harvest(api_client, article, storage)
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "harvest.already_documented"
+        assert "non_field_errors" in resp.data["details"]
+        assert Harvest.objects.filter(share_article=article).count() == 1
+
+    def test_same_article_on_the_same_day_in_another_storage_is_recorded(
+        self, api_client, tenant
+    ):
+        article = ShareArticleFactory()
+        HarvestFactory(
+            **self.KEY,
+            share_article=article,
+            storage=StorageFactory(is_short_term_harvest_storage=True),
+        )
+
+        resp = self._post_harvest(api_client, article, StorageFactory())
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        assert Harvest.objects.filter(share_article=article).count() == 2
+
+    def test_moving_a_harvest_onto_a_documented_one_is_refused(
+        self, api_client, tenant
+    ):
+        article = ShareArticleFactory()
+        storage = StorageFactory(is_short_term_harvest_storage=True)
+        HarvestFactory(**self.KEY, share_article=article, storage=storage)
+        other = HarvestFactory(
+            **self.KEY, share_article=article, storage=StorageFactory()
+        )
+
+        resp = api_client.patch(
+            reverse("harvest-detail", args=[other.pk]),
+            {"storage": str(storage.id)},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "harvest.already_documented"
+        other.refresh_from_db()
+        assert other.storage_id != storage.id
+
+    def test_saving_a_harvest_unchanged_is_not_a_duplicate_of_itself(
+        self, api_client, tenant
+    ):
+        harvest = HarvestFactory(
+            **self.KEY, storage=StorageFactory(is_short_term_harvest_storage=True)
+        )
+
+        resp = api_client.patch(
+            reverse("harvest-detail", args=[harvest.pk]),
+            {"amount": "4", "storage": str(harvest.storage_id)},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +396,173 @@ class TestPurchaseViewSet:
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
         purchase = Purchase.objects.get(id=resp.data["id"])
         assert purchase.storage_id == storage.id
+
+    KEY = {"year": 2026, "delivery_week": 28, "unit": "KG", "size": "M"}
+
+    def _post_purchase(self, api_client, article, storage, **extra):
+        return api_client.post(
+            self.URL,
+            {
+                **self.KEY,
+                "share_article": str(article.id),
+                "amount": "5",
+                "storage": str(storage.id),
+                **extra,
+            },
+            format="json",
+        )
+
+    def test_same_article_from_the_same_seller_in_the_same_storage_is_refused(
+        self, api_client, tenant
+    ):
+        """The page sends no day; the purchase lands on the purchase day, where
+        the supplier's documented row already is."""
+        article = ShareArticleFactory(is_purchased=True)
+        seller = ResellerFactory()
+        storage = StorageFactory()
+        PurchaseFactory(
+            **self.KEY,
+            day_number=PURCHASE_DAY,
+            share_article=article,
+            seller=seller,
+            storage=storage,
+            amount=Decimal("3"),
+        )
+
+        resp = self._post_purchase(api_client, article, storage, seller=str(seller.id))
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "purchase.already_documented"
+        assert "non_field_errors" in resp.data["details"]
+        assert Purchase.objects.filter(share_article=article).count() == 1
+
+    def test_same_article_from_the_same_seller_in_another_storage_is_recorded(
+        self, api_client, tenant
+    ):
+        article = ShareArticleFactory(is_purchased=True)
+        seller = ResellerFactory()
+        PurchaseFactory(
+            **self.KEY,
+            day_number=PURCHASE_DAY,
+            share_article=article,
+            seller=seller,
+            storage=StorageFactory(),
+        )
+
+        resp = self._post_purchase(
+            api_client, article, StorageFactory(), seller=str(seller.id)
+        )
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        assert Purchase.objects.filter(share_article=article).count() == 2
+
+    def test_same_article_from_another_seller_is_recorded(self, api_client, tenant):
+        article = ShareArticleFactory(is_purchased=True)
+        storage = StorageFactory()
+        PurchaseFactory(
+            **self.KEY,
+            day_number=1,
+            share_article=article,
+            seller=ResellerFactory(),
+            storage=storage,
+        )
+
+        resp = self._post_purchase(
+            api_client,
+            article,
+            storage,
+            day_number=1,
+            seller=str(ResellerFactory().id),
+        )
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        assert Purchase.objects.filter(share_article=article).count() == 2
+
+    def test_same_article_without_a_seller_in_the_same_storage_is_refused(
+        self, api_client, tenant
+    ):
+        """The page sends no day; the purchase lands on the purchase day, where
+        the no-seller row already is."""
+        article = ShareArticleFactory(is_purchased=True)
+        storage = StorageFactory()
+        PurchaseFactory(
+            **self.KEY,
+            day_number=PURCHASE_DAY,
+            share_article=article,
+            seller=None,
+            storage=storage,
+            amount=Decimal("3"),
+        )
+
+        resp = self._post_purchase(api_client, article, storage)
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "purchase.already_documented_without_seller"
+        assert Purchase.objects.filter(share_article=article).count() == 1
+
+    def test_same_article_without_a_seller_in_another_storage_is_recorded(
+        self, api_client, tenant
+    ):
+        article = ShareArticleFactory(is_purchased=True)
+        PurchaseFactory(
+            **self.KEY,
+            day_number=None,
+            share_article=article,
+            seller=None,
+            storage=StorageFactory(),
+        )
+
+        resp = self._post_purchase(api_client, article, StorageFactory())
+
+        assert resp.status_code == status.HTTP_201_CREATED, resp.data
+        assert Purchase.objects.filter(share_article=article).count() == 2
+
+    def test_moving_a_purchase_onto_a_documented_one_is_refused(
+        self, api_client, tenant
+    ):
+        article = ShareArticleFactory(is_purchased=True)
+        seller = ResellerFactory()
+        storage = StorageFactory()
+        PurchaseFactory(
+            **self.KEY,
+            day_number=1,
+            share_article=article,
+            seller=seller,
+            storage=storage,
+        )
+        other = PurchaseFactory(
+            **self.KEY,
+            day_number=1,
+            share_article=article,
+            seller=ResellerFactory(),
+            storage=storage,
+        )
+
+        resp = api_client.patch(
+            reverse("purchase-detail", args=[other.pk]),
+            {"seller": str(seller.id)},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "purchase.already_documented"
+        other.refresh_from_db()
+        assert other.seller_id != seller.id
+
+    def test_saving_a_purchase_unchanged_is_not_a_duplicate_of_itself(
+        self, api_client, tenant
+    ):
+        purchase = PurchaseFactory(
+            **self.KEY, day_number=None, seller=None, storage=StorageFactory()
+        )
+
+        resp = api_client.patch(
+            reverse("purchase-detail", args=[purchase.pk]),
+            {"amount": "6", "storage": str(purchase.storage_id)},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +640,79 @@ class TestForecastInvalidVariation:
         )
         assert resp.status_code == status.HTTP_404_NOT_FOUND
         assert resp.data["code"] == "share_type_variation.not_found"
+
+
+# ---------------------------------------------------------------------------
+# ForecastViewSet — a PATCH that names only the changed fields
+# ---------------------------------------------------------------------------
+@pytest.mark.django_db
+class TestForecastPartialUpdate:
+    """A PATCH carries only what changed: the week, unit, size and the
+    variation / offer-group selection it leaves out are the stored ones."""
+
+    def _patch(self, api_client, forecast, payload):
+        url = reverse("forecast-detail", kwargs={"pk": forecast.pk})
+        return api_client.patch(url, payload, format="json")
+
+    def test_amount_only_updates_the_amount(self, api_client, tenant):
+        forecast = ForecastFactory(year=2026, delivery_week=15, amount=3)
+
+        resp = self._patch(api_client, forecast, {"amount": "7"})
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        forecast.refresh_from_db()
+        assert forecast.amount == Decimal("7")
+        assert (forecast.year, forecast.delivery_week) == (2026, 15)
+
+    def test_note_only_updates_the_note(self, api_client, tenant):
+        forecast = ForecastFactory(year=2026, delivery_week=15)
+
+        resp = self._patch(api_client, forecast, {"note": "late frost"})
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        forecast.refresh_from_db()
+        assert forecast.note == "late frost"
+
+    def test_amount_only_keeps_the_variations_and_offer_groups(
+        self, api_client, tenant
+    ):
+        forecast = ForecastFactory(
+            year=2026, delivery_week=15, amount=3, for_all_harvest_shares=False
+        )
+        variation = ShareTypeVariationFactory()
+        ForecastShareTypeVariationFactory(
+            forecast=forecast, share_type_variation=variation
+        )
+        offer_group = OfferGroupFactory()
+        ForecastOfferGroup.objects.create(forecast=forecast, offer_group=offer_group)
+
+        resp = self._patch(api_client, forecast, {"amount": "7"})
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert resp.data[f"variation_{variation.pk}"] is True
+        assert resp.data[f"offer_group_{offer_group.pk}"] is True
+        assert ForecastShareTypeVariation.objects.filter(
+            forecast=forecast, share_type_variation=variation
+        ).exists()
+        assert ForecastOfferGroup.objects.filter(
+            forecast=forecast, offer_group=offer_group
+        ).exists()
+
+    def test_a_flag_set_to_false_still_removes_its_variation(self, api_client, tenant):
+        forecast = ForecastFactory(
+            year=2026, delivery_week=15, for_all_harvest_shares=False
+        )
+        variation = ShareTypeVariationFactory()
+        ForecastShareTypeVariationFactory(
+            forecast=forecast, share_type_variation=variation
+        )
+
+        resp = self._patch(
+            api_client, forecast, {"amount": "7", f"variation_{variation.pk}": False}
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert not ForecastShareTypeVariation.objects.filter(forecast=forecast).exists()
 
 
 # ---------------------------------------------------------------------------

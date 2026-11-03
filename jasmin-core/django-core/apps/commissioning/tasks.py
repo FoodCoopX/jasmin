@@ -1,108 +1,32 @@
-import datetime
 import logging
 
-from django.conf import settings
 from django.utils import timezone
 from huey import crontab
 from huey.contrib.djhuey import db_periodic_task, db_task
 
-from apps.commissioning.services import InvoiceService
+from apps.commissioning.services.scheduled_upkeep import (
+    check_all_invoice_hashes,
+    prune_stale_import_batches,
+)
 from apps.shared.display_formats import DisplayFormats
-from apps.shared.ops_alerts import alert_operator
-from apps.shared.retention import IMPORT_BATCH_RETENTION_DAYS
+from apps.shared.tenant_urls import frontend_base_url
 from apps.shared.tenants.sweep import for_each_tenant
 
-log = logging.getLogger("django.security")
 ops_log = logging.getLogger("tasks")
 
 
 @db_periodic_task(crontab(hour="3", minute="0"), retries=2, retry_delay=300)
 def nightly_invoice_hash_check():
-    """Nightly tamper-detection sweep for finalized invoices.
-
-    For each tenant schema, recomputes the document_hash on every
-    finalized invoice and warns on any drift (``invoice.hash_drift``), then
-    emails the operator one list of the drifted invoices.
-    """
-    drifted: list[str] = []
-
-    def check(tenant):
-        for inv in InvoiceService.find_drifted_invoices():
-            log.warning(
-                "invoice.hash_drift tenant=%s invoice_id=%s prefix=%s number=%s",
-                tenant.schema_name,
-                inv["id"],
-                inv["prefix"],
-                inv["number"],
-            )
-            drifted.append(
-                f"{tenant.schema_name}: invoice {inv['prefix']}{inv['number']}"
-                f" (id {inv['id']})"
-            )
-
-    # Per-tenant isolation: one bad tenant must NOT abort the sweep. Failures
-    # are logged (to the security log) and skipped.
-    # ``include_inactive=True``: a frozen (is_active=False) tenant is exactly
-    # when tamper detection matters most (offboarding dispute, non-payment,
-    # suspected breach). Deactivation is soft (schema kept), the request path is
-    # already blocked by TenantActiveMiddleware, and this scan is read-only — so
-    # keep watching finalized-invoice hash drift on frozen schemas too.
-    for_each_tenant(
-        check, label="invoice.hash_check", logger=log, include_inactive=True
-    )
-    if drifted:
-        alert_operator(
-            "Finalized invoices changed after finalization",
-            "The nightly check found finalized invoices whose stored hash no "
-            "longer matches their content, which can mean tampering:\n\n"
-            + "\n".join(drifted),
-        )
+    """Tamper detection for finalized invoices, see ``check_all_invoice_hashes``."""
+    check_all_invoice_hashes()
 
 
 @db_periodic_task(
     crontab(hour="2", minute="45", day_of_week="0"), retries=2, retry_delay=300
 )
 def cleanup_stale_import_batches() -> None:
-    """Prune abandoned ShareShareImportBatch rows.
-
-    Upload + preview cycles leave behind rows in ``FAILED`` or
-    ``PREVIEW_READY`` status. Delete those older than
-    ``IMPORT_BATCH_RETENTION_DAYS``. Rows in status ``APPLIED`` are
-    NEVER deleted — those are the audit trail of what membership
-    changes actually happened and when.
-
-    Per-tenant: ``ShareShareImportBatch`` lives in the tenant schema.
-    """
-    # Lazy import: model lives in a TENANT_APP.
-    from apps.commissioning.models.imports import ShareImportBatch
-
-    cutoff = timezone.now() - datetime.timedelta(days=IMPORT_BATCH_RETENTION_DAYS)
-    deletable_statuses = (
-        ShareImportBatch.STATUS_FAILED,
-        ShareImportBatch.STATUS_PREVIEW_READY,
-    )
-    counters = {"deleted": 0}
-
-    def prune(tenant):
-        deleted, _ = ShareImportBatch.objects.filter(
-            created_at__lt=cutoff,
-            status__in=deletable_statuses,
-        ).delete()
-        counters["deleted"] += deleted
-        if deleted:
-            ops_log.info(
-                "housekeeping.import_batch_pruned tenant=%s deleted=%s",
-                tenant.schema_name,
-                deleted,
-            )
-
-    for_each_tenant(prune, label="housekeeping.import_batch_pruned")
-
-    ops_log.info(
-        "housekeeping.import_batch_pruned total_deleted=%s retention_days=%s",
-        counters["deleted"],
-        IMPORT_BATCH_RETENTION_DAYS,
-    )
+    """Prune abandoned import batches, see ``prune_stale_import_batches``."""
+    prune_stale_import_batches()
 
 
 @db_periodic_task(
@@ -202,13 +126,9 @@ def _build_renewal_failures_text(failed: list[dict], language: str):
 
 
 def _office_review_url(tenant, path: str) -> str:
-    """Absolute frontend URL for the tenant, built from its primary domain (the
-    sweep runs with no request, so ``connection.tenant`` isn't reliably set)."""
-    domain = tenant.domains.filter(is_primary=True).first() or tenant.domains.first()
-    if domain:
-        scheme = "http" if settings.DEBUG else "https"
-        return f"{scheme}://{domain.domain}{path}"
-    return f"{getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:3000')}{path}"
+    """Absolute frontend URL for the tenant (the sweep runs with no request, so
+    the tenant is passed in rather than read off ``connection.tenant``)."""
+    return f"{frontend_base_url(tenant)}{path}"
 
 
 def _notify_office_of_renewal_failures(tenant, failed: list[dict], run_date) -> None:

@@ -29,8 +29,9 @@ import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: unknown) =>
-      typeof fallback === "string" ? fallback : key,
+    // Interpolation values are appended, so a message's counts can be asserted.
+    t: (key: string, values?: unknown) =>
+      typeof values === "string" ? values : values ? `${key} ${JSON.stringify(values)}` : key,
     i18n: { language: "de", changeLanguage: () => Promise.resolve() },
   }),
   Trans: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
@@ -477,9 +478,7 @@ describe("Offers creation", () => {
     );
 
     await waitFor(() =>
-      expect(notifyMock.success).toHaveBeenCalledWith(
-        "commissioning.offers_created",
-      ),
+      expect(notifyMock.success).toHaveBeenCalledWith('commissioning.offers_created {"created":12}'),
     );
     // No offer group: creation always covers every group.
     expect(api.createOffers).toHaveBeenCalledWith({
@@ -532,7 +531,7 @@ describe("Offers creation", () => {
 // ── Editing and permissions ─────────────────────────────────────────────────
 
 describe("Offers editing", () => {
-  it("lets the office edit the current week but not delete an offer that was already ordered", async () => {
+  it("lets the office edit the current week but not delete an offer that was already ordered or sent", async () => {
     renderPage();
     await pickOfferGroup();
 
@@ -544,9 +543,18 @@ describe("Offers editing", () => {
       record: TableRecord,
     ) => boolean;
     expect(canDeleteRecord({ key: "offer-1", amount_ordered: "0.000" })).toBe(true);
-    expect(canDeleteRecord({ key: "offer-2", amount_ordered: "15.000" })).toBe(
-      false,
-    );
+    expect(canDeleteRecord({ key: "offer-2", amount_ordered: "15.000" })).toBe(false);
+    // The backend's flag wins: a finalized offer may go, one sent by email not.
+    expect(canDeleteRecord({ key: "offer-3", is_finalized: true, can_be_deleted: true })).toBe(true);
+    expect(canDeleteRecord({ key: "offer-4", amount_ordered: "0.000", can_be_deleted: false })).toBe(false);
+  });
+
+  it("shows and takes an available amount in PU fractions", async () => {
+    setOffers([makeOffer({ amount: "2.500" })]);
+    renderPage();
+    await pickOfferGroup();
+    expect(screen.getByTestId("offer-1-amount")).toHaveTextContent("2,5 commissioning.pu");
+    expect(grid().columns.find((c) => c.key === "amount")?.inputType).toBe("positive_decimal3");
   });
 
   it("keeps the offers read-only for a user without the office role", async () => {
@@ -608,27 +616,42 @@ describe("Offers editing", () => {
     });
   });
 
-  it("updates and deletes offers through the generated client", async () => {
+  it("updates an offer with the amount it opened with, and deletes offers, through the generated client", async () => {
     api.offersPartialUpdate.mockResolvedValue({ id: "offer-1" });
     api.offersDestroy.mockResolvedValue(undefined);
     renderPage();
     await pickOfferGroup();
 
-    await grid().apiFunctions!.update!("offer-1", { price_1: "2.60" });
+    // The row was refetched while it stood open: orders took 8 PU.
+    const payload = grid().customSave!(
+      { amount: "20.000", price_1: "2.60", expected_amount: "20.000" },
+      { key: "offer-1", amount: "12.000" },
+    );
+    await grid().apiFunctions!.update!("offer-1", payload!);
     await grid().apiFunctions!.delete!("offer-1");
 
     expect(api.offersPartialUpdate).toHaveBeenCalledWith("offer-1", {
+      amount: "20.000",
       price_1: "2.60",
+      expected_amount: "20.000",
+      year: YEAR,
+      delivery_week: WEEK,
+      offer_group: "og-1",
     });
     expect(api.offersDestroy).toHaveBeenCalledWith("offer-1");
   });
 
-  it("seeds a new offer with size M", () => {
+  it("seeds a new offer with size M, and an open one with the amount it opens with", () => {
     renderPage();
     const form = { setFieldsValue: vi.fn() } as unknown as FormInstance;
 
     expect(grid().customEdit!({ key: -1 }, form)).toEqual({ key: -1, size: "M" });
     expect(form.setFieldsValue).toHaveBeenCalledWith({ size: "M" });
+    expect(grid().customEdit!({ key: "offer-1", amount: "20.000" }, form)).toEqual({
+      key: "offer-1",
+      amount: "20.000",
+      expected_amount: "20.000",
+    });
   });
 });
 
@@ -658,9 +681,7 @@ describe("Offers prices", () => {
     renderPage();
     await pickOfferGroup();
 
-    const changed = within(screen.getByTestId("offer-1-price_1")).getByText(
-      "2,90 €",
-    );
+    const changed = within(screen.getByTestId("offer-1-price_1")).getByText("2,90 €");
     expect(changed).toHaveStyle({ fontWeight: "bold" });
   });
 
@@ -668,26 +689,8 @@ describe("Offers prices", () => {
     renderPage();
     await pickOfferGroup();
 
-    const unchanged = within(screen.getByTestId("offer-1-price_1")).getByText(
-      "2,40 €",
-    );
+    const unchanged = within(screen.getByTestId("offer-1-price_1")).getByText("2,40 €");
     expect(unchanged).toHaveStyle({ fontWeight: "normal" });
-  });
-
-  it("locks the prices of a finalized offer", async () => {
-    tenantState.values = { used_tiers_for_offers: [1, 5, 10] };
-    renderPage();
-    await pickOfferGroup();
-
-    const priceColumn = (dataIndex: string) =>
-      grid()
-        .columns.flatMap((column) => column.children ?? [column])
-        .find((column) => column.dataIndex === dataIndex)!;
-    const disabled = priceColumn("price_2").disabled as (
-      record: TableRecord,
-    ) => boolean;
-    expect(disabled({ key: "offer-1", is_finalized: true })).toBe(true);
-    expect(disabled({ key: "offer-1", is_finalized: false })).toBe(false);
   });
 
   describe("tier prices derived from the base price", () => {
@@ -843,45 +846,45 @@ describe("Offers bulk actions", () => {
   });
 
   it("copies the selected offers to next week after confirmation", async () => {
-    api.copyToNextWeek.mockResolvedValue({});
+    api.copyToNextWeek.mockResolvedValue({
+      total_requested: 2, total_copied: 2, skipped_count: 0, copied_offers: ["c-1", "c-2"],
+    });
     renderPage();
     await selectBothOffers();
 
     await userEvent.click(
-      screen.getByRole("button", {
-        name: "commissioning.copy_selected_to_next_week",
-      }),
+      screen.getByRole("button", { name: "commissioning.copy_selected_to_next_week" }),
     );
     await userEvent.click(await screen.findByRole("button", { name: "common.yes" }));
 
     await waitFor(() =>
-      expect(api.copyToNextWeek).toHaveBeenCalledWith({
-        ids: ["offer-1", "offer-2"],
-      }),
+      expect(api.copyToNextWeek).toHaveBeenCalledWith({ ids: ["offer-1", "offer-2"] }),
     );
     expect(notifyMock.success).toHaveBeenCalledWith(
-      "commissioning.copied_to_next_week",
+      'commissioning.copied_to_next_week {"count":2,"skipped":0}',
     );
   });
 
   it("copies the selected offers into each other offer group of the week", async () => {
-    api.copyToOfferGroup.mockResolvedValue({});
+    api.copyToOfferGroup.mockResolvedValue({
+      total_requested: 2, total_copied: 1, skipped_count: 1, copied_offers: ["c-1"],
+    });
     renderPage();
     await selectBothOffers();
 
     // Only the other group is offered as a copy target.
     await userEvent.click(
-      screen.getByRole("button", { name: "commissioning.copy_to_offer_group" }),
+      screen.getByRole("button", { name: /^commissioning\.copy_to_offer_group .*"Shops"/ }),
     );
     await userEvent.click(await screen.findByRole("button", { name: "common.yes" }));
 
     await waitFor(() =>
       expect(api.copyToOfferGroup).toHaveBeenCalledWith({
-        ids: ["offer-1", "offer-2"],
-        year: YEAR,
-        delivery_week: WEEK,
-        offer_group: "og-2",
+        ids: ["offer-1", "offer-2"], year: YEAR, delivery_week: WEEK, offer_group: "og-2",
       }),
+    );
+    expect(notifyMock.success).toHaveBeenCalledWith(
+      'commissioning.copied_to_offer_group_some_skipped {"count":1,"skipped":1,"offerGroup":"Shops"}',
     );
   });
 });

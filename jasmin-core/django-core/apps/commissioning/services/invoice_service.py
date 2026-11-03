@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -25,8 +23,10 @@ from ..models import (
     InvoiceResellerContent,
 )
 from ..utils.iso_week_utils import coerce_document_date
+from .delivery_note_invoices import current_invoices_by_delivery_note
 from .email_dispatch import load_pdf_attachments, send_document_email
 from .finalize_utils import finalize_children
+from .invoice_hash import compute_document_hash
 
 logger = logging.getLogger(__name__)
 
@@ -65,73 +65,26 @@ class InvoiceService:
     def get_invoice_for_delivery_note(
         delivery_note,
     ) -> InvoiceReseller | None:
-        """Return the invoice linked to *delivery_note*, or ``None``."""
+        """Return the current invoice of *delivery_note*, or ``None``.
+
+        The current one is the newest that isn't cancelled, else the newest
+        overall, reached through article and crate lines alike (see
+        ``current_invoices_by_delivery_note``).
+        """
         if not delivery_note:
             return None
-        content = (
-            InvoiceResellerContent.objects.filter(
-                delivery_note_contents__delivery_note=delivery_note
-            )
-            .select_related("invoice", "invoice__cancelled_by_invoice")
-            .first()
+        return current_invoices_by_delivery_note([delivery_note.pk]).get(
+            delivery_note.pk
         )
-        if content:
-            return content.invoice
-        # Crate-only delivery note: no article lines, so the article M2M above
-        # misses. Fall back to the crate-line provenance link.
-        crate_content = (
-            CrateContentInvoiceReseller.objects.filter(
-                crate_delivery_note_contents__delivery_note=delivery_note
-            )
-            .select_related("invoice", "invoice__cancelled_by_invoice")
-            .first()
-        )
-        return crate_content.invoice if crate_content else None
 
     @staticmethod
     def get_invoices_for_delivery_notes(
         delivery_note_ids,
     ) -> dict[str, InvoiceReseller]:
         """Batch form of ``get_invoice_for_delivery_note``: map each delivery
-        note id → its invoice in a constant number of queries instead of 1-2
-        per note (the per-order N+1 in bulk reminder sends).
-
-        A delivery note's article lines all belong to one invoice, so the first
-        content per note is authoritative; crate-only notes fall back to the
-        crate-line provenance. ``values_list`` over the SAME M2M path used in
-        the filter reuses one join (no filter-vs-annotate join mismatch).
-        """
-        ids = list(delivery_note_ids)
-        if not ids:
-            return {}
-
-        invoice_id_by_dn: dict[str, str] = {}
-        for dn_id, invoice_id in InvoiceResellerContent.objects.filter(
-            delivery_note_contents__delivery_note_id__in=ids
-        ).values_list("delivery_note_contents__delivery_note_id", "invoice_id"):
-            invoice_id_by_dn.setdefault(dn_id, invoice_id)
-
-        missing = [dn_id for dn_id in ids if dn_id not in invoice_id_by_dn]
-        if missing:
-            for dn_id, invoice_id in CrateContentInvoiceReseller.objects.filter(
-                crate_delivery_note_contents__delivery_note_id__in=missing
-            ).values_list(
-                "crate_delivery_note_contents__delivery_note_id", "invoice_id"
-            ):
-                invoice_id_by_dn.setdefault(dn_id, invoice_id)
-
-        if not invoice_id_by_dn:
-            return {}
-        invoices = (
-            InvoiceReseller.objects.filter(id__in=set(invoice_id_by_dn.values()))
-            .select_related("cancelled_by_invoice")
-            .in_bulk()
-        )
-        return {
-            dn_id: invoices[invoice_id]
-            for dn_id, invoice_id in invoice_id_by_dn.items()
-            if invoice_id in invoices
-        }
+        note id to its current invoice in a constant number of queries, however
+        many notes are asked for. Notes without an invoice are left out."""
+        return current_invoices_by_delivery_note(delivery_note_ids)
 
     @staticmethod
     def unfinalized_upstream_delivery_note_ids(invoice_ids) -> set[str]:
@@ -243,108 +196,6 @@ class InvoiceService:
         return content
 
     @staticmethod
-    def build_hash_payload(invoice: InvoiceReseller) -> dict:
-        """Canonical snapshot used to derive ``document_hash``.
-
-        Covers every field that legally affects the invoice's monetary
-        position: parent identity (number / prefix / date / reseller) and,
-        per line, ``amount`` / ``price_per_unit`` / ``rabatt`` / ``tax_rate``
-        — for both article items AND crate items.
-
-        Lines are sorted by pk so the payload is deterministic regardless
-        of fetch order; ``json.dumps(sort_keys=True)`` only sorts dict keys.
-        """
-        payload = {
-            "number": invoice.number,
-            "prefix": invoice.prefix,
-            "date": invoice.date.isoformat() if invoice.date else None,
-            "reseller_id": str(invoice.reseller.id),
-            "items": [
-                {
-                    "amount": str(item.amount),
-                    "price_per_unit": str(item.price_per_unit),
-                    "rabatt": item.rabatt,
-                    "tax_rate": str(item.tax_rate),
-                }
-                for item in invoice.items.order_by("pk")
-            ],
-            "crate_items": [
-                {
-                    "amount": str(crate.amount),
-                    "price_per_unit": (
-                        str(crate.price_per_unit)
-                        if crate.price_per_unit is not None
-                        else None
-                    ),
-                    "rabatt": crate.rabatt,
-                    "tax_rate": str(crate.tax_rate),
-                }
-                for crate in invoice.crate_items.order_by("pk")
-            ],
-        }
-        # v2 extends the sealed surface to the resolved §14/§14a recipient
-        # block and the document-type / cancellation identity, so a
-        # post-finalize edit to the reseller/contact row (or a forged
-        # document_type / storno linkage) shows up as drift. v1 documents
-        # keep the original payload so their stored hash still validates —
-        # legacy invoices must not all suddenly report as tampered.
-        if invoice.document_hash_version >= 2:
-            recipient = invoice.resolved_recipient()
-            payload["recipient"] = {
-                key: (str(value) if value is not None else None)
-                for key, value in recipient.items()
-            }
-            payload["document_type"] = invoice.document_type
-            payload["cancels_invoice_id"] = (
-                str(invoice.cancels_invoice_id) if invoice.cancels_invoice_id else None
-            )
-        return payload
-
-    @staticmethod
-    def compute_document_hash(invoice: InvoiceReseller) -> str:
-        """SHA-256 of the canonical payload (see ``build_hash_payload``)."""
-        payload = InvoiceService.build_hash_payload(invoice)
-        data_string = json.dumps(payload, sort_keys=True, default=str)
-        return hashlib.sha256(data_string.encode()).hexdigest()
-
-    @staticmethod
-    def find_drifted_invoices() -> list[dict]:
-        """Iterate every finalized invoice and return drift records for
-        any whose stored hash no longer matches the recomputed hash.
-
-        Returns ``[{"id", "number", "prefix", "stored", "recomputed"}, ...]``.
-        Used for tamper detection on commercial documents by the nightly
-        ``nightly_invoice_hash_check`` Huey task and the
-        ``check_invoice_hashes`` management command.
-        """
-        drift: list[dict] = []
-        finalized = (
-            InvoiceReseller.objects.filter(is_finalized=True)
-            .exclude(document_hash__isnull=True)
-            .exclude(document_hash="")
-            # build_hash_payload reads invoice.reseller per row. (items /
-            # crate_items are intentionally NOT prefetched: build_hash_payload
-            # iterates them via .order_by("pk"), and that SQL ordering is part
-            # of the deterministic GoBD hash — switching to a prefetched/
-            # Python-sorted list could change the order under a different
-            # collation and invalidate every stored hash.)
-            .select_related("reseller")
-        )
-        for invoice in finalized.iterator():
-            recomputed = InvoiceService.compute_document_hash(invoice)
-            if invoice.document_hash != recomputed:
-                drift.append(
-                    {
-                        "id": str(invoice.id),
-                        "number": invoice.number,
-                        "prefix": invoice.prefix,
-                        "stored": invoice.document_hash,
-                        "recomputed": recomputed,
-                    }
-                )
-        return drift
-
-    @staticmethod
     @transaction.atomic
     def create_from_delivery_note(
         delivery_note: DeliveryNoteReseller,
@@ -364,8 +215,8 @@ class InvoiceService:
         DeliveryNoteReseller.objects.select_for_update().get(pk=delivery_note.pk)
 
         # Matches via BOTH the article-line and crate-line provenance links, so
-        # a crate-only DN can't be double-billed (the article M2M is empty for
-        # it — see get_invoice_for_delivery_note).
+        # a crate-only DN can't be double-billed. A cancelled invoice counts
+        # too: a storno is final and doesn't free the DN for a new invoice.
         existing_invoice = InvoiceService.get_invoice_for_delivery_note(delivery_note)
 
         if existing_invoice:
@@ -481,12 +332,6 @@ class InvoiceService:
 
         invoice.assign_final_number()
 
-        # Seal the wider v2 surface (recipient block + document-type /
-        # cancellation identity). Set the version BEFORE computing the hash
-        # so the payload and the stored version agree. This runs while the
-        # invoice is still unfinalized, so the finalized-update guard is not
-        # engaged yet.
-        invoice.document_hash_version = 2
         # Freeze the §14/§14a recipient from the live Reseller/Contact NOW, so
         # the hash (and any later re-render) reads the snapshot instead of the
         # live row — a subsequent edit or GDPR anonymization of the reseller
@@ -500,11 +345,10 @@ class InvoiceService:
         # even if the reseller's billing address was edited in between.
         if invoice.recipient_snapshot is None:
             invoice.recipient_snapshot = invoice._live_recipient()
-        invoice.document_hash = InvoiceService.compute_document_hash(invoice)
+        invoice.document_hash = compute_document_hash(invoice)
         invoice.save(
             update_fields=[
                 "document_hash",
-                "document_hash_version",
                 "recipient_snapshot",
                 "number",
                 "prefix",
@@ -612,13 +456,11 @@ class InvoiceService:
         # A storno must reproduce the EXACT §14/§14a recipient of the
         # invoice it cancels (a legally-paired Rechnung/Storno set), NOT a
         # re-resolved live address. resolved_recipient() returns the original's
-        # frozen v2 snapshot (or, for a legacy v1 original with no snapshot, a
-        # live fallback). Freeze it onto the still-unfinalized storno and mark it
-        # v2 so finalize_invoice seals THIS inherited block into the storno's
+        # frozen snapshot. Freeze it onto the still-unfinalized storno, so
+        # finalize_invoice seals THIS inherited block into the storno's
         # document_hash instead of overwriting it from the live reseller.
         storno.recipient_snapshot = invoice.resolved_recipient()
-        storno.document_hash_version = 2
-        storno.save(update_fields=["recipient_snapshot", "document_hash_version"])
+        storno.save(update_fields=["recipient_snapshot"])
 
         # A storno negates each line, copies the tax verbatim, and wires NO
         # provenance M2M; the snapshot mirrors the (negated) storno line so the
@@ -695,34 +537,20 @@ class InvoiceService:
     ) -> None:
         """Lock the source delivery notes (deterministic pk order to avoid
         deadlocks) so concurrent summary-invoice runs over the same DNs
-        serialize, then refuse to bill a DN whose lines are already on an
-        invoice — together this prevents double-billing."""
+        serialize, then refuse to bill a DN any invoice already holds, a
+        cancelled one included — together this prevents double-billing."""
         delivery_note_pks = [delivery_note.pk for delivery_note in delivery_notes]
         list(
             DeliveryNoteReseller.objects.select_for_update()
             .filter(pk__in=delivery_note_pks)
             .order_by("pk")
         )
-        already_invoiced = (
-            InvoiceResellerContent.objects.filter(
-                delivery_note_contents__delivery_note__in=delivery_note_pks
-            )
-            .select_related("invoice")
-            .first()
-        )
-        # Crate-only DNs link only via the crate provenance M2M.
-        already_invoiced_crate = (
-            CrateContentInvoiceReseller.objects.filter(
-                crate_delivery_note_contents__delivery_note__in=delivery_note_pks
-            )
-            .select_related("invoice")
-            .first()
-        )
-        existing = already_invoiced or already_invoiced_crate
-        if existing:
+        billed = current_invoices_by_delivery_note(delivery_note_pks)
+        if billed:
+            existing = billed[min(billed)]
             raise ConflictError(
                 "One or more delivery notes are already invoiced: "
-                f"{existing.invoice.number}",
+                f"{existing.number}",
                 code="invoice.already_exists",
             )
 

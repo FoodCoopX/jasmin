@@ -7,16 +7,20 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import { useAuth } from "./AuthContext";
 import { TenantContext } from "./TenantContext";
+import { useCapability } from "@hooks/configuration/useCapability";
 import { authPartialUpdate } from "@shared/api/generated/auth/auth";
 import {
   ThemeEnum,
   type UserLanguageEnum,
-  type UserProfileUpdateRequest,
+  type PatchedUserProfileUpdateRequest,
 } from "@shared/api/generated/models";
 import { isSupportedLanguageCode } from "@shared/i18n/languages";
+import { notify } from "@shared/utils";
+import { getServerErrorMessage } from "@shared/utils/apiError";
 
 /**
  * Load a dayjs locale on demand. English is built into dayjs and
@@ -196,11 +200,20 @@ export function useIsDarkTheme(): boolean {
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { t } = useTranslation();
+  const { user: signedInUser, updateUser } = useAuth();
   // Direct ``useContext`` instead of ``useTenant()`` because LocaleProvider
   // is also mounted on the platform (super-admin) domain where there is no
   // TenantProvider — ``useTenant()`` would throw.
   const tenantCtx = useContext(TenantContext);
+  // Without jasmin's own logins the signed-in user belongs to the host
+  // application: it carries none of jasmin's preferences and has no profile to
+  // save them to. Language, theme and sidebar then stay in this browser, as
+  // they do signed out. Until the tenant says which it is, the user waits:
+  // read early, a host user's theme would overwrite the one kept here.
+  const offersUserAccounts = useCapability("user_accounts");
+  const user =
+    offersUserAccounts && !tenantCtx?.loading ? signedInUser : null;
   const tenantLanguage = tenantCtx?.tenant?.tenant_language ?? null;
   const [language, setLanguage] = useState(() =>
     resolveLanguage(user?.user_language, tenantLanguage),
@@ -297,7 +310,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
         // Only fields the server persists for a profile PATCH;
         // sidebar_collapsed is a local-only preference.
-        const profilePayload: UserProfileUpdateRequest = {};
+        const profilePayload: PatchedUserProfileUpdateRequest = {};
         // A language from browser/tenant detection can be anything — switch
         // the UI to it locally below, but never send an unsupported code to
         // the server, whose choice field would 400.
@@ -325,34 +338,31 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
           setSidebarCollapsed(newPreferences.sidebar_collapsed);
         }
 
-        // Update auth data in localStorage
-        try {
-          const storedAuth = localStorage.getItem("auth");
-          if (storedAuth) {
-            const auth = JSON.parse(storedAuth);
-            if (auth.user) {
-              if (newPreferences.language)
-                auth.user.user_language = newPreferences.language;
-              if (newPreferences.theme) auth.user.theme = newPreferences.theme;
-              if (newPreferences.sidebar_collapsed !== undefined)
-                auth.user.sidebar_collapsed = newPreferences.sidebar_collapsed;
-              localStorage.setItem("auth", JSON.stringify(auth));
-            }
-          }
-        } catch (storageError) {
-          console.error("Failed to update stored auth:", storageError);
+        // The signed-in user carries what the profile now holds, so a later
+        // profile save, which writes the user back whole, can't undo the
+        // pick. ``updateUser`` also keeps the stored ``auth`` entry.
+        const savedUserFields: Parameters<typeof updateUser>[0] = {};
+        if (profilePayload.user_language) {
+          savedUserFields.user_language = profilePayload.user_language;
+        }
+        if (profilePayload.theme) savedUserFields.theme = profilePayload.theme;
+        if (newPreferences.sidebar_collapsed !== undefined) {
+          savedUserFields.sidebar_collapsed = newPreferences.sidebar_collapsed;
+        }
+        if (Object.keys(savedUserFields).length > 0) {
+          updateUser(savedUserFields);
         }
       } catch (err) {
-        console.error("Failed to save preferences:", err);
         const errorMessage =
-          (err as Error).message || "Failed to save preferences";
+          getServerErrorMessage(err) ?? t("profile.preferences_save_error");
+        notify.error(errorMessage);
         setError(errorMessage);
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [user],
+    [user, updateUser, t],
   );
 
   // Save language to backend and update auth

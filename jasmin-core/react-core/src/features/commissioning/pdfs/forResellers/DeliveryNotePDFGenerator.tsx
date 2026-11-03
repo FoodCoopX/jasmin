@@ -40,7 +40,7 @@ export default function DeliveryNotePDFGenerator({
   const { dateFormat } = useDateFormat();
   const { tenantSettings, footerSettings, currencySymbol, lineSettings } =
     useResellerPdfContext({
-      tenant: tenant as Record<string, unknown>,
+      tenant,
       getSetting,
       logoUrl,
       bioLogoUrl,
@@ -60,7 +60,7 @@ export default function DeliveryNotePDFGenerator({
   // rather than ``Error``. ``message`` is on both shapes — read it
   // directly and fall back to the generic copy.
   const error = queryError
-    ? queryError.message || "Failed to load delivery note data"
+    ? queryError.message || t("commissioning.failed_to_load_delivery_note")
     : null;
 
   const pdfData = useMemo(

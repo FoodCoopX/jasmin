@@ -16,8 +16,6 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningDocumentationSummaryAddAdditionalTheoreticalAmountCreateBody,
-  CommissioningDocumentationSummaryUpdateAdditionalTheoreticalAmountPartialUpdateBody,
-  Harvest,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
 import {
@@ -42,10 +40,10 @@ import {
   VariationsTotalsCard,
 } from "@features/commissioning/components";
 import {
+  useDateFormat,
   useIsMobile,
   useTenantSettingToggle,
   useYearWeekState,
-  currentWeek,
 } from "@hooks/index";
 import {
   useHarvestingListColumns,
@@ -57,22 +55,28 @@ import {
   generatePdfFilename,
   getDayName,
   isWeekInPast,
+  toDayNumber,
 } from "@shared/utils";
 import HarvestingCrateSummary from "@features/commissioning/components/HarvestingCrateSummary";
 import HarvestingListControls from "@features/commissioning/components/HarvestingListControls";
 
-const currentDay = dayjs().isoWeekday();
-
 export default function HarvestingList() {
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
-  const [selectedDay, setSelectedDay] = useState<number | null>(currentDay - 1);
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedWeek,
+    setSelectedWeek,
+  } = useYearWeekState();
+  const [selectedDay, setSelectedDay] = useState(() =>
+    toDayNumber(dayjs().isoWeekday() - 1),
+  );
   const isPast = useMemo(
     () => isWeekInPast(selectedYear, selectedWeek),
     [selectedYear, selectedWeek],
   );
   const isMobile = useIsMobile();
-  const { canEdit } = useRoles();
+  const { canEdit, isOffice } = useRoles();
+  const { dateFormat } = useDateFormat();
   const [isGardenerView, setIsGardenerView] = useState(isMobile);
   const { t } = useTranslation();
 
@@ -92,6 +96,7 @@ export default function HarvestingList() {
     plotGroupFirstIds,
     crateSummary,
     deliveryDaysForHarvesting,
+    deliveryDateOf,
     variationsTotalsFilters,
     variationsTotals,
     invalidateData,
@@ -115,7 +120,6 @@ export default function HarvestingList() {
     selectedYear,
     selectedWeek,
     selectedDay,
-    fallbackWeek: currentWeek,
     onSaved: invalidateData,
   });
 
@@ -182,7 +186,7 @@ export default function HarvestingList() {
         update: (id, payload) =>
           commissioningDocumentationSummaryUpdateAdditionalTheoreticalAmountPartialUpdate(
             id,
-            payload as unknown as CommissioningDocumentationSummaryUpdateAdditionalTheoreticalAmountPartialUpdateBody,
+            payload,
           ),
       }),
     [],
@@ -213,7 +217,7 @@ export default function HarvestingList() {
         <DaySelector
           selectedDay={selectedDay}
           setSelectedDay={setSelectedDay}
-          selectedWeek={selectedWeek ?? currentWeek}
+          selectedWeek={selectedWeek}
           selectedYear={selectedYear}
           days={[0, 1, 2, 3, 4, 5, 6]}
           suffix={t("commissioning.harvesting_day")}
@@ -224,8 +228,11 @@ export default function HarvestingList() {
         <RelatedDayInfo
           label={t("commissioning.delivery_day_shares")}
           relatedDayNumbers={deliveryDaysForHarvesting}
-          selectedWeek={selectedWeek ?? currentWeek}
+          selectedWeek={selectedWeek}
           selectedYear={selectedYear}
+          formatDate={(day) =>
+            deliveryDateOf(day).format(`dddd, ${dateFormat}`)
+          }
         />
       )}
 
@@ -235,6 +242,7 @@ export default function HarvestingList() {
         onViewChange={setIsGardenerView}
         roundUpToFullPU={roundUpToFullPU}
         onRoundUpChange={handleRoundUpToFullVPEChange}
+        canChangeRoundUp={isOffice}
       />
 
       {!isMobile && (

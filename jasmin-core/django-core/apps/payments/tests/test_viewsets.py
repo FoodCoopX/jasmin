@@ -718,6 +718,29 @@ class TestBillingProfileMandateWriteRules:
         billing_profile.save()
         return billing_profile
 
+    def test_an_active_mandate_without_its_details_is_refused_with_a_code(
+        self, step_up_client, tenant
+    ):
+        member = MemberFactory()
+
+        resp = step_up_client.post(
+            self.URL,
+            {
+                "member": str(member.pk),
+                "payment_method": PaymentMethodOptions.SEPA_DIRECT_DEBIT,
+                "is_active": True,
+                "iban": "DE89370400440532013000",
+            },
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["code"] == "billing_profile.sepa_details_missing"
+        assert resp.data["details"] == {
+            "fields": ["account_holder", "sepa_mandate_signed_at"]
+        }
+        assert not BillingProfile.objects.filter(member=member).exists()
+
     def test_reference_change_refused_on_used_mandate(
         self, step_up_client, tenant, billing_profile
     ):
@@ -875,10 +898,9 @@ class TestBillingProfileMandateWriteRules:
         self, step_up_client, tenant_settings, subscription, billing_profile
     ):
         # The office SEPA modal clears its fields on open, so the operator
-        # retypes the IBAN — off a statement, spaced and lower-cased. The
-        # pain.008 debtor block only strips spaces and the XSD demands an
-        # upper-case country code, so storing it as typed kills the whole
-        # batch at the next run, for every member in it.
+        # retypes the IBAN — off a statement, spaced and lower-cased. The XSD
+        # demands an upper-case country code, so an IBAN kept as typed would
+        # kill the whole batch at the next run, for every member in it.
         self._mark_used(billing_profile)
 
         resp = step_up_client.patch(

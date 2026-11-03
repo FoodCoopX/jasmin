@@ -24,18 +24,27 @@ x-backend-env: &backend-env
   DEBUG: "False"
   DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
   POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-  POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+  # The app's own role, which owns the database but is no superuser
+  # (postgres/app_db_role.sh). Unset in .env -> the superuser's credentials,
+  # so the app keeps running until the role exists.
+  POSTGRES_USER: ${APP_DB_USER:-${POSTGRES_USER:?POSTGRES_USER is required}}
+  POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}}
   POSTGRES_HOST: postgres
   POSTGRES_PORT: 5432
   REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
   DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?DJANGO_ALLOWED_HOSTS is required}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
   FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?FIELD_ENCRYPTION_KEY is required}
-  # First-boot SuperAdmin bootstrap — docker_entrypoint.sh runs the idempotent
-  # ``createsuperadmin --update-if-exists`` when BOTH are non-empty. Without
-  # this passthrough the vars exist only in .env and the entrypoint silently
-  # skips creation (no super_admin row, admin login impossible).
+  # Key of the tamper hash sealed into finalized invoices (an HMAC). Keep a
+  # copy with the other secrets: without it no sealed hash can be verified.
+  # During a rotation the FALLBACKS hold the old key(s), comma-separated.
+  INVOICE_HASH_KEY: ${INVOICE_HASH_KEY:?INVOICE_HASH_KEY is required}
+  INVOICE_HASH_KEY_FALLBACKS: ${INVOICE_HASH_KEY_FALLBACKS:-}
+  # First-boot SuperAdmin bootstrap — docker_entrypoint.sh runs
+  # ``createsuperadmin --bootstrap``, which creates the account from these only
+  # while no SuperAdmin exists and never touches an existing one (so a rotated
+  # password or a deactivation survives restarts). Optional once the first
+  # SuperAdmin exists; without this passthrough a fresh install gets none.
   DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
   DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
   EMAIL_HOST: ${EMAIL_HOST:-}
@@ -65,6 +74,13 @@ x-backend-env: &backend-env
   SUPER_ADMIN_ALLOWED_IPS: ${SUPER_ADMIN_ALLOWED_IPS:-}
   TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
   CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+  # Same-origin check on the login / refresh / logout endpoints. "False" turns
+  # it off, for a proxy that strips or alters Sec-Fetch-Site / Origin.
+  AUTH_ORIGIN_GUARD: ${AUTH_ORIGIN_GUARD:-True}
+  # Sign-in lockout. "True" refuses an (email, client IP) pair for an hour after
+  # 5 failed sign-ins. Leave it off while the backend sees a CDN edge's address
+  # instead of the client's: everyone behind that edge would share one lock.
+  LOGIN_LOCKOUT_ENABLED: ${LOGIN_LOCKOUT_ENABLED:-False}
   SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-31536000}
   # Secret-key rotation: verify in-flight JWTs / signed links against the old
   # key during a rotation window (see settings.py SECRET_KEY_FALLBACKS).
@@ -76,6 +92,10 @@ x-backend-env: &backend-env
   FRIENDLY_CAPTCHA_TIMEOUT_SECONDS: ${FRIENDLY_CAPTCHA_TIMEOUT_SECONDS:-5.0}
   STEP_UP_TTL_SECONDS: ${STEP_UP_TTL_SECONDS:-300}
   STEP_UP_REQUIRES_TOTP: ${STEP_UP_REQUIRES_TOTP:-False}
+  # Free space, in percent of a disk, under which huey's hourly disk check
+  # mails the admins a warning and a critical alert.
+  DISK_FREE_WARNING_PERCENT: ${DISK_FREE_WARNING_PERCENT:-20}
+  DISK_FREE_CRITICAL_PERCENT: ${DISK_FREE_CRITICAL_PERCENT:-10}
 
 # Container logs go to the host's systemd journal, so they outlive the
 # containers a deploy recreates (json-file logs are deleted with them). Age and
@@ -116,9 +136,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Read by app_db_role.sh below, which creates the app's role when the
+      # data volume is new.
+      APP_DB_USER: ${APP_DB_USER:-}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backups:/backups:rw
+      - ./postgres/app_db_role.sh:/docker-entrypoint-initdb.d/app_db_role.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -192,7 +216,9 @@ services:
     # mean "migrated", which gates huey below so it can't run tasks against a
     # half-migrated schema. start_period is generous to cover a long
     # multi-tenant migrate without flapping. (python is always present; the
-    # runtime image has no curl/wget.)
+    # runtime image has no curl/wget.) Liveness, not /health/ready/: an outage
+    # of the database or Redis must not mark the backend unhealthy and hold
+    # huey back. The deploy smoke test and the uptime monitors check readiness.
     healthcheck:
       test:
         [
@@ -237,6 +263,11 @@ services:
       # (see backups/backup.sh) — huey only prunes, never produces
       # backups.
       - ./backups:/backups:rw
+    # backup.sh gives /backups this group with mode 2770; without it the
+    # non-root django user can neither list nor prune the backups. Keep the
+    # default in step with the backup service's BACKUP_GID below.
+    group_add:
+      - "${BACKUP_GID:-61000}"
     command: ["huey"]
     healthcheck:
       # huey_heartbeat (apps/notifications/tasks.py) rewrites this file every
@@ -284,27 +315,39 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
+      # restore.sh loads a dump as the app's role, which app_db_role.sh
+      # (mounted below) creates if it is missing.
+      APP_DB_USER: ${APP_DB_USER:-}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-}
       # Required — the symmetric passphrase for the *.sql.gz.gpg dumps. Compose
       # fails fast if it is unset: an unencrypted dump is a GDPR problem and a
       # dump you can't decrypt is worthless. Keep this key OFF this host.
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?BACKUP_ENCRYPTION_KEY is required for backups}
       # Cron expression; defaults to 02:00 daily (matches backup.sh).
       BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 2 * * *}
+      # The group backup.sh gives /backups (mode 2770), which huey joins through
+      # group_add to prune the backups and check their freshness. 61000 lies in
+      # the GID range systemd leaves unused, so no host group owns it; override
+      # it only if one does on this host.
+      BACKUP_GID: ${BACKUP_GID:-61000}
       # Uploaded media (invoice/delivery-note PDFs, e-invoice XML, tenant
       # logos) is archived alongside the DB dump from this read-only mount.
       MEDIA_DIR: /app/media
-      # Off-host push scaffold: set RCLONE_REMOTE (+ mount an rclone config and
-      # point RCLONE_CONFIG at it) to copy each encrypted artifact off-host.
-      # Unset -> local-only backups.
+      # Off-host push: set RCLONE_REMOTE (e.g. "storagebox:jasmin-backups") and
+      # RCLONE_CONFIG=/backups/rclone.conf in .env to copy each encrypted
+      # artifact off-host. The config lives in ./backups, already mounted below,
+      # so no compose edit is needed. Unset -> local-only backups.
       RCLONE_REMOTE: ${RCLONE_REMOTE:-}
       RCLONE_CONFIG: ${RCLONE_CONFIG:-}
     volumes:
       - ./backups:/backups:rw
       # Read-only source for the media archive step in backup.sh.
       - media_volume:/app/media:ro
-      # To enable the off-host push, mount an rclone config and set
-      # RCLONE_CONFIG=/rclone.conf (+ RCLONE_REMOTE) in .env:
-      # - ./backups/rclone.conf:/rclone.conf:ro
+      # This mount also carries the rclone config for the off-host push. Create
+      # it with
+      #   docker compose run --rm --entrypoint rclone backup --config /backups/rclone.conf config
+      # then set RCLONE_REMOTE and RCLONE_CONFIG=/backups/rclone.conf in .env.
+      - ./postgres/app_db_role.sh:/usr/local/bin/app_db_role.sh:ro
     depends_on:
       postgres: { condition: service_healthy }
     networks: [jasmin-net]
@@ -351,8 +394,15 @@ services:
       BACKEND_PORT: "8000"
       FRONTEND_HOST: frontend
       FRONTEND_PORT: "80"
+      # The origin gate (nginx/render_config.sh): empty keeps it off. The
+      # gateway reads them when it is created, so a change takes
+      # `docker compose up -d gateway`, not a restart.
+      BUNNY_ORIGIN_SECRET: ${BUNNY_ORIGIN_SECRET:-}
+      BUNNY_ORIGIN_SECRET_NEXT: ${BUNNY_ORIGIN_SECRET_NEXT:-}
     volumes:
       - ./nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+      - ./nginx/render_config.sh:/etc/nginx/render_config.sh:ro
+      - ./nginx/bunny_edges:/etc/nginx/bunny_edges:ro
       - ./nginx/super_admin_allowed_ips.conf:/etc/nginx/super_admin_allowed_ips.conf:ro
       - ./nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
       - ./nginx/security_headers_admin.conf:/etc/nginx/security_headers_admin.conf:ro
@@ -375,9 +425,7 @@ services:
     # ("syntax error: unexpected &&", gateway crash-loop). Same indent
     # everywhere + operators at end-of-line folds to one clean command line.
     command: >
-      /bin/sh -c "envsubst '$$FRONTEND_DOMAIN $$SUPER_ADMIN_SUBDOMAIN $$BACKEND_HOST $$BACKEND_PORT $$FRONTEND_HOST $$FRONTEND_PORT'
-      < /etc/nginx/templates/nginx.conf.template
-      > /etc/nginx/nginx.conf &&
+      /bin/sh -c "sh /etc/nginx/render_config.sh &&
       nginx -t &&
       (while :; do sleep 12h & wait $${!}; nginx -s reload; done &) &&
       exec nginx -g 'daemon off;'"
@@ -406,9 +454,12 @@ services:
     # tunnel access keeps the Node admin UI off the internet.
     #
     # Configure monitors against the public-facing URL, NOT the
-    # internal ``backend`` service. That way Kuma is testing what an
-    # actual user would hit — TLS, gateway, backend, all the way
-    # through.  Example: ``https://${FRONTEND_DOMAIN}/health/``
+    # internal ``backend`` service, so Kuma tests what an actual user
+    # hits: TLS, gateway, backend. Point them at the readiness probe,
+    # ``https://${FRONTEND_DOMAIN}/health/ready/``, which answers 200 only
+    # while the backend also reaches the database and Redis takes writes.
+    # ``/health/`` is the containers' liveness check and stays 200 through
+    # an outage of either.
     image: louislam/uptime-kuma:1
     restart: unless-stopped
     logging: *default-logging
@@ -512,7 +563,7 @@ services:
     # Initial issuance: ./certbots/init-wildcard-cert.sh
     # Pinned (not :latest) for reproducible TLS renewals — a silent certbot
     # swap could break renewals. Bump via the docker Dependabot entry.
-    image: certbot/dns-linode:v5.6.0
+    image: certbot/dns-linode:v5.8.0
     restart: unless-stopped
     logging: *default-logging
     mem_limit: 128m
@@ -521,16 +572,19 @@ services:
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
       - ./certbots/linode.ini:/linode.ini:ro
+    # Same-indent lines so ``>`` folds this into one command line (see the
+    # gateway's command): a deeper-indented line keeps its newline, and sh
+    # would run a bare ``certbot renew`` and then each flag as a command.
     entrypoint: >
       /bin/sh -c "trap exit TERM;
-                  while :; do
-                      certbot renew
-                          --dns-linode
-                          --dns-linode-credentials /linode.ini
-                          --dns-linode-propagation-seconds 120
-                          --quiet;
-                      sleep 12h & wait $${!};
-                  done"
+      while :; do
+      certbot renew
+      --dns-linode
+      --dns-linode-credentials /linode.ini
+      --dns-linode-propagation-seconds 120
+      --quiet;
+      sleep 12h & wait $${!};
+      done"
 
 volumes:
   postgres_data:

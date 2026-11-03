@@ -4,29 +4,22 @@ import userEvent from "@testing-library/user-event";
 
 // vi.mock factories are hoisted to the top of the file, so any closed-over
 // variable must be created via vi.hoisted() to survive the lift.
-const { notify, axiosMock } = vi.hoisted(() => ({
+const { notify } = vi.hoisted(() => ({
   notify: {
     success: vi.fn(),
     error: vi.fn(),
     warning: vi.fn(),
     info: vi.fn(),
   },
-  axiosMock: {
-    post: vi.fn(),
-    put: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-  },
 }));
 
 vi.mock("@shared/utils", () => ({ notify }));
-vi.mock("@shared/services/api", () => ({ default: axiosMock }));
 
+import i18n from "@shared/i18n";
 import BulkActionButton from "../BulkActionButton";
 
 beforeEach(() => {
   Object.values(notify).forEach((fn) => fn.mockReset());
-  Object.values(axiosMock).forEach((fn) => fn.mockReset());
 });
 
 describe("BulkActionButton", () => {
@@ -112,20 +105,86 @@ describe("BulkActionButton", () => {
     expect(onSuccess).toHaveBeenCalledTimes(1);
   });
 
-  it("warns and does not hit the API when selection is empty even if it could click", async () => {
-    // selectedIds=[] makes the button disabled, so we test the early-return
-    // branch via direct re-render with at least 1, then 0. Easier: enable it
-    // via apiFunction trick — but the disabled check happens at the DOM level
-    // first, so the early notify.warning branch is unreachable from a click.
-    // We can still assert the contract: with 0 ids, the button is disabled.
+  async function clickWithSkips(errors: unknown[]) {
+    const apiFunction = vi.fn().mockResolvedValue({ updated: 0, errors });
+    render(
+      <BulkActionButton
+        selectedIds={["a", "b"]}
+        apiFunction={apiFunction}
+        buttonText="Finalize"
+      />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /finalize/i }));
+  }
+
+  it("names a skipped item's reason in its translated error code", async () => {
+    await clickWithSkips([
+      {
+        id: "a",
+        error: "This week is in the past.",
+        code: "commissioning.past_week",
+      },
+    ]);
+
+    expect(notify.warning).toHaveBeenCalledWith(
+      i18n.t("table.bulk_partial_skipped", {
+        skipped: 1,
+        total: 2,
+        reason: i18n.t("errors.commissioning.past_week"),
+      }),
+    );
+    expect(notify.warning.mock.calls[0][0]).not.toContain(
+      "This week is in the past.",
+    );
+  });
+
+  it("keeps the server's reason when the code has no translation", async () => {
+    await clickWithSkips([
+      { id: "a", error: "Something odd happened", code: "no_such.code" },
+    ]);
+
+    expect(notify.warning.mock.calls[0][0]).toContain("Something odd happened");
+  });
+
+  it("asks for a selection in the user's language when clicked with none", async () => {
+    const apiFunction = vi.fn().mockResolvedValue({});
     render(
       <BulkActionButton
         selectedIds={[]}
-        apiFunction={vi.fn()}
+        apiFunction={apiFunction}
         buttonText="x"
+        buttonProps={{ disabled: false }}
       />,
     );
-    expect(screen.getByRole("button", { name: "x" })).toBeDisabled();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "x" }));
+
+    const message = i18n.t("table.bulk_select_at_least_one");
+    expect(message).not.toBe("table.bulk_select_at_least_one");
+    expect(notify.warning).toHaveBeenCalledWith(message);
+    expect(apiFunction).not.toHaveBeenCalled();
+  });
+
+  it("sends the selected ids as strings, the way model ids travel", async () => {
+    const apiFunction = vi.fn().mockResolvedValue({});
+    render(
+      <BulkActionButton
+        selectedIds={["a", 7]}
+        apiFunction={apiFunction}
+        buttonText="Run"
+        payload={{ model: "invoice" }}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /run/i }));
+
+    expect(apiFunction).toHaveBeenCalledWith({
+      ids: ["a", "7"],
+      model: "invoice",
+    });
   });
 
   it("respects the confirmMessage — cancelling the prompt aborts the call", async () => {
@@ -149,56 +208,12 @@ describe("BulkActionButton", () => {
     confirmSpy.mockRestore();
   });
 
-  it("dispatches a POST via apiEndpoint when no apiFunction is provided", async () => {
-    axiosMock.post.mockResolvedValue({ status: 200, data: { id: 1 } });
-    const onClearSelection = vi.fn();
-
-    render(
-      <BulkActionButton
-        selectedIds={["x"]}
-        apiEndpoint="/api/things/bulk/"
-        buttonText="Run"
-        onClearSelection={onClearSelection}
-      />,
-    );
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /run/i }));
-
-    expect(axiosMock.post).toHaveBeenCalledWith("/api/things/bulk/", {
-      ids: ["x"],
-    });
-    expect(onClearSelection).toHaveBeenCalledTimes(1);
-  });
-
-  it("dispatches a DELETE with the payload under `data` (axios contract)", async () => {
-    axiosMock.delete.mockResolvedValue({ status: 204, data: null });
-
-    render(
-      <BulkActionButton
-        selectedIds={["x", "y"]}
-        apiEndpoint="/api/things/"
-        method="DELETE"
-        buttonText="Trash"
-      />,
-    );
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /trash/i }));
-
-    expect(axiosMock.delete).toHaveBeenCalledWith("/api/things/", {
-      data: { ids: ["x", "y"] },
-    });
-  });
-
   it("surfaces a friendly error notification when the API rejects", async () => {
     const apiFunction = vi.fn().mockRejectedValue({
       isAxiosError: true,
       response: { data: { message: "Cannot delete: in use" } },
     });
     const onError = vi.fn();
-    // Silence the page's console.error.
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     render(
       <BulkActionButton
@@ -215,12 +230,29 @@ describe("BulkActionButton", () => {
     expect(notify.error).toHaveBeenCalledTimes(1);
     expect(notify.error).toHaveBeenCalledWith("Cannot delete: in use");
     expect(onError).toHaveBeenCalledTimes(1);
-    errSpy.mockRestore();
+  });
+
+  it("falls back to the translated message when the server gives no reason", async () => {
+    const apiFunction = vi.fn().mockRejectedValue(
+      Object.assign(new Error("Request failed with status code 503"), {
+        isAxiosError: true,
+        response: { status: 503, data: {} },
+      }),
+    );
+
+    render(
+      <BulkActionButton selectedIds={["a"]} apiFunction={apiFunction} buttonText="Delete" />,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /delete/i }));
+
+    expect(notify.error).toHaveBeenCalledWith(i18n.t("common.action_failed"));
+    expect(i18n.t("common.action_failed")).not.toBe("common.action_failed");
   });
 
   it("uses the custom errorMessage prop verbatim when provided (overrides extracted message)", async () => {
     const apiFunction = vi.fn().mockRejectedValue(new Error("boom"));
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     render(
       <BulkActionButton
@@ -237,6 +269,5 @@ describe("BulkActionButton", () => {
     expect(notify.error).toHaveBeenCalledWith(
       "Could not delete the selected rows.",
     );
-    errSpy.mockRestore();
   });
 });

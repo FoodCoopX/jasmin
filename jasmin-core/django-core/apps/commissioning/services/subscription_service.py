@@ -20,6 +20,7 @@ from ..errors import (
     CancellationInPast,
     CancellationNotSunday,
     DeliveryStationOverCapacity,
+    MemberAlreadyRejected,
     NoSundayRemainsInTerm,
     SubscriptionDeliveryStationDayOutOfRange,
     SubscriptionNotConfirmed,
@@ -39,6 +40,7 @@ from .additional_share_policy import (
 )
 from .capacity_reservation_service import CapacityReservationService
 from .delivery_cycle import filter_weeks_by_delivery_cycle
+from .subscription_term import effective_term_end
 from .variation_capacity_service import VariationCapacityService
 from .waiting_list_policy import assert_waiting_list_enabled
 
@@ -265,6 +267,36 @@ class SubscriptionService:
         VariationCapacityService.assert_capacity_available(subscription)
         CapacityReservationService.reserve_for_subscription(subscription)
         return subscription
+
+    @staticmethod
+    @transaction.atomic
+    def admit_member_on_confirm(subscription: Subscription, *, admin_user: Any) -> None:
+        """Confirm the member a freshly confirmed subscription admits.
+
+        A confirmed member stays confirmed (a reject refuses one), so it needs
+        neither the lock nor the rejection check: a member re-admitted after a
+        rejection keeps its ``admin_rejected_at``. Any other member is re-read
+        and locked after the subscription, the order a member reject takes them
+        in. A rejected member is refused, not re-admitted through one of their
+        subscriptions; the office re-admits by sending a new invitation. A
+        member who has started their exit (``cancelled_at`` set) isn't
+        re-admitted by a leftover subscription either: the confirm endpoint
+        refuses such a subscription, or in onboarding mode requires the member
+        to be confirmed already, and this guard covers any other ``confirm()``
+        caller.
+        """
+        if subscription.member.admin_confirmed:
+            return
+        member = Member.objects.select_for_update().get(pk=subscription.member_id)
+        subscription.member = member
+        if member.admin_confirmed:
+            return
+        if member.admin_rejected_at is not None:
+            raise MemberAlreadyRejected(
+                "The member was rejected; a new invitation re-admits them."
+            )
+        if member.cancelled_at is None:
+            member.confirm(admin_user)
 
     @transaction.atomic
     def materialize_confirmed_subscription(
@@ -547,11 +579,18 @@ class SubscriptionService:
         backfill of a fresh confirm passes it, so those past weeks are
         materialised while capacity checks, reservations and pause resync keep
         the default set of current and future weeks.
+
+        The weeks end at ``effective_term_end``, not at ``valid_until``: a
+        subscription the member exit force-ended keeps its ``valid_until``, and
+        a week whose delivery day falls after ``cancelled_effective_at`` is
+        dropped — the strict "after" cut ``truncate_future_deliveries`` makes.
+        A ``cancel_subscription`` cancel truncates ``valid_until`` to that same
+        date, so for it nothing changes.
         """
         day_number = subscription.default_delivery_station_day.delivery_day.day_number
         year_weeks = SubscriptionService._get_delivery_weeks(
             subscription.valid_from,
-            subscription.valid_until,
+            effective_term_end(subscription),
             day_number,
             _delivery_cycle_of(subscription),
         )

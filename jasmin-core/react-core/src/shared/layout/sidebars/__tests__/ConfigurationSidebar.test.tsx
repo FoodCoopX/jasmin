@@ -1,10 +1,11 @@
 /**
- * ConfigurationSidebar — the members group is gated on the tenant setting
- * ``uploads_weekly_share_amount``.
+ * ConfigurationSidebar — the members group and the delivery exceptions entry
+ * are gated on the tenant setting ``uploads_weekly_share_amount``.
  *
- * A tenant that uploads aggregate weekly share amounts keeps no member records,
- * so the whole members group (data protection and consents included) is
- * dropped. Two distinct tenant states resolve to flag-off and both are
+ * A tenant that uploads aggregate weekly share amounts keeps no member records
+ * and runs no subscriptions, so the whole members group (data protection and
+ * consents included) is dropped, and so is the delivery exceptions page, which
+ * pauses subscriptions' deliveries. Two distinct tenant states resolve to flag-off and both are
  * regression guards: the setting explicitly ``false``, and a tenant carrying no
  * such key at all — ``getSetting`` returns the caller's default for a missing
  * key just as it does for a tenant payload with no settings, so the default
@@ -13,9 +14,9 @@
  * ``t`` is stubbed to return the key, so the assertions read as i18n keys. Only
  * keys unique to one group are asserted by text — the general and reseller
  * groups render ``configuration.email_templates`` too, which is why that one is
- * counted rather than matched. The member routes are asserted on BOTH sides of
- * the flag: "no link with this href" only proves something once the same href
- * is proven to exist while the flag is off.
+ * counted rather than matched. The member routes and the delivery exceptions
+ * route are asserted on BOTH sides of the flag: "no link with this href" only
+ * proves something once the same href is proven to exist while the flag is off.
  */
 
 import { render, screen } from "@testing-library/react";
@@ -46,6 +47,10 @@ const settings = vi.hoisted(() => ({
   weeklyUpload: false as boolean | undefined,
 }));
 
+// What the deployment offers; a name left out is offered, as with a payload
+// that carries no capabilities.
+const capabilities = vi.hoisted(() => ({}) as Record<string, boolean>);
+
 vi.mock("@hooks/index", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
   const tenant = makeUseTenantMock({
@@ -55,7 +60,10 @@ vi.mock("@hooks/index", async () => {
         ? settings.weeklyUpload
         : defaultValue,
   });
-  return { useTenant: () => tenant };
+  return {
+    useTenant: () => tenant,
+    useCapability: (name: string) => capabilities[name] ?? true,
+  };
 });
 
 // Every entry in this sidebar is ``requireRole: "isAdmin"``; the real
@@ -103,7 +111,7 @@ const memberRoutes = [
   "/configuration/email-templates/members",
 ];
 
-/** Headings and children of the two groups the flag must never touch. */
+/** Headings and children of the two groups the flag leaves standing. */
 const untouchedGroupEntries = [
   "configuration.group.general",
   "configuration.app",
@@ -114,9 +122,12 @@ const untouchedGroupEntries = [
   "configuration.commissioning",
   "configuration.share_type_variations",
   "configuration.delivery_days",
-  "commissioning.delivery_exceptions",
   "configuration.reseller_documents",
 ];
+
+/** The one commissioning entry the flag drops. */
+const deliveryExceptionsEntry = "commissioning.delivery_exceptions";
+const deliveryExceptionsRoute = "/configuration/delivery-exceptions";
 
 function renderSidebar() {
   return render(
@@ -131,10 +142,14 @@ function renderSidebar() {
 /** The full flag-off expectation: all three groups, every member entry, every
  *  member route, one e-mail-template link per group. */
 function expectEveryGroupRendered() {
-  for (const entry of [...untouchedGroupEntries, ...membersGroupEntries]) {
+  for (const entry of [
+    ...untouchedGroupEntries,
+    ...membersGroupEntries,
+    deliveryExceptionsEntry,
+  ]) {
     expect(screen.getByText(entry)).toBeInTheDocument();
   }
-  for (const route of memberRoutes) {
+  for (const route of [...memberRoutes, deliveryExceptionsRoute]) {
     expect(
       document.querySelector(`a[href="${route}"]`),
       `${route} must be linked`,
@@ -182,12 +197,47 @@ describe("ConfigurationSidebar", () => {
     );
   });
 
-  it("leaves the general and commissioning groups alone when the flag is on", () => {
+  it("drops the delivery exceptions entry when the flag is on", () => {
+    settings.weeklyUpload = true;
+    renderSidebar();
+
+    expect(screen.queryByText(deliveryExceptionsEntry)).not.toBeInTheDocument();
+    expect(
+      document.querySelector(`a[href="${deliveryExceptionsRoute}"]`),
+    ).toBeNull();
+  });
+
+  it("leaves the rest of the general and commissioning groups alone when the flag is on", () => {
     settings.weeklyUpload = true;
     renderSidebar();
 
     for (const entry of untouchedGroupEntries) {
       expect(screen.getByText(entry)).toBeInTheDocument();
     }
+  });
+});
+
+describe("ConfigurationSidebar users page", () => {
+  beforeEach(() => {
+    settings.weeklyUpload = false;
+    delete capabilities.user_accounts;
+  });
+
+  it("links the users page where the deployment has its own logins", () => {
+    renderSidebar();
+
+    expect(screen.getByText("users.title")).toBeInTheDocument();
+    expect(
+      document.querySelector('a[href="/configuration/users"]'),
+    ).not.toBeNull();
+  });
+
+  it("drops the users page where the host application owns the logins", () => {
+    capabilities.user_accounts = false;
+    renderSidebar();
+
+    expect(screen.queryByText("users.title")).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/configuration/users"]')).toBeNull();
+    expect(screen.getByText("configuration.general")).toBeInTheDocument();
   });
 });

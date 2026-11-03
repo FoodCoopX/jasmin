@@ -12,10 +12,9 @@ import {
   useCommissioningOrdersOverviewList,
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
-  BulkDocumentRequest,
   CombinedOrderOverview,
   CommissioningOrdersOverviewListParams,
-  SetInvoiceNoteRequest,
+  PatchedSetInvoiceNoteRequest,
 } from "@shared/api/generated/models";
 import { JobProgressDrawer } from "@shared/ui/JobProgressDrawer";
 import { ResellerSelector, WeekSelector } from "@shared/selectors";
@@ -48,7 +47,7 @@ type CombinedOrderOverviewRow = CombinedOrderOverview & TableRecord;
 
 export default function PaymentsResellers() {
   const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
+    useYearWeekState({ allWeeks: true });
   const [selectedReseller, setSelectedReseller] = useState<string | null>(null);
   const isPast = useMemo(
     () => isWeekInPast(selectedYear, selectedWeek),
@@ -78,8 +77,8 @@ export default function PaymentsResellers() {
 
   const { data: rawData, isFetching } =
     useCommissioningOrdersOverviewList(listParams);
-  const data = useMemo(
-    () => (rawData ?? []) as unknown as CombinedOrderOverviewRow[],
+  const data = useMemo<CombinedOrderOverviewRow[]>(
+    () => (rawData ?? []).map((item) => ({ ...item, key: item.id })),
     [rawData],
   );
 
@@ -110,7 +109,7 @@ export default function PaymentsResellers() {
           align: "left",
           disabled: true,
           sortable: true,
-          render: (value: unknown) => formatDate(value as string),
+          render: (_: unknown, record) => formatDate(record.invoice_date),
         },
         {
           title: t("commissioning.invoice_number"),
@@ -120,7 +119,7 @@ export default function PaymentsResellers() {
           inputType: "text",
           sortable: true,
           disabled: true,
-          render: (value: unknown, record: CombinedOrderOverviewRow) => (
+          render: (_: unknown, record) => (
             <>
               {record.has_finalized_invoice ? (
                 <>
@@ -134,7 +133,7 @@ export default function PaymentsResellers() {
                   {t("commissioning.not_finalized")}
                 </span>
               )}
-              {value as string}
+              {record.invoice_number}
             </>
           ),
         },
@@ -148,8 +147,8 @@ export default function PaymentsResellers() {
           inputType: "decimal2",
           sortable: true,
 
-          render: (value: unknown) =>
-            formatCurrency(parseFloat((value as string) || "0")),
+          render: (_: unknown, record) =>
+            formatCurrency(parseFloat(record.sum_netto || "0")),
         },
         {
           title: (
@@ -189,7 +188,7 @@ export default function PaymentsResellers() {
           readOnly: true,
           disabled: true,
           width: "15em",
-          render: (_: unknown, record: CombinedOrderOverviewRow) => (
+          render: (_: unknown, record) => (
             <div className="button-row">
               <>
                 {record.invoice_cancelled_by ? (
@@ -204,9 +203,7 @@ export default function PaymentsResellers() {
                     <BulkActionButton
                       selectedIds={[record.id]}
                       apiFunction={(payload) =>
-                        commissioningBulkSetToPaidDocumentsCreate(
-                          payload as unknown as BulkDocumentRequest,
-                        )
+                        commissioningBulkSetToPaidDocumentsCreate(payload)
                       }
                       buttonText={t("commissioning.set_to_paid")}
                       buttonProps={{ type: "primary" }}
@@ -225,13 +222,13 @@ export default function PaymentsResellers() {
           inputType: "optional",
           width: "25em",
         },
-      ] as EditableColumnConfig<CombinedOrderOverviewRow>[],
+      ],
     [t, formatCurrency, formatDate, invalidateData, noteColumn],
   );
 
   const apiFunctions = useMemo<ApiFunctions>(
     () =>
-      wrapApiFunctions<SetInvoiceNoteRequest & TableRecord>({
+      wrapApiFunctions<PatchedSetInvoiceNoteRequest & TableRecord>({
         update: (id, updateData) =>
           commissioningSetInvoiceNotePartialUpdate(id, updateData),
       }),
@@ -296,9 +293,7 @@ export default function PaymentsResellers() {
           <BulkActionButton
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
-              commissioningBulkSetToPaidDocumentsCreate(
-                payload as unknown as BulkDocumentRequest,
-              )
+              commissioningBulkSetToPaidDocumentsCreate(payload)
             }
             buttonText={t("commissioning.set_to_paid_bulk")}
             buttonProps={{ type: "primary" }}
@@ -316,7 +311,7 @@ export default function PaymentsResellers() {
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningBulkSetToPaidDocumentsCreate(
-                payload as unknown as BulkDocumentRequest,
+                payload,
                 { undo: true },
               )
             }
@@ -335,9 +330,7 @@ export default function PaymentsResellers() {
           <BulkActionButton
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
-              commissioningBulkSendInvoiceRemindersViaEmailCreate(
-                payload as unknown as BulkDocumentRequest,
-              )
+              commissioningBulkSendInvoiceRemindersViaEmailCreate(payload)
             }
             buttonText={t("commissioning.send_reminders_bulk_via_email")}
             buttonProps={{ type: "primary" }}

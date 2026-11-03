@@ -12,11 +12,11 @@ can run:
     candidate + the runbook that sets it. Same operator-applies
     pattern.
 
-  * ``rotate_bunny_token``: no integration in code today, so the
-    service emits a runbook only. Listed for completeness so the
-    super-admin UI button is non-misleading: it tells the operator
-    exactly which dashboard to log into rather than promising
-    work the platform can't do.
+  * ``rotate_bunny_token``: a runbook only. The account's API key
+    lives in Bunny's dashboard, and the origin secret is set by hand
+    in ``.env`` and in the pull zones' edge rules, so the super-admin
+    UI button tells the operator exactly what to change rather than
+    promising work the platform can't do.
 
   * ``rotate_email_creds``: per-tenant, real Django side effects.
     Clears every ``TenantEmailConfig.smtp_password`` and flips
@@ -138,22 +138,29 @@ def _rotate_db_password() -> RotationResult:
         kind="rotate_db_password",
         generated_secret=new_password,
         instructions=(
+            "The database has two logins: the app's role, APP_DB_USER in the\n"
+            "prod .env, which backend and huey use, and the superuser,\n"
+            "POSTGRES_USER, which backups and restores use (and the app too\n"
+            "while APP_DB_USER is unset). This password is for one of them;\n"
+            "run the rotation again for the other.\n"
             "1. Save the generated password above in your password manager.\n"
-            "2. Set it on the database role. From the repo root on the server:\n"
+            "2. Set it on the role. From the repo root on the server:\n"
             '       docker compose exec postgres sh -c \'psql -U "$POSTGRES_USER" '
             '-d "$POSTGRES_DB"\'\n'
-            "   and at the psql prompt:\n"
-            "       \\password\n"
-            "   Paste the new password twice, then leave with \\q. psql sends\n"
-            "   it hashed, so it ends up in no log and no shell history.\n"
-            "3. Set POSTGRES_PASSWORD in the prod .env to the new password.\n"
+            "   and at the psql prompt, for the app's role:\n"
+            "       \\password jasmin_app\n"
+            "   (the name APP_DB_USER holds), or \\password alone for the\n"
+            "   superuser. Paste the new password twice, then leave with \\q.\n"
+            "   psql sends it hashed, so it ends up in no log and no shell\n"
+            "   history.\n"
+            "3. Set it in the prod .env: APP_DB_PASSWORD for the app's role,\n"
+            "   POSTGRES_PASSWORD for the superuser.\n"
             "4. Recreate everything that connects with it, then let nginx find\n"
             "   the recreated backend:\n"
             "       docker compose up -d backend huey backup\n"
             "       docker compose restart gateway\n"
-            "   The postgres container itself needs nothing: its\n"
-            "   POSTGRES_PASSWORD only applies when the database is first\n"
-            "   created.\n"
+            "   The postgres container itself needs nothing: it reads both\n"
+            "   passwords only when the database is first created.\n"
             "5. Check that backend and huey are healthy (docker compose ps) and\n"
             "   that a backup still works:\n"
             "       docker compose exec backup /usr/local/bin/backup.sh now"
@@ -165,13 +172,28 @@ def _rotate_bunny_token() -> RotationResult:
     return RotationResult(
         kind="rotate_bunny_token",
         instructions=(
-            "Nothing on the server uses a Bunny credential, so .env stays as\n"
-            "it is and nothing needs a restart. On Bunny's side:\n"
+            "Two Bunny credentials, each rotated on its own.\n"
             "\n"
+            "The account's API key. Nothing on the server uses it:\n"
             "1. In the Bunny dashboard, reset the account's API key.\n"
             "2. Update any tool outside this platform that uses it.\n"
             "3. Save the new key in your password manager and check that the\n"
-            "   account still has two-factor login on."
+            "   account still has two-factor login on.\n"
+            "\n"
+            "The origin secret, while BUNNY_ORIGIN_SECRET in .env is set:\n"
+            "1. Generate a new one: openssl rand -hex 32\n"
+            "2. Put it in .env as BUNNY_ORIGIN_SECRET_NEXT, then\n"
+            "       ./scripts/validate_gateway_config.sh\n"
+            "       docker compose up -d gateway\n"
+            "   The check stops a mistyped secret from taking the gateway\n"
+            "   down. The tenant hosts now accept the old secret and the new one.\n"
+            "3. In every tenant pull zone, put the new value into the edge rule\n"
+            "   that sets the X-Origin-Secret request header, and give Bunny a\n"
+            "   few minutes to roll it out.\n"
+            "4. Move the new value to BUNNY_ORIGIN_SECRET, empty\n"
+            "   BUNNY_ORIGIN_SECRET_NEXT, and run both commands of step 2 again.\n"
+            "5. Check that every tenant host still loads, and save the new\n"
+            "   secret in your password manager."
         ),
     )
 

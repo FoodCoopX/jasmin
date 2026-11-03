@@ -7,6 +7,7 @@
  */
 import type { TenantCurrentSettings } from './tenantCurrentSettings';
 import type { TenantSettingsProperty } from './tenantSettingsProperty';
+import type { HostCapabilities } from './hostCapabilities';
 import type { TenantLanguageEnum } from './tenantLanguageEnum';
 import type { TenantEmail } from './tenantEmail';
 import type { TenantEmailForOrders } from './tenantEmailForOrders';
@@ -37,6 +38,7 @@ export interface Tenant {
   readonly id?: string;
   readonly current_settings?: TenantCurrentSettings;
   readonly settings?: TenantSettingsProperty;
+  readonly capabilities?: HostCapabilities;
   readonly app_icon_version?: string;
   tenant_language?: TenantLanguageEnum;
   readonly schema_name?: string;

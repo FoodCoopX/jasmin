@@ -20,10 +20,8 @@ from ..errors import (
     OrderContentNotFound,
 )
 from ..models import (
-    CrateContentInvoiceReseller,
     CrateOrderContent,
     Forecast,
-    InvoiceResellerContent,
     MovementShareArticle,
     Offer,
     Order,
@@ -37,6 +35,9 @@ from ..models import (
 )
 from ..utils.iso_week_utils import date_from_order
 from ..utils.tax_rate_utils import resolve_article_tax_rate, resolve_crate_tax_rate
+from .delivery_note_invoices import current_invoices_by_delivery_note
+from .order_content_locks import lock_order_content
+from .order_days import apply_order_days
 from .snapshot_service import SnapshotService
 
 
@@ -259,7 +260,7 @@ class OrderContentService:
     # ──────────────────────────────────────────────
 
     @staticmethod
-    def _serialize_order_metadata(order, invoice_content) -> dict[str, Any]:
+    def _serialize_order_metadata(order, invoice) -> dict[str, Any]:
         """Top-level order identity + delivery-note / invoice state for a period.
 
         Surfaced independently of OrderContent rows so the Orders page can
@@ -269,7 +270,6 @@ class OrderContentService:
         reads it identically.
         """
         delivery_note = getattr(order, "delivery_note", None)
-        invoice = invoice_content.invoice if invoice_content else None
         return {
             **OrderContentService._order_identity_dict(order),
             **OrderContentService._delivery_note_identity_dict(delivery_note),
@@ -369,55 +369,14 @@ class OrderContentService:
         # order_contents to harvest it from) still resolves its invoice below.
         if order is not None and getattr(order, "delivery_note", None):
             delivery_note_ids.append(order.delivery_note.id)
-        invoice_by_delivery_note: dict[
-            int, InvoiceResellerContent | CrateContentInvoiceReseller
-        ] = {}
-        if delivery_note_ids:
-            invoice_contents = (
-                InvoiceResellerContent.objects.filter(
-                    delivery_note_contents__delivery_note_id__in=delivery_note_ids
-                )
-                .select_related("invoice")
-                .distinct()
-            )
-            for invoice_content in invoice_contents:
-                for (
-                    delivery_note_id
-                ) in invoice_content.delivery_note_contents.values_list(
-                    "delivery_note_id", flat=True
-                ):
-                    if delivery_note_id in delivery_note_ids:
-                        invoice_by_delivery_note[delivery_note_id] = invoice_content
-            # Crate-only delivery notes link to their invoice only via the crate
-            # provenance M2M. Both content types expose ``.invoice`` — all the
-            # downstream serialization reads — so a crate content is a drop-in.
-            crate_invoice_contents = (
-                CrateContentInvoiceReseller.objects.filter(
-                    crate_delivery_note_contents__delivery_note_id__in=delivery_note_ids
-                )
-                .select_related("invoice")
-                .distinct()
-            )
-            for crate_invoice_content in crate_invoice_contents:
-                for (
-                    delivery_note_id
-                ) in crate_invoice_content.crate_delivery_note_contents.values_list(
-                    "delivery_note_id", flat=True
-                ):
-                    if (
-                        delivery_note_id in delivery_note_ids
-                        and delivery_note_id not in invoice_by_delivery_note
-                    ):
-                        invoice_by_delivery_note[delivery_note_id] = (
-                            crate_invoice_content
-                        )
+        invoice_by_delivery_note = current_invoices_by_delivery_note(delivery_note_ids)
 
         result: list[dict[str, Any]] = []
 
         for order_content in order_contents:
             delivery_note = getattr(order_content.order, "delivery_note", None)
 
-            invoice_content = (
+            invoice = (
                 invoice_by_delivery_note.get(delivery_note.id)
                 if delivery_note
                 else None
@@ -437,23 +396,7 @@ class OrderContentService:
                     "delivery_note_is_finalized": (
                         delivery_note.is_finalized if delivery_note else False
                     ),
-                    "invoice_id": (
-                        invoice_content.invoice.id if invoice_content else None
-                    ),
-                    "invoice_number": (
-                        invoice_content.invoice.display_number
-                        if invoice_content
-                        else None
-                    ),
-                    "invoice_prefix": (
-                        invoice_content.invoice.prefix if invoice_content else None
-                    ),
-                    "has_invoice": invoice_content is not None,
-                    "has_finalized_invoice": (
-                        invoice_content.invoice.is_finalized
-                        if invoice_content
-                        else False
-                    ),
+                    **OrderContentService._invoice_identity_dict(invoice),
                 }
             )
             result.append(item)
@@ -464,13 +407,13 @@ class OrderContentService:
         order_block = None
         if order is not None:
             order_delivery_note = getattr(order, "delivery_note", None)
-            order_invoice_content = (
+            order_invoice = (
                 invoice_by_delivery_note.get(order_delivery_note.id)
                 if order_delivery_note
                 else None
             )
             order_block = OrderContentService._serialize_order_metadata(
-                order, order_invoice_content
+                order, order_invoice
             )
 
         return {
@@ -563,38 +506,7 @@ class OrderContentService:
             defaults={"created_by": kwargs.pop("created_by", None)},
         )
 
-        # Populate day_number fields from kwargs or OrdersDeliveryDay defaults
-        day_fields = [
-            "harvesting_day",
-            "packing_day",
-            "washing_day",
-            "cleaning_day",
-            "last_possible_ordering_day",
-        ]
-        if created:
-            orders_delivery_day = OrdersDeliveryDay.objects.filter(
-                day_number=day_number
-            ).first()
-            for field in day_fields:
-                value = kwargs.pop(field, None)
-                if value is None and orders_delivery_day:
-                    # OrdersDeliveryDay carries a ``default_<field>``
-                    # column for every entry in ``day_fields``; no
-                    # safety default — a typo in ``day_fields`` should
-                    # crash here rather than silently fall through
-                    # with ``None``.
-                    value = getattr(orders_delivery_day, f"default_{field}")
-                setattr(order, field, value)
-            order.save()
-        else:
-            updated = False
-            for field in day_fields:
-                value = kwargs.pop(field, None)
-                if value is not None and getattr(order, field) != value:
-                    setattr(order, field, value)
-                    updated = True
-            if updated:
-                order.save()
+        apply_order_days(order, created=created, day_number=day_number, sent=kwargs)
 
         # tax_rate is NOT NULL on OrderableItem — resolve from the canonical
         # chain (offer/share_article pricing → tenant default → hardcoded)
@@ -679,10 +591,12 @@ class OrderContentService:
 
         ``amount=AMOUNT_NOT_SENT`` leaves the stored amount, the offer stock and
         the crate row untouched; ``None`` means zero. Only the
-        ``_UPDATABLE_ORDER_CONTENT_FIELDS`` in ``kwargs`` are applied.
+        ``_UPDATABLE_ORDER_CONTENT_FIELDS`` in ``kwargs`` are applied. The
+        line and its offer are read under their locks (``lock_order_content``),
+        so the stock moves by the difference to the amount actually stored.
         """
         try:
-            order_content = OrderContent.objects.get(id=order_content_id)
+            order_content = lock_order_content(order_content_id)
         except OrderContent.DoesNotExist:
             # The ID may be an offer ID from an unused-offer stub — create instead
             try:
@@ -716,8 +630,6 @@ class OrderContentService:
         offer = order_content.offer
 
         if offer is not None and new_amount is not None:
-            # Lock the offer row to prevent race conditions on availability
-            offer = Offer.objects.select_for_update().get(pk=offer.pk)
             old_amount = order_content.amount or Decimal("0")
             amount_difference = new_amount - old_amount
             pu_divisor = OrderContentService._amount_per_pu_or_one(offer)
@@ -745,12 +657,6 @@ class OrderContentService:
 
             offer.amount -= amount_difference / pu_divisor
             offer.save(update_fields=["amount"])
-            # Re-point the cached relation to the freshly-locked offer so the
-            # serialized response carries the NEW available amount — the row
-            # was loaded with a stale ``order_content.offer`` (its ``amount``
-            # predates this update), which made the frontend show an outdated
-            # ``offer_available_amount`` until the next refetch.
-            order_content.offer = offer
 
             crate_type = offer.used_crate
             if crate_type is not None:
@@ -796,9 +702,11 @@ class OrderContentService:
     @staticmethod
     @transaction.atomic
     def delete_order_content(order_content_id: str) -> dict[str, bool]:
-        """Delete order content, restore offer availability, and delete order if empty."""
+        """Delete order content, restore offer availability, and delete order if
+        empty. The stock restored is the amount stored under the line's lock
+        (``lock_order_content``)."""
         try:
-            order_content = OrderContent.objects.get(id=order_content_id)
+            order_content = lock_order_content(order_content_id)
         except OrderContent.DoesNotExist as exc:
             raise OrderContentNotFound(
                 "Order content not found",
@@ -819,20 +727,16 @@ class OrderContentService:
         )
 
         offer = order_content.offer
-        amount_to_restore = order_content.amount
-        order = order_content.order
 
         if offer:
-            # Lock the offer row to prevent race conditions on availability
-            offer = Offer.objects.select_for_update().get(pk=offer.pk)
             # ``Offer.amount`` is in PU. The create/update paths debit it by
             # ``amount / pu_divisor``; restore must use the SAME unit, else
             # stock drifts upward by ``amount_per_pu`` on every delete.
             pu_divisor = OrderContentService._amount_per_pu_or_one(offer)
-            offer.amount += (amount_to_restore or Decimal("0")) / pu_divisor
+            offer.amount += (order_content.amount or Decimal("0")) / pu_divisor
             offer.save(update_fields=["amount"])
 
-        order_pk = order.pk
+        order_pk = order_content.order_id
         order_content.delete()
 
         # Cascade future inventories for all affected entities + re-derive the
@@ -844,7 +748,7 @@ class OrderContentService:
 
         # ``OrderContent.delete()`` (model-level) already auto-deletes the
         # order when it was the last child — see TestEmptyParentAutoCleanup.
-        # Don't touch the stale ``order`` reference; just check whether the
+        # Don't touch the line's cached ``order``; just check whether the
         # row is still in the DB.
         if not Order.objects.filter(pk=order_pk).exists():
             return {"order_deleted": True}

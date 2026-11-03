@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any, Literal, TypedDict
 
 from django.db import transaction
@@ -30,6 +31,7 @@ from ..models import (
 )
 from ..models.choices import MovementTypeOptions
 from ..services.documentation_service import GenericDocumentationService
+from ..services.documentation_stock import StockKey, calculate_theoretical_stock
 from ..services.stock_service import StockService
 from ..utils import (
     build_storage_fields,
@@ -40,7 +42,7 @@ from ..utils.iso_week_utils import previous_day_stock_coordinates
 # Type definitions
 ModelType = Literal["harvest", "purchase", "washamount", "cleanamount"]
 GroupingKey = tuple[
-    int, str, str | None, int | None, str
+    str, str, str | None, int | None, str
 ]  # (share_article_id, unit, size, day_number, storage_id)
 
 
@@ -234,7 +236,7 @@ class DocumentationSummaryService:
         day_number: int | None,
         single_id: str | None,
         actual_manager: Any,
-    ) -> dict[tuple[int, str, str | None, int | None], dict[str, Any]]:
+    ) -> dict[StockKey, dict[str, Any]]:
         """Get theoretical current stock map for entities."""
         if model not in ["harvest", "purchase", "washamount"]:
             return {}
@@ -396,61 +398,6 @@ class DocumentationSummaryService:
             return None, None, None
 
     @staticmethod
-    def _calculate_theoretical_stock(
-        share_article_id: str,
-        unit: str,
-        size: str | None,
-        storage_id: str,
-        theoretical_stock_map: dict[
-            tuple[str, str, str | None, str | None], dict[str, Any]
-        ],
-        theoretical_sum_share: float = 0,
-    ) -> tuple[float, float, float]:
-        """Calculate theoretical current stock for an entry.
-
-        Returns (total, share_stock, order_stock).
-        Uses for_shares / for_resellers flags from the stock entries to split.
-        Falls back from current_stock_amount to theoretical_current_stock.
-        Negative values are clamped to 0.
-        """
-        candidate = (share_article_id, unit, size, storage_id)
-        matching_keys = [candidate] if candidate in theoretical_stock_map else []
-
-        if not matching_keys:
-            return 0, 0.0, 0.0
-
-        share_stock = 0.0
-        order_stock = 0.0
-        theoretical_sum_share = float(theoretical_sum_share)
-
-        for key in matching_keys:
-            entry = theoretical_stock_map[key]
-            stock = entry.get("current_stock_amount")
-            if stock is None:
-                stock = entry.get("theoretical_current_stock") or 0
-            stock = max(float(stock), 0.0)
-
-            is_share = entry.get("for_shares")
-            is_order = entry.get("for_resellers")
-
-            if is_share and is_order:
-                # Both flags: assign up to theoretical_sum_share to share,
-                # remainder to order
-                to_share = min(stock, max(theoretical_sum_share - share_stock, 0))
-                share_stock += to_share
-                order_stock += stock - to_share
-            elif is_share:
-                share_stock += stock
-            elif is_order:
-                order_stock += stock
-            else:
-                share_stock += stock
-
-        total = share_stock + order_stock
-
-        return total, share_stock, order_stock
-
-    @staticmethod
     def _build_result_entry(
         entry: Any,
         model: ModelType,
@@ -462,10 +409,10 @@ class DocumentationSummaryService:
         theoretical_id: str | None,
         additional_id: str | None,
         forecast_info: tuple[str | None, str | None, str | None],
-        theoretical_current_stock: float | None,
+        theoretical_current_stock: Decimal | None,
         harvest_sums: tuple[float, float, float, float] | None = None,
-        theoretical_current_stock_share_content: float | None = None,
-        theoretical_current_stock_order_content: float | None = None,
+        theoretical_current_stock_share_content: Decimal | None = None,
+        theoretical_current_stock_order_content: Decimal | None = None,
         theoretical_note: str = "",
     ) -> dict[str, Any]:
         """Build a single result entry."""
@@ -660,11 +607,8 @@ class DocumentationSummaryService:
                 theoretical_current_stock,
                 theoretical_current_stock_share,
                 theoretical_current_stock_order,
-            ) = DocumentationSummaryService._calculate_theoretical_stock(
-                share_article_id,
-                unit,
-                size,
-                storage_id,
+            ) = calculate_theoretical_stock(
+                (share_article_id, unit, size, storage_id),
                 theoretical_stock_map,
                 theoretical_sum_share=theoretical_sum_share or 0,
             )
@@ -711,7 +655,7 @@ class DocumentationSummaryService:
         amount_key: str,
         unit_key: str,
         size_key: str,
-        day_number_fn: Callable[[dict[str, Any]], int | None],
+        slot_fn: Callable[[dict[str, Any]], dict[str, Any]],
     ) -> None:
         """Shared core of the bulk "set as expected" actions: upsert the actual
         Harvest/Purchase row per item and (re)create its movement.
@@ -724,9 +668,9 @@ class DocumentationSummaryService:
         write of a non-short-term theoretical (bypassing ``full_clean`` via a raw
         ``.update()``).
 
-        ``day_number_fn`` resolves the slot's day: harvests carry their own
-        ``day_number``; purchases are always ``PURCHASE_DAY`` (matching the
-        ``TheoreticalPurchase``).
+        ``slot_fn`` resolves the rest of the row's key: harvests carry their own
+        ``day_number``; purchases are always on ``PURCHASE_DAY`` (matching the
+        ``TheoreticalPurchase``), and on the selected row's seller.
         """
         if not items:
             return
@@ -758,7 +702,7 @@ class DocumentationSummaryService:
             instance, _created = model.objects.update_or_create(
                 year=item.get("year"),
                 delivery_week=item.get("delivery_week"),
-                day_number=day_number_fn(item),
+                **slot_fn(item),
                 share_article_id=item.get("id"),
                 unit=item.get(unit_key),
                 size=item.get(size_key),
@@ -782,22 +726,27 @@ class DocumentationSummaryService:
             amount_key="theoretical_harvest_amount",
             unit_key="theoretical_harvest_unit",
             size_key="theoretical_harvest_size",
-            day_number_fn=lambda item: item.get("day_number"),
+            slot_fn=lambda item: {"day_number": item.get("day_number")},
         )
 
     @staticmethod
     def bulk_set_purchase_as_expected(data: dict[str, Any]) -> None:
         """Record theoretical/expected PURCHASE as actual purchase for the
-        selected items (upsert + movement). Purchases always land on
-        ``PURCHASE_DAY`` (matching the ``TheoreticalPurchase``), never a NULL
-        day_number. No-op when ``selectedData`` is empty."""
+        selected items (upsert + movement), on ``PURCHASE_DAY`` (matching the
+        ``TheoreticalPurchase``) and on the selected row's seller where the
+        client sends it. No-op when ``selectedData`` is empty."""
         DocumentationSummaryService._bulk_set_actual(
             data.get("selectedData", []),
             model=Purchase,
             amount_key="theoretical_purchase_amount",
             unit_key="theoretical_purchase_unit",
             size_key="theoretical_purchase_size",
-            day_number_fn=lambda _item: PURCHASE_DAY,
+            slot_fn=lambda item: (
+                {"day_number": PURCHASE_DAY, "seller": item["seller"]}
+                if "seller" in item
+                # A client that sends no seller can only take over an empty row.
+                else {"day_number": PURCHASE_DAY, "amount__isnull": True}
+            ),
         )
 
     @staticmethod
@@ -854,14 +803,13 @@ class DocumentationSummaryService:
             models, common_fields, data.get("note")
         )
 
-        # Get or create actual entry
+        # The slot's actual row; a documented one keeps its own fields.
         instance = DocumentationSummaryService._get_or_create_actual_instance(
             models["actual"], common_fields
         )
-
-        # Update model-specific fields
+        if instance.amount is not None:
+            return instance
         DocumentationSummaryService._update_model_specific_fields(instance, data, model)
-
         instance.save()
         return instance
 
@@ -876,9 +824,6 @@ class DocumentationSummaryService:
         movement_type: str,
     ) -> None:
         """Sync the movement for an additional theoretical entry."""
-        from decimal import Decimal
-
-        from .documentation_service import GenericDocumentationService
         from .snapshot_service import SnapshotService
         from .theoretical_objects import recalculate_actual_corrections
 
@@ -1005,11 +950,11 @@ class DocumentationSummaryService:
     def _get_or_create_actual_instance(
         actual_model: Any, common_fields: dict[str, Any]
     ) -> Any:
-        """Get or create an actual instance with None amount."""
-        try:
-            return actual_model.objects.get(**common_fields, amount=None)
-        except actual_model.DoesNotExist:
-            return actual_model.objects.create(**common_fields, amount=None)
+        """The slot's empty row, or a purchase's documented one; else a new one."""
+        rows = actual_model.objects.filter(**common_fields)
+        if actual_model is not Purchase:
+            rows = rows.filter(amount__isnull=True)
+        return rows.first() or actual_model.objects.create(**common_fields, amount=None)
 
     @staticmethod
     def _update_model_specific_fields(
@@ -1052,7 +997,6 @@ class DocumentationSummaryService:
             # seller's row or raises MultipleObjectsReturned across sellers.
             common_fields["seller"] = instance.seller
 
-        # Update model-specific fields
         DocumentationSummaryService._update_model_specific_fields(instance, data, model)
         instance.save()
 
@@ -1077,8 +1021,6 @@ class DocumentationSummaryService:
             partial=True,
         )
         if model_key == "purchase":
-            from .documentation_service import GenericDocumentationService
-
             # Re-derive the purchase's own movement too, so it is dated and
             # netted with the additional amount just written.
             GenericDocumentationService._upsert_movement(instance)

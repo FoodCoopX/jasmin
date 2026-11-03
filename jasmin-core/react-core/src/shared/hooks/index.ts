@@ -16,11 +16,7 @@ export { useErrorDateFormat } from './configuration/useErrorDateFormat';
 export { useDateRangePresets } from './configuration/useDateRangePresets';
 export { useDeliveryDayLabel } from './useDeliveryDayLabel';
 export { useTenantYearOptions } from './configuration/useTenantYearOptions';
-export {
-  useYearWeekState,
-  currentYear,
-  currentWeek,
-} from './useYearWeekState';
+export { useYearWeekState } from './useYearWeekState';
 export type {
   UseYearWeekState,
   UseYearWeekStateOptions,
@@ -54,6 +50,7 @@ export { useSubscriptionTerm } from './useSubscriptionTerm';
 export { useTableRowSelection } from './useTableRowSelection';
 export { useSepaMandateStatus } from './useSepaMandateStatus';
 export { useTenant } from './configuration/useTenant';
+export { useCapability } from './configuration/useCapability';
 export { useOnboardingMode } from './configuration/useOnboardingMode';
 export { useTenantSmtpConfigured } from './configuration/useTenantSmtpConfigured';
 export { useInvitationDisabledReason } from './configuration/useInvitationDisabledReason';

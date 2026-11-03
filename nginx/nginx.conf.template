@@ -28,13 +28,20 @@ http {
     tcp_nodelay on;
     keepalive_timeout 65;
     types_hash_max_size 2048;
+    # The origin gate's secrets, up to 64 characters, are map keys too long
+    # for the default bucket. Has to come before the first map.
+    map_hash_bucket_size 128;
     server_tokens off;
 
     client_max_body_size 50M;
 
+    # ``peer`` is the connecting address. It differs from the first field only
+    # on the tenant hosts with the origin gate on, where the first is the client
+    # Bunny forwarded — what a request that is then refused claims to be.
     log_format main '$remote_addr - $remote_user [$time_local] "$request" '
                     '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
-                    'host="$host" rt=$request_time ut=$upstream_response_time';
+                    'host="$host" rt=$request_time ut=$upstream_response_time '
+                    'peer=$realip_remote_addr';
 
     # /media/ URLs carry a capability token in the query string (``?st=``,
     # core/protected_media.py). ``$request`` is the full request line, so the
@@ -47,7 +54,8 @@ http {
     log_format media '$remote_addr - $remote_user [$time_local] '
                      '"$request_method $uri $server_protocol" '
                      '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
-                     'host="$host" rt=$request_time ut=$upstream_response_time';
+                     'host="$host" rt=$request_time ut=$upstream_response_time '
+                     'peer=$realip_remote_addr';
     access_log /var/log/nginx/access.log main;
     error_log  /var/log/nginx/error.log warn;
 
@@ -82,6 +90,54 @@ http {
         ~*application/javascript|text/css       "public, max-age=31536000, immutable";
     }
 
+    # ---- Protected media: inline, or a sandboxed download ------------------
+    # A browser may render a PDF (the office previews invoices in a tab) or a
+    # picture as a document. Every other stored file — the e-invoice XML, the
+    # SEPA export, share imports — the app only fetches or downloads, and
+    # opened in a tab on the tenant origin an XHTML-namespaced XML or an SVG
+    # would run its script there. Those get a CSP sandbox (no script, an opaque
+    # origin, no subresources) and an attachment disposition. PDFs stay
+    # unsandboxed: Chrome's PDF viewer does not load in a sandboxed document.
+    # The list is INLINE_MEDIA_SUFFIXES in core/protected_media.py, and
+    # apps/shared/tenants/tests/test_protected_media.py fails when the two
+    # differ. An empty value makes nginx skip the add_header that uses it.
+    map $uri $protected_media_csp {
+        default                             "sandbox; default-src 'none'";
+        ~*\.(?:pdf|png|jpe?g|gif|webp)$     "";
+    }
+
+    map $uri $protected_media_attachment {
+        default                             "attachment";
+        ~*\.(?:pdf|png|jpe?g|gif|webp)$     "";
+    }
+
+    # Django sends the same disposition and nginx carries it across the
+    # X-Accel-Redirect, so the gateway adds its own only when the backend sent
+    # none. Two Content-Disposition lines are invalid, and a client that joins
+    # them into "attachment, attachment" no longer reads an attachment.
+    map $upstream_http_content_disposition $protected_media_disposition {
+        ""                                  $protected_media_attachment;
+        default                             "";
+    }
+
+    # ---- Origin gate: tenant hosts only through our Bunny pull zone --------
+    # render_config.sh writes the secrets Bunny may present and, while the gate
+    # is on, the check and the real_ip settings the tenant server block
+    # includes; its header explains the gate. A request without an accepted
+    # secret is refused unless it asks for /health/. Every location of the
+    # tenant block that proxies drops the header first
+    # (``proxy_set_header X-Origin-Secret ""``), so the backend never sees it.
+    map $http_x_origin_secret $origin_secret_ok {
+        default                             0;
+        include /etc/nginx/origin_gate/secrets.conf;
+    }
+
+    map "$origin_secret_ok:$uri" $origin_gate_deny {
+        default                             1;
+        ~^1:                                0;
+        ~^0:/health/                        0;
+    }
+
     # ---- HTTP -> HTTPS + ACME --------------------------------------------
     server {
         listen      80 default_server;
@@ -113,12 +169,13 @@ http {
     # ------- Apex host: closed by design ---------------------------------
     # The product lives ONLY on subdomains (tenant hosts + the super-admin
     # host). The bare ${FRONTEND_DOMAIN} maps to the public schema and would
-    # otherwise serve an empty shell of the SPA. Everything 404s except
-    # /health/, which stays on the apex because the public-schema Domain row
-    # for it is what the deploy smoke test and uptime probes hit. This block
-    # is load-bearing, not cosmetic: with the apex merely REMOVED from the
-    # wildcard block below, nginx's default-server fallback would route apex
-    # requests straight back into that block.
+    # otherwise serve an empty shell of the SPA. Everything 404s except the
+    # /health/ probes, which the deploy and rollback smoke tests and the
+    # uptime monitors hit here — /health/ and /health/ready/, both through the
+    # prefix location below. This block is load-bearing, not cosmetic: with
+    # the apex merely REMOVED from the wildcard block below, nginx's
+    # default-server fallback would route apex requests straight back into
+    # that block.
     server {
         listen      443 ssl;
         listen      [::]:443 ssl;
@@ -135,6 +192,13 @@ http {
 
         include /etc/nginx/security_headers.conf;
 
+        # No limit_req here or in the other /health/ locations, unlike every
+        # other location that reaches Django: the deploy and rollback smoke
+        # tests and the uptime monitors must never get a 429, and neither probe
+        # does a request's worth of work. /health/ touches nothing, and each
+        # backend worker answers /health/ready/ from a verdict at most
+        # READY_VERDICT_SECONDS old (core/middleware.py), so a flood reaches
+        # the database and Redis at most once per worker per window.
         location /health/ {
             proxy_pass http://jasmin_backend;
             access_log off;
@@ -161,6 +225,9 @@ http {
         ssl_stapling        on;
         ssl_stapling_verify on;
 
+        # The origin gate (see its maps above); empty while it is off.
+        include /etc/nginx/origin_gate/tenant.conf;
+
         # Security headers. NOTE: because nginx add_header inheritance is
         # all-or-nothing per level, this same snippet is re-included inside
         # every location below that sets its own add_header (/static/,
@@ -178,6 +245,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
         }
 
         location = /api/auth/register/ {
@@ -187,6 +255,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
         }
 
         # JWT refresh — bot-replays a stolen token; harder to mass-spam but
@@ -198,6 +267,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
         }
 
         # Password-reset request — every successful POST sends an email and
@@ -209,6 +279,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
         }
 
         # Password-reset confirm — accepts a token + new password; brute-force
@@ -220,6 +291,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
         }
 
         # Invitation accept — accepts a secret invitation token. Same brute-
@@ -231,6 +303,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
         }
 
         # ------- Super-admin API is NOT served on tenant / apex hosts -------
@@ -257,6 +330,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
             proxy_http_version 1.1;
             proxy_set_header   Connection      "";
             proxy_read_timeout 120s;
@@ -265,6 +339,7 @@ http {
 
         location /health/ {
             proxy_pass http://jasmin_backend;
+            proxy_set_header X-Origin-Secret   "";
             access_log off;
         }
 
@@ -298,6 +373,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
             proxy_http_version 1.1;
             proxy_set_header   Connection      "";
         }
@@ -310,14 +386,15 @@ http {
             # with PII) — browsers may cache, shared proxies/CDNs must
             # not. ``nosniff`` pins the extension-derived MIME type so
             # a crafted upload can't be content-sniffed into HTML.
-            # (No ``Content-Disposition: attachment`` — the office
-            # previews invoice PDFs in-tab; upload content is
-            # magic-byte-validated server-side.)
             # Single authoritative Cache-Control: ``expires`` would emit
             # a second, non-``private`` Cache-Control header that naive
             # intermediaries may honour.
             add_header Cache-Control "private, max-age=2592000";
             add_header X-Content-Type-Options "nosniff";
+            # PDFs and pictures render inline; every other file is a
+            # sandboxed download (the $protected_media_* maps above).
+            add_header Content-Security-Policy $protected_media_csp always;
+            add_header Content-Disposition $protected_media_disposition;
             # Re-include the security headers: this location's own add_header
             # otherwise voids the server-level set (nginx all-or-nothing rule).
             # Critical here — these are tenant invoice PDFs (PII): without
@@ -332,6 +409,7 @@ http {
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Origin-Secret   "";
             proxy_http_version 1.1;
             proxy_set_header   Connection      "";
         }
@@ -457,14 +535,15 @@ http {
             # with PII) — browsers may cache, shared proxies/CDNs must
             # not. ``nosniff`` pins the extension-derived MIME type so
             # a crafted upload can't be content-sniffed into HTML.
-            # (No ``Content-Disposition: attachment`` — the office
-            # previews invoice PDFs in-tab; upload content is
-            # magic-byte-validated server-side.)
             # Single authoritative Cache-Control: ``expires`` would emit
             # a second, non-``private`` Cache-Control header that naive
             # intermediaries may honour.
             add_header Cache-Control "private, max-age=2592000";
             add_header X-Content-Type-Options "nosniff";
+            # PDFs and pictures render inline; every other file is a
+            # sandboxed download (the $protected_media_* maps above).
+            add_header Content-Security-Policy $protected_media_csp always;
+            add_header Content-Disposition $protected_media_disposition;
             # Re-include the security headers: this location's own add_header
             # otherwise voids the server-level set (nginx all-or-nothing rule).
             # Critical here — these are tenant invoice PDFs (PII): without

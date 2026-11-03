@@ -7,6 +7,7 @@
  */
 import type { CurrentTenantEmail } from './currentTenantEmail';
 import type { CurrentTenantWebsite } from './currentTenantWebsite';
+import type { HostCapabilities } from './hostCapabilities';
 
 /**
  * Pre-login bootstrap payload — **anonymous endpoint**.
@@ -28,7 +29,8 @@ must render without authentication.)
     — anonymous callers must not be able to enumerate internal
     schema identifiers; the auth-gated ``TenantSerializer`` keeps it)
   * Branding: ``logo``, ``bio_logo``
-  * i18n / locale bootstrap: ``tenant_language``, ``date_format``
+  * i18n / locale bootstrap: ``tenant_language``, ``date_format``,
+    ``number_locale``
   * Tenant-disabled UX: ``is_active``
   * Public legal-notice / GDPR contact block: ``address``,
     ``zip_code``, ``city``, ``country``, ``email``, ``phone_number``,
@@ -78,6 +80,8 @@ export interface CurrentTenant {
   tenant_language?: string;
   /** @maxLength 32 */
   date_format?: string;
+  /** @maxLength 16 */
+  number_locale?: string;
   /** @maxLength 8 */
   currency?: string;
   is_active?: boolean;
@@ -155,4 +159,5 @@ export interface CurrentTenant {
   readonly min_weeks_from_creation_to_start_delivery?: number;
   readonly allows_solidarity_pricing?: boolean;
   readonly allows_waiting_list_for_subscriptions?: boolean;
+  readonly capabilities?: HostCapabilities;
 }

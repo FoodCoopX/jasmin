@@ -7,9 +7,9 @@
  * an in-memory farm. The PDF library, the PDF templates and the browser
  * download are stubbed, so no real PDF is rendered.
  *
- * The clock is frozen on Tuesday 6 October 2026 (ISO week 41). The week state
- * reads "today" once when its module loads, so the clock is set before the
- * imports run as well as before every test.
+ * The clock is frozen on Tuesday 6 October 2026 (ISO week 41), before the
+ * imports run as well as before every test. The week state reads "today" when
+ * the page mounts.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -859,7 +859,7 @@ describe("PackingListBulk is read-only", () => {
     renderPage();
     await screen.findByText("Carrots");
 
-    expect(screen.queryByRole("button", { name: /table\.add_plus_icon/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /table\.add_record/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "table.actions" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /table\.(edit|delete)/ })).not.toBeInTheDocument();
 

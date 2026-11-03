@@ -1,6 +1,7 @@
-import { Card, DatePicker, Divider, Spin, Table, Typography } from "antd";
+import { Card, DatePicker, Divider, Spin, Typography } from "antd";
 import dayjs from "dayjs";
 import { ExplainerText, StatsAreaChart } from "@shared/ui";
+import { ReadOnlyReportTable } from "@shared/tables";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -8,13 +9,11 @@ import {
   useCommissioningShareTypeVariationsList,
 } from "@shared/api/generated/commissioning/commissioning";
 import { usePaymentsChargeSchedulesIncomeByMonthList } from "@shared/api/generated/payments-—-charge-schedule/payments-—-charge-schedule";
-import type { ChargeScheduleMonthlyIncome } from "@shared/api/generated/models";
 import {
   buildMonthlyActiveByVariation,
   useSubscriptionVariationStats,
 } from "@features/abos/hooks/useSubscriptionVariationStats";
 import { buildMonthlyIncomeSeries } from "@features/abos/utils/incomeSeries";
-import { useIsDarkTheme } from "@shared/contexts/LocaleContext";
 import {
   useCurrency,
   useDateFormat,
@@ -27,13 +26,8 @@ import {
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
-// A finance-green, distinct from the categorical VARIATION_PALETTE (income is a
-// single, non-per-variation series), and a lighter one for the dark theme.
-const INCOME_COLOR = "#3f8600";
-const INCOME_COLOR_DARK = "#73d13d";
-
 interface PriceRow {
-  key: string;
+  id: string;
   name: string;
   reference: number;
   avg: number | null;
@@ -47,7 +41,6 @@ export default function DashboardAbos() {
   const presets = useDateRangePresets();
   const { getSetting } = useTenant();
   const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
-  const isDark = useIsDarkTheme();
 
   // The average-vs-reference price comparison is only meaningful when members
   // can pay different amounts for the same variation — i.e. solidarity pricing.
@@ -90,17 +83,17 @@ export default function DashboardAbos() {
     incomeParams,
     { query: { enabled: !!range } },
   );
-  // The endpoint returns a bare array at runtime (the action isn't paginated);
-  // the shared pagination-typed hook mislabels it, so cast — same pattern as
-  // ChargesAbos / DecidedDeletionsCard.
-  const income = useMemo(() => {
-    const points = (incomeData ?? []) as unknown as ChargeScheduleMonthlyIncome[];
-    return buildMonthlyIncomeSeries(points, range, {
-      id: "income",
-      label: t("statistics.income"),
-      color: isDark ? INCOME_COLOR_DARK : INCOME_COLOR,
-    });
-  }, [incomeData, range, t, isDark]);
+  // Income is a single series, so it takes the money colour rather than one
+  // of the per-variation palette colours.
+  const income = useMemo(
+    () =>
+      buildMonthlyIncomeSeries(incomeData ?? [], range, {
+        id: "income",
+        label: t("statistics.income"),
+        color: "var(--color-chart-money)",
+      }),
+    [incomeData, range, t],
+  );
   // Solidarity: prices actually paid per variation for subs STARTED in range.
   const paidPricesByVariation = useMemo(() => {
     const rows = subscriptions ?? [];
@@ -133,7 +126,7 @@ export default function DashboardAbos() {
         ? prices.reduce((a, b) => a + b, 0) / prices.length
         : null;
       return {
-        key: v.id ?? "",
+        id: v.id ?? "",
         name: [v.share_type_name, getShareTypeVariationSizeLabel(v.size)]
           .filter(Boolean)
           .join(" · "),
@@ -204,14 +197,14 @@ export default function DashboardAbos() {
             title={t("statistics.solidarity_title")}
             style={{ marginTop: "1em" }}
           >
-            <Table<PriceRow>
-              size="small"
+            <ReadOnlyReportTable<PriceRow>
+              rowKey="id"
               pagination={false}
               columns={priceColumns}
               dataSource={priceRows}
               style={{ width: "40%" }}
               className="custom-jasmin-table"
-              locale={{ emptyText: t("statistics.no_subscription_data") }}
+              emptyText={t("statistics.no_subscription_data")}
             />
           </Card>
         )}

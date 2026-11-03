@@ -12,7 +12,6 @@ import {
   variationColumnKey,
 } from "@features/commissioning/hooks";
 import {
-  currentWeek,
   useActiveShareOptions,
   useInvalidateAfterTableMutation,
   useIsMobile,
@@ -60,11 +59,12 @@ import {
   mondayOfIsoWeek,
   notify,
 } from "@shared/utils";
-import { getErrorMessage } from "@shared/utils/apiError";
+import { getErrorMessage, messageForErrorCode } from "@shared/utils/apiError";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import { Button, Popconfirm } from "antd";
 import { useCallback, useMemo } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 const shareArticleFilters = {
@@ -72,6 +72,38 @@ const shareArticleFilters = {
   is_active: true,
   is_purchased: false,
 };
+
+/**
+ * Copies the forecasts to the next week. The copy succeeds with a list of the
+ * forecasts it skipped (already planned, or a read-only next week), so those
+ * are named rather than lost behind a plain success. False when it failed.
+ */
+async function copyForecastsToNextWeek(
+  ids: string[],
+  t: TFunction,
+): Promise<boolean> {
+  try {
+    const { errors } = await commissioningForecastBulkCopyToNextWeekCreate({
+      ids,
+    });
+    const [firstSkip] = errors;
+    if (firstSkip) {
+      notify.warning(
+        t("table.bulk_partial_skipped", {
+          skipped: errors.length,
+          total: ids.length,
+          reason:
+            (firstSkip.code && messageForErrorCode(firstSkip.code)) ||
+            firstSkip.error,
+        }),
+      );
+    }
+    return true;
+  } catch (error) {
+    notify.error(getErrorMessage(error, t("commissioning.copy_failed")));
+    return false;
+  }
+}
 
 export default function Forecast() {
   const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
@@ -205,7 +237,7 @@ export default function Forecast() {
   const listParams = useMemo<CommissioningForecastListParams>(
     () => ({
       year: selectedYear,
-      delivery_week: selectedWeek!,
+      delivery_week: selectedWeek,
       is_past: isPast,
     }),
     [selectedYear, selectedWeek, isPast],
@@ -215,12 +247,8 @@ export default function Forecast() {
     listParams,
     { query: { enabled: columnsReady } },
   );
-  const data = useMemo(
-    () =>
-      (rawData ?? []).map((item) => ({
-        ...item,
-        key: (item as unknown as ForecastModel).id ?? "",
-      })) as unknown as TableRecord[],
+  const data = useMemo<TableRecord[]>(
+    () => (rawData ?? []).map((item) => ({ ...item, key: item.id })),
     [rawData],
   );
   const invalidateData = useCallback(() => {
@@ -433,7 +461,7 @@ export default function Forecast() {
   const nextWeekInfo = useMemo(() => {
     const nextWeekDate = mondayOfIsoWeek(
       selectedYear,
-      selectedWeek ?? currentWeek,
+      selectedWeek,
     ).add(1, "week");
     return {
       week: nextWeekDate.isoWeek(),
@@ -476,7 +504,7 @@ export default function Forecast() {
               const body: BulkFinalizeRequest = {
                 model: "forecast",
                 app_label: "commissioning",
-                ids: payload.ids as string[],
+                ids: payload.ids,
               };
               return commissioningBulkFinalizeCreate(body);
             }}
@@ -497,14 +525,8 @@ export default function Forecast() {
             })}
             icon={null}
             onConfirm={async () => {
-              try {
-                await commissioningForecastBulkCopyToNextWeekCreate({
-                  ids: selectedRowKeys.map(String),
-                });
-                setSelectedRowKeys([]);
-              } catch (error) {
-                notify.error(getErrorMessage(error, "Failed to load data"));
-              }
+              const ids = selectedRowKeys.map(String);
+              if (await copyForecastsToNextWeek(ids, t)) setSelectedRowKeys([]);
             }}
             okText={t("common.yes")}
             cancelText={t("common.cancel")}

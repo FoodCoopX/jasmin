@@ -4,6 +4,8 @@ import {
 } from "@features/commissioning/components";
 import {
   computePlannedAmountForDay,
+  dayCellKeys,
+  dayCellTier,
   dayHarvestedKey,
   dayPlannedAmountKey,
   dayVariationKey,
@@ -24,13 +26,14 @@ import {
 import type { DeliveryDay } from "@features/commissioning/hooks/columns/useDeliveryDayColumns";
 import type { ShareArticleOption } from "@features/commissioning/hooks/useShareArticles";
 import type { ShareTypeVariationOption } from "@features/commissioning/hooks/useShareTypeVariations";
+import { usePlanningTenantSettings } from "@features/commissioning/hooks/usePlanningTenantSettings";
 import { BackupModal } from "@features/commissioning/modals";
 import {
   useCurrency,
   useNoteColumn,
   useTableRowSelection,
-  useTenant,
   useUnitOptions,
+  useYearWeekState,
 } from "@hooks/index";
 import {
   commissioningBulkFinalizeShareContentCreate,
@@ -48,13 +51,20 @@ import type {
   CommissioningHarvestSharePlanningListParams,
   DefaultShareArticleInShare,
   HarvestSharePlanningCreateRequest,
-  HarvestSharePlanningRow,
-  HarvestSharePlanningUpdateRequest,
 } from "@shared/api/generated/models";
 import { ShareTypeEnum } from "@shared/api/generated/models";
+import {
+  articlePriceField,
+  articleWeightField,
+  forecastAmountInRowUnit,
+} from "@features/commissioning/utils/planningRow";
 import { useRoles } from "@shared/auth";
 import { PlanningModeSelector, WeekSelector } from "@shared/selectors";
-import { EditableTable, gatedByPermission } from "@shared/tables";
+import {
+  EditableTable,
+  gatedByPermission,
+  wrapApiFunctions,
+} from "@shared/tables";
 import type {
   ApiFunctions,
   TableRecord,
@@ -69,35 +79,16 @@ import { hasPurchasedSuffix, isWeekInPast, mondayOfIsoWeek, toApiDate } from "@s
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import { Button, Space } from "antd";
-import dayjs from "dayjs";
 import type { Key } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-const currentYear = dayjs().isoWeekYear();
-const nextWeek = dayjs().isoWeek();
-
-// The article's net box price field for each unit — the source of a planning
-// row's ``price_per_unit`` default (mirrors the backend's per-unit fallback in
-// ShareContentService).
-const PRICE_PER_UNIT_ARTICLE_FIELD: Record<string, string> = {
-  KG: "net_price_for_boxes_kg",
-  PCS: "net_price_for_boxes_pieces",
-  PIECES: "net_price_for_boxes_pieces",
-  BUNCH: "net_price_for_boxes_bunch",
-};
-
-// The article's per-item weight base for each unit — the source of a planning
-// row's ``kg_per_piece``. PCS uses the per-piece weight, BUNCH the per-bunch
-// weight (a distinct field); KG carries no per-item weight (the amount is
-// already in kg). Combined with the row's size, e.g. ``kg_per_piece_M`` /
-// ``kg_per_bunch_M``.
-const KG_WEIGHT_ARTICLE_BASE: Record<string, string | null> = {
-  KG: null,
-  PCS: "kg_per_piece",
-  PIECES: "kg_per_piece",
-  BUNCH: "kg_per_bunch",
-};
+/**
+ * A planning-list row as the cache holds it: the generated
+ * ``HarvestSharePlanningRow`` plus its dynamic ``day_*`` cells, or the
+ * table's echo of a saved row, which carries the same keys untyped.
+ */
+type PlanningListCacheRow = Record<string, unknown> & { id?: string | number };
 
 interface PlanningShareContentBaseProps {
   shareOption: ShareTypeEnum;
@@ -121,8 +112,8 @@ export default function PlanningShareContentBase({
   explainerKey,
   genericArticleColumn = false,
 }: PlanningShareContentBaseProps) {
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(nextWeek);
+  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
+    useYearWeekState();
   const isPast = useMemo(
     () => isWeekInPast(selectedYear, selectedWeek),
     [selectedYear, selectedWeek],
@@ -137,17 +128,19 @@ export default function PlanningShareContentBase({
     useState<TableRecord | null>(null);
 
   const { t } = useTranslation();
-  const { getSetting } = useTenant();
+  const {
+    defaultPlanningGranularity,
+    numberPackingStations: number_packing_stations,
+    showSummaryOnTop: showSummaryInHarvestSharePlanningOnTop,
+  } = usePlanningTenantSettings();
 
   // Seed ``planningMode`` from ``TenantSettings.default_planning_granularity``.
-  // Lazy initializer runs once on mount so subsequent tenant-settings
+  // The initial state is taken once on mount so subsequent tenant-settings
   // refetches don't clobber the user's manual selection via the
   // <PlanningModeSelector> dropdown (the auto-seeding ``useEffect`` below
   // also intentionally leaves the value alone in certain branches).
   const [planningMode, setPlanningMode] = useState<string>(
-    () =>
-      (getSetting("default_planning_granularity", "basic") as string) ||
-      "basic",
+    defaultPlanningGranularity,
   );
   const [showForecastClassification, setShowForecastClassification] =
     useState(true);
@@ -163,7 +156,7 @@ export default function PlanningShareContentBase({
       // creations — they were scaffolded by the system from
       // upstream data (a Forecast row → green + bold; leftover
       // stock from last week → green + normal weight, see
-      // ``styles/planningColors.planningRowColor``). Deleting one
+      // ``styles/planningRowEmphasis.planningRowStatus``). Deleting one
       // here would only nuke the planner's per-(day, variation,
       // tour, station) ShareContent line, but the underlying
       // forecast / stock would re-scaffold the row on the next
@@ -184,20 +177,11 @@ export default function PlanningShareContentBase({
     [isPast, isOffice],
   );
 
-  const number_packing_stations = getSetting(
-    "number_packing_stations",
-    1,
-  ) as number;
-  const showSummaryInHarvestSharePlanningOnTop = getSetting(
-    "show_summary_in_harvest_share_planning_on_top",
-    true,
-  ) as boolean;
-
   // Single source of truth for the (day × variation) axes. The base grid
   // AND the BackupModal consume this same hook, so their day/variation
   // sets can never diverge.
   const {
-    shareDeliveryDays: rawShareDeliveryDays,
+    shareDeliveryDays,
     shareTypeVariations,
     toursExist,
     activeAtDate,
@@ -205,7 +189,7 @@ export default function PlanningShareContentBase({
     variationsLoading: shareTypeVariationsLoading,
   } = usePlanningAxes({
     year: selectedYear,
-    week: selectedWeek ?? nextWeek,
+    week: selectedWeek,
     shareOption,
     requireStations: true,
     needTours: true,
@@ -216,7 +200,7 @@ export default function PlanningShareContentBase({
   // ShareTypeVariationViewSet, so no `share_type_variation_ids` are passed.
   const { data: historicalAverages } = useHistoricalShareTypeVariationAverages({
     year: selectedYear,
-    delivery_week: selectedWeek ?? nextWeek,
+    delivery_week: selectedWeek,
     share_option: shareOption,
     active_at_date: activeAtDate,
     years_back: 2,
@@ -239,19 +223,13 @@ export default function PlanningShareContentBase({
       share_option: shareOption,
       get_price_info: true,
       price_date: toApiDate(
-        mondayOfIsoWeek(selectedYear, selectedWeek ?? nextWeek).add(1, "day"),
+        mondayOfIsoWeek(selectedYear, selectedWeek).add(1, "day"),
       )!,
     }),
     [shareArticleFilters, shareOption, selectedYear, selectedWeek],
   );
   const { shareArticles: pricingArticles } = useShareArticles(
     pricingArticleFilters,
-  );
-
-  // Cast to extended type that correctly types delivery_stations as array
-  const shareDeliveryDays = useMemo(
-    () => rawShareDeliveryDays as unknown as DeliveryDay[],
-    [rawShareDeliveryDays],
   );
 
   // When the selected week has no share-type variations or no
@@ -287,20 +265,8 @@ export default function PlanningShareContentBase({
   // The editable day×variation cell keys for one (day, variation) in the
   // currently-active tier — mirrors ``customEdit``'s tier fan-out exactly.
   const activeTierCellKeys = useCallback(
-    (deliveryDay: DeliveryDay, variationId: string): string[] => {
-      const dayId = deliveryDay.id!;
-      if (planningMode === "tours" && deliveryDay.used_tours) {
-        return deliveryDay.used_tours.map((tour: number) =>
-          dayVariationKey({ dayId, variationId, tour }),
-        );
-      }
-      if (planningMode === "stations" && deliveryDay.delivery_stations) {
-        return deliveryDay.delivery_stations.map((station) =>
-          dayVariationKey({ dayId, variationId, station: station.id }),
-        );
-      }
-      return [dayVariationKey({ dayId, variationId })];
-    },
+    (deliveryDay: DeliveryDay, variationId: string): string[] =>
+      dayCellKeys(deliveryDay, variationId, planningMode),
     [planningMode],
   );
 
@@ -393,27 +359,23 @@ export default function PlanningShareContentBase({
       },
       articleChanged: boolean,
     ) => {
-      const article = pricingArticlesById.get(String(articleId)) as
-        | Record<string, unknown>
-        | undefined;
+      const article = pricingArticlesById.get(String(articleId));
       if (!article) return;
 
       const patch: Record<string, unknown> = {};
       const unitKey = String(unit).toUpperCase();
-      const size = String(form.getFieldValue("size") ?? "");
 
       // kg/item weight is fully derived from (article, unit, size), so always
       // reflect the current state: the per-PIECE weight for PCS, the per-BUNCH
       // weight for BUNCH, and none for KG. Clearing when this unit/size has no
       // source weight (KG, or a bunch article lacking a per-bunch weight) stops
       // a stale piece-weight from lingering after a unit switch.
-      const weightBase = KG_WEIGHT_ARTICLE_BASE[unitKey];
-      const kgWeight =
-        weightBase && size ? article[`${weightBase}_${size}`] : undefined;
+      const weightField = articleWeightField(unitKey, form.getFieldValue("size"));
+      const kgWeight = weightField ? article[weightField] : undefined;
       patch.kg_per_piece =
         kgWeight != null && kgWeight !== "" ? kgWeight : null;
 
-      const priceField = PRICE_PER_UNIT_ARTICLE_FIELD[unitKey];
+      const priceField = articlePriceField(unitKey);
       const price = priceField ? article[priceField] : undefined;
       if (price != null && price !== "") {
         patch.price_per_unit = price;
@@ -507,10 +469,12 @@ export default function PlanningShareContentBase({
           // On an unsaved row the article id lives under ``share_article_name``
           // (the foreignKey display field) until it is persisted — mirror
           // handleUnitChange's fallback so a size change actually re-derives.
-          const articleId = (form.getFieldValue("share_article") ??
-            form.getFieldValue("share_article_name")) as string | undefined;
-          const unit = form.getFieldValue("unit") as string | undefined;
-          if (articleId) applyRowDefaults(articleId, unit ?? "", form);
+          const articleId =
+            form.getFieldValue("share_article") ??
+            form.getFieldValue("share_article_name");
+          const unit = form.getFieldValue("unit");
+          if (typeof articleId === "string" && articleId)
+            applyRowDefaults(articleId, typeof unit === "string" ? unit : "", form);
         },
         disabled: (record: TableRecord) => {
           if (record.key != -1) return true;
@@ -544,7 +508,7 @@ export default function PlanningShareContentBase({
         return { ...record, ...defaultValues };
       }
 
-      const processedRecord = { ...record } as Record<string, unknown>;
+      const processedRecord: TableRecord = { ...record };
       const formValues: Record<string, unknown> = {};
 
       // First, initialize ALL possible day_ fields based on your column structure
@@ -553,33 +517,13 @@ export default function PlanningShareContentBase({
         const dayId = deliveryDay.id!;
         shareTypeVariations.forEach((variation: ShareTypeVariationOption) => {
           const variationId = variation.id!;
-          // Basic variation field
-          const basicKey = dayVariationKey({ dayId, variationId });
-          processedRecord[basicKey] = processedRecord[basicKey] || 0;
-
-          // Tour fields (if in tours mode)
-          if (planningMode === "tours" && deliveryDay.used_tours) {
-            deliveryDay.used_tours.forEach((tourNumber: number) => {
-              const tourKey = dayVariationKey({
-                dayId,
-                variationId,
-                tour: tourNumber,
-              });
-              processedRecord[tourKey] = processedRecord[tourKey] || 0;
-            });
-          }
-
-          // Station fields (if in stations mode)
-          if (planningMode === "stations" && deliveryDay.delivery_stations) {
-            deliveryDay.delivery_stations.forEach((station) => {
-              const stationKey = dayVariationKey({
-                dayId,
-                variationId,
-                station: station.id,
-              });
-              processedRecord[stationKey] = processedRecord[stationKey] || 0;
-            });
-          }
+          // The basic field and the active mode's tour or station fields.
+          [
+            dayVariationKey({ dayId, variationId }),
+            ...dayCellKeys(deliveryDay, variationId, planningMode),
+          ].forEach((key) => {
+            processedRecord[key] = processedRecord[key] || 0;
+          });
         });
 
         // Planned amount and harvested fields
@@ -610,7 +554,7 @@ export default function PlanningShareContentBase({
       // Set all values to the form - this ensures ALL fields are initialized
       form.setFieldsValue(formValues);
 
-      return processedRecord as TableRecord;
+      return processedRecord;
     },
     [shareDeliveryDays, shareTypeVariations, planningMode],
   );
@@ -649,7 +593,14 @@ export default function PlanningShareContentBase({
       // strings on the surviving tier become 0 (the wire signal for
       // "user cleared this cell"; backend treats "all zero on the
       // surviving tier" as "no human plan").
-      const activeTier = planningModeTier(planningMode);
+      // A day planned as a whole keeps its bare cells (see ``dayCellTier``).
+      const tierByDay = new Map(
+        shareDeliveryDays.map((deliveryDay) => [
+          String(deliveryDay.id),
+          dayCellTier(deliveryDay, planningMode),
+        ]),
+      );
+      const modeTier = planningModeTier(planningMode);
       Object.keys(processedData).forEach((key) => {
         // Only our own (unprefixed) day×variation cells are subject to the
         // tier drop — a `backup_…` field on the record must pass through
@@ -659,7 +610,7 @@ export default function PlanningShareContentBase({
           return;
         }
 
-        if (parsed.tier !== activeTier) {
+        if (parsed.tier !== (tierByDay.get(parsed.dayId) ?? modeTier)) {
           delete processedData[key];
           return;
         }
@@ -677,13 +628,20 @@ export default function PlanningShareContentBase({
         delivery_week: selectedWeek,
       };
     },
-    [planningMode, selectedYear, selectedWeek, t, vegetables_and_fruits],
+    [
+      planningMode,
+      shareDeliveryDays,
+      selectedYear,
+      selectedWeek,
+      t,
+      vegetables_and_fruits,
+    ],
   );
 
   const listParams = useMemo<CommissioningHarvestSharePlanningListParams>(
     () => ({
       year: selectedYear,
-      delivery_week: selectedWeek ?? nextWeek,
+      delivery_week: selectedWeek,
       share_option: shareOption,
       is_past: isPast,
     }),
@@ -727,33 +685,28 @@ export default function PlanningShareContentBase({
     }
   }, [daysOk, toursOk, toursExist]);
 
-  const apiFunctions: ApiFunctions = useMemo(
-    () => ({
-      create: (data) =>
-        commissioningHarvestSharePlanningCreate(
-          data as unknown as HarvestSharePlanningCreateRequest,
-        ).then((d) => ({ data: d as unknown as TableRecord })),
-      update: (id, data) =>
-        commissioningHarvestSharePlanningUpdate(
-          id,
-          data as unknown as HarvestSharePlanningUpdateRequest,
-        ).then((d) => ({ data: d as unknown as TableRecord })),
-      delete: (id) => commissioningHarvestSharePlanningDestroy(id),
-    }),
+  const apiFunctions = useMemo<ApiFunctions>(
+    () =>
+      // The update request is the create request with every field optional,
+      // so a row that satisfies the create shape serves both.
+      wrapApiFunctions<HarvestSharePlanningCreateRequest & TableRecord>({
+        create: (payload) => commissioningHarvestSharePlanningCreate(payload),
+        update: (id, payload) =>
+          commissioningHarvestSharePlanningUpdate(id, payload),
+        delete: (id) => commissioningHarvestSharePlanningDestroy(id),
+      }),
     [],
   );
 
   const { data: rawData, isFetching } =
-    useCommissioningHarvestSharePlanningList<
-      (HarvestSharePlanningRow & Record<string, unknown>)[]
-    >(listParams, {
+    useCommissioningHarvestSharePlanningList(listParams, {
       // Don't fetch the planning grid when there are no variation columns
       // (no share-type variations / delivery-station days) — the banner shows
       // instead, so the rows would never render.
       query: { enabled: hasVariationColumns },
     });
-  const data = useMemo(
-    () => (rawData ?? []) as unknown as TableRecord[],
+  const data = useMemo<TableRecord[]>(
+    () => (rawData ?? []).map((row) => ({ ...row, key: row.id })),
     [rawData],
   );
 
@@ -831,26 +784,20 @@ export default function PlanningShareContentBase({
       shareTypeVariationAmounts,
       t,
       currencySymbol,
-      historicalAverages: historicalAverages as
-        | Record<string, string | number>
-        | null
-        | undefined,
+      historicalAverages,
     });
 
-  // Live still-free indicator: forecast + current stock − Σ (planned per day).
-  // Per-day planned is derived from the same variation-cell values the user
-  // is editing right now (see `computePlannedAmountForDay`), not from the
-  // saved `day_X_planned_amount` snapshot — otherwise the indicator would
-  // lag a save behind. EditableCell hands `record === liveRecord` to this
-  // render while the row is in edit mode, so the result updates per keystroke.
+  // Live still-free indicator: forecast + current stock − Σ (planned per day),
+  // all in the row's own unit. Per-day planned is derived from the variation
+  // cells the user is editing right now (`computePlannedAmountForDay`), not
+  // the saved `day_X_planned_amount` snapshot, which lags a save behind.
+  // EditableCell hands `record === liveRecord` to this render while the row
+  // is in edit mode, so the result updates per keystroke.
   const calculateStillFree = useCallback(
     (record: TableRecord) => {
-      const forecastAmount =
-        parseFloat(String(record.forecast_available_amount)) || 0;
+      const forecastAmount = forecastAmountInRowUnit(record);
       const currentStock =
-        parseFloat(
-          String(record.available_amount_current_stock_at_time_of_planning),
-        ) || 0;
+        parseFloat(String(record.current_stock_begin_of_week)) || 0;
 
       const totalPlanned = shareDeliveryDays.reduce(
         (sum, deliveryDay) =>
@@ -1007,30 +954,29 @@ export default function PlanningShareContentBase({
       // cell's backing ShareContent is deleted server-side and its key is
       // simply ABSENT from the response — a plain spread-merge would keep
       // the stale amount forever.
-      queryClient.setQueryData<
-        (HarvestSharePlanningRow & Record<string, unknown>)[]
-      >(getCommissioningHarvestSharePlanningListQueryKey(listParams), (old) => {
-        if (!old) return old;
-        const saved = savedRecord as unknown as HarvestSharePlanningRow &
-          Record<string, unknown>;
-        if (!old.some((row) => row.id === saved.id)) {
-          // Freshly-created slot the cache doesn't know yet — prepend it
-          // (EditableTable pins new rows to the top anyway).
-          return action === "create" ? [saved, ...old] : old;
-        }
-        return old.map((row) =>
-          row.id === saved.id
-            ? {
-                ...(Object.fromEntries(
-                  Object.entries(row).filter(
-                    ([cellKey]) => !cellKey.startsWith("day_"),
+      queryClient.setQueryData<PlanningListCacheRow[]>(
+        getCommissioningHarvestSharePlanningListQueryKey(listParams),
+        (old) => {
+          if (!old) return old;
+          if (!old.some((row) => row.id === savedRecord.id)) {
+            // Freshly-created slot the cache doesn't know yet — prepend it
+            // (EditableTable pins new rows to the top anyway).
+            return action === "create" ? [savedRecord, ...old] : old;
+          }
+          return old.map((row) =>
+            row.id === savedRecord.id
+              ? {
+                  ...Object.fromEntries(
+                    Object.entries(row).filter(
+                      ([cellKey]) => !cellKey.startsWith("day_"),
+                    ),
                   ),
-                ) as HarvestSharePlanningRow & Record<string, unknown>),
-                ...saved,
-              }
-            : row,
-        );
-      });
+                  ...savedRecord,
+                }
+              : row,
+          );
+        },
+      );
     },
     [refetchGranularity, invalidateData, queryClient, listParams],
   );
@@ -1148,7 +1094,7 @@ export default function PlanningShareContentBase({
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningBulkFinalizeShareContentCreate({
-                ids: payload.ids as string[],
+                ids: payload.ids,
               })
             }
             buttonText={t("commissioning.finalize")}
@@ -1160,7 +1106,7 @@ export default function PlanningShareContentBase({
             selectedIds={selectedRowKeys}
             apiFunction={(payload) =>
               commissioningBulkUnfinalizeShareContentCreate({
-                ids: payload.ids as string[],
+                ids: payload.ids,
               })
             }
             buttonText={t("commissioning.unfinalize")}
@@ -1212,7 +1158,7 @@ export default function PlanningShareContentBase({
         }}
         data={selectedBackupData}
         year={selectedYear}
-        delivery_week={selectedWeek ?? nextWeek}
+        delivery_week={selectedWeek}
         shareOption={shareOption}
         showDaysTogether={showDaysTogether}
         onSave={() => {

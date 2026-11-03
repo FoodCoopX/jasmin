@@ -24,9 +24,10 @@ import type {
   TheoreticalWashAmount,
 } from "@shared/api/generated/models";
 import { YearSelector } from "@shared/selectors";
-import { EmptyHint, ExplainerText } from "@shared/ui";
+import { ExplainerText } from "@shared/ui";
+import { ReadOnlyReportTable } from "@shared/tables";
 import type { TablePaginationConfig } from "antd";
-import { DatePicker, Divider, Switch, Table, Tag } from "antd";
+import { DatePicker, Divider, Switch, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { dateForWeekDayNumber, toApiDate } from "@shared/utils";
@@ -412,7 +413,7 @@ export default function LoggingStorage() {
       <h1>{t("commissioning.storage_logging")}</h1>
       <h5>{t("commissioning.storage_logging_explanation")}</h5>
 
-      <div style={{ marginBottom: "1em", marginLeft: "-2em" }}>
+      <div className="logging-storage-filters">
         <StorageSelector
           selectedStorage={selectedStorage}
           setSelectedStorage={setSelectedStorage}
@@ -423,7 +424,7 @@ export default function LoggingStorage() {
           setSelectedShareArticle={setSelectedShareArticle}
           include_null_option={true}
         />
-        <div style={{ marginTop: "1em", marginLeft: "2em" }}>
+        <div className="logging-storage-date-row">
           <RangePicker
             value={dateRange}
             onChange={(dates) => {
@@ -455,15 +456,13 @@ export default function LoggingStorage() {
 
       {selectedStorage && (
         <div>
-          <Table
+          <ReadOnlyReportTable
             columns={columns}
             dataSource={data}
             pagination={paginationConfig}
-            size="small"
             loading={loading}
             rowKey="id"
             className="w-max custom-jasmin-table"
-            locale={{ emptyText: <EmptyHint>{t("table.no_data")}</EmptyHint> }}
           />
         </div>
       )}
@@ -529,15 +528,13 @@ export default function LoggingStorage() {
       </div>
 
       <div>
-        <Table
+        <ReadOnlyReportTable
           columns={workflowColumns}
           dataSource={workflowData}
           pagination={workflowPaginationConfig}
-          size="small"
           loading={workflowLoading}
           rowKey="id"
           className="w-max custom-jasmin-table"
-          locale={{ emptyText: <EmptyHint>{t("table.no_data")}</EmptyHint> }}
         />
       </div>
 

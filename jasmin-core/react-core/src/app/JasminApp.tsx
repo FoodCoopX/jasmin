@@ -1,7 +1,8 @@
 import { ConfigProvider, Layout, theme } from "antd";
-import { lazy, Suspense, useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { activateLanguage } from "@shared/i18n";
+import { RequireCapability } from "@shared/auth/RequireCapability";
 import { ROLES } from "@shared/auth/roles";
 import { Navigate, Route, Routes, useMatch } from "react-router-dom";
 import DynamicSidebar from "@shared/layout/DynamicSidebar";
@@ -16,6 +17,7 @@ import { useLocale } from "@shared/contexts/LocaleContext";
 import { ModalProvider } from "@shared/contexts/ModalContext";
 import { NavigationProvider } from "@shared/contexts/NavigationContext";
 import { useErrorDateFormat, useTheme } from "@hooks/index";
+import HostSignInPage from "@features/auth/pages/HostSignInPage";
 import LoginPage from "@features/auth/pages/LoginPage";
 import RegistrationPage from "@features/auth/pages/registration/RegistrationPage";
 import SetPasswordPage from "@features/auth/pages/SetPasswordPage";
@@ -38,11 +40,24 @@ import frFR from "antd/locale/fr_FR";
 
 const ANTD_LOCALES = { en: enUS, de: deDE, it: itIT, fr: frFR };
 
+/** A page of jasmin's own logins. Where the host application signs people in,
+ * it sends them to the sign-in page, which hands over to the host. */
+function OwnAccountPage({ page }: { page: ReactNode }) {
+  return (
+    <RequireCapability
+      name="user_accounts"
+      fallback={<Navigate to="/login" replace />}
+    >
+      {page}
+    </RequireCapability>
+  );
+}
+
 export default function JasminApp() {
   const themeTokens = useTheme();
   const { language, theme: userTheme } = useLocale();
   const { user, isAuthenticated, bootstrapping } = useAuth();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   useErrorDateFormat();
   // Pages a link in an email opens. The token in the URL is the credential, so
   // they open whatever the visitor's session: the layouts for signed-in users
@@ -66,12 +81,6 @@ export default function JasminApp() {
     algorithm: isDark ? darkAlgorithm : defaultAlgorithm,
     token: {
       ...themeTokens,
-      colorPrimary: "rgb(29, 96, 62)",
-      // The light theme's link green is too dark to read on the dark
-      // background, so the dark theme links in its own primary green.
-      colorLink: isDark ? "rgb(76, 175, 120)" : "rgb(29, 96, 62)",
-      colorLinkHover: "rgb(169, 227, 159)",
-      colorLinkActive: "rgb(136, 0, 111)",
       fontFamily:
         "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
     },
@@ -113,7 +122,7 @@ export default function JasminApp() {
             height: "100vh",
           }}
         >
-          Loading...
+          {t("app.loading")}
         </div>
       </ConfigProvider>
     );
@@ -124,13 +133,32 @@ export default function JasminApp() {
     return (
       <ConfigProvider theme={antdTheme} locale={antdLocale}>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegistrationPage />} />
-          <Route path="/set-password/:token" element={<SetPasswordPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route
+            path="/login"
+            element={
+              <RequireCapability
+                name="user_accounts"
+                fallback={<HostSignInPage />}
+              >
+                <LoginPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="/register"
+            element={<OwnAccountPage page={<RegistrationPage />} />}
+          />
+          <Route
+            path="/set-password/:token"
+            element={<OwnAccountPage page={<SetPasswordPage />} />}
+          />
+          <Route
+            path="/forgot-password"
+            element={<OwnAccountPage page={<ForgotPasswordPage />} />}
+          />
           <Route
             path="/reset-password/:uid/:token"
-            element={<ResetPasswordPage />}
+            element={<OwnAccountPage page={<ResetPasswordPage />} />}
           />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/impressum" element={<PublicLegalNoticePage />} />
@@ -191,7 +219,7 @@ export default function JasminApp() {
               <Suspense
                 fallback={
                   <div role="status" aria-live="polite">
-                    Loading...
+                    {t("app.loading")}
                   </div>
                 }
               >
@@ -242,7 +270,7 @@ export default function JasminApp() {
               <Suspense
                 fallback={
                   <div role="status" aria-live="polite">
-                    Loading...
+                    {t("app.loading")}
                   </div>
                 }
               >

@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.signals import user_login_failed
 from drf_spectacular.utils import (
     OpenApiResponse,
     PolymorphicProxySerializer,
@@ -38,6 +37,7 @@ from apps.shared.auth_cookies import (
 )
 from apps.shared.deferred_email import schedule_deferred_email
 from apps.shared.request_utils import auth_user, client_ip, request_tenant
+from apps.shared.same_origin import require_same_origin
 from core.serializers import ErrorResponseSerializer
 from core.throttling import set_throttle_scope
 
@@ -49,6 +49,7 @@ from ..errors import (
     RefreshTokenMissing,
     RegistrationCodeInvalid,
     RegistrationError,
+    TwoFactorInvalidCode,
 )
 from ..serializers import (
     InvitationAcceptRequestSerializer,
@@ -76,6 +77,7 @@ from ..services import (
     authenticate_for_tenant,
     blacklist_refresh,
     email_verification_service,
+    login_lockout,
     refresh_access_token,
     register_public_applicant,
     revoke_all_sessions,
@@ -127,6 +129,7 @@ logger = logging.getLogger("authentication")
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@require_same_origin
 def user_login_view(request):
     serializer = LoginRequestSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -188,25 +191,33 @@ def user_login_view(request):
 
 def _login_payload(*, result, tenant) -> dict:
     """Shared by the login view and the post-2FA-verify view."""
-    user = result.user
     return {
         "access": result.access,
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "user_language": user.user_language,
-            "theme": user.theme,
-            "roles": user.roles or ["member"],
-            "member_id": result.member_id,
-            "reseller_id": result.reseller_id,
-        },
+        "user": _user_payload(
+            result.user, member_id=result.member_id, reseller_id=result.reseller_id
+        ),
         "tenant": {
             "id": tenant.id,
             "name": tenant.name,
             "schema_name": tenant.schema_name,
         },
+    }
+
+
+def _user_payload(
+    user: JasminUser, *, member_id: str | None, reseller_id: str | None
+) -> dict:
+    """The signed-in user as login and refresh return it."""
+    return {
+        "id": user.id,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "user_language": user.user_language,
+        "theme": user.theme,
+        "roles": user.roles or ["member"],
+        "member_id": member_id,
+        "reseller_id": reseller_id,
     }
 
 
@@ -224,6 +235,7 @@ set_throttle_scope(user_login_view, "login")
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@require_same_origin
 def user_token_refresh_view(request):
     refresh_token = get_tenant_refresh_token(request)
     if not refresh_token:
@@ -242,8 +254,15 @@ def user_token_refresh_view(request):
         )
         raise
 
+    # The user goes along so a client whose cached user is gone can rebuild
+    # it from the session it still has.
     response_data = {
         "access": result["access"],
+        "user": _user_payload(
+            result["user"],
+            member_id=result["member_id"],
+            reseller_id=result["reseller_id"],
+        ),
         "tenant": {
             "id": tenant.id,
             "name": tenant.name,
@@ -264,6 +283,7 @@ def user_token_refresh_view(request):
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@require_same_origin
 def user_logout_view(request):
     refresh_token = get_tenant_refresh_token(request)
     response = Response(
@@ -282,14 +302,15 @@ def user_logout_view(request):
     description=(
         "Revokes every refresh token for the authenticated user — this browser "
         "and every other device/session. Use after a suspected compromise. "
-        "Already-issued access tokens keep working until they expire "
-        "(short-lived); no new session can be minted from an old refresh token."
+        "Access tokens issued before it are refused as well, and no new "
+        "session can be minted from an old refresh token."
     ),
     request=None,
     responses={200: MessageResponseSerializer, 401: ErrorResponseSerializer},
 )
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@require_same_origin
 def user_logout_all_view(request):
     revoke_all_sessions(request.user)
     response = Response(
@@ -510,8 +531,10 @@ set_throttle_scope(password_reset_confirm_view, "password_reset")
         "token carrying ``step_up_verified_at``. The frontend swaps "
         "the access token in and retries the original destructive "
         "request. The new token's TTL for step-up purposes is "
-        "``STEP_UP_TTL_SECONDS`` (default 300); the JWT itself still "
-        "expires at the normal access-token lifetime."
+        "``STEP_UP_TTL_SECONDS`` (default 300). The new JWT keeps the "
+        "presented token's expiry, so a step-up never lengthens a session; "
+        "the frontend renews the session first, so the token it presents "
+        "outlasts the step-up window."
     ),
     request=StepUpRequestSerializer,
     responses={
@@ -531,6 +554,7 @@ def step_up_view(request: Request) -> Response:
     totp_code = serializer.validated_data.get("totp_code") or None
     payload = getattr(request.auth, "payload", None) if request.auth else None
     user = auth_user(request)
+    login_lockout.refuse_if_locked(request, user.email)
     try:
         access = verify_and_issue_step_up_token(
             user=user,
@@ -538,26 +562,21 @@ def step_up_view(request: Request) -> Response:
             totp_code=totp_code,
             current_access_payload=payload,
         )
-    except InvalidCredentials:
-        # Step-up deliberately bypasses ``authenticate()`` (it doesn't want
-        # the login flow's is_active / 2FA forks), so django-axes never sees
-        # these failures. Feed the same signal axes hooks for login so a
-        # wrong-password grind locks the (username, ip) pair exactly as
-        # repeated login failures do — closing the lockout-bypass hole.
-        user_login_failed.send(
-            sender=user.__class__,
-            credentials={"username": user.email},
-            request=request,
-        )
+    except (InvalidCredentials, TwoFactorInvalidCode):
+        # Step-up checks the password and the code itself, outside
+        # ``authenticate()``, so axes counts a wrong one only through this
+        # report — toward the same (email, IP) lockout a failed login feeds.
+        login_lockout.record_failure(request, user.email)
         raise
+    login_lockout.clear_failures(request, user.email)
     return Response({"access": access, "ttl_seconds": settings.STEP_UP_TTL_SECONDS})
 
 
 # Dedicated strict scope (keyed per user, since the request is
 # authenticated) — NOT the generous ``login`` bucket. Re-validating a
-# password is the same brute-force surface as logging in; pairing the
-# tighter rate with the axes signal above means wrong passwords both
-# throttle AND count toward account lockout.
+# password is the same brute-force surface as logging in, so the wrong
+# passwords and codes are throttled here AND counted toward the (email, IP)
+# lockout above, which refuses them once LOGIN_LOCKOUT_ENABLED is on.
 set_throttle_scope(step_up_view, "step_up")
 
 

@@ -39,6 +39,9 @@ vi.mock("@hooks/index", async () => {
     useShareTypes: () => ({ shareTypes: [] }),
     useLogoShape: () => ({ logoShape: "circle", logoAspectRatio: 1 }),
     useOnboardingMode: () => onboardingState.onboardingMode,
+    // ``MemberDataProtectionCard`` hides itself where the deployment has no
+    // data-protection actions; this page runs in one that has them.
+    useCapability: () => true,
     // ``MemberConsentsCard`` (a child of MemberDetail) calls
     // ``useTimeFormat().formatDateTimeWithFallback`` to render the
     // ``consented_at`` / ``revoked_at`` timestamps. We stub it

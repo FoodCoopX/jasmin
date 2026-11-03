@@ -1,4 +1,4 @@
-"""The ``cleanup_stale_import_batches`` Huey periodic task.
+"""The weekly sweep of stale import batches (``prune_stale_import_batches``).
 
 Abandoned upload/preview rows are swept once they pass the retention
 window. ``APPLIED`` rows never are, at any age: they record which
@@ -13,7 +13,7 @@ import pytest
 from django.utils import timezone
 
 from apps.commissioning.models import ShareImportBatch
-from apps.commissioning.tasks import cleanup_stale_import_batches
+from apps.commissioning.services.scheduled_upkeep import prune_stale_import_batches
 from apps.shared.retention import IMPORT_BATCH_RETENTION_DAYS
 
 # The sweep measures its cutoff against the real clock, so the fixtures are
@@ -41,7 +41,7 @@ class TestCleanupStaleImportBatches:
         _batch(ShareImportBatch.STATUS_FAILED, checksum="c", age_days=_FRESH)
         _batch(ShareImportBatch.STATUS_APPLIED, checksum="d", age_days=_STALE)
 
-        cleanup_stale_import_batches.call_local()
+        prune_stale_import_batches()
 
         survivors = set(
             ShareImportBatch.objects.values_list("file_checksum", flat=True)
@@ -55,7 +55,7 @@ class TestCleanupStaleImportBatches:
             age_days=IMPORT_BATCH_RETENTION_DAYS * 10,
         )
 
-        cleanup_stale_import_batches.call_local()
+        prune_stale_import_batches()
 
         assert ShareImportBatch.objects.filter(
             status=ShareImportBatch.STATUS_APPLIED
@@ -72,6 +72,6 @@ class TestCleanupStaleImportBatches:
     def test_a_status_outside_the_deletable_set_survives(self, tenant, kept_status):
         _batch(kept_status, checksum="f", age_days=_STALE)
 
-        cleanup_stale_import_batches.call_local()
+        prune_stale_import_batches()
 
         assert ShareImportBatch.objects.filter(status=kept_status).exists()

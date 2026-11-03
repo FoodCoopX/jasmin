@@ -40,7 +40,6 @@ logger = logging.getLogger(__name__)
 
 
 class OfferGroup(JasminModel):
-    is_active = models.BooleanField(default=True, db_index=True)
     number = models.PositiveIntegerField(unique=True)
     name = models.CharField(max_length=200, blank=True, null=True)
     note = models.CharField(max_length=500, blank=True, null=True)
@@ -1010,16 +1009,9 @@ class InvoiceReseller(
     )
 
     document_hash = models.CharField(max_length=64, blank=True, null=True)
-    # Which ``build_hash_payload`` shape produced ``document_hash``. v1 (the
-    # legacy default) seals number/prefix/date/reseller_id + line items only;
-    # v2 additionally seals the resolved §14/§14a recipient block and the
-    # document-type / cancellation identity. Stored per-invoice so legacy v1
-    # documents keep validating against their original hash (no mass false
-    # drift) while newly finalized invoices get the wider tamper surface.
-    document_hash_version = models.PositiveSmallIntegerField(default=1)
 
     # Frozen §14/§14a recipient block, captured from the live Reseller/Contact
-    # at finalization and sealed into ``document_hash`` (v2). Makes the invoice
+    # at finalization and sealed into ``document_hash``. Makes the invoice
     # self-contained: a later edit — or GDPR anonymization — of the reseller's
     # general record can neither re-render nor drift the immutable document.
     # Set on the (still-unfinalized) finalize save, then immutable; the generic

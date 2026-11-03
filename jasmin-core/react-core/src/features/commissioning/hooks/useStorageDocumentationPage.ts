@@ -16,9 +16,6 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-import { currentWeek } from "@hooks/index";
-import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
-
 import {
   useDocumentationSummaryPage,
   type DocumentationModel,
@@ -53,9 +50,10 @@ export function useStorageDocumentationPage({
     queryEnabled: !!selectedStorage,
   });
 
-  const { rawData, selectedYear, selectedWeek, selectedDay } = summary;
+  const { rawData, selectedYear, selectedWeek, selectedDay } =
+    summary;
 
-  const data = useMemo<TableRecord[]>(() => {
+  const data = useMemo<DocumentationSummaryRecord[]>(() => {
     // Directional cast at the orval boundary: raw rows lack the table-only
     // ``key`` until the map below adds it.
     const items = (rawData ?? []) as DocumentationSummaryRecord[];
@@ -77,7 +75,7 @@ export function useStorageDocumentationPage({
       ...transformedData,
       storage: selectedStorage,
       year: selectedYear,
-      delivery_week: selectedWeek ?? currentWeek,
+      delivery_week: selectedWeek,
       ...(withDay ? { day_number: selectedDay ?? 0 } : {}),
       amount:
         transformedData.amount === null ||
@@ -86,7 +84,13 @@ export function useStorageDocumentationPage({
           ? 0
           : transformedData.amount,
     }),
-    [selectedStorage, selectedYear, selectedWeek, selectedDay, withDay],
+    [
+      selectedStorage,
+      selectedYear,
+      selectedWeek,
+      selectedDay,
+      withDay,
+    ],
   );
 
   return {

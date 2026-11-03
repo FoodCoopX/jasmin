@@ -56,7 +56,7 @@ import ShareTypeVariationPickerGrid from "../components/ShareTypeVariationPicker
 import { DeliveryStationMap } from "@shared/ui";
 import NumberInput from "@shared/ui/NumberInput";
 import ToolTipIcon from "@shared/ui/ToolTipIcon";
-import { filterVariationsForTrial, notify } from "@shared/utils";
+import { filterVariationsForTrial, notify, todayApiDate } from "@shared/utils";
 import { getErrorCode, getErrorMessage } from "@shared/utils/apiError";
 import SepaSetupModal from "@features/members/modals/SepaSetupModal";
 import { usePaymentsBillingProfilesList } from "@shared/api/generated/payments-—-billing-profiles/payments-—-billing-profiles";
@@ -289,7 +289,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
         !dayjs(p.valid_until).isBefore(validFrom, "day")
       );
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dates keyed by their timestamps
   }, [exceptionPeriods, validFromMs, validUntilMs]);
 
   // Every ``"<iso-year>-<iso-week>"`` key in the term — via the SHARED
@@ -298,7 +298,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
   // math that could disagree). Open-ended terms span a one-year window.
   const periodWeekKeys = useMemo(
     () => termWeekKeys(validFrom ?? dayjs(), validUntil ?? null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dates keyed by their timestamps
     [validFromMs, validUntilMs],
   );
 
@@ -314,8 +314,8 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
       active_at_date: formatDateForAPI(start)!,
       ...capacityWindowParams(),
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [validFromMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dates keyed by their timestamps
+  }, [validFromMs, formatDateForAPI]);
 
   const { deliveryStationDays, loading: stationsLoading } =
     useDeliveryStationDays(deliveryStationDayParams);
@@ -393,7 +393,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
       cycle: variationCycle,
     });
     form.setFieldsValue({ valid_until: until ?? undefined });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dates keyed by their timestamps
   }, [lockValidUntil, validFromMs, effectiveIsTrial, variationCycle]);
 
   // Trial end preview for the is_trial helper text.
@@ -417,7 +417,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
   // Group variations by share type for the visual picker (step 1).
   // Variation ID → total active quantity (drives the "already subscribed" badge).
   const activeQuantityByVariation = useMemo(() => {
-    const today = dayjs().format("YYYY-MM-DD");
+    const today = todayApiDate();
     const map: Record<string, number> = {};
     for (const sub of subscriptions) {
       if (
@@ -824,8 +824,8 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                 theme={{
                   components: {
                     Segmented: {
-                      itemSelectedBg: "var(--color-primary)",
-                      itemSelectedColor: "#ffffff",
+                      itemSelectedBg: "var(--color-primary-solid)",
+                      itemSelectedColor: "var(--color-text-on-primary)",
                     },
                   },
                 }}

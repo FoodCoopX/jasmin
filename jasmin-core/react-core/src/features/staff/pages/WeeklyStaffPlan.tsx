@@ -80,7 +80,7 @@ export default function WeeklyStaffPlan() {
   const [selectedYear, setSelectedYear] = useState<number>(() =>
     dayjs().isoWeekYear(),
   );
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(() =>
+  const [selectedWeek, setSelectedWeek] = useState<number>(() =>
     dayjs().isoWeek(),
   );
   const [copyFromWeek, setCopyFromWeek] = useState<number | null>(null);
@@ -220,7 +220,7 @@ export default function WeeklyStaffPlan() {
         },
       },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- saves only on a user edit, reading the week as of it
   }, [cells]);
 
   const handlePlace = useCallback(

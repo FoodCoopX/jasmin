@@ -29,8 +29,7 @@ from core.errors import InvalidQueryParam
 from core.pagination import OptionalLimitOffsetPagination
 from core.serializers import ErrorResponseSerializer
 
-from .constants import OPEN_CHARGE_STATUSES, BillingRunStatus, ChargeStatus
-from .errors import BillingRunNotDraft
+from .constants import OPEN_CHARGE_STATUSES, ChargeStatus
 from .models import BillingProfile, BillingRun, ChargeSchedule
 from .scoping import scope_to_member
 from .serializers import (
@@ -212,7 +211,9 @@ class BillingProfileViewSet(
         # the decrypted values are write-only and never echoed — so log it
         # explicitly here (the mixin only auto-logs the detail retrieve()).
         if status.is_success(response.status_code):
-            member = request.query_params.get("member")
+            member = validate_query_params(
+                request, PARAM_CATALOGUE, optional=["member"]
+            )["member"]
             self._log_pii_list_read(
                 request, f"list(member={member})" if member else "list(all)"
             )
@@ -224,7 +225,9 @@ class BillingProfileViewSet(
         # Privileged roles can narrow to one member. Lets callers that only need one
         # member's mandate fetch + decrypt a single row instead of the whole
         # tenant, and keeps the PII-read audit line scoped (``list(member=...)``).
-        member_id = self.request.query_params.get("member")
+        member_id = validate_query_params(
+            self.request, PARAM_CATALOGUE, optional=["member"]
+        )["member"]
         if member_id:
             # A non-privileged caller may narrow only to their OWN profile; a
             # foreign ``?member=`` is a 403, not a silent empty set — the same
@@ -560,6 +563,7 @@ class ChargeScheduleViewSet(RolePermissionsMixin, viewsets.ReadOnlyModelViewSet)
         responses={
             204: None,
             # BillingRunNotDraft — only DRAFT runs may be deleted.
+            # BillingRunChargesBeingReplanned — retry once the re-plan is done.
             409: ErrorResponseSerializer,
         },
     ),
@@ -610,6 +614,8 @@ class BillingRunViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
+            # BillingRunChargesBeingReplanned — retry once the re-plan is done.
+            409: ErrorResponseSerializer,
         },
     )
     def create(self, request, *args, **kwargs):
@@ -618,11 +624,11 @@ class BillingRunViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # ``BillingRunService.create_run`` is the single enforcement point for
         # the run's own invariants — period order, a collection_date in the past
         # (SEPA can't settle a debit before today, so the bank would bounce the
-        # whole pain.008 batch), no eligible charges, no valid mandates — so a
-        # management command or bulk job is held to exactly the same rules as
-        # this endpoint. It raises payments JasminErrors, which carry stable
-        # dotted codes and reach the canonical handler on their own, no
-        # ``ValidationError`` re-wrap needed.
+        # whole pain.008 batch), no eligible charges, no valid mandates, charges
+        # a re-plan still holds — so a management command or bulk job is held
+        # to exactly the same rules as this endpoint. It raises payments
+        # JasminErrors, which carry stable dotted codes and reach the canonical
+        # handler on their own, no ``ValidationError`` re-wrap needed.
         run = BillingRunService.create_run(
             period_start=serializer.validated_data["period_start"],
             period_end=serializer.validated_data["period_end"],
@@ -636,19 +642,7 @@ class BillingRunViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         )
 
     def destroy(self, request, *args, **kwargs):
-        # ``get_object()`` is an unlocked snapshot — a concurrent ``export`` can
-        # flip the run DRAFT→EXPORTED between the status check and the delete,
-        # letting an exported SEPA run (with its pain.008 + ISSUED charges) be
-        # deleted. Re-fetch under a row lock and re-check inside the transaction,
-        # same pattern as ``BillingRunService.export``.
-        from django.db import transaction
-
-        run = self.get_object()
-        with transaction.atomic():
-            locked = BillingRun.objects.select_for_update().get(pk=run.pk)
-            if locked.status != BillingRunStatus.DRAFT:
-                raise BillingRunNotDraft("Only DRAFT billing runs can be deleted.")
-            locked.delete()
+        BillingRunService.delete_draft(self.get_object())
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(

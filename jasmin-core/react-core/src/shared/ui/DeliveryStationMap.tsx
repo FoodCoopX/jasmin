@@ -41,9 +41,15 @@ function markerIcon(marker: DeliveryStationMapMarker): L.DivIcon {
   if (marker.selected) classes.push("jasmin-station-marker--selected");
   if (marker.disabled) classes.push("jasmin-station-marker--disabled");
   const size = marker.selected ? 24 : 20;
+  // An element, never an HTML string: Leaflet writes a string ``html`` into
+  // ``innerHTML``, and the label is a contact's name, which stays plain text
+  // only as a DOM property.
+  const markerElement = document.createElement("div");
+  markerElement.className = classes.join(" ");
+  markerElement.title = marker.label;
   return L.divIcon({
     className: "",
-    html: `<div class="${classes.join(" ")}" title="${marker.label}"></div>`,
+    html: markerElement,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -(size / 2) - 2],
@@ -63,7 +69,7 @@ function FitBounds({ points }: { points: [number, number][] }) {
     map.fitBounds(points as LatLngBoundsExpression, { padding: [30, 30] });
     // ``key`` (the serialized points) is the real dependency; ``points`` is a
     // fresh array each render and would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key stands for points
   }, [map, key]);
   return null;
 }

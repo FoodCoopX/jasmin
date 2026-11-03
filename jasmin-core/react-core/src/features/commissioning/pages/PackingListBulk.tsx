@@ -18,7 +18,6 @@ import {
   useDeliveryDayLabel,
   useInvalidateAfterTableMutation,
   useIsMobile,
-  currentWeek,
   useNoteColumn,
   useNumberFormat,
   useVegetableSizeOptions,
@@ -115,8 +114,12 @@ export default function PackingListBulk() {
     | "MIXED";
   const showSize = Boolean(getSetting("show_size_column"));
 
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedWeek,
+    setSelectedWeek,
+  } = useYearWeekState();
   // Backend day numbers run 0 = Monday … 6 = Sunday.
   const [selectedDeliveryDay, setSelectedDeliveryDay] = useState<number | null>(
     () => dayjs().isoWeekday() - 1,
@@ -187,7 +190,7 @@ export default function PackingListBulk() {
       if (packingDayNum === null) return "";
       let date = dateForWeekDayNumber(
         selectedYear,
-        selectedWeek ?? currentWeek,
+        selectedWeek,
         packingDayNum,
       );
       if (selectedDeliveryDay !== null && packingDayNum > selectedDeliveryDay) {
@@ -209,7 +212,7 @@ export default function PackingListBulk() {
 
   const calculateDeliveryDate = useCallback(
     (deliveryDayNum: number | null) =>
-      deliveryDayLabel(selectedYear, selectedWeek ?? currentWeek, deliveryDayNum),
+      deliveryDayLabel(selectedYear, selectedWeek, deliveryDayNum),
     [deliveryDayLabel, selectedYear, selectedWeek],
   );
 
@@ -444,7 +447,7 @@ export default function PackingListBulk() {
         <DaySelector
           selectedDay={selectedDeliveryDay}
           setSelectedDay={setSelectedDeliveryDay}
-          selectedWeek={selectedWeek ?? currentWeek}
+          selectedWeek={selectedWeek}
           selectedYear={selectedYear}
           days={deliveryDayOptions}
           suffix={t("commissioning.delivery_day")}
@@ -457,7 +460,7 @@ export default function PackingListBulk() {
           <RelatedDayInfo
             label={t("commissioning.packing_day")}
             relatedDayNumbers={packingDaysForDelivery}
-            selectedWeek={selectedWeek ?? currentWeek}
+            selectedWeek={selectedWeek}
             selectedYear={selectedYear}
             formatDate={calculatePackingDate}
           />
@@ -475,10 +478,7 @@ export default function PackingListBulk() {
       </div>
 
       {!isMobile && (
-        <div
-          className="section-divider"
-          style={{ display: "flex", gap: "1em" }}
-        >
+        <div className="section-divider flex-row gap-1em">
           <PackingListBulkPDFGenerator
             data={processedData}
             year={selectedYear}

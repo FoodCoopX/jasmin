@@ -9,8 +9,8 @@
  * "add article" is a stub.
  *
  * The clock is frozen on Tuesday 6 October 2026 (ISO week 41, day number 1).
- * The page's week and day state read "today" once when their modules load, so
- * the clock is set before the imports run as well as before every test.
+ * The clock is set before the imports run as well as before every test; the
+ * page reads "today" when it mounts, so a test can move it before rendering.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -119,82 +119,34 @@ vi.mock("@features/commissioning/modals", () => ({
 }));
 
 import DocumentationWaste from "../DocumentationWaste";
+import {
+  COLD_STORE,
+  TUESDAY_IN_COLD_STORE,
+  STORAGES,
+  CARROTS,
+  LETTUCE,
+  RADISHES,
+  POTATOES,
+  LEEKS,
+  BEETROOT,
+  CHARD,
+  TUESDAY,
+  waste,
+  CARROTS_WASTE,
+  LETTUCE_WASTE,
+  POTATOES_WASTE,
+  RADISHES_WASTE,
+  LEEKS_WASTE,
+  decimal,
+  type WasteRow,
+  type Payload,
+} from "./documentationWaste.fixtures";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
-
-const COLD_STORE: Storage = { id: "st-cold", name: "Cold store", is_active: true };
-const ROOT_CELLAR: Storage = { id: "st-cellar", name: "Root cellar", is_active: true };
-const FARM_SHOP: Storage = { id: "st-shop", name: "Farm shop", is_active: true };
-const STORAGES = [COLD_STORE, ROOT_CELLAR, FARM_SHOP];
-
-const article = (name: string, unit: ShareArticle["default_movement_unit"]): ShareArticle => ({
-  id: `sa-${name.toLowerCase()}`, name, default_movement_unit: unit, is_active: true,
-});
-
-const CARROTS = article("Carrots", "KG");
-const LETTUCE = article("Lettuce", "PCS");
-const RADISHES = article("Radishes", "BUNCH");
-const POTATOES = article("Potatoes", "KG");
-const LEEKS = article("Leeks", "KG");
-const BEETROOT = article("Beetroot", "KG");
-const CHARD = article("Chard", "BUNCH");
-
-/** A waste row as the list returns it, with its ``storage_<id>`` flags. */
-type WasteRow = Waste & Record<string, unknown>;
-type Payload = Record<string, unknown>;
-
-/** A day of 2026: its ISO week and its backend day number (0 = Monday). */
-type Day = { week: number; day: number };
-const TUESDAY: Day = { week: 41, day: 1 };
-const WEDNESDAY: Day = { week: 41, day: 2 };
-const TUESDAY_WEEK_39: Day = { week: 39, day: 1 };
-
-const waste = (
-  id: string,
-  ofArticle: ShareArticle,
-  storage: Storage,
-  when: Day,
-  fields: Partial<WasteRow> = {},
-): WasteRow => ({
-  id,
-  year: 2026,
-  delivery_week: when.week,
-  day_number: when.day as Waste["day_number"],
-  share_article: ofArticle.id!,
-  share_article_name: ofArticle.name,
-  unit: ofArticle.default_movement_unit,
-  size: "M",
-  amount: null,
-  note: "",
-  storage: storage.id!,
-  created_by: null,
-  // The list flags the storage a row is kept in among all active ones.
-  ...Object.fromEntries(STORAGES.map((each) => [`storage_${each.id}`, each.id === storage.id])),
-  ...fields,
-});
-
-// Tuesday of week 41: carrots and lettuce thrown away from the cold store,
-// potatoes from the root cellar. Wednesday: radishes. Week 39: leeks.
-const CARROTS_WASTE = waste("waste-carrots", CARROTS, COLD_STORE, TUESDAY, {
-  amount: "4.00", note: "Rotten at the bottom",
-});
-const LETTUCE_WASTE = waste("waste-lettuce", LETTUCE, COLD_STORE, TUESDAY, { size: "L", amount: "12.00" });
-const POTATOES_WASTE = waste("waste-potatoes", POTATOES, ROOT_CELLAR, TUESDAY, {
-  amount: "25.00", note: "Sprouted",
-});
-const RADISHES_WASTE = waste("waste-radishes", RADISHES, COLD_STORE, WEDNESDAY, { amount: "3.00" });
-const LEEKS_WASTE = waste("waste-leeks", LEEKS, COLD_STORE, TUESDAY_WEEK_39, { amount: "7.00" });
 
 /** What the in-memory farm holds; the request spies answer from it. */
 let farm: { storages: Storage[]; articles: ShareArticle[]; wastes: WasteRow[] };
 let createdCount = 0;
-
-/** An amount as the backend's two-decimal field returns it. */
-const decimal = (value: unknown) =>
-  value === null || value === undefined || value === "" ? null : Number(value).toFixed(2);
-
-/** The fields every waste saved from the frozen day in the cold store carries. */
-const TUESDAY_IN_COLD_STORE = { storage: COLD_STORE.id, year: 2026, delivery_week: 41, day_number: 1 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -219,7 +171,7 @@ const UNIT = "commissioning.unit";
 const SIZE = "commissioning.size";
 const AMOUNT = "commissioning.amount";
 const NOTE = "commissioning.note";
-const ADD_ROW = /table\.add_plus_icon/;
+const ADD_ROW = /table\.add_record/;
 const ADD_ARTICLE = /commissioning\.add_share_article/;
 const EDIT_OR_DELETE = /table\.(edit|delete)/;
 
@@ -400,6 +352,15 @@ describe("DocumentationWaste loading", () => {
     expect(screen.queryByText("Potatoes")).not.toBeInTheDocument();
     expect(screen.queryByText("table.past_week_readonly")).not.toBeInTheDocument();
     expect(screen.getByText("explainers.waste")).toBeInTheDocument();
+  });
+
+  // The module loaded in week 41 of 2026; the page reads the date when it opens.
+  it("opens on today's week and day when it opens after New Year", async () => {
+    vi.setSystemTime(new Date(2027, 0, 7, 12, 0));
+    renderPage();
+
+    await waitFor(() => expect(api.list).toHaveBeenCalled());
+    expect(lastListRequest()).toEqual({ year: 2027, delivery_week: 1, day_number: 3, is_past: false });
   });
 
   it("loads no waste until the storages are known", async () => {
@@ -675,6 +636,55 @@ describe("DocumentationWaste recording waste", () => {
     await editingDone();
     expect(cellOf("Beetroot", AMOUNT)).toHaveTextContent(amountText(9));
     expect(screen.queryByText("table.save_failed_title")).not.toBeInTheDocument();
+  });
+
+  it("refuses an article, unit and size already thrown away that day from the storage", async () => {
+    renderPage();
+    await screen.findByText("Carrots");
+
+    await startNewRow();
+    await chooseArticle("Carrots");
+    await waitFor(() => expect(selectedIn(UNIT)).toBe("commissioning.units.kg"));
+    await userEvent.type(screen.getByRole("textbox", { name: AMOUNT }), "2");
+    await save();
+
+    const unique = "validation.unique.share_article_unit_size_must_be_unique";
+    expect(await screen.findByText(`${unique} — table.save_failed_hint`)).toBeInTheDocument();
+    expect(api.create).not.toHaveBeenCalled();
+  });
+
+  it("records an article thrown away the same day from another storage", async () => {
+    renderPage();
+    await screen.findByText("Carrots");
+
+    // The potatoes of that day went to waste from the root cellar.
+    await startNewRow();
+    await chooseArticle("Potatoes");
+    await userEvent.type(screen.getByRole("textbox", { name: AMOUNT }), "5");
+    await save();
+
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        expect.objectContaining({ ...TUESDAY_IN_COLD_STORE, share_article: POTATOES.id, amount: "5" }),
+      ),
+    );
+    await editingDone();
+  });
+
+  it("shows the server's refusal of the whole row without a field name before it", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const reason = "The fields year, delivery_week, day_number, share_article, unit, size, storage must make a unique set.";
+    api.create.mockRejectedValueOnce(refusal(reason, { non_field_errors: [reason] }));
+    renderPage();
+    await screen.findByText("Carrots");
+
+    await startNewRow();
+    await chooseArticle("Beetroot");
+    await userEvent.type(screen.getByRole("textbox", { name: AMOUNT }), "1");
+    await save();
+
+    expect(await screen.findByText(`${reason} — table.save_failed_hint`)).toBeInTheDocument();
+    expect(screen.queryByText(/non_field_errors/)).not.toBeInTheDocument();
   });
 
   it("offers an article created from the page in the article picker", async () => {

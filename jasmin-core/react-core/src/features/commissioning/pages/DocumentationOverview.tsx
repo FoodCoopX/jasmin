@@ -19,15 +19,20 @@ import { ExplainerText } from "@shared/ui";
 import { Select } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { currentWeek, useYearWeekState } from "@hooks/index";
+import { useYearWeekState } from "@hooks/index";
 
 // The aggregation rows carry no server id (grouped by article/size/unit), so a
 // stable synthetic key is minted per row for the table.
 type DocumentationRow = DocumentationAggregationItem & TableRecord;
 
 export default function DocumentationOverview() {
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedWeek,
+    setSelectedWeek,
+    currentWeek,
+  } = useYearWeekState({ allWeeks: true });
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedShareArticle, setSelectedShareArticle] = useState<
     string | null
@@ -106,17 +111,16 @@ export default function DocumentationOverview() {
           include_null_option={true}
         />
       )}
-      <div style={{ marginTop: "1em", marginBottom: "1em" }}>
+      <div className="mt-1em mb-1em">
         <ShareArticleSelector
           selectedShareArticle={selectedShareArticle}
           setSelectedShareArticle={setSelectedShareArticle}
           preserveSelection={true}
         />
       </div>
-      <div style={{ marginTop: "1em", marginBottom: "1em" }}>
+      <div className="mt-1em mb-1em">
         <Select
           value={selectedSource}
-          style={{ width: "12em" }}
           size="small"
           onChange={(val) =>
             setSelectedSource(
@@ -124,7 +128,7 @@ export default function DocumentationOverview() {
             )
           }
           options={sourceOptions}
-          className="bold-select"
+          className="bold-select documentation-source-select"
         />
       </div>
       <EditableTable

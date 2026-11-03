@@ -79,8 +79,6 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
     getCommissioningSharesGetDaysListQueryKey: queryKey,
     commissioningSharesBulkUpdateUpdate: (body: unknown, params: unknown) =>
       api.saveDays(body, params),
-    commissioningSharesCreate: vi.fn(),
-    commissioningSharesDestroy: vi.fn(),
   };
 });
 
@@ -537,6 +535,9 @@ describe("ShareDays changing a delivery day's plan", () => {
       changed_day_number: null, harvesting_day: MONDAY, packing_day: TUESDAY,
       washing_day: SATURDAY, cleaning_day: TUESDAY, get_current_stock_day: TUESDAY,
     });
+    // The week travels in the query only; the body carries the row's days.
+    expect(body).not.toHaveProperty("year");
+    expect(body).not.toHaveProperty("delivery_week");
     expect(highlightedIn(TUESDAY)).toEqual([WASHING]);
     expect(planOf(FRIDAY).movedTo).toBe(shown(THURSDAY));
   });
@@ -726,7 +727,7 @@ describe("ShareDays read-only plans", () => {
       expect(screen.queryByText(WEEK_BEGUN)).not.toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: "table.edit" })).toHaveLength(2);
       expect(screen.queryByRole("button", { name: "table.delete" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "table.add_plus_icon" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "table.add_record" })).not.toBeInTheDocument();
       expect(await openRow(FRIDAY, PACKING)).toBeInTheDocument();
     },
   );

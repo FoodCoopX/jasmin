@@ -50,6 +50,8 @@ from core.tenant_db import connection
 # a security-relevant signal (possible compromised office account) that would
 # otherwise leave no trace (the block raises before any ActionRateLog row).
 _security_log = logging.getLogger("authz")
+# The ledger's pruning logs with the other scheduled jobs.
+_tasks_log = logging.getLogger("tasks")
 
 _WEEKLY = "weekly"
 _PER_MINUTE = "per_minute"
@@ -350,3 +352,23 @@ def _notify_ops_approaching_cap(
         "may be compromised — investigate the ActionRateLog for this tenant."
     )
     transaction.on_commit(lambda: mail_admins(subject, body, fail_silently=True))
+
+
+# Keep the rate-limit ledger well beyond the widest guard window (7 days) so a
+# little history remains for forensic review, but bounded so the table can't
+# grow without limit.
+_ACTION_RATE_LOG_RETENTION = timedelta(days=30)
+
+
+def prune_action_rate_log() -> int:
+    """Delete ``ActionRateLog`` rows older than the retention window, daily.
+
+    ``ActionRateLog`` is a public-schema (SHARED_APPS) table holding every
+    tenant's rate-limited-action events, so a single delete prunes all tenants
+    at once. Jasmin's Huey task calls it, and it needs no Huey, so a host's own
+    scheduler can call it too. Returns the number of rows removed.
+    """
+    cutoff = timezone.now() - _ACTION_RATE_LOG_RETENTION
+    deleted, _ = ActionRateLog.objects.filter(created_at__lt=cutoff).delete()
+    _tasks_log.info("action_rate_log.prune.done deleted=%s cutoff=%s", deleted, cutoff)
+    return deleted

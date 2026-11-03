@@ -16,7 +16,7 @@ later stays blocked until someone lists it. Still sent:
 * reseller and customer documents (:data:`RESELLER_AND_CUSTOMER_SLUGS`);
 * GDPR data-subject emails, which run on legal deadlines
   (:data:`GDPR_DATA_SUBJECT_SLUGS`);
-* test sends the office makes to check its SMTP setup or a template
+* test sends that check the tenant's SMTP setup or a template
   (:attr:`EmailCategory.TEST_SEND`).
 
 ``accounts.invitation`` and ``accounts.welcome_user`` are sent both by login
@@ -45,7 +45,7 @@ class EmailCategory(StrEnum):
     # An email about a member's membership, sent by a member flow. Blocked in
     # onboarding mode, also for a slug that login flows share.
     MEMBER_LIFECYCLE = "member_lifecycle"
-    # A test the office sends to check its SMTP setup or a template. Always sent.
+    # A test send that checks the tenant's SMTP setup or a template. Always sent.
     TEST_SEND = "test_send"
 
 
@@ -104,7 +104,9 @@ def onboarding_mode_enabled_for_schema(schema_name: str) -> bool:
     """
     from django_tenants.utils import get_public_schema_name
 
-    from .models import Tenant, TenantSettings
+    from apps.shared.tenant_lookup import tenants_with_schema
+
+    from .models import TenantSettings
 
     if schema_name == get_public_schema_name():
         return False
@@ -112,7 +114,7 @@ def onboarding_mode_enabled_for_schema(schema_name: str) -> bool:
     if getattr(active_tenant, "schema_name", None) == schema_name:
         settings = TenantSettings.get_current_settings(active_tenant)
     else:
-        tenant = Tenant.objects.filter(schema_name=schema_name).first()
+        tenant = tenants_with_schema(schema_name).first()
         if tenant is None:
             return False
         settings = TenantSettings.get_current_settings(tenant)

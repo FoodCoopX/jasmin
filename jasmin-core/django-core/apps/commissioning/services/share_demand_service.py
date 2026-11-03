@@ -619,13 +619,13 @@ class ExternalDemandBackend:
 
 
 def _resolve_backend() -> _DemandBackend:
-    """Pick the backend based on the *current* tenant's settings.
-
-    Reads ``TenantSettings.uploads_weekly_share_amount`` for the current
-    tenant (set via the existing Configuration → Commissioning →
-    Planning & Management UI).
+    """Pick the backend from the operating mode in effect for the *current*
+    tenant: its ``TenantSettings.uploads_weekly_share_amount`` (Configuration
+    → App), or the mode a host application fixes
+    (``share_demand_is_imported``).
     """
     # Local import to keep this app loosely coupled from the tenants app.
+    from apps.shared.host_capabilities import share_demand_is_imported
     from apps.shared.tenants.models import TenantSettings
 
     # Outside a request (a Huey task, a management command under
@@ -634,7 +634,9 @@ def _resolve_backend() -> _DemandBackend:
     # so such a path picks the same backend as a request and never wipes an
     # external-CSV tenant's theoreticals.
     settings = TenantSettings.get_current_settings(connection.tenant)
-    if settings and settings.uploads_weekly_share_amount:
+    if share_demand_is_imported(
+        bool(settings and settings.uploads_weekly_share_amount)
+    ):
         return ExternalDemandBackend()
     return SubscriptionDemandBackend()
 

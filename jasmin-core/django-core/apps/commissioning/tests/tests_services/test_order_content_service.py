@@ -9,7 +9,10 @@ from unittest.mock import patch
 import pytest
 from django.utils import timezone
 
+from apps.commissioning.errors import OrderDayMissing
 from apps.commissioning.models import (
+    CrateContentInvoiceReseller,
+    CrateDeliveryNoteContent,
     CrateOrderContent,
     Order,
     OrderContent,
@@ -21,6 +24,8 @@ from apps.commissioning.services.order_content_service import OrderContentServic
 from apps.commissioning.tests.factories import (
     CrateFactory,
     CrateNetPriceFactory,
+    DeliveryNoteResellerFactory,
+    InvoiceResellerFactory,
     OfferFactory,
     OrderContentFactory,
     OrderFactory,
@@ -334,6 +339,100 @@ class TestCreateOrderWithContentAndCrates:
         )
         assert order.harvesting_day == 1
         assert order.packing_day == 2
+
+    @patch.object(OrderContentService, "create_movements", side_effect=_noop_movements)
+    @patch.object(
+        OrderContentService,
+        "create_all_theoretical_objects",
+        side_effect=_noop_theoretical,
+    )
+    def test_day_sent_empty_without_a_default_is_refused(
+        self, _mock_theo, _mock_mv, tenant
+    ):
+        OrdersDeliveryDayFactory(
+            day_number=2,
+            default_harvesting_day=1,
+            default_packing_day=2,
+            default_washing_day=1,
+            default_cleaning_day=None,
+        )
+        reseller = ResellerFactory()
+        offer = OfferFactory(amount=Decimal("100"), unit="KG", size="M")
+
+        with pytest.raises(OrderDayMissing) as refusal:
+            OrderContentService.create_order_with_content_and_crates(
+                reseller=reseller,
+                year=2026,
+                delivery_week=15,
+                day_number=2,
+                offer=offer,
+                amount=Decimal("10"),
+                harvesting_day=None,
+                packing_day=None,
+                washing_day=None,
+                cleaning_day=None,
+            )
+
+        assert refusal.value.code == "order.day_missing"
+        assert refusal.value.details == {"context": "cleaning_day", "day_number": 2}
+        assert not Order.objects.filter(reseller=reseller).exists()
+
+    @patch.object(OrderContentService, "create_movements", side_effect=_noop_movements)
+    @patch.object(
+        OrderContentService,
+        "create_all_theoretical_objects",
+        side_effect=_noop_theoretical,
+    )
+    def test_days_left_out_without_defaults_stay_empty(
+        self, _mock_theo, _mock_mv, tenant
+    ):
+        reseller = ResellerFactory()
+        offer = OfferFactory(amount=Decimal("100"), unit="KG", size="M")
+
+        OrderContentService.create_order_with_content_and_crates(
+            reseller=reseller,
+            year=2026,
+            delivery_week=15,
+            day_number=4,
+            offer=offer,
+            amount=Decimal("10"),
+        )
+
+        order = Order.objects.get(reseller=reseller)
+        assert order.harvesting_day is None
+        assert order.cleaning_day is None
+
+    @patch.object(OrderContentService, "create_movements", side_effect=_noop_movements)
+    @patch.object(
+        OrderContentService,
+        "create_all_theoretical_objects",
+        side_effect=_noop_theoretical,
+    )
+    def test_day_sent_empty_on_an_existing_order_keeps_its_day(
+        self, _mock_theo, _mock_mv, tenant
+    ):
+        reseller = ResellerFactory()
+        order = OrderFactory(
+            reseller=reseller,
+            year=2026,
+            delivery_week=15,
+            day_number=4,
+            harvesting_day=1,
+        )
+        offer = OfferFactory(amount=Decimal("100"), unit="KG", size="M")
+
+        OrderContentService.create_order_with_content_and_crates(
+            reseller=reseller,
+            year=2026,
+            delivery_week=15,
+            day_number=4,
+            offer=offer,
+            amount=Decimal("10"),
+            harvesting_day=None,
+        )
+
+        order.refresh_from_db()
+        assert order.harvesting_day == 1
 
 
 # ---------------------------------------------------------------------------
@@ -665,6 +764,103 @@ class TestGetOffersAndOrderContentOrderBlock:
 
         assert result["order"] is None
         assert result["items"] == []
+
+
+@pytest.mark.django_db
+class TestGetOffersAndOrderContentCrateInvoiceLines:
+    """``CrateContentInvoiceReseller.invoice`` is nullable, unlike the article
+    line's ``invoice``. A crate invoice line that reaches the delivery-note
+    lookup without an invoice must read as "no invoice", not crash."""
+
+    def _order_with_crate_line(self, *, invoice):
+        order = OrderFactory()
+        OrderContentFactory(order=order, offer=None, amount=Decimal("5"))
+        delivery_note = DeliveryNoteResellerFactory(order=order)
+        crate = CrateFactory()
+        crate_delivery_note_line = CrateDeliveryNoteContent.objects.create(
+            delivery_note=delivery_note,
+            crate_type=crate,
+            amount=2,
+            tax_rate=Decimal("19.00"),
+        )
+        crate_invoice_line = CrateContentInvoiceReseller.objects.create(
+            invoice=invoice,
+            crate_type=crate,
+            amount=2,
+            tax_rate=Decimal("19.00"),
+        )
+        crate_invoice_line.crate_delivery_note_contents.add(crate_delivery_note_line)
+        return order, delivery_note
+
+    def test_crate_line_without_invoice_reads_as_no_invoice(self, tenant):
+        order, delivery_note = self._order_with_crate_line(invoice=None)
+
+        result = OrderContentService.get_offers_and_order_content(
+            order.reseller_id, order.year, order.delivery_week, order.day_number
+        )
+
+        [row] = result["items"]
+        assert row["delivery_note_id"] == delivery_note.id
+        assert row["invoice_id"] is None
+        assert row["has_invoice"] is False
+        assert row["has_finalized_invoice"] is False
+        assert result["order"]["invoice_id"] is None
+        assert result["order"]["has_invoice"] is False
+
+    def test_crate_line_with_invoice_surfaces_it(self, tenant):
+        invoice = InvoiceResellerFactory()
+        order, _ = self._order_with_crate_line(invoice=invoice)
+
+        result = OrderContentService.get_offers_and_order_content(
+            order.reseller_id, order.year, order.delivery_week, order.day_number
+        )
+
+        [row] = result["items"]
+        assert row["invoice_id"] == invoice.id
+        assert row["has_invoice"] is True
+        assert result["order"]["invoice_id"] == invoice.id
+
+    # Both id orders, so the orphan line comes first in one of them whichever
+    # order the database returns the lines in.
+    @pytest.mark.parametrize(
+        ("orphan_id", "invoiced_id"),
+        [("222222222222", "zzzzzzzzzzzz"), ("zzzzzzzzzzzz", "222222222222")],
+        ids=["orphan-id-first", "orphan-id-last"],
+    )
+    def test_crate_line_without_invoice_never_hides_the_invoiced_one(
+        self, tenant, orphan_id, invoiced_id
+    ):
+        invoice = InvoiceResellerFactory()
+        order = OrderFactory()
+        OrderContentFactory(order=order, offer=None, amount=Decimal("5"))
+        delivery_note = DeliveryNoteResellerFactory(order=order)
+        crate = CrateFactory()
+        crate_delivery_note_line = CrateDeliveryNoteContent.objects.create(
+            delivery_note=delivery_note,
+            crate_type=crate,
+            amount=2,
+            tax_rate=Decimal("19.00"),
+        )
+        for line_id, line_invoice in ((orphan_id, None), (invoiced_id, invoice)):
+            crate_invoice_line = CrateContentInvoiceReseller.objects.create(
+                id=line_id,
+                invoice=line_invoice,
+                crate_type=crate,
+                amount=2,
+                tax_rate=Decimal("19.00"),
+            )
+            crate_invoice_line.crate_delivery_note_contents.add(
+                crate_delivery_note_line
+            )
+
+        result = OrderContentService.get_offers_and_order_content(
+            order.reseller_id, order.year, order.delivery_week, order.day_number
+        )
+
+        [row] = result["items"]
+        assert row["invoice_id"] == invoice.id
+        assert row["has_invoice"] is True
+        assert result["order"]["invoice_id"] == invoice.id
 
 
 # ---------------------------------------------------------------------------

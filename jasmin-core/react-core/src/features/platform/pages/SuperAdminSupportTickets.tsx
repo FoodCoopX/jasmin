@@ -49,8 +49,7 @@ export default function SuperAdminSupportTickets() {
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated || !isSuperAdmin) navigate("/login");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated, isSuperAdmin]);
+  }, [authLoading, isAuthenticated, isSuperAdmin, navigate]);
 
   const listQuery = useQuery<Paginated<AdminTicketListRow>>({
     queryKey: ["super-admin", "support-tickets", statusFilter],
@@ -227,6 +226,7 @@ function TicketDetailPanel({ id, onBack }: { id: string; onBack: () => void }) {
   };
 
   const replyMutation = useMutation({
+    meta: { silent: true },
     mutationFn: async (body: string) =>
       (
         await axiosService.post(SUPER_ADMIN_ENDPOINTS.supportTicketReply(id), {
@@ -241,6 +241,7 @@ function TicketDetailPanel({ id, onBack }: { id: string; onBack: () => void }) {
   });
 
   const statusMutation = useMutation({
+    meta: { silent: true },
     mutationFn: async (status: string) =>
       (
         await axiosService.post(

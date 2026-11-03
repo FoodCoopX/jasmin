@@ -1,0 +1,278 @@
+"""Errors of resellers, orders, delivery notes and invoices."""
+
+from __future__ import annotations
+
+from core.errors import (
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+)
+
+# --------------------------------------------------------------------------- #
+# Resellers                                                                    #
+# --------------------------------------------------------------------------- #
+
+
+class ResellerNotFound(NotFoundError):
+    code = "reseller.not_found"
+
+
+class ResellerEmailMissing(BadRequestError):
+    """A document could not be sent because the reseller has no
+    ``invoice_email`` configured."""
+
+    code = "reseller.email_missing"
+
+
+class ResellerInvoiceEmailDisabled(BadRequestError):
+    """An invoice could not be sent to the reseller because the reseller takes
+    invoices on paper only (``invoice_via_email`` is off)."""
+
+    code = "reseller.invoice_email_disabled"
+
+
+class AccountingEmailMissing(BadRequestError):
+    """An invoice could not be sent to accounting because the tenant has no
+    ``accounting_email`` configured."""
+
+    code = "accounting.email_missing"
+
+
+class OfferGroupCannotDeleteDefault(ConflictError):
+    """The tenant's default offer group is protected — it is seeded per tenant,
+    pre-selected for new resellers, and must always persist."""
+
+    code = "offer_group.cannot_delete_default"
+
+
+class OfferGroupNameUnknown(BadRequestError):
+    """An imported reseller row names an offer group no offer group carries."""
+
+    code = "offer_group.name_unknown"
+
+
+class OfferGroupNameAmbiguous(BadRequestError):
+    """An imported reseller row names an offer group more than one offer group
+    carries (names are not unique, and match ignoring case)."""
+
+    code = "offer_group.name_ambiguous"
+
+
+class OfferAmountChanged(ConflictError):
+    """A save would set an offer's available amount, but the stored amount is
+    no longer the one the client read: orders moved the stock since. The save
+    writes nothing, so it can't undo them; reloading shows the current amount,
+    which ``details.amount`` also carries."""
+
+    code = "offer.amount_changed"
+
+
+class OfferAlreadyOrdered(ConflictError):
+    """The office asked to delete an offer that order lines point at: deleting
+    it would take them along."""
+
+    code = "offer.already_ordered"
+
+
+class OfferAlreadySent(ConflictError):
+    """The office asked to delete an offer whose week has gone out by email to a
+    reseller it is for: that reseller may already be looking at it."""
+
+    code = "offer.already_sent"
+
+
+# --------------------------------------------------------------------------- #
+# Orders / delivery notes / invoices                                          #
+# --------------------------------------------------------------------------- #
+
+
+class OrderNotFound(NotFoundError):
+    code = "order.not_found"
+
+
+class OrderDayMissing(BadRequestError):
+    """A new order would start without one of its work days: the day was sent
+    empty, and the delivery day's order defaults (``OrdersDeliveryDay``) hold
+    none to fill it. ``context`` names the day, so the frontend can say which
+    one (``errors.order.day_missing_<field>``)."""
+
+    code = "order.day_missing"
+
+    def __init__(self, *, field: str, day_number: int) -> None:
+        super().__init__(
+            f"The order has no {field}, and no default {field} is set for "
+            f"delivery day {day_number}.",
+            details={"context": field, "day_number": day_number},
+        )
+
+
+class OrderContentNotFound(NotFoundError):
+    code = "order_content.not_found"
+
+
+class OrderContentChanged(ConflictError):
+    """A write of an order line found the line on another offer each time it
+    locked the offer it had looked up, so it stops rather than move the stock
+    of an offer the line may no longer order from. Another write moved the
+    line in the meantime; reloading shows its offer."""
+
+    code = "order_content.changed"
+
+
+class OrderContentOfferRequired(ForbiddenError):
+    """A customer order line must order an offer. A free ``share_article`` line
+    has no offer, so it would skip the stock check and the offer group's
+    offer set; only office staff may add one or change it."""
+
+    code = "order_content.offer_required"
+
+
+class OrderContentOfferNotInOfferGroup(ForbiddenError):
+    """A customer tried to order an offer outside their own reseller's offer
+    group (or their reseller has no offer group, so no offer is theirs)."""
+
+    code = "order_content.offer_not_in_offer_group"
+
+
+class OrderContentItemChangeForbidden(ForbiddenError):
+    """A customer tried to re-point an existing order line at another offer or
+    article. Stock was reserved on the line's current offer, so only office
+    staff may change what a line orders."""
+
+    code = "order_content.item_change_forbidden"
+
+
+class OrderContentOfferNotFinalized(ForbiddenError):
+    """A customer tried to order an offer that isn't finalized. A draft's prices
+    may still be missing or change, and the server prices a customer's line
+    from them; only office staff may order one."""
+
+    code = "order_content.offer_not_finalized"
+
+
+class OrderContentOfferWeekMismatch(ForbiddenError):
+    """A customer tried to order an offer of another year or week than the
+    order's. That offer would price the line and give it its stock; only office
+    staff may order one."""
+
+    code = "order_content.offer_week_mismatch"
+
+
+class OrderContentAmountNegative(ForbiddenError):
+    """A customer tried to set a negative amount on an order line. The line
+    would reach the delivery note and the invoice as a credit and hand its PU
+    back to the offer's stock; only office staff may set one."""
+
+    code = "order_content.amount_negative"
+
+
+class OrderableItemReferenceInvalid(BadRequestError):
+    """An order / delivery-note / invoice line must reference EXACTLY one item:
+    an ``offer`` or a ``share_article``, never both and never neither. A line
+    with both is ambiguous about what was sold; one with neither prices at zero
+    and prints as an empty position on a legally binding document."""
+
+    code = "orderable_item.reference_invalid"
+
+
+class InvoiceNotFound(NotFoundError):
+    code = "invoice.not_found"
+
+
+class OfferGroupNotFound(NotFoundError):
+    code = "offer_group.not_found"
+
+
+class StorageNotFound(NotFoundError):
+    code = "storage.not_found"
+
+
+class CrateNotFound(NotFoundError):
+    code = "crate.not_found"
+
+
+class CrateNetPriceInUse(ConflictError):
+    """A currently valid ``CrateNetPrice`` cannot be deleted while its crate is
+    in use (offers, crate orders, deliveries, a variation's packing crate) —
+    the same rule its serializer's ``can_be_deleted`` reports. Future and past
+    prices stay deletable."""
+
+    code = "crate.net_price_in_use"
+
+
+class CrateLineOfferBound(ConflictError):
+    """A write to an order's crate line would lower or delete the deposit
+    crates that come with its order lines. Those crates follow their order
+    line, which sets them anew whenever it is saved, so the office changes the
+    order line instead. ``details.offer_bound_amount`` is how many crates of
+    the line come with order lines."""
+
+    code = "crate_line.offer_bound"
+
+
+class CrateLineOfferBoundFields(ConflictError):
+    """A write to an order's crate line would change the price, rabatt or note
+    of the deposit crates that come with its order lines. The order line
+    rebuilds those rows at the crate's dated price, with no rabatt and no
+    note, whenever it is saved, so the change would not last. A note goes on
+    the crates added directly to the order, so it is refused only when none of
+    those remain after the write. ``details.offer_bound_amount`` is how many
+    crates of the line come with order lines."""
+
+    code = "crate_line.offer_bound_fields"
+
+
+class CratesDisabledOnDocuments(BadRequestError):
+    """A crate write was attempted while the tenant keeps crates OFF documents
+    (``crates_should_be_on_documents=False``): crates are neither priced nor put
+    on orders / delivery notes / invoices for such tenants."""
+
+    code = "crates.disabled_on_documents"
+
+
+class CrateDeliveryNoteContentMissingRequired(BadRequestError):
+    """A crate delivery-note-content write is missing one of
+    ``delivery_note_id`` / ``crate_type`` / ``amount``."""
+
+    code = "crate_delivery_note_content.missing_required"
+
+
+class CrateContentInvoiceMissingRequired(BadRequestError):
+    """A crate invoice-content write is missing one of
+    ``invoice_id`` / ``crate_type`` / ``amount``."""
+
+    code = "crate_content_invoice.missing_required"
+
+
+class InventoryEntryNotFound(NotFoundError):
+    """No INVENTORY movement exists for the requested composite ID."""
+
+    code = "inventory_entry.not_found"
+
+
+class RequiredFieldMissing(BadRequestError):
+    code = "required_field.missing"
+
+
+class DocumentDateRequired(BadRequestError):
+    """A legal document (delivery note / invoice) was saved without a date.
+
+    The service layer normally resolves the date via ``coerce_document_date``
+    (explicit → fallback_date → derived from the order's ISO week).
+    Reaching ``save()`` with ``date=None`` means a caller bypassed that
+    resolution — refuse loudly instead of silently dating the document
+    "today", which is a GoBD / UStG audit hazard.
+    """
+
+    code = "document.date_required"
+
+
+class DeliveryNoteFinalizeFailed(ConflictError):
+    """A delivery note could not be finalized as a prerequisite step (e.g.
+    before creating its invoice). ``Conflict`` (409): the request is
+    well-formed but the document's state blocked the transition. In the bulk
+    per-order flow this is caught per order and recorded, not aborting the
+    batch."""
+
+    code = "delivery_note.finalize_failed"

@@ -137,6 +137,9 @@ class TestRotationService:
         assert result.generated_secret
         assert "docker compose exec postgres" in result.instructions
         assert "\\password" in result.instructions
+        # Two logins, each with its own variable in .env.
+        assert "APP_DB_PASSWORD" in result.instructions
+        assert "POSTGRES_PASSWORD" in result.instructions
         # Typed at the prompt, never part of SQL text or the response.
         assert result.generated_secret not in result.instructions
         assert result.extras == {}
@@ -146,6 +149,10 @@ class TestRotationService:
         assert result.generated_secret is None
         assert result.items_affected == 0
         assert "Bunny dashboard" in result.instructions
+        # The origin secret changes through the next-secret slot, so Bunny
+        # never sends one the gateway refuses.
+        assert "BUNNY_ORIGIN_SECRET_NEXT" in result.instructions
+        assert "docker compose up -d gateway" in result.instructions
 
     def test_unknown_kind_raises(self):
         with pytest.raises(UnknownRotationKind):

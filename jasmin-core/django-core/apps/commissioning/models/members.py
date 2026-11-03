@@ -801,9 +801,9 @@ class Subscription(
             # NOTE: there is intentionally NO cancelled_effective_at >=
             # valid_from constraint. The member-exit cascade force-ends a
             # not-yet-started subscription effective on the member's exit date,
-            # which legitimately precedes valid_from (the member leaves before
-            # the subscription's term begins). See
-            # member_cancellation._force_end_subscription.
+            # or at the end of the current week for a backdated exit, which
+            # legitimately precedes valid_from (the member leaves before the
+            # term begins). See member_cancellation._force_end_date.
             models.CheckConstraint(
                 condition=Q(cancelled_effective_at__isnull=True)
                 | Q(valid_until__isnull=True)
@@ -869,8 +869,8 @@ class Subscription(
         #
         # There is intentionally no lower-bound (>= valid_from) check: the
         # member-exit cascade force-ends a not-yet-started subscription
-        # effective on the member's exit date, which legitimately precedes
-        # valid_from.
+        # effective on the member's exit date, or at the end of the current week
+        # for a backdated exit, which legitimately precedes valid_from.
         if (
             self.cancelled_effective_at is not None
             and self.valid_until is not None
@@ -962,8 +962,8 @@ class Subscription(
         """Materialise Shares + ShareDeliveries + ChargeSchedule on confirm.
 
         Also cascades confirmation to the owning Member if it is not yet
-        admin-confirmed (a confirmed subscription implies the member is
-        accepted). Confirmation does NOT cascade the other way around.
+        admin-confirmed, and refuses the confirm for a rejected one (see
+        ``SubscriptionService.admit_member_on_confirm``). No reverse cascade.
 
         While the tenant is in onboarding mode the office enters subscriptions
         that are already running, so a fresh confirm also materialises the
@@ -977,15 +977,7 @@ class Subscription(
             SubscriptionService,
         )
 
-        member = self.member
-        # Don't back-cascade confirmation onto a member who has initiated their
-        # exit (cancelled_at set) — they should not be re-admitted by confirming
-        # a leftover subscription. The confirm endpoint refuses such a
-        # subscription, or in onboarding mode requires the member to be
-        # confirmed already; the guard covers any other confirm() caller.
-        if not member.admin_confirmed and member.cancelled_at is None:
-            member.confirm(admin_user)
-
+        SubscriptionService.admit_member_on_confirm(self, admin_user=admin_user)
         SubscriptionService().materialize_confirmed_subscription(
             self,
             actor=admin_user,

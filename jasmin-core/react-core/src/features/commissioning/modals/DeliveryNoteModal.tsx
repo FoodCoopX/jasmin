@@ -15,7 +15,6 @@ import {
   useCommissioningDeliveryNotesRetrieve,
 } from "@shared/api/generated/commissioning/commissioning";
 import type { CommissioningCrateContentsDeliveryNoteDestroyParams } from "@shared/api/generated/models/commissioningCrateContentsDeliveryNoteDestroyParams";
-import type { CrateDeliveryNoteContent } from "@shared/api/generated/models/crateDeliveryNoteContent";
 import type { CrateDeliveryNoteContentWriteRequest } from "@shared/api/generated/models/crateDeliveryNoteContentWriteRequest";
 import type { DeliveryNoteResellerContent } from "@shared/api/generated/models/deliveryNoteResellerContent";
 import { useRoles } from "@shared/auth";
@@ -34,7 +33,6 @@ import type {
 } from "@shared/tables/BasicEditableTable/types";
 
 type DeliveryNoteContentRecord = DeliveryNoteResellerContent & TableRecord;
-type CrateContentRecord = CrateDeliveryNoteContent & TableRecord;
 
 interface DeliveryNoteModalProps {
   visible: boolean;
@@ -53,7 +51,7 @@ export default function DeliveryNoteModal({
   const { getSetting } = useTenant();
   // The setting gates crate CREATION (backend). The table shows when the tenant
   // puts crates on documents OR the document already HAS crate rows (see the
-  // ``|| lineItemsCrates.length`` at the render site) — so existing crates,
+  // ``|| crate_items?.length`` at the render site) — so existing crates,
   // incl. on finalized/immutable docs, still show and reconcile to the total.
   const showCratesOnDocuments = Boolean(
     getSetting("crates_should_be_on_documents", true),
@@ -75,11 +73,6 @@ export default function DeliveryNoteModal({
 
   const lineItems = useMemo(
     () => (deliveryNoteData?.line_items ?? []) as DeliveryNoteContentRecord[],
-    [deliveryNoteData],
-  );
-  const lineItemsCrates = useMemo(
-    () =>
-      (deliveryNoteData?.crate_items ?? []) as unknown as CrateContentRecord[],
     [deliveryNoteData],
   );
   const isFinalized = deliveryNoteData?.is_finalized ?? false;
@@ -133,6 +126,7 @@ export default function DeliveryNoteModal({
       amount: {
         title: t("commissioning.ordered_amount"),
         width: "6em",
+        inputType: "positive_decimal3",
         render: (value: unknown, record: DeliveryNoteContentRecord) => {
           const numValue = Number(value);
           if (isNaN(numValue) || numValue === 0) return "";
@@ -225,24 +219,22 @@ export default function DeliveryNoteModal({
 
   const apiFunctionsCrates = useMemo<ApiFunctions>(
     () =>
-      wrapApiFunctions<CrateDeliveryNoteContentWriteRequest & TableRecord>({
+      wrapApiFunctions<
+        CrateDeliveryNoteContentWriteRequest & TableRecord,
+        Record<string, string>,
+        CommissioningCrateContentsDeliveryNoteDestroyParams
+      >({
         create: (data) => commissioningCrateContentsDeliveryNoteCreate(data),
         update: (id, data) =>
-          commissioningCrateContentsDeliveryNotePartialUpdate(
-            id,
-            data as unknown as CrateDeliveryNoteContent,
-          ),
+          commissioningCrateContentsDeliveryNotePartialUpdate(id, data),
         delete: (id, data) =>
-          commissioningCrateContentsDeliveryNoteDestroy(
-            id,
-            data as unknown as CommissioningCrateContentsDeliveryNoteDestroyParams,
-          ),
+          commissioningCrateContentsDeliveryNoteDestroy(id, data),
       }),
     [],
   );
 
   const { tableProps: crateTableProps } = useDocumentCrateTable({
-    crateItems: lineItemsCrates,
+    crateItems: deliveryNoteData?.crate_items,
     documentField: "delivery_note_id",
     documentId: deliveryNoteId,
     canWrite: !isFinalized && isOffice,
@@ -307,7 +299,7 @@ export default function DeliveryNoteModal({
               "validation.unique.share_article_unit_size_must_be_unique",
             )}
           />
-          {(showCratesOnDocuments || lineItemsCrates.length > 0) && (
+          {(showCratesOnDocuments || !!deliveryNoteData.crate_items?.length) && (
             <>
               <div style={{ marginTop: "4em", marginBottom: "-1em" }}>
                 <h5>{t("commissioning.crates")}</h5>
