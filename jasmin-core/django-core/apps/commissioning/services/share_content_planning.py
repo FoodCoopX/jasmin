@@ -334,6 +334,7 @@ class ShareContentPlanning(ShareContentStock):
         shares: Iterable[Share],
         *,
         collect_movements: list[MovementShareArticle] | None = None,
+        replaced_movements: list[MovementShareArticle] | None = None,
     ) -> list[Any]:
         """Wipe + rebuild theoreticals and SHARECONTENT movements for ``shares``.
 
@@ -353,6 +354,12 @@ class ShareContentPlanning(ShareContentStock):
         ``collect_movements`` hands even
         the final cascade to an enclosing caller that has more movements to
         fold into the same single pass.
+
+        ``replaced_movements``: the movements of contents the caller deleted
+        before recreating them on these shares; their actual corrections are
+        re-derived with the shares' own old ones, under the Share locks and
+        before the allocation. Shares without contents rebuild nothing and
+        leave them to the caller.
 
         Returns the list of touched ``ShareContent`` ids (handy for tests
         and callers that want to invalidate caches).
@@ -433,6 +440,7 @@ class ShareContentPlanning(ShareContentStock):
             collect_movements=deferred_movements,
         )
 
+        old_movements.extend(replaced_movements or [])
         if old_movements:
             deferred_movements.extend(old_movements)
             # Re-derive actual harvest/purchase corrections for the OLD
