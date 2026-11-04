@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import App from "./App";
 import { reloadOnceForChunkError } from "@shared/utils/chunkReload";
+import { ERROR_REPORT_PRIVACY } from "@shared/utils/errorReportPrivacy";
 import "@shared/i18n";
 
 // Error monitoring (Sentry-compatible, points at self-hosted GlitchTip).
@@ -21,19 +22,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     environment: import.meta.env.PROD ? "production" : "development",
     // 5% performance-trace sampling matches the backend.
     tracesSampleRate: 0.05,
-    // GDPR: GlitchTip doesn't need a user's IP / email by default.
-    // Attach them per-event via ``Sentry.setUser({...})`` after a
-    // logged-in session, behind whatever consent gating you want. Every
-    // category collects unless turned off: ``userInfo`` off also stops the
-    // server inferring the IP, query strings and the Referer can carry
-    // tokens, and the User-Agent stays for the browser and OS.
-    dataCollection: {
-      userInfo: false,
-      cookies: false,
-      httpHeaders: { allow: ["User-Agent"] },
-      httpBodies: [],
-      urlQueryParams: false,
-    },
+    ...ERROR_REPORT_PRIVACY,
   });
 }
 
