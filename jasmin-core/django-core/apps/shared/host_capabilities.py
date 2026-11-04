@@ -80,9 +80,10 @@ def host_capabilities() -> dict[str, bool]:
       amounts; Tapir imports them on every visit, and a manual import there
       would compete with it.
     * ``delivery_stations`` — jasmin's delivery-station pages: the station list,
-      the delivery tours, the tour and pickup lists and the station fees. Tapir
-      syncs its pickup locations into jasmin, knows the members at each and
-      handles them itself.
+      the delivery tours, the tour and pickup lists and the station fees, and
+      the "also a delivery station" flag of resellers and sellers. Tapir syncs
+      its pickup locations into jasmin, knows the members at each and handles
+      them itself.
     """
     standalone = jasmin_host() == STANDALONE
     return {

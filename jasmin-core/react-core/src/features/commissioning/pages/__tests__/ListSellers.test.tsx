@@ -20,6 +20,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Reseller } from "@shared/api/generated/models";
+import { TenantContext } from "@shared/contexts/TenantContext";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
@@ -51,6 +52,9 @@ vi.mock("@hooks/configuration/useTenant", async () => {
   });
   return { useTenant: () => tenant };
 });
+
+// What the deployment offers, per test; a capability left unset is offered.
+const deployment = { capabilities: {} as Record<string, boolean> };
 
 // `useRoles` is real; it reads the signed-in user's roles from here.
 const auth = vi.hoisted(() => ({ roles: ["office"] as string[] }));
@@ -210,6 +214,7 @@ beforeEach(() => {
   auth.roles = ["office"];
   tenantState.record.organic_control_number = "";
   tenantState.settings = {};
+  deployment.capabilities = {};
   stubs.template = null;
   createdCount = 0;
   serverRows = [GRUBER, OBSTHOF, BERGER, HUBER];
@@ -249,7 +254,12 @@ function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   });
-  render(<QueryClientProvider client={queryClient}>{profiler.wrap(<ListSellers />)}</QueryClientProvider>);
+  const tenantContext = { tenant: deployment } as unknown as Parameters<typeof TenantContext.Provider>[0]["value"];
+  render(
+    <QueryClientProvider client={queryClient}>
+      <TenantContext.Provider value={tenantContext}>{profiler.wrap(<ListSellers />)}</TenantContext.Provider>
+    </QueryClientProvider>,
+  );
   return { user, profiler };
 }
 
@@ -442,6 +452,21 @@ describe("ListSellers rows", () => {
     expect(flag(gruber, RESELLER)).not.toBeChecked();
     expect(flag(rowOf("Obsthof Maier"), RESELLER)).toBeChecked();
     expect(flag(rowOf("Hofkäserei Berger"), DELIVERY_STATION)).toBeChecked();
+  });
+
+  it("leaves out the delivery station flag, in the table and the template, where the host keeps its pickup locations", async () => {
+    deployment.capabilities = { delivery_stations: false };
+    tenantState.settings = { allow_upload_for_data_lists: true };
+    const { user } = await renderLoaded();
+
+    expect(columnTitles()).not.toContain(DELIVERY_STATION);
+    expect(columnTitles()).toContain(RESELLER);
+
+    await user.click(screen.getByRole("button", { name: "csv_upload.open" }));
+    await screen.findByRole("dialog", { name: "csv_upload.import_title" });
+    const templateColumns = (stubs.template?.columns ?? []).map((column) => column.dataIndex);
+    expect(templateColumns).not.toContain("is_also_delivery_station");
+    expect(templateColumns).toContain("is_reseller");
   });
 });
 
