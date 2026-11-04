@@ -2,7 +2,7 @@
 # Managed by scripts/mypy_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/mypy_baseline.py freeze
-# 302 finding(s).
+# 301 finding(s).
 
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
@@ -107,7 +107,6 @@ apps/commissioning/services/invoice_service.py: Item "None" of "OrderContent | N
 apps/commissioning/services/member_email.py: List item 0 has incompatible type "str | None"; expected "str"  [list-item]
 apps/commissioning/services/member_service.py: Argument "user" to "resend_invitation" has incompatible type "JasminUser | None"; expected "JasminUser"  [arg-type]
 apps/commissioning/services/member_service.py: Item "None" of "JasminUser | None" has no attribute "account_status"  [union-attr]
-apps/commissioning/services/movements.py: Argument "entity_filter" to "get_theoretical_current_stock" of "StockService" has incompatible type "dict[str, list[str]] | None"; expected "dict[str, str] | None"  [arg-type]
 apps/commissioning/services/movements.py: Argument "size" to "calculate_current_stock_for_allocation" has incompatible type "str | None"; expected "str"  [arg-type]
 apps/commissioning/services/movements.py: Argument "unit" to "calculate_current_stock_for_allocation" has incompatible type "str | None"; expected "str"  [arg-type]
 apps/commissioning/services/offer_service.py: Argument "amount_pu" to "_persist_offer" of "OfferService" has incompatible type "Decimal | None"; expected "Decimal"  [arg-type]

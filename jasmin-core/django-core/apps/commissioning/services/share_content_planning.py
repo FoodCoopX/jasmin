@@ -95,6 +95,7 @@ class ShareContentPlanning(ShareContentStock):
         data: dict[str, Any],
         *,
         collect_movements: list[MovementShareArticle] | None = None,
+        replaced_movements: list[MovementShareArticle] | None = None,
     ) -> list[ShareContent]:
         """Process frontend data and create ShareContent + theoretical objects + movements.
 
@@ -104,6 +105,11 @@ class ShareContentPlanning(ShareContentStock):
         could interleave with a concurrent writer and AB/BA-deadlock). When the
         caller passes ``collect_movements`` it takes over even that final
         cascade (``replace_share_planning`` folds the old movements in too).
+
+        ``replaced_movements``: the movements of the contents this data
+        replaces, whose actual corrections are re-derived once the new
+        theoretical objects exist and before the SHARECONTENT movements are
+        allocated, which read those corrections from the ledger.
         """
         year: int = data.get("year")
         delivery_week: int = data.get("delivery_week")
@@ -280,6 +286,25 @@ class ShareContentPlanning(ShareContentStock):
             )
         )
 
+        self._build_planned_movements(
+            share_contents,
+            collect_movements=collect_movements,
+            replaced_movements=replaced_movements or [],
+        )
+        return share_contents
+
+    def _build_planned_movements(
+        self,
+        share_contents: list[ShareContent],
+        *,
+        collect_movements: list[MovementShareArticle] | None,
+        replaced_movements: list[MovementShareArticle],
+    ) -> None:
+        """The theoretical objects and SHARECONTENT movements of freshly saved
+        ``share_contents``; see ``process_share_planning_data``."""
+        from .snapshot_service import SnapshotService
+        from .theoretical_objects import recalculate_actual_corrections
+
         # Compute the demand totals once and share them — both builders
         # need the identical lookup.
         deferred_movements: list[MovementShareArticle] = (
@@ -291,17 +316,17 @@ class ShareContentPlanning(ShareContentStock):
             variation_totals_by_week=variation_totals_by_week,
             collect_movements=deferred_movements,
         )
+        # A no-op without replaced movements.
+        recalculate_actual_corrections(
+            replaced_movements, collect_movements=deferred_movements
+        )
         self.create_movements(
             share_contents,
             variation_totals_by_week=variation_totals_by_week,
             collect_movements=deferred_movements,
         )
         if collect_movements is None and deferred_movements:
-            from .snapshot_service import SnapshotService
-
             SnapshotService.cascade_for_movements(deferred_movements)
-
-        return share_contents
 
     @transaction.atomic
     def recompute_for_shares(
@@ -407,11 +432,6 @@ class ShareContentPlanning(ShareContentStock):
             variation_totals_by_week=variation_totals_by_week,
             collect_movements=deferred_movements,
         )
-        self.create_movements(
-            share_contents,
-            variation_totals_by_week=variation_totals_by_week,
-            collect_movements=deferred_movements,
-        )
 
         if old_movements:
             deferred_movements.extend(old_movements)
@@ -423,11 +443,19 @@ class ShareContentPlanning(ShareContentStock):
             # ≠ counted. Recomputing from the OLD dimensions re-derives them
             # against the CURRENT theoreticals (= 0 if gone) → entity total =
             # counted again. (SHARECONTENT keys in old_movements match no actual
-            # correction, so they are harmless no-ops here.) The mutated
-            # corrections join the deferred union instead of cascading here.
+            # correction, so they are harmless no-ops here.) It runs before the
+            # SHARECONTENT movements are allocated, which read these corrections
+            # from the ledger. The mutated corrections join the deferred union
+            # instead of cascading here.
             recalculate_actual_corrections(
                 old_movements, collect_movements=deferred_movements
             )
+
+        self.create_movements(
+            share_contents,
+            variation_totals_by_week=variation_totals_by_week,
+            collect_movements=deferred_movements,
+        )
 
         # ONE cascade over everything the rebuild touched — old entities whose
         # movements were wiped/relocated, new theoretical + SHARECONTENT
@@ -525,6 +553,9 @@ class ShareContentPlanning(ShareContentStock):
             # contributing harvest/production demand, THEN cascade stock
             # snapshots — snapshots must be recomputed last, after the
             # movement set is corrected (mirrors the wipe-and-rebuild path).
+            # The survivors first, which takes their Share rows before any
+            # theoretical_sum lock, as every recompute does; they allocate
+            # nothing of the cleared amounts.
             if affected_share_ids:
                 from .recompute import recompute_shares
 
@@ -565,7 +596,9 @@ class ShareContentPlanning(ShareContentStock):
 
         old_share_contents.delete()
         share_contents = self.process_share_planning_data(
-            data, collect_movements=deferred_movements
+            data,
+            collect_movements=deferred_movements,
+            replaced_movements=old_movements,
         )
 
         # Re-stamp each rebuilt row from its matching (share, delivery_station).
@@ -595,11 +628,9 @@ class ShareContentPlanning(ShareContentStock):
                     ],
                 )
 
-        if old_movements:
-            deferred_movements.extend(old_movements)
-            recalculate_actual_corrections(
-                old_movements, collect_movements=deferred_movements
-            )
+        # The old movements' corrections were re-derived before the new
+        # movements were allocated; their entities join the one cascade.
+        deferred_movements.extend(old_movements)
         if deferred_movements:
             SnapshotService.cascade_for_movements(deferred_movements)
 
