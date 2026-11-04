@@ -1,8 +1,14 @@
 import { Card, Spin, Typography } from "antd";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useCommissioningShareWeightsByWeekList } from "@shared/api/generated/commissioning/commissioning";
-import type { ShareWeightsByWeek } from "@shared/api/generated/models";
+import {
+  useCommissioningShareWeightsByWeekList,
+  useCommissioningShareWeightsSummaryList,
+} from "@shared/api/generated/commissioning/commissioning";
+import type {
+  ShareWeightsByWeek,
+  ShareWeightsSummary,
+} from "@shared/api/generated/models";
 import { useIsDarkTheme } from "@shared/contexts/LocaleContext";
 import { ExplainerText, StatsBarChart } from "@shared/ui";
 import type { StatsBarSeries } from "@shared/ui";
@@ -18,6 +24,7 @@ import {
   useNumberFormat,
   useShareTypeVariationSizeOptions,
 } from "@hooks/index";
+import ShareWeightsSummaryTable from "../components/ShareWeightsSummaryTable";
 import StatisticsRangePicker from "../components/StatisticsRangePicker";
 import { useStatisticsRange } from "../hooks/useStatisticsRange";
 
@@ -94,6 +101,9 @@ function weekTargets(size: SizeSeries, weekKeys: string[]): (number | null)[] {
  * server's order (``share_type_rank``, ``variation_rank``). Laid out like
  * the purchase statistics; the averages come from the weights recorded under
  * the boxes packing list, aggregated server-side (``share_weights_by_week``).
+ * Below the chart, each size's figures for the whole range: its weighed
+ * boxes, their average and spread, and how far they were over or under their
+ * targets in sum (``share_weights_summary``).
  */
 export default function StatisticsShareWeights() {
   const { t } = useTranslation();
@@ -107,8 +117,11 @@ export default function StatisticsShareWeights() {
     params,
     { query: { enabled: !!range } },
   );
+  const { data: summary } = useCommissioningShareWeightsSummaryList(params, {
+    query: { enabled: !!range },
+  });
 
-  const { chartData, series } = useMemo(() => {
+  const { chartData, series, colorByVariation } = useMemo(() => {
     const sizes = sizeSeriesOf((rawData ?? []) as ShareWeightsByWeek[]);
 
     // Each share type takes one hue of the palette, its sizes shades of it.
@@ -169,7 +182,15 @@ export default function StatisticsShareWeights() {
         },
       ];
     });
-    return { chartData, series };
+    // The summary table names each size by its first variation, as the chart
+    // does.
+    const colorByVariation = new Map(
+      sizes.map((size) => [
+        size.first.share_type_variation,
+        colorOf.get(size) ?? palette[0],
+      ]),
+    );
+    return { chartData, series, colorByVariation };
   }, [rawData, range, isDark, getShareTypeVariationSizeLabel, t]);
 
   return (
@@ -208,6 +229,19 @@ export default function StatisticsShareWeights() {
             showAllXLabels
           />
         </Card>
+
+        {/* A range in which nothing was weighed says so in the chart alone. */}
+        {(summary ?? []).some((row) => row.weighed_boxes > 0) && (
+          <Card
+            className="dark-green-border mt-1em"
+            title={t("commissioning.statistics_share_weights_summary_title")}
+          >
+            <ShareWeightsSummaryTable
+              rows={(summary ?? []) as ShareWeightsSummary[]}
+              colorByVariation={colorByVariation}
+            />
+          </Card>
+        )}
       </Spin>
 
       <ExplainerText title={t("common.info")}>

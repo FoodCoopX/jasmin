@@ -154,5 +154,6 @@ from .statistics_serializer import (
     MemberGrowthStatisticSerializer,
     PurchaseCostByWeekSerializer,
     ShareWeightsByWeekSerializer,
+    ShareWeightsSummarySerializer,
 )
 from .subscription_import_serializer import SubscriptionImportSerializer

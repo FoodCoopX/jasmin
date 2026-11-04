@@ -86,5 +86,5 @@
   "overview_resellers": "",
   "planning_share_content_page": "",
   "statistics_purchase": "",
-  "statistics_share_weights": "Pro Woche das Durchschnittsgewicht der gewogenen Anteile jeder Größe als Balken, aus den Gewichten unter der Pack-Liste (Kisten); gestrichelt das Sollgewicht der Größe. Fehlt in einer Woche der Balken einer Größe, wurde in dieser Woche kein Anteil von ihr gewogen. Lose verpackte Größen kommen nicht vor, da nur Kisten gewogen werden."
+  "statistics_share_weights": "Pro Woche das Durchschnittsgewicht der gewogenen Anteile jeder Größe als Balken, aus den Gewichten unter der Pack-Liste (Kisten); gestrichelt das Sollgewicht der Größe. Fehlt in einer Woche der Balken einer Größe, wurde in dieser Woche kein Anteil von ihr gewogen. Lose verpackte Anteile kommen nicht vor, da nur Kisten gewogen werden. Darunter für den ganzen Zeitraum je Größe: wie viele Kisten gewogen wurden, ihr Durchschnitt mit der Standardabweichung zwischen den einzelnen Kisten, das Sollgewicht und wie viel die gewogenen Kisten zusammen über (+) oder unter (−) ihrem Sollgewicht lagen. Der Durchschnitt dort zählt jede gewogene Kiste; ein Balken mittelt die Liefertage seiner Woche, jeder Tag zählt einmal."
 }

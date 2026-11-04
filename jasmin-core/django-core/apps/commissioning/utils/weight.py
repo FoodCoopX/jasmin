@@ -13,10 +13,15 @@ def quantize_weight(value: Decimal | float) -> Decimal:
     return Decimal(value).quantize(WEIGHT_QUANTIZE, rounding=ROUND_HALF_UP)
 
 
+def taken_weights(weights: Iterable[Decimal | None]) -> list[Decimal]:
+    """The weights that were taken: an empty or zero weight wasn't. Each of a
+    share's up to four weights is one box weighed."""
+    return [weight for weight in weights if weight is not None and weight > 0]
+
+
 def mean_weight(weights: Iterable[Decimal | None]) -> Decimal | None:
-    """The mean of the weights that were taken, unrounded: an empty or zero
-    weight wasn't taken and doesn't count. ``None`` when none was. A share's
-    weight is the mean of its up to four weighings, and a week's average the
-    mean of its shares' weights."""
-    taken = [weight for weight in weights if weight is not None and weight > 0]
+    """The mean of the ``taken_weights``, unrounded; ``None`` when none was
+    taken. A share's weight is the mean of its up to four weighings, and a
+    week's average the mean of its shares' weights."""
+    taken = taken_weights(weights)
     return sum(taken, Decimal(0)) / len(taken) if taken else None

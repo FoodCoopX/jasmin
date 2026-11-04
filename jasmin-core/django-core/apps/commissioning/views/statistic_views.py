@@ -28,6 +28,7 @@ from ..serializers import (
     MemberGrowthStatisticSerializer,
     PurchaseCostByWeekSerializer,
     ShareWeightsByWeekSerializer,
+    ShareWeightsSummarySerializer,
 )
 from ..services import (
     ShareContentService,
@@ -35,6 +36,7 @@ from ..services import (
     calculate_member_dashboard_statistics,
     calculate_member_growth_statistics,
     calculate_share_weights_by_week,
+    calculate_share_weights_summary,
 )
 from ..utils.query_params import validate_query_params
 
@@ -178,6 +180,35 @@ def share_weights_by_week(request: Request) -> Response:
     start_date, end_date = _weekly_report_range(request)
     data = calculate_share_weights_by_week(start_date, end_date)
     serializer = ShareWeightsByWeekSerializer(data, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Get the share weights of a date range per share type size",
+    description=f"""
+    Per share type size packed in boxes, over a date range: how many of its
+    boxes were weighed (each weight taken of a share one box), their average
+    weight and the standard deviation between them, the size's target weight,
+    and how much the weighed boxes weighed over or under their targets in sum.
+    A size takes in the variations succeeding each other in it. Only the
+    variations packed in boxes, physical and not packed in bulk, as only they
+    are weighed. Office only.
+
+    {_WEEKLY_REPORT_BOUNDS}
+    """,
+    parameters=_WEEKLY_REPORT_PARAMETERS,
+    responses={
+        200: ShareWeightsSummarySerializer(many=True),
+        400: ErrorResponseSerializer,
+    },
+)
+@api_view(["GET"])
+@permission_classes([IsOffice])
+def share_weights_summary(request: Request) -> Response:
+    """The weighed boxes of [start_date, end_date] per share type size."""
+    start_date, end_date = _weekly_report_range(request)
+    data = calculate_share_weights_summary(start_date, end_date)
+    serializer = ShareWeightsSummarySerializer(data, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 

@@ -3,7 +3,8 @@
  * tenant's current fiscal year, the average weight of the weighed shares of
  * each box-packed share type variation as a bar, with its target weight as a
  * dashed line in the bar's colour through every week; a share type's
- * variations share one hue, in shades along their order. Rendered through the real range picker, date
+ * variations share one hue, in shades along their order. Below the chart,
+ * each size's figures for the whole range. Rendered through the real range picker, date
  * and number format hooks and the shared bar chart, whose
  * visually-hidden table carries every week's figures. The generated
  * commissioning client is the mocking boundary: its query hook is a real
@@ -13,10 +14,10 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ShareWeightsByWeek } from "@shared/api/generated/models";
+import type { ShareWeightsByWeek, ShareWeightsSummary } from "@shared/api/generated/models";
 import type { StatsBarSeries } from "@shared/ui";
 import { colorRamp } from "@shared/utils/colorRamp";
 import { VARIATION_PALETTE } from "@shared/utils/variationPalette";
@@ -59,7 +60,7 @@ vi.mock("@hooks/configuration/useTenant", async () => {
   return { useTenant: () => (fiscalYear.startsInJuly ? fromJuly : calendarYear) };
 });
 
-const api = vi.hoisted(() => ({ shareWeightsByWeek: vi.fn() }));
+const api = vi.hoisted(() => ({ shareWeightsByWeek: vi.fn(), shareWeightsSummary: vi.fn() }));
 
 vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
   const { useQuery } = await import("@tanstack/react-query");
@@ -71,6 +72,16 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
       return useQuery({
         queryKey: ["/api/commissioning/share_weights_by_week/", params],
         queryFn: async () => api.shareWeightsByWeek(params),
+        enabled: options?.query?.enabled,
+      });
+    },
+    useCommissioningShareWeightsSummaryList: function useShareWeightsSummary(
+      params: unknown,
+      options?: { query?: { enabled?: boolean } },
+    ) {
+      return useQuery({
+        queryKey: ["/api/commissioning/share_weights_summary/", params],
+        queryFn: async () => api.shareWeightsSummary(params),
         enabled: options?.query?.enabled,
       });
     },
@@ -152,6 +163,7 @@ beforeEach(() => {
   chart.series = [];
   fiscalYear.startsInJuly = false;
   api.shareWeightsByWeek.mockReset().mockResolvedValue(AUTUMN);
+  api.shareWeightsSummary.mockReset().mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -322,12 +334,98 @@ describe("StatisticsShareWeights", () => {
     ]);
   });
 
+  it("shows each size's figures for the whole range below the chart", async () => {
+    const summaryRow = (
+      variation: keyof typeof VARIATIONS,
+      figures: Partial<ShareWeightsSummary>,
+    ): ShareWeightsSummary => ({
+      share_type_variation: VARIATIONS[variation].id,
+      share_type_name: VARIATIONS[variation].name,
+      size: VARIATIONS[variation].size,
+      target_weight: VARIATIONS[variation].target,
+      weighed_boxes: 0,
+      average_weight: null,
+      standard_deviation: null,
+      total_difference_from_target: null,
+      ...figures,
+    });
+    api.shareWeightsSummary.mockResolvedValue([
+      summaryRow("small", {
+        weighed_boxes: 4,
+        average_weight: "2.525",
+        standard_deviation: "0.299",
+        total_difference_from_target: "0.100",
+      }),
+      // One box, under its target: no spread yet.
+      summaryRow("medium", {
+        weighed_boxes: 1,
+        average_weight: "3.800",
+        total_difference_from_target: "-0.200",
+      }),
+      // Delivered, never weighed: no figures.
+      summaryRow("eggs", {}),
+    ]);
+    renderPage();
+
+    const card = (await screen.findByText("commissioning.statistics_share_weights_summary_title")).closest(".ant-card");
+    if (!(card instanceof HTMLElement)) throw new Error("No summary card");
+    const cellsOf = (label: string) =>
+      Array.from(within(card).getByText(label).closest("tr")!.querySelectorAll("td"), (cell) => cell.textContent);
+
+    await waitFor(() => expect(within(card).getByText(SMALL)).toBeInTheDocument());
+    expect(api.shareWeightsSummary.mock.calls[0][0]).toEqual({ start_date: "2026-01-01", end_date: "2026-12-31" });
+    expect(cellsOf(SMALL)).toEqual([SMALL, "4", "2,525 ± 0,299 kg", "2,500 kg", "+0,100 kg"]);
+    expect(cellsOf(MEDIUM)).toEqual([MEDIUM, "1", "3,800 kg", "4,000 kg", "−0,200 kg"]);
+    expect(cellsOf("Eggs · L")).toEqual(["Eggs · L", "0", "—", "—", "—"]);
+  });
+
+  it("gives each size in the figures its colour from the chart", async () => {
+    api.shareWeightsSummary.mockResolvedValue([
+      {
+        share_type_variation: "v-m",
+        share_type_name: "Vegetables",
+        size: "M",
+        target_weight: "4.000",
+        weighed_boxes: 1,
+        average_weight: "4.100",
+        standard_deviation: null,
+        total_difference_from_target: "0.100",
+      },
+    ]);
+    renderPage();
+    await screen.findByRole("table", { name: CHART });
+
+    const title = await screen.findByText("commissioning.statistics_share_weights_summary_title");
+    const card = title.closest(".ant-card");
+    if (!(card instanceof HTMLElement)) throw new Error("No summary card");
+    const row = (await within(card).findByText(MEDIUM)).closest("tr")!;
+    const medium = chart.series.find((series) => series.id === "average_v-m");
+    expect(row.querySelector("circle")?.getAttribute("fill")).toBe(medium?.color);
+  });
+
   it("says when no share was weighed in the range", async () => {
     api.shareWeightsByWeek.mockResolvedValue([point(41, "medium", null)]);
+    // The same range's figures: the medium size delivered, never weighed.
+    api.shareWeightsSummary.mockResolvedValue([
+      {
+        share_type_variation: "v-m",
+        share_type_name: "Vegetables",
+        size: "M",
+        target_weight: "4.000",
+        weighed_boxes: 0,
+        average_weight: null,
+        standard_deviation: null,
+        total_difference_from_target: null,
+      },
+    ]);
     renderPage();
 
     expect(await screen.findByText("commissioning.statistics_share_weights_no_data")).toBeInTheDocument();
     expect(screen.queryByRole("table", { name: CHART })).not.toBeInTheDocument();
+    // Nor are there figures for the range, once they have arrived.
+    await waitFor(() => expect(api.shareWeightsSummary).toHaveBeenCalled());
+    await flushMicrotasks();
+    expect(screen.queryByText("commissioning.statistics_share_weights_summary_title")).not.toBeInTheDocument();
   });
 
   it("settles after loading instead of re-rendering in a loop", async () => {

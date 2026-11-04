@@ -99,3 +99,41 @@ class ShareWeightsByWeekSerializer(serializers.Serializer):
     average_weight = serializers.DecimalField(
         max_digits=10, decimal_places=3, allow_null=True
     )
+
+
+class ShareWeightsSummarySerializer(serializers.Serializer):
+    """One share type size's weighed boxes over a date range, for the weight
+    statistics; weights in kg as 3dp strings, each weight taken of a share one
+    box. A size takes in the variations succeeding each other in it, and names
+    its first one, as the weekly points of the same range do.
+    ``average_weight`` is null where none of the size's boxes was weighed,
+    ``standard_deviation`` below two weighed boxes, ``target_weight`` where the
+    size's latest-starting variation has none, and
+    ``total_difference_from_target`` where no weighed box has a target."""
+
+    share_type_variation = serializers.CharField()
+    share_type_name = serializers.CharField()
+    size = serializers.CharField()
+    target_weight = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        allow_null=True,
+        help_text="The target of the size's variation that starts latest.",
+    )
+    weighed_boxes = serializers.IntegerField()
+    average_weight = serializers.DecimalField(
+        max_digits=10, decimal_places=3, allow_null=True
+    )
+    standard_deviation = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        allow_null=True,
+        help_text="The sample standard deviation between the weighed boxes.",
+    )
+    total_difference_from_target = serializers.DecimalField(
+        max_digits=15,
+        decimal_places=3,
+        allow_null=True,
+        help_text="The weighed boxes' differences from their own variation's "
+        "target, summed; negative where they weighed too little.",
+    )

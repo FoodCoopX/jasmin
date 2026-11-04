@@ -19660,6 +19660,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Error response.
+  /api/commissioning/share_weights_summary/:
+    get:
+      operationId: commissioning_share_weights_summary_list
+      description: "\n    Per share type size packed in boxes, over a date range:
+        how many of its\n    boxes were weighed (each weight taken of a share one
+        box), their average\n    weight and the standard deviation between them, the
+        size's target weight,\n    and how much the weighed boxes weighed over or
+        under their targets in sum.\n    A size takes in the variations succeeding
+        each other in it. Only the\n    variations packed in boxes, physical and not
+        packed in bulk, as only they\n    are weighed. Office only.\n\n    The range
+        is bounded: `start_date` must be on or before `end_date`, and the two may
+        span at most 5 years.\n    "
+      summary: Get the share weights of a date range per share type size
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Inclusive range end (YYYY-MM-DD). At most 5 years after `start_date`.
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: Inclusive range start (YYYY-MM-DD)
+        required: true
+      tags:
+      - commissioning
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ShareWeightsSummary'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
   /api/commissioning/shares/:
     get:
       operationId: commissioning_shares_list
@@ -46438,6 +46491,59 @@ components:
       - week
       - weighed_shares
       - year
+    ShareWeightsSummary:
+      type: object
+      description: |-
+        One share type size's weighed boxes over a date range, for the weight
+        statistics; weights in kg as 3dp strings, each weight taken of a share one
+        box. A size takes in the variations succeeding each other in it, and names
+        its first one, as the weekly points of the same range do.
+        ``average_weight`` is null where none of the size's boxes was weighed,
+        ``standard_deviation`` below two weighed boxes, ``target_weight`` where the
+        size's latest-starting variation has none, and
+        ``total_difference_from_target`` where no weighed box has a target.
+      properties:
+        share_type_variation:
+          type: string
+        share_type_name:
+          type: string
+        size:
+          type: string
+        target_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,3})?$
+          nullable: true
+          description: The target of the size's variation that starts latest.
+        weighed_boxes:
+          type: integer
+        average_weight:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          nullable: true
+        standard_deviation:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          nullable: true
+          description: The sample standard deviation between the weighed boxes.
+        total_difference_from_target:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,3})?$
+          nullable: true
+          description: The weighed boxes' differences from their own variation's target,
+            summed; negative where they weighed too little.
+      required:
+      - average_weight
+      - share_type_name
+      - share_type_variation
+      - size
+      - standard_deviation
+      - target_weight
+      - total_difference_from_target
+      - weighed_boxes
     SharesDeliveryDay:
       type: object
       properties:
