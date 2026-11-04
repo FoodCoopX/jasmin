@@ -161,6 +161,11 @@ updates:
       # engines together, and only to an LTS release.
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
+      # Python moves in the backend Dockerfile, ci.yml's python-version and
+      # mypy's python_version in pyproject.toml together, once every compiled
+      # dependency (ortools above all) ships wheels for the new release.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-minor"]
 
   # Images the compose files run as published (postgres, redis, nginx,
   # certbot, glitchtip, uptime-kuma, mailhog). The docker ecosystem reads
