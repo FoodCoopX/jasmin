@@ -115,6 +115,16 @@ test-local:
 		POSTGRES_DB=jasmin POSTGRES_USER=jasmin POSTGRES_PASSWORD=DontForgetMeAgain \
 		$(PYTHON) -m pytest $(PYTEST_ARGS)
 
+# The backend tests that read react-core files — every test module naming it:
+# the role list, the error-code locales, shared constants, the tier-price cases
+# and the comment guard over src. A frontend change can fail them, so
+# check-frontend runs them too.
+CROSS_STACK_TESTS = $(shell cd $(DJANGO_DIR) && grep -rl --include='test_*.py' react-core apps)
+
+.PHONY: test-cross-stack
+test-cross-stack:
+	$(MAKE) test-local PYTEST_ARGS="$(CROSS_STACK_TESTS)"
+
 
 makemigrations:
 	cd $(DJANGO_DIR) && $(PYTHON) manage.py makemigrations
@@ -355,8 +365,14 @@ schema-check:
 # The same advisory gates as CI's two "Security audit" steps; each ignored
 # advisory carries its reason there and in scripts/check-prod-audit.mjs.
 .PHONY: audit
-audit:
+audit: audit-backend audit-frontend
+
+.PHONY: audit-backend
+audit-backend:
 	$(COMPOSE_DEV) exec -T backend python -m pip_audit --strict --ignore-vuln PYSEC-2025-183
+
+.PHONY: audit-frontend
+audit-frontend:
 	$(COMPOSE_DEV) exec -T frontend node scripts/check-prod-audit.mjs
 
 # CI's gitleaks scan, over the files a commit would carry (scripts/secret_scan.sh).
@@ -369,5 +385,16 @@ secrets:
 # roughly the order of their cost, so a cheap failure stops it early. The suite
 # runs on the host (test-local), as in CI's checkout: some tests read repo files
 # outside django-core (scripts/, backups/), which the backend container lacks.
+BACKEND_GATES = black ruff import-contracts module-length mypy migrations-check schema-check audit-backend
+FRONTEND_GATES = type-check lint lint-pins audit-frontend
+
 .PHONY: check
-check: deps-check lock-check secrets black ruff import-contracts module-length mypy migrations-check schema-check type-check lint lint-pins audit test-local test-frontend size
+check: deps-check lock-check secrets $(BACKEND_GATES) $(FRONTEND_GATES) test-local test-frontend size
+
+# Its two halves, for a change on one side only; CLAUDE.md says when one is
+# enough. The frontend half also runs the backend tests that read react-core.
+.PHONY: check-backend
+check-backend: deps-check lock-check secrets $(BACKEND_GATES) test-local
+
+.PHONY: check-frontend
+check-frontend: deps-check secrets $(FRONTEND_GATES) test-cross-stack test-frontend size

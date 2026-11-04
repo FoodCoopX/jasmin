@@ -49,16 +49,21 @@ the matching section of Part 1.
 ## Working agreements
 
 - **DO NOT commit.** The user commits manually.
-- **No commit message before the code review and `make check`.** Before
+- **No commit message before the code review and the checks.** Before
   suggesting a commit message or saying a change can be committed, run the
-  `code-reviewer` agent over the whole uncommitted diff and `make check`, both on
-  the code as it will be committed. Fix the failures and the blocking and
-  should-fix findings, and name any finding left for the user to decide. A small
-  fix made after them needs only the checks it touches — the affected tests and
-  gates, and a look at the changed lines; a larger one, or one that reaches into
-  other code, means running both again. Report what ran and its result alongside
-  the message; if something couldn't run or still fails, say so instead of
-  giving the message.
+  `code-reviewer` agent over the whole uncommitted diff and the checks for what
+  it touches, both on the code as it will be committed: `make check-backend`
+  for a diff only in `django-core`, `make check-frontend` for one only in
+  `react-core` (it runs the backend tests that read react-core files too), and
+  the full `make check` for a diff in both or in anything they share —
+  `schema.yml` and the generated client, the lock files, the Makefile, CI,
+  Docker, compose or nginx config — and whenever unsure. Fix the failures and
+  the blocking and should-fix findings, and name any finding left for the user
+  to decide. A small fix made after them needs only the checks it touches — the
+  affected tests and gates, and a look at the changed lines; a larger one, or
+  one that reaches into other code, means running both again. Report what ran
+  and its result alongside the message; if something couldn't run or still
+  fails, say so instead of giving the message.
   They can run side by side as long as the reviewer reads only: a second test
   run would clobber the suite's schema.
 - **Never guess paths.** Always check which ones this repository actually uses —
@@ -1164,6 +1169,13 @@ mount. `deps-check` comes first because the containers' venv and `node_modules`
 are named volumes a lock change never reaches; when it fails, `make
 dev-sync-deps` installs the locks into them (the host venv: `poetry sync`). `secrets` (`scripts/secret_scan.sh`) runs CI's
 gitleaks over the files a commit would carry, not the gitignored ones.
+
+`make check-backend` and `make check-frontend` run its two halves. The
+frontend half adds `test-cross-stack`: the backend test modules that name
+`react-core` and read its files — the role list, the error-code locales, shared
+constants, the tier-price cases, and the comment guard over `src`. No frontend
+test reads a backend file; the backend reaches the frontend only through
+`schema.yml` and the generated client.
 
 Much of it also runs on `git commit` through pre-commit (once you have run
 `pre-commit install`): gitleaks secret scanning, `ruff --fix` and `black` over
