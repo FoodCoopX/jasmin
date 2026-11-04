@@ -23,8 +23,17 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     tracesSampleRate: 0.05,
     // GDPR: GlitchTip doesn't need a user's IP / email by default.
     // Attach them per-event via ``Sentry.setUser({...})`` after a
-    // logged-in session, behind whatever consent gating you want.
-    sendDefaultPii: false,
+    // logged-in session, behind whatever consent gating you want. Every
+    // category collects unless turned off: ``userInfo`` off also stops the
+    // server inferring the IP, query strings and the Referer can carry
+    // tokens, and the User-Agent stays for the browser and OS.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { allow: ["User-Agent"] },
+      httpBodies: [],
+      urlQueryParams: false,
+    },
   });
 }
 
