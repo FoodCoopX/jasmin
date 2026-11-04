@@ -9,7 +9,11 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-from core.sentry_scrub import before_breadcrumb, before_send
+from core.sentry_scrub import (
+    before_breadcrumb,
+    before_send,
+    before_send_transaction,
+)
 
 
 def init_sentry(dsn: str, *, debug: bool) -> None:
@@ -37,9 +41,16 @@ def init_sentry(dsn: str, *, debug: bool) -> None:
         # send_default_pii says, so a 500 on a member form would ship the
         # email address and IBAN typed into it.
         max_request_body_size="never",
+        # Frame locals hold the request (its path can carry a mailed link's
+        # token), model instances and form data, which no hook can scrub
+        # reliably. Passing ``data_collection`` would bring them back: its
+        # ``stack_frame_variables`` (default on) then takes over from this.
+        include_local_variables=False,
         # send_default_pii=False does not cover PII the app put into a log
-        # message or an exception; these hooks scrub email/IP/IBAN substrings.
+        # message or an exception; these hooks scrub email/IP/IBAN substrings
+        # and mailed-link tokens.
         before_breadcrumb=before_breadcrumb,
         before_send=before_send,
+        before_send_transaction=before_send_transaction,
         environment="development" if debug else "production",
     )
