@@ -1,5 +1,5 @@
 import { MenuOutlined } from "@ant-design/icons";
-import { useTenant } from "@hooks/index";
+import { useTenant, useWashingCleaningVisibility } from "@hooks/index";
 import { Drawer, Menu } from "antd";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ export default function MobileSidebar() {
   const { t } = useTranslation();
   const { getSetting } = useTenant();
   const { showBoxesPackingList } = usePackingListVisibility();
+  const { showsWashing } = useWashingCleaningVisibility();
   const sells_to_resellers = getSetting("sells_to_resellers", true);
 
   const menuItemsCommissioning = [
@@ -39,14 +40,18 @@ export default function MobileSidebar() {
       ),
     },
 
-    {
-      key: "commissioning-washing-list",
-      label: (
-        <Link to="/commissioning/washing-list">
-          {t("commissioning.washing_list")}
-        </Link>
-      ),
-    },
+    ...(showsWashing
+      ? [
+          {
+            key: "commissioning-washing-list",
+            label: (
+              <Link to="/commissioning/washing-list">
+                {t("commissioning.washing_list")}
+              </Link>
+            ),
+          },
+        ]
+      : []),
     {
       key: "commissioning-harvesting-lists",
       label: (

@@ -3,6 +3,7 @@ import type {
   OddDefaults,
   OrderDays,
 } from "@features/commissioning/hooks/useOrdersData";
+import type { WashingCleaningVisibility } from "@hooks/index";
 
 export interface OrderDayConfig {
   label: string;
@@ -10,24 +11,36 @@ export interface OrderDayConfig {
   defaultField: keyof OddDefaults;
 }
 
-/** The work days an order carries, in the order the Orders page shows them. */
-export function orderDayConfigs(t: TFunction): OrderDayConfig[] {
+/** The work days an order carries, in the order the Orders page shows them;
+ * washing and cleaning only where the farm shows them. */
+export function orderDayConfigs(
+  t: TFunction,
+  { showsWashing, showsCleaning }: WashingCleaningVisibility,
+): OrderDayConfig[] {
   return [
     {
       label: t("commissioning.harvest_day_label"),
       field: "harvesting_day",
       defaultField: "default_harvesting_day",
     },
-    {
-      label: t("commissioning.washing_day_label"),
-      field: "washing_day",
-      defaultField: "default_washing_day",
-    },
-    {
-      label: t("commissioning.cleaning_day_label"),
-      field: "cleaning_day",
-      defaultField: "default_cleaning_day",
-    },
+    ...(showsWashing
+      ? [
+          {
+            label: t("commissioning.washing_day_label"),
+            field: "washing_day" as const,
+            defaultField: "default_washing_day" as const,
+          },
+        ]
+      : []),
+    ...(showsCleaning
+      ? [
+          {
+            label: t("commissioning.cleaning_day_label"),
+            field: "cleaning_day" as const,
+            defaultField: "default_cleaning_day" as const,
+          },
+        ]
+      : []),
     {
       label: t("commissioning.commissioning_day_label"),
       field: "packing_day",

@@ -12,6 +12,8 @@ import {
   useNoteColumn,
   useNumberFormat,
   useUnitOptions,
+  useWashingCleaningVisibility,
+  type WashingCleaningVisibility,
 } from "@hooks/index";
 import type {
   CommissioningCrateContentsListParams,
@@ -30,7 +32,7 @@ import {
 import { parseDecimalInput } from "@shared/utils/numberFormat";
 import { pickTierPrice } from "@shared/utils/tierPrice";
 import type { CrateOption } from "../useCrates";
-import type { CrateOrderContentRow } from "../useOrdersData";
+import type { CrateOrderContentRow, OrderDays } from "../useOrdersData";
 import { useAmountUnitSizeColumns } from "./useAmountUnitSizeColumns";
 
 type CrateColumn = EditableColumnConfig<CrateOrderContentRow>;
@@ -89,6 +91,22 @@ interface UseOrderColumnsParams {
   dataCrates: readonly CrateOrderContentRow[];
 }
 
+/** The order's work days for a save. A hidden one is ``undefined``, which
+ * overrides the empty day an offer row carries and which the JSON body leaves
+ * out: a new order then takes its default, or stays without one, where
+ * sending it empty would be refused. */
+function orderDaysPayload(
+  orderDays: OrderDays,
+  { showsWashing, showsCleaning }: WashingCleaningVisibility,
+): Record<string, number | null | undefined> {
+  return {
+    harvesting_day: orderDays.harvesting_day,
+    packing_day: orderDays.packing_day,
+    washing_day: showsWashing ? orderDays.washing_day : undefined,
+    cleaning_day: showsCleaning ? orderDays.cleaning_day : undefined,
+  };
+}
+
 export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
   const { t } = useTranslation();
   const { currencySymbol, formatCurrency } = useCurrency();
@@ -111,6 +129,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
   const finalTiers = useOfferTiers();
 
   const { washingCleaningColumns } = useWashingCleaningColumns();
+  const shownWorkDays = useWashingCleaningVisibility();
   const { shareArticleColumn, handleUnitChange, handleAmountChange } =
     useShareArticleColumn({
       filters: {
@@ -424,10 +443,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
           day_number: selectedDay,
           reseller: selectedReseller,
           rabatt: transformedData.rabatt || null,
-          harvesting_day: orderDaysVal.harvesting_day,
-          packing_day: orderDaysVal.packing_day,
-          washing_day: orderDaysVal.washing_day,
-          cleaning_day: orderDaysVal.cleaning_day,
+          ...orderDaysPayload(orderDaysVal, shownWorkDays),
         };
 
         if (transformedData.offer && transformedData.amount) {
@@ -455,7 +471,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
         return baseData;
       };
     },
-    [],
+    [shownWorkDays],
   );
 
   const createCustomSaveOffers = useCallback(
@@ -501,10 +517,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
           day_number: selectedDay,
           reseller: selectedReseller,
           rabatt: transformedData.rabatt || null,
-          harvesting_day: orderDaysVal.harvesting_day,
-          packing_day: orderDaysVal.packing_day,
-          washing_day: orderDaysVal.washing_day,
-          cleaning_day: orderDaysVal.cleaning_day,
+          ...orderDaysPayload(orderDaysVal, shownWorkDays),
         };
 
         // For an unused-offer row the user typically only edits `amount` —
@@ -568,7 +581,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
         return baseData;
       };
     },
-    [offers, finalTiers],
+    [offers, finalTiers, shownWorkDays],
   );
 
   return {

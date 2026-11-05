@@ -3,9 +3,11 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { EditableColumnConfig, TableRecord } from "@shared/tables/BasicEditableTable/types";
 import ToolTipIcon from "@shared/ui/ToolTipIcon";
+import { useWashingCleaningVisibility } from "@hooks/index";
 
 export const useWashingCleaningColumns = () => {
   const { t } = useTranslation();
+  const { showsWashing, showsCleaning } = useWashingCleaningVisibility();
 
   const handleWashingCleaningChange = useMemo(() => {
     return (value: unknown, _record: TableRecord, _form: FormInstance, fieldName: string): Record<string, unknown> | undefined => {
@@ -17,48 +19,56 @@ export const useWashingCleaningColumns = () => {
     };
   }, []);
 
+  // The checkbox of hidden washing or cleaning stays out.
   const washingCleaningColumns = useMemo<EditableColumnConfig<TableRecord>[]>(
-    () => [
-      {
-        title: (
-          <>
-            {t("commissioning.wash")}
-            <ToolTipIcon title={t("tooltip.washing_checkbox")} />
-          </>
-        ),
-        dataIndex: "washing",
-        key: "washing",
-        inputType: "checkbox",
-        required: false,
-        onFieldChange: handleWashingCleaningChange,
-      },
-      {
-        title: (
-          <>
-            {t("commissioning.clean")}
-            <ToolTipIcon title={t("tooltip.cleaning_checkbox")} />
-          </>
-        ),
-        dataIndex: "cleaning",
-        key: "cleaning",
-        inputType: "checkbox",
-        required: false,
-        onFieldChange: handleWashingCleaningChange,
-      },
-      {
-        title: (
-          <>
-            {t("commissioning.comes_from_long_term_storage")}
-            <ToolTipIcon title={t("tooltip.comes_from_long_term_storage")} />
-          </>
-        ),
-        dataIndex: "comes_from_long_term_storage",
-        key: "comes_from_long_term_storage",
-        inputType: "checkbox",
-        required: false,
-      },
-    ],
-    [t, handleWashingCleaningChange],
+    () =>
+      (
+        [
+          {
+            title: (
+              <>
+                {t("commissioning.wash")}
+                <ToolTipIcon title={t("tooltip.washing_checkbox")} />
+              </>
+            ),
+            dataIndex: "washing",
+            key: "washing",
+            inputType: "checkbox",
+            required: false,
+            onFieldChange: handleWashingCleaningChange,
+          },
+          {
+            title: (
+              <>
+                {t("commissioning.clean")}
+                <ToolTipIcon title={t("tooltip.cleaning_checkbox")} />
+              </>
+            ),
+            dataIndex: "cleaning",
+            key: "cleaning",
+            inputType: "checkbox",
+            required: false,
+            onFieldChange: handleWashingCleaningChange,
+          },
+          {
+            title: (
+              <>
+                {t("commissioning.comes_from_long_term_storage")}
+                <ToolTipIcon title={t("tooltip.comes_from_long_term_storage")} />
+              </>
+            ),
+            dataIndex: "comes_from_long_term_storage",
+            key: "comes_from_long_term_storage",
+            inputType: "checkbox",
+            required: false,
+          },
+        ] as EditableColumnConfig<TableRecord>[]
+      ).filter(
+        (column) =>
+          (showsWashing || column.dataIndex !== "washing") &&
+          (showsCleaning || column.dataIndex !== "cleaning"),
+      ),
+    [t, handleWashingCleaningChange, showsWashing, showsCleaning],
   );
 
   return { washingCleaningColumns };

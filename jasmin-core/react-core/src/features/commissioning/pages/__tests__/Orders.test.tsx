@@ -45,6 +45,7 @@ vi.mock("@hooks/index", () => ({
   useTenant: () => ({
     getSetting: (_key: string, fallback?: unknown) => fallback,
   }),
+  useWashingCleaningVisibility: () => ({ showsWashing: true, showsCleaning: true }),
 }));
 
 // ── Orchestration hooks (mocked wholesale) ──────────────────────────────────

@@ -827,6 +827,17 @@ describe("LoggingStorage internal workflow", () => {
     );
   });
 
+  it("offers no washing or cleaning amounts on a farm that hides them", async () => {
+    setTenant({ show_washing: false, show_cleaning: false });
+    renderPage();
+    await harvestsShown();
+
+    const shown = (label: string) => screen.queryByRole("button", { name: label });
+    expect(shown("commissioning.theoretical_wash_amounts")).not.toBeInTheDocument();
+    expect(shown("commissioning.theoretical_clean_amounts")).not.toBeInTheDocument();
+    expect(shown("commissioning.theoretical_purchase_amounts")).toBeInTheDocument();
+  });
+
   it("opens on the year of the day the page is opened, not the day the app was loaded", async () => {
     vi.setSystemTime(new Date(2027, 0, 4, 12, 0));
     renderPage();

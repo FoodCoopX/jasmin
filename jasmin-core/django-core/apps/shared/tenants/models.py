@@ -513,6 +513,11 @@ class TenantSettings(JasminModel):
 
     # layout app
     show_size_column = models.BooleanField(default=True)
+    # Off, the frontend leaves out the washing / cleaning days, lists and
+    # columns; the backend plans them either way. The database default lets a
+    # release from before them still insert a settings row.
+    show_washing = models.BooleanField(default=True, db_default=True)
+    show_cleaning = models.BooleanField(default=True, db_default=True)
     # When True, the harvest-share content planner auto-prefills each physical
     # variation's EMPTY day cells with the forecast amount split across sizes by
     # ``average_weight`` and weighted by the physical-variation counts (floored

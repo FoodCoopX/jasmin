@@ -7,6 +7,7 @@ import {
   useDateFormat,
   useDateRangePresets,
   useNumberFormat,
+  useWashingCleaningVisibility,
 } from "@hooks/index";
 import {
   useCommissioningStorageLoggingList,
@@ -44,6 +45,14 @@ type WorkflowEntry =
   | TheoreticalWashAmount
   | TheoreticalPurchase;
 
+// Every kind of theoretical amount the workflow view can list.
+const WORKFLOW_SOURCES = [
+  { value: "HARVEST", label: "HARVEST", color: "green" },
+  { value: "CLEAN", label: "CLEAN", color: "magenta" },
+  { value: "WASH", label: "WASH", color: "purple" },
+  { value: "PURCHASE", label: "PURCHASE", color: "cyan" },
+];
+
 export default function LoggingStorage() {
   // Storage Logging State
   const [selectedStorage, setSelectedStorage] = useState<string | null>(null);
@@ -59,6 +68,7 @@ export default function LoggingStorage() {
   const [selectedWorkflowShareArticle, setSelectedWorkflowShareArticle] =
     useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState("HARVEST");
+  const shownWorkDays = useWashingCleaningVisibility();
 
   // Hide rows with amount = 0 (default on). One toggle per table — independent.
   const [hideInactiveStorage, setHideInactiveStorage] = useState(true);
@@ -377,12 +387,11 @@ export default function LoggingStorage() {
     ...(amountUnitSizeColumns as unknown as ColumnsType<WorkflowEntry>),
   ];
 
-  const sourceOptions = [
-    { value: "HARVEST", label: "HARVEST", color: "green" },
-    { value: "CLEAN", label: "CLEAN", color: "magenta" },
-    { value: "WASH", label: "WASH", color: "purple" },
-    { value: "PURCHASE", label: "PURCHASE", color: "cyan" },
-  ];
+  const sourceOptions = WORKFLOW_SOURCES.filter(
+    ({ value }) =>
+      (shownWorkDays.showsCleaning || value !== "CLEAN") &&
+      (shownWorkDays.showsWashing || value !== "WASH"),
+  );
 
   const [pageSize, setPageSize] = useState(10);
   const paginationConfig: TablePaginationConfig = {

@@ -50,6 +50,10 @@ vi.mock("@hooks/index", async () => {
     useTenant: () => tenant,
     useCapability: (name: string) => capabilities[name] ?? true,
     useShareTypes: () => ({ shareTypes: [] }),
+    useWashingCleaningVisibility: () => ({
+      showsWashing: settings.show_washing !== false,
+      showsCleaning: settings.show_cleaning !== false,
+    }),
   };
 });
 
@@ -169,6 +173,17 @@ describe("CommissioningSidebar", () => {
 
     expect(routes.has(resellersCommissioningList)).toBe(false);
     expect(routes.has("/commissioning/commissioning-list-packing")).toBe(true);
+  });
+
+  it("drops the washing and cleaning lists on a farm that hides them", () => {
+    settings.show_washing = false;
+    settings.show_cleaning = false;
+
+    const routes = linkedRoutes();
+
+    expect(routes.has("/commissioning/washing-list")).toBe(false);
+    expect(routes.has("/commissioning/cleaning-list")).toBe(false);
+    expect(routes.has("/commissioning/harvesting-list")).toBe(true);
   });
 
   it("offers the share import in the import-shares mode", () => {

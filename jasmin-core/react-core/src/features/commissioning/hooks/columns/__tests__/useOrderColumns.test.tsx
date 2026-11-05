@@ -1,11 +1,12 @@
 /**
- * useOrderColumns: the offer line's "still available" cell, and the crate
- * table's price, discount and note cells on a line holding deposit crates. The
- * column hooks it composes and the shared formatting hooks are stubbed.
+ * useOrderColumns: the offer line's "still available" cell, the crate table's
+ * price, discount and note cells on a line holding deposit crates, and the work
+ * days a saved line carries. The column hooks it composes and the shared
+ * formatting hooks are stubbed.
  */
 import { render, renderHook, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -40,7 +41,10 @@ vi.mock("@features/commissioning/hooks", () => ({
   }),
   useWashingCleaningColumns: () => ({ washingCleaningColumns: [] }),
 }));
+// Whether the farm shows washing and cleaning, per test.
+const shownWorkDays = vi.hoisted(() => ({ showsWashing: true, showsCleaning: true }));
 vi.mock("@hooks/index", () => ({
+  useWashingCleaningVisibility: () => shownWorkDays,
   useCurrency: () => ({ currencySymbol: "€", formatCurrency: String }),
   useNoteColumn: () => ({ noteColumn: { key: "note", dataIndex: "note" } }),
   useNumberFormat: () => ({
@@ -151,5 +155,42 @@ describe("useOrderColumns crate cells", () => {
       crateCellDisabled("note", { key: "1", amount: 4, offer_bound_amount: 0 }),
     ).toBe(false);
     expect(crateCellDisabled("note", { key: -1 })).toBe(false);
+  });
+});
+
+describe("useOrderColumns saving an order line", () => {
+  const ORDER_DAYS = { harvesting_day: 1, packing_day: 2, washing_day: null, cleaning_day: null };
+
+  beforeEach(() => {
+    shownWorkDays.showsWashing = true;
+    shownWorkDays.showsCleaning = true;
+  });
+
+  function savedLine() {
+    const { result } = renderHook(() =>
+      useOrderColumns({
+        params: { year: 2026, delivery_week: 40, day_number: 2, reseller: "r1" },
+        dataCrates: [],
+      }),
+    );
+    const save = result.current.createCustomSave(2026, 40, 2, "r1", ORDER_DAYS, [], () => null);
+    // A row carries the order's days as the table loaded them, empty ones too.
+    const line = save({ share_article: "sa-carrots", amount: 2, size: "M", washing_day: null, cleaning_day: null });
+    // What the JSON body sends.
+    return JSON.parse(JSON.stringify(line)) as Record<string, unknown>;
+  }
+
+  it("carries every work day of the order", () => {
+    expect(savedLine()).toMatchObject(ORDER_DAYS);
+  });
+
+  it("leaves out washing and cleaning on a farm that hides them, so a new order takes their defaults", () => {
+    shownWorkDays.showsWashing = false;
+    shownWorkDays.showsCleaning = false;
+
+    const line = savedLine();
+    expect(line).toMatchObject({ harvesting_day: 1, packing_day: 2 });
+    expect(line).not.toHaveProperty("washing_day");
+    expect(line).not.toHaveProperty("cleaning_day");
   });
 });

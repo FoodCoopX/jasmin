@@ -155,6 +155,10 @@
     "packing_mode_mixed": "gemischt (pro Anteilsart wählbar)",
     "number_packing_stations": "Anzahl Packstationen",
     "show_size_column": "Gemüse-Größen Spalte anzeigen",
+    "show_washing": "Waschen anzeigen",
+    "show_washing_description": "Aus: Waschtage, Wasch-Liste und Waschen-Spalten werden ausgeblendet. Die Planung im Hintergrund bleibt gleich.",
+    "show_cleaning": "Putzen anzeigen",
+    "show_cleaning_description": "Aus: Putztage, Putz-Liste und Putzen-Spalten werden ausgeblendet. Die Planung im Hintergrund bleibt gleich.",
     "distribute_forecast_by_weight": "Prognosemenge nach Gewicht auf Größen verteilen (leere Zellen vorausfüllen)",
     "show_summary_in_harvest_share_planning_on_top": "Summen-Zeilen in Kistenplanung oben anzeigen", 
     "sales": {
