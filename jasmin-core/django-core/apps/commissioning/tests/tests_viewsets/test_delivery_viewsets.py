@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 
 import pytest
 import time_machine
@@ -10,8 +11,9 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
-from apps.commissioning.models import DeliveryStation, DeliveryStationDay
+from apps.commissioning.models import DeliveryStation, DeliveryStationDay, ShareContent
 from apps.commissioning.tests.factories import (
+    DefaultShareContentFactory,
     DeliveryStationDayFactory,
     DeliveryStationFactory,
     ShareDeliveryFactory,
@@ -734,6 +736,40 @@ class TestDeliveryStationDayCreate:
         assert not DeliveryStationDay.objects.filter(
             delivery_station=station, delivery_day=delivery_day
         ).exists()
+
+    def test_a_new_weekdays_first_station_day_brings_the_long_term_plan(
+        self, api_client, tenant
+    ):
+        """A weekday added after the plan was saved, as Tapir's sync adds one:
+        its first station-day brings the plan's share and contents for the
+        future weeks, so a week's import later finds them and only recomputes."""
+        DefaultShareContentFactory(year=2026, delivery_week=15)
+        station = DeliveryStationFactory()
+
+        day_resp = api_client.post(
+            reverse("share_delivery_day-list"),
+            {"day_number": 3, "valid_from": "2026-02-09"},
+            format="json",
+        )
+        assert day_resp.status_code == status.HTTP_201_CREATED
+        resp = api_client.post(
+            self.URL,
+            {
+                "delivery_station": str(station.id),
+                "delivery_day": day_resp.data["id"],
+                "valid_from": "2026-02-09",
+            },
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_201_CREATED
+        content = ShareContent.objects.get(
+            share__delivery_day_id=day_resp.data["id"],
+            share__year=2026,
+            share__delivery_week=15,
+            delivery_station=station,
+        )
+        assert content.amount == Decimal("3.000")
 
 
 # ---------------------------------------------------------------------------
