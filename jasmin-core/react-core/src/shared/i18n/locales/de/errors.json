@@ -363,7 +363,7 @@
   },
   "shares_delivery_day": {
     "not_found": "Für den angegebenen Tag wurde kein aktiver Liefertag gefunden.",
-    "tours_reduced_while_in_use": "Dieser Liefertag wird bereits verwendet – die Anzahl der Touren kann nur erhöht, nicht verringert werden. Eine Verringerung würde Lieferungen auf den entfernten Touren verwaisen lassen.",
+    "tours_reduced_while_in_use": "An diesem Liefertag sind noch Stationen auf Tour {{highest_tour}} – die Anzahl der Touren kann nicht unter {{highest_tour}} sinken.",
     "shortening_strands_children": "Dieser Liefertag kann nicht zu diesem Datum beendet werden: Zukünftige Stationstage oder Anteile würden danach noch bestehen und verwaisen. Lege stattdessen über eine Nachfolge (neuen Liefertag anlegen) einen Nachfolger an oder wähle ein späteres Enddatum.",
     "start_move_strands_children": "Der Beginn dieses Liefertags kann nicht auf dieses Datum verschoben werden: Bestehende Stationstage oder Anteile liegen davor und wären dann nicht mehr abgedeckt. Wähle ein früheres Startdatum oder verschiebe diese Objekte zuerst.",
     "succession_coverage_gap": "Die Liefertag-Nachfolge konnte nicht abgeschlossen werden: Für eine Station fehlt am neuen Tag ein Stationstag, der die betroffene Woche abdeckt. Richte diesen Stationstag zuerst ein und versuche es erneut.",

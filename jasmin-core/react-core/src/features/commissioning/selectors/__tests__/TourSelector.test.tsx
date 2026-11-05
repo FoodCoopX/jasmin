@@ -12,10 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  CommissioningSharesDeliveryDaysListParams,
-  SharesDeliveryDay,
-} from "@shared/api/generated/models";
+import type { SharesDeliveryDay } from "@shared/api/generated/models";
 import { flushMicrotasks } from "@/test/profileRenders";
 
 // A `t` that shows the tour number, so the tours tell apart.
@@ -59,18 +56,20 @@ import TourSelector from "../TourSelector";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-const deliveryDay = (id: string, numberOfTours: number | undefined): SharesDeliveryDay => ({
+// ``usedTours``: the tours the day's stations sit on, as the list sends them.
+const deliveryDay = (id: string, usedTours: number[] | undefined): SharesDeliveryDay => ({
   id,
   day_number: 1,
   valid_from: "2026-01-05",
   valid_until: null,
-  number_of_tours: numberOfTours,
+  used_tours: usedTours,
 });
 
-const TUESDAY_THREE_TOURS = deliveryDay("day-tue", 3);
-const FRIDAY_TWO_TOURS = deliveryDay("day-fri", 2);
-const SATURDAY_NO_COUNT = deliveryDay("day-sat", undefined);
-const SUNDAY_ZERO_TOURS = deliveryDay("day-sun", 0);
+const TUESDAY_THREE_TOURS = deliveryDay("day-tue", [1, 2, 3]);
+const FRIDAY_TWO_TOURS = deliveryDay("day-fri", [2, 1]);
+const THURSDAY_LATER_TOURS = deliveryDay("day-thu", [3, 2]);
+const SATURDAY_NO_TOURS = deliveryDay("day-sat", undefined);
+const SUNDAY_EMPTY_TOURS = deliveryDay("day-sun", []);
 
 const TOUR = "commissioning.tour_number";
 const ALL_TOURS = "commissioning.all_tours";
@@ -88,10 +87,9 @@ type PageProps = {
   preserveSelection?: boolean;
   year?: number | null;
   week?: number | null;
-  filters?: CommissioningSharesDeliveryDaysListParams;
 };
 
-function Page({ day = null, initialTour = null, includeAll, preserveSelection, year, week, filters }: PageProps) {
+function Page({ day = null, initialTour = null, includeAll, preserveSelection, year, week }: PageProps) {
   const [tour, setTour] = useState<number | "all" | null>(initialTour);
   picked = tour;
   pageRenders += 1;
@@ -105,7 +103,6 @@ function Page({ day = null, initialTour = null, includeAll, preserveSelection, y
       preserveSelection={preserveSelection}
       selectedYear={year}
       selectedWeek={week}
-      filters={filters}
     />
   );
 }
@@ -156,7 +153,13 @@ beforeEach(() => {
   onTourChange.mockReset();
   api.deliveryDays
     .mockReset()
-    .mockResolvedValue([TUESDAY_THREE_TOURS, FRIDAY_TWO_TOURS, SATURDAY_NO_COUNT, SUNDAY_ZERO_TOURS]);
+    .mockResolvedValue([
+      TUESDAY_THREE_TOURS,
+      FRIDAY_TWO_TOURS,
+      THURSDAY_LATER_TOURS,
+      SATURDAY_NO_TOURS,
+      SUNDAY_EMPTY_TOURS,
+    ]);
 });
 
 // ── Options ─────────────────────────────────────────────────────────────────
@@ -182,15 +185,22 @@ describe("TourSelector options", () => {
     expect(listedTours()).toEqual([ALL_TOURS, `${TOUR} 1`, `${TOUR} 2`]);
   });
 
-  it.each([
-    ["no tour count", SATURDAY_NO_COUNT.id],
-    ["a tour count of 0", SUNDAY_ZERO_TOURS.id],
-  ])("counts a day with %s as one tour", async (_case, day) => {
-    renderPage({ day });
+  it("lists the tours the day's stations sit on, which need not start at 1", async () => {
+    renderPage({ day: THURSDAY_LATER_TOURS.id });
 
-    await waitFor(() => expect(picked).toBe(1));
+    await waitFor(() => expect(picked).toBe(2));
     await userEvent.click(tourSelect());
-    expect(listedTours()).toEqual([`${TOUR} 1`]);
+    expect(listedTours()).toEqual([`${TOUR} 2`, `${TOUR} 3`]);
+  });
+
+  it.each([
+    ["no tours listed", SATURDAY_NO_TOURS.id],
+    ["an empty tour list", SUNDAY_EMPTY_TOURS.id],
+  ])("is disabled for a day with %s", async (_case, day) => {
+    renderPage({ day });
+    await settle();
+
+    expect(tourSelect()).toBeDisabled();
   });
 
   it("is disabled and lists nothing without a delivery day", async () => {
@@ -238,10 +248,15 @@ describe("TourSelector options", () => {
 // ── Fetch scope ─────────────────────────────────────────────────────────────
 
 describe("TourSelector fetch scope", () => {
-  it("asks for the days running on the selected week's Saturday", async () => {
+  it("asks for the days running on the selected week's Saturday, with their tours", async () => {
     renderPage({ day: TUESDAY_THREE_TOURS.id, year: 2026, week: 41 });
 
-    await waitFor(() => expect(api.deliveryDays).toHaveBeenCalledWith({ active_at_date: "2026-10-10" }));
+    await waitFor(() =>
+      expect(api.deliveryDays).toHaveBeenCalledWith({
+        active_at_date: "2026-10-10",
+        need_info_on_tours: true,
+      }),
+    );
   });
 
   it("asks for every day without a full year and week", async () => {
@@ -250,22 +265,14 @@ describe("TourSelector fetch scope", () => {
     await waitFor(() => expect(api.deliveryDays).toHaveBeenCalledWith({}));
   });
 
-  it("lets explicit filters win over the week", async () => {
-    renderPage({ day: TUESDAY_THREE_TOURS.id, year: 2026, week: 41, filters: { get_delivery_stations: true } });
-
-    await waitFor(() => expect(api.deliveryDays).toHaveBeenCalledWith({ get_delivery_stations: true }));
-    expect(api.deliveryDays).not.toHaveBeenCalledWith({ active_at_date: "2026-10-10" });
-  });
-
-  it("asks once and renders no more while the page re-renders with the same filters", async () => {
-    const filters = { need_info_on_tours: true };
-    const page = renderPage({ day: TUESDAY_THREE_TOURS.id, filters });
+  it("asks once and renders no more while the page re-renders with the same week", async () => {
+    const page = renderPage({ day: TUESDAY_THREE_TOURS.id, year: 2026, week: 41 });
     await waitFor(() => expect(picked).toBe(1));
     await settle();
     const rendersSettled = pageRenders;
 
-    page.rerenderWith({ filters });
-    page.rerenderWith({ filters });
+    page.rerenderWith({ year: 2026, week: 41 });
+    page.rerenderWith({ year: 2026, week: 41 });
     await settle();
 
     expect(api.deliveryDays).toHaveBeenCalledTimes(1);
@@ -274,13 +281,18 @@ describe("TourSelector fetch scope", () => {
     expect(picked).toBe(1);
   });
 
-  it("asks again when the filters change", async () => {
-    const page = renderPage({ day: TUESDAY_THREE_TOURS.id, filters: { need_info_on_tours: true } });
+  it("asks again when the week changes", async () => {
+    const page = renderPage({ day: TUESDAY_THREE_TOURS.id, year: 2026, week: 41 });
     await waitFor(() => expect(api.deliveryDays).toHaveBeenCalledTimes(1));
 
-    page.rerenderWith({ filters: { future: true } });
+    page.rerenderWith({ week: 42 });
 
-    await waitFor(() => expect(api.deliveryDays).toHaveBeenLastCalledWith({ future: true }));
+    await waitFor(() =>
+      expect(api.deliveryDays).toHaveBeenLastCalledWith({
+        active_at_date: "2026-10-17",
+        need_info_on_tours: true,
+      }),
+    );
     expect(api.deliveryDays).toHaveBeenCalledTimes(2);
   });
 });

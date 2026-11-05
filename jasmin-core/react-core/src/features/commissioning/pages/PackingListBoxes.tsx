@@ -112,8 +112,12 @@ function usePackingScope({
     day_number: dayNumber ?? undefined,
   });
 
-  const numberOfTours = dayRecord?.number_of_tours || 1;
-  const tourSelectorActive = !daysOk && Boolean(toursOk) && numberOfTours > 1;
+  // The tours the day's stations sit on that week, which need not start at 1.
+  const dayTours = useMemo(
+    () => [...(dayRecord?.used_tours ?? [])].sort((a, b) => a - b),
+    [dayRecord],
+  );
+  const tourSelectorActive = !daysOk && Boolean(toursOk) && dayTours.length > 1;
   const needsStation = !daysOk && !toursOk;
 
   // The tour picker offers only the day's tours, so the list asks for one of
@@ -121,10 +125,10 @@ function usePackingScope({
   // again when the picked one isn't among the day's or none is picked.
   const effectiveTour = useMemo<number | undefined>(() => {
     if (!tourSelectorActive) return undefined;
-    return typeof selectedTour === "number" && selectedTour <= numberOfTours
+    return typeof selectedTour === "number" && dayTours.includes(selectedTour)
       ? selectedTour
-      : 1;
-  }, [tourSelectorActive, selectedTour, numberOfTours]);
+      : dayTours[0];
+  }, [tourSelectorActive, selectedTour, dayTours]);
 
   // The station is checked only while one is asked for, so a farm whose
   // stations all get the same amounts loads no station list.
@@ -203,6 +207,7 @@ export default function PackingListBoxes() {
     useMemo<CommissioningSharesDeliveryDaysListParams>(
       () => ({
         active_at_date: activeAtDateForWeek(selectedYear, selectedWeek),
+        need_info_on_tours: true,
       }),
       [selectedYear, selectedWeek],
     );

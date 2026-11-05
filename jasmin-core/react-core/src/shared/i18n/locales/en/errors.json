@@ -363,7 +363,7 @@
   },
   "shares_delivery_day": {
     "not_found": "No active delivery day found for the given day.",
-    "tours_reduced_while_in_use": "This delivery day is already in use — the number of tours can only be increased, not reduced. Lowering it would strand deliveries on the removed tours.",
+    "tours_reduced_while_in_use": "Stations of this delivery day are still on tour {{highest_tour}}, so the number of tours can't go below {{highest_tour}}.",
     "shortening_strands_children": "This delivery day can't end on that date: future station-days or shares would outlive it and be stranded. Create a successor instead (add a new delivery day), or pick a later end date.",
     "start_move_strands_children": "This delivery day can't start on that date: existing station-days or shares fall before it and would no longer be covered. Pick an earlier start date, or move them first.",
     "succession_coverage_gap": "Couldn't complete the delivery-day succession: a station has no station-day covering the affected week on the new day. Set up that station-day first, then retry.",

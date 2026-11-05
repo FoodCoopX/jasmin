@@ -17,11 +17,6 @@ interface TourSelectorProps {
   delivery_day?: string | null;
   selectedYear?: number | null;
   selectedWeek?: number | null;
-  /**
-   * Filters for the delivery-day fetch, replacing the week's `active_at_date`.
-   * Pass a memoised object: a new one each render recomputes the fetch scope.
-   */
-  filters?: CommissioningSharesDeliveryDaysListParams;
 }
 
 const TourSelector = ({
@@ -33,7 +28,6 @@ const TourSelector = ({
   delivery_day = null,
   selectedYear = null,
   selectedWeek = null,
-  filters,
 }: TourSelectorProps) => {
   const { t } = useTranslation();
 
@@ -42,36 +36,36 @@ const TourSelector = ({
     return activeAtDateForWeek(selectedYear, selectedWeek);
   }, [selectedYear, selectedWeek]);
 
-  const tourFilters = useMemo<CommissioningSharesDeliveryDaysListParams>(() => {
-    if (filters && Object.keys(filters).length > 0) return filters;
-    if (activeAtDate) return { active_at_date: activeAtDate };
-    return {};
-  }, [filters, activeAtDate]);
+  // The list carries a day's tours only for a week's date, so without a full
+  // year and week the selector has no tour to offer.
+  const tourFilters = useMemo<CommissioningSharesDeliveryDaysListParams>(
+    () =>
+      activeAtDate
+        ? { active_at_date: activeAtDate, need_info_on_tours: true }
+        : {},
+    [activeAtDate],
+  );
 
   const { shareDeliveryDays, loading } = useShareDeliveryDays(tourFilters);
 
-  const numberOfTours = useMemo(() => {
-    if (delivery_day === null) {
-      return 0;
-    }
+  // The tours the day's stations sit on that week, which need not start at 1.
+  const dayTours = useMemo<number[]>(() => {
+    if (delivery_day === null) return [];
     const record = shareDeliveryDays.find((day) => day.id === delivery_day);
-    return record ? record.number_of_tours || 1 : 0;
+    return [...(record?.used_tours ?? [])].sort((a, b) => a - b);
   }, [shareDeliveryDays, delivery_day]);
 
   const options = useMemo<SelectorOption<TourValue | null>[]>(() => {
-    if (numberOfTours === 0) return [];
-    const tours: SelectorOption<TourValue | null>[] = Array.from(
-      { length: numberOfTours },
-      (_, i) => ({
-        value: i + 1,
-        label: t("commissioning.tour_number", { number: i + 1 }),
-      }),
-    );
+    if (dayTours.length === 0) return [];
+    const tours: SelectorOption<TourValue | null>[] = dayTours.map((tour) => ({
+      value: tour,
+      label: t("commissioning.tour_number", { number: tour }),
+    }));
     if (include_null_option) {
       tours.unshift({ value: "all", label: t("commissioning.all_tours") });
     }
     return tours;
-  }, [numberOfTours, include_null_option, t]);
+  }, [dayTours, include_null_option, t]);
 
   return (
     <BaseEntitySelector<TourValue | null>
@@ -81,7 +75,7 @@ const TourSelector = ({
       options={options}
       loading={loading}
       placeholder={t("placeholder.tour_selector")}
-      disabled={numberOfTours === 0}
+      disabled={dayTours.length === 0}
       className="bold-select week-selector-select tour-selector"
       preserveSelection={preserveSelection}
       // Without a day there is nothing to check the pick against; a day

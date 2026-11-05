@@ -17,12 +17,13 @@ export const TUESDAY = 1;
 export const THURSDAY = 3;
 export const FRIDAY = 4;
 
+// ``tours``: how many tours the day's stations sit on (1 … tours).
 export const deliveryDay = (id: string, dayNumber: number, tours = 1): SharesDeliveryDay => ({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
   valid_until: null,
-  number_of_tours: tours,
+  used_tours: Array.from({ length: tours }, (_, index) => index + 1),
 });
 
 export const station = (id: string, shortName: string): DeliveryStation => ({

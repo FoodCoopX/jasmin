@@ -122,6 +122,8 @@ const deliveryDay = (dayNumber: number, tours: number, stops: Stop[]): SharesDel
   valid_from: "2026-01-05",
   valid_until: null,
   number_of_tours: tours,
+  // The tours its stations sit on, as the backend derives them.
+  used_tours: [...new Set(stops.map((each) => each.tour))].sort((a, b) => a - b),
   delivery_stations: stops.map((each, index) => ({
     id: each.id, short_name: each.name, tour_number: each.tour, stop_order: index + 1,
   })),
@@ -130,7 +132,7 @@ const deliveryDay = (dayNumber: number, tours: number, stops: Stop[]): SharesDel
 // Tuesday is served by one tour; Friday by two.
 const TUESDAY_ONE_TOUR = deliveryDay(TUESDAY, 1, [FARM_SHOP, MARKET]);
 const FRIDAY_TWO_TOURS = deliveryDay(FRIDAY, 2, [SCHOOL, LIBRARY]);
-const FRIDAY_ONE_TOUR = deliveryDay(FRIDAY, 1, [SCHOOL, LIBRARY]);
+const FRIDAY_ONE_TOUR = deliveryDay(FRIDAY, 1, [SCHOOL, { ...LIBRARY, tour: 1 }]);
 
 const HONEY_SMALL: PackingBoxesMatrixAddOn = {
   variation_id: "var-honey-S",
@@ -481,6 +483,18 @@ describe("AmountShareTypeVariations splitting the days", () => {
     expect(toursSwitch()).not.toBeChecked();
     expect(stationsSwitch()).toBeInTheDocument();
     expect(stationsSwitch()).not.toBeChecked();
+  });
+
+  it.each([
+    ["offers", "a count of one with stations on two tours", 1, [SCHOOL, LIBRARY], true],
+    ["offers no", "a count of two with every station on tour 1", 2, [SCHOOL, { ...LIBRARY, tour: 1 }], false],
+  ])("%s tours for a day with %s: the stations' tours decide", async (_offers, _case, count, stops, offered) => {
+    farm.deliveryDays = [TUESDAY_ONE_TOUR, deliveryDay(FRIDAY, count, stops)];
+    renderPage();
+    await waitFor(() => expect(api.deliveryDays).toHaveBeenCalled());
+    await waitFor(() => expect(rows()).toHaveLength(2));
+
+    expect(Boolean(toursSwitch())).toBe(offered);
   });
 
   it("offers no tours when every delivery day of the week has a single tour", async () => {

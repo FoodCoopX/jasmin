@@ -365,7 +365,10 @@ describe("PackingListBoxes loading", () => {
 
     expect(await screen.findByText("Carrots")).toBeInTheDocument();
     expect(shownIn(selectNamed(DAY))).toBe(TUESDAY_LABEL);
-    expect(api.deliveryDays).toHaveBeenCalledWith({ active_at_date: "2026-10-10" });
+    expect(api.deliveryDays).toHaveBeenCalledWith({
+      active_at_date: "2026-10-10",
+      need_info_on_tours: true,
+    });
     expect(api.granularity).toHaveBeenLastCalledWith(granularityFor(TUESDAY));
     expect(lastBoxesRequest()).toEqual(requestFor(TUESDAY));
     expect(api.memberAmounts).not.toHaveBeenCalled();
@@ -670,6 +673,17 @@ describe("PackingListBoxes when the amounts differ between tours", () => {
     expect(lastBoxesRequest()).toEqual(requestFor(FRIDAY, { tour: 1 }));
   });
 
+  it("starts with the first tour the day's stations sit on when that isn't tour 1", async () => {
+    farm.deliveryDays = [deliveryDay("day-tue", TUESDAY), { ...deliveryDay("day-fri", FRIDAY), used_tours: [3, 2] }];
+    renderPage();
+    await screen.findByText("Carrots");
+    await choose(selectNamed(DAY), FRIDAY_LABEL);
+
+    expect(await screen.findByText("Beetroot")).toBeInTheDocument();
+    expect(await optionsOf(tourPicker()!)).toEqual([TOUR_2, "commissioning.tour_number 3"]);
+    expect(lastBoxesRequest()).toEqual(requestFor(FRIDAY, { tour: 2 }));
+  });
+
   it("lists another tour's boxes when the tour changes", async () => {
     renderPage();
     await screen.findByText("Carrots");
@@ -790,7 +804,10 @@ describe("PackingListBoxes choosing the week", () => {
     await waitFor(() =>
       expect(shownIn(selectNamed(DAY))).toBe("commissioning.delivery_day Tuesday, 13.10.2026"),
     );
-    expect(api.deliveryDays).toHaveBeenLastCalledWith({ active_at_date: "2026-10-17" });
+    expect(api.deliveryDays).toHaveBeenLastCalledWith({
+      active_at_date: "2026-10-17",
+      need_info_on_tours: true,
+    });
     await waitFor(() =>
       expect(lastBoxesRequest()).toEqual(requestFor(TUESDAY, { delivery_week: 42 })),
     );
