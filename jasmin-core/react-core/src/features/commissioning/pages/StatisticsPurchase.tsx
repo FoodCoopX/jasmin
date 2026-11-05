@@ -1,19 +1,14 @@
-import { Card, DatePicker, Spin, Typography } from "antd";
-import type { Dayjs } from "dayjs";
-import { useMemo, useState } from "react";
+import { Card, Spin, Typography } from "antd";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useCommissioningPurchaseCostByWeekList } from "@shared/api/generated/commissioning/commissioning";
 import type { PurchaseCostByWeek } from "@shared/api/generated/models";
 import { ExplainerText, StatsBarChart } from "@shared/ui";
-import {
-  useCurrency,
-  useDateFormat,
-  useDateRangePresets,
-  useFiscalYearRangeState,
-} from "@hooks/index";
-import { isOutsidePurchaseCostRange } from "../utils/purchaseCostRange";
+import { formatWeekKey } from "@shared/utils";
+import { useCurrency } from "@hooks/index";
+import StatisticsRangePicker from "../components/StatisticsRangePicker";
+import { useStatisticsRange } from "../hooks/useStatisticsRange";
 
-const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
 /**
@@ -26,25 +21,7 @@ const { Text } = Typography;
 export default function StatisticsPurchase() {
   const { t } = useTranslation();
   const { formatCurrency } = useCurrency();
-  const { dateFormat, formatDateForAPI } = useDateFormat();
-  const presets = useDateRangePresets();
-
-  // Default window: the tenant's current fiscal year.
-  const [range, setRange] = useFiscalYearRangeState();
-
-  // The bound already chosen in the open panel, so the other end can be
-  // limited to the span the API serves.
-  const [pickedBound, setPickedBound] = useState<
-    [Dayjs | null, Dayjs | null] | null
-  >(null);
-
-  const params = useMemo(
-    () => ({
-      start_date: range ? (formatDateForAPI(range[0]) ?? "") : "",
-      end_date: range ? (formatDateForAPI(range[1]) ?? "") : "",
-    }),
-    [range, formatDateForAPI],
-  );
+  const { range, setRange, params } = useStatisticsRange();
 
   // Gated on ``range`` so we never fire with empty date params.
   const { data: rawData, isLoading } = useCommissioningPurchaseCostByWeekList(
@@ -61,7 +38,9 @@ export default function StatisticsPurchase() {
     const spansYears = new Set(points.map((point) => point.year)).size > 1;
     const chartData = points.map((point) => ({
       key: `${point.year}-${point.week}`,
-      label: spansYears ? `${point.week}/${point.year}` : point.week,
+      label: spansYears
+        ? formatWeekKey(`${point.year}-${point.week}`)
+        : point.week,
       amount: parseFloat(point.amount) || 0,
     }));
     const total = chartData.reduce((sum, point) => sum + point.amount, 0);
@@ -82,22 +61,10 @@ export default function StatisticsPurchase() {
       <h1>{t("commissioning.statistics_purchase")}</h1>
 
       <Spin spinning={isLoading}>
-        <RangePicker
+        <StatisticsRangePicker
           value={range}
-          onChange={(v) => setRange(v && v[0] && v[1] ? [v[0], v[1]] : null)}
-          onCalendarChange={(dates) => setPickedBound(dates)}
-          onOpenChange={(open) => {
-            if (!open) setPickedBound(null);
-          }}
-          // Dates the API would refuse are not selectable: the report's span
-          // is capped server-side.
-          disabledDate={(current) =>
-            isOutsidePurchaseCostRange(current, pickedBound)
-          }
-          presets={presets}
-          format={dateFormat}
-          allowClear={false}
-          aria-label={t("commissioning.statistics_purchase_date_range")}
+          onChange={setRange}
+          ariaLabel={t("commissioning.statistics_purchase_date_range")}
         />
 
         {/* The totals are only as good as the prices entered in the planning /

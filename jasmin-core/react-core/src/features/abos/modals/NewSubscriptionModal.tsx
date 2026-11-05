@@ -49,8 +49,8 @@ import type { ShareTypeVariationOption } from "@hooks/useAllShareTypeVariations"
 import {
   capacityWindowParams,
   termCapacity,
-  termWeekKeys,
 } from "@features/abos/utils/stationCapacity";
+import { termWeekKeys } from "@shared/utils/weekRange";
 import { useDeliveryStationPicker } from "../hooks/useDeliveryStationPicker";
 import ShareTypeVariationPickerGrid from "../components/ShareTypeVariationPickerGrid";
 import { DeliveryStationMap } from "@shared/ui";

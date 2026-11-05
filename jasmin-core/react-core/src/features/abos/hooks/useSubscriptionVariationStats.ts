@@ -1,39 +1,13 @@
 import dayjs, { type Dayjs } from "dayjs";
 import { useMemo } from "react";
 import { useIsDarkTheme } from "@shared/contexts/LocaleContext";
-import { buildMonthAxis } from "@shared/utils";
+import {
+  buildMonthAxis,
+  VARIATION_PALETTE,
+  VARIATION_PALETTE_DARK,
+  variationLabel,
+} from "@shared/utils";
 import { useShareTypeVariationSizeOptions } from "@hooks/index";
-
-/**
- * Okabe–Ito colourblind-safe categorical palette, in a fixed order. Assigned to
- * share-type variations by catalogue order (never cycled until exhausted) so a
- * variation keeps its colour across the stats strips and the dashboard graph.
- * A CSA runs a handful of variations, well within these eight steps.
- *
- * Colours rather than CSS variables: the charts write them into SVG attributes.
- */
-export const VARIATION_PALETTE = [
-  "#0072B2", // blue
-  "#CC79A7", // reddish purple
-  "#E69F00", // orange
-  "#009E73", // green
-  "#D55E00", // vermillion
-  "#56B4E9", // sky blue
-  "#999999", // grey
-  "#000000", // black
-];
-
-/** The same palette for the dark theme, with white in black's place. */
-export const VARIATION_PALETTE_DARK = [
-  "#0072B2", // blue
-  "#CC79A7", // reddish purple
-  "#E69F00", // orange
-  "#009E73", // green
-  "#D55E00", // vermillion
-  "#56B4E9", // sky blue
-  "#999999", // grey
-  "#FFFFFF", // white
-];
 
 export interface VariationLegendEntry {
   id: string;
@@ -108,9 +82,10 @@ export function useSubscriptionVariationStats(
       .sort((a, b) => compareVariationId(a.id, b.id));
     ordered.forEach((v, i) => {
       const label =
-        [v.share_type_name, getShareTypeVariationSizeLabel(v.size ?? "")]
-          .filter(Boolean)
-          .join(" · ") || v.id;
+        variationLabel(
+          v.share_type_name,
+          getShareTypeVariationSizeLabel(v.size ?? ""),
+        ) || v.id;
       map.set(v.id, {
         id: v.id,
         label,

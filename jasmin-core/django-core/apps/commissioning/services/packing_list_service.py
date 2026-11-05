@@ -19,7 +19,7 @@ from ..utils.packing_queries import packing_share_contents
 from ..utils.share_type_variation_amounts import (
     batch_get_physical_variation_totals_for_week,
 )
-from ..utils.sort_order import size_order_annotation
+from ..utils.sort_order import share_type_ranks, size_order_annotation
 from ..utils.weight import quantize_weight
 
 _UNSET = object()  # sentinel: "not hoisted" vs a legitimately None delivery_day
@@ -583,27 +583,10 @@ class PackingListService:
             .order_by("sort_order", "size_order")
         )
 
-        # Rank share types: base (non-additional) groups first, then additional,
-        # each by its lightest variation, name, id — a stable group order.
-        share_type_rank_key: dict[str, tuple[Any, ...]] = {}
-        for variation in variations:
-            share_type = variation.share_type
-            candidate = (
-                share_type.is_additional_share_type,
-                variation.sort_order,
-                variation.size_order,
-                share_type.name or "",
-                str(share_type.id),
-            )
-            existing = share_type_rank_key.get(share_type.id)
-            if existing is None or candidate < existing:
-                share_type_rank_key[share_type.id] = candidate
-        ranked_share_type_ids = sorted(
-            share_type_rank_key, key=lambda st_id: share_type_rank_key[st_id]
+        share_type_rank = share_type_ranks(
+            (variation.share_type, variation.sort_order, variation.size_order)
+            for variation in variations
         )
-        share_type_rank = {
-            st_id: index for index, st_id in enumerate(ranked_share_type_ids)
-        }
 
         indexed_columns: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
         for variation in variations:

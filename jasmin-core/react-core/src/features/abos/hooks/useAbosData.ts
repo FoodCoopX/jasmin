@@ -23,8 +23,8 @@ import {
   capacityWindowParams,
   stationDayTermCapacity,
   termCapacity,
-  termWeekKeys,
 } from "@features/abos/utils/stationCapacity";
+import { termWeekKeys } from "@shared/utils/weekRange";
 import { useAllShareTypeVariations } from "@hooks/useAllShareTypeVariations";
 import { useDateFormat } from "@hooks/configuration/useDateFormat";
 import { useDeliveryStationDays } from "@hooks/useDeliveryStationDays";

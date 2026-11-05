@@ -85,5 +85,6 @@
   "list_markets": "",
   "overview_resellers": "",
   "planning_share_content_page": "",
-  "statistics_purchase": ""
+  "statistics_purchase": "",
+  "statistics_share_weights": "The average weight of the weighed shares of each size per week as a bar, from the weights recorded under the boxes packing list, with the size's target weight as a dashed line. A week without a bar for a size means that no share of it was weighed that week. Shares packed in bulk don't appear, as only boxes are weighed. Below, for the whole period and each size: how many boxes were weighed, their average with the standard deviation between single boxes, the target weight, and how much the weighed boxes weighed over (+) or under (−) their target in total. That average counts every weighed box; a bar averages the delivery days of its week, each day counting once."
 }

@@ -243,6 +243,12 @@ jobs:
         # makemigrations`` locally and commit the generated migration(s).
         run: poetry run python manage.py makemigrations --check --dry-run
 
+      - name: Ghostscript and Pango for the e-invoice PDFs
+        # The Factur-X e-invoices are rendered with WeasyPrint (Pango) and
+        # normalised to PDF/A-3 through Ghostscript, as in the production image;
+        # without Ghostscript their tests skip.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ghostscript libpango-1.0-0 libpangoft2-1.0-0
+
       - name: Tests (pytest)
         run: poetry run pytest --maxfail=5 -q
 

@@ -25,10 +25,11 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import Protocol
 
-from django.db.models import Q, Sum
+from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from apps.shared.iso_week_filters import iso_week_bound
 from core.tenant_db import connection
 
 from ..models import (
@@ -364,13 +365,12 @@ class SubscriptionDemandBackend:
         from_week: int,
     ) -> tuple[int, int | None, int | None]:
         # Busiest single week at/after (from_year, from_week): confirmed
-        # deliveries + active draft reservations, merged per week. ISO
-        # (year, week) tuple comparison via the OR-Q (year>Y, or year==Y &&
-        # week>=W) — past weeks are excluded (immutable, can't constrain a cap).
+        # deliveries + active draft reservations, merged per week. Past weeks
+        # are excluded (immutable, can't constrain a cap).
         per_week: dict[tuple[int, int], int] = defaultdict(int)
 
-        future_deliveries = Q(share__year__gt=from_year) | Q(
-            share__year=from_year, share__delivery_week__gte=from_week
+        future_deliveries = iso_week_bound(
+            (from_year, from_week), "gte", prefix="share__"
         )
         delivery_rows = (
             ShareDelivery.objects.filter(
@@ -388,8 +388,8 @@ class SubscriptionDemandBackend:
                 row["count"]
             )
 
-        future_reservations = Q(year__gt=from_year) | Q(
-            year=from_year, week__gte=from_week
+        future_reservations = iso_week_bound(
+            (from_year, from_week), "gte", week_field="week"
         )
         reservation_rows = (
             CapacityReservation.objects.filter(
@@ -597,7 +597,7 @@ class ExternalDemandBackend:
     ) -> tuple[int, int | None, int | None]:
         # CSV demand carries quantities, so the busiest week is the highest
         # summed quantity at/after (from_year, from_week).
-        future = Q(year__gt=from_year) | Q(year=from_year, delivery_week__gte=from_week)
+        future = iso_week_bound((from_year, from_week), "gte")
         rows = (
             ExternalShareDemand.objects.filter(
                 delivery_station_day_id=delivery_station_day_id,

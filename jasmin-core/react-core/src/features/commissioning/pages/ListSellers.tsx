@@ -21,7 +21,12 @@ import {
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
 import { IconActionButton, ToolTipIcon } from "@shared/ui";
 import { CsvImportButton } from "@shared/modals";
-import { useContactColumns, useOrganicGate, useTenant } from "@hooks/index";
+import {
+  useCapability,
+  useContactColumns,
+  useOrganicGate,
+  useTenant,
+} from "@hooks/index";
 import { isFieldDisabled } from "@shared/utils";
 import { sellerLabel } from "@features/commissioning/hooks/useSellers";
 import OrganicCertificatesModal from "../modals/OrganicCertificatesModal";
@@ -62,6 +67,7 @@ export default function ListSellers() {
   // Single-sourced via useOrganicGate so the trim/empty semantics match the
   // organic-status column gate everywhere.
   const { enabled: tenantHasOrganicNumber } = useOrganicGate();
+  const offersDeliveryStations = useCapability("delivery_stations");
   const [certReseller, setCertReseller] = useState<{
     id: string;
     name: string;
@@ -103,19 +109,23 @@ export default function ListSellers() {
         required: false,
         sortable: true,
       },
-      {
-        title: <>{t("resellers.is_also_delivery_station")}</>,
-        dataIndex: "is_also_delivery_station",
-        key: "is_also_delivery_station",
-        inputType: "checkbox",
-        required: false,
-        sortable: true,
-        // A linked station still in use can't be unlinked: the server keeps
-        // it, so the box would only tick itself again.
-        disabled: (record: ResellerRow) =>
-          !!record.is_also_delivery_station &&
-          record.linked_delivery_station_can_be_deleted === false,
-      },
+      ...(offersDeliveryStations
+        ? [
+            {
+              title: <>{t("resellers.is_also_delivery_station")}</>,
+              dataIndex: "is_also_delivery_station",
+              key: "is_also_delivery_station",
+              inputType: "checkbox",
+              required: false,
+              sortable: true,
+              // A linked station still in use can't be unlinked: the server
+              // keeps it, so the box would only tick itself again.
+              disabled: (record: ResellerRow) =>
+                !!record.is_also_delivery_station &&
+                record.linked_delivery_station_can_be_deleted === false,
+            },
+          ]
+        : []),
       {
         title: <>{t("resellers.is_reseller")}</>,
         dataIndex: "is_reseller",
@@ -186,7 +196,13 @@ export default function ListSellers() {
       contactColumns.phone,
       contactColumns.phone2,
     ],
-    [t, contactColumns, tenantHasOrganicNumber, openCertModal],
+    [
+      t,
+      contactColumns,
+      tenantHasOrganicNumber,
+      openCertModal,
+      offersDeliveryStations,
+    ],
   );
 
   return (

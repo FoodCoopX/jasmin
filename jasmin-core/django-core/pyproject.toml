@@ -27,11 +27,11 @@ openpyxl = "^3.1.5"
 # CP-SAT solver behind the cultivation placement planner (apps/cultivation/optimizer).
 ortools = "^9.15"
 psycopg2-binary = "^2.9.10"
-python-dateutil = "^2.9.0"
+python-dateutil = ">=2.9,<4.0"
 requests = "^2.32.3"
 weasyprint = "^70.0"
 
-django-tenants = "^3.10"
+django-tenants = ">=3.10,<5.0"
 drf-spectacular = ">=0.29,<0.31"
 django-localflavor = "^5.0"
 redis = "^8.1.0"
@@ -95,7 +95,7 @@ cryptography = ">=48.0.1,<51"
 # PDF/A-3 normalisation (OutputIntent, font embedding, pdfaid) is done by
 # Ghostscript, a system binary in the runtime image — see
 # ``apps/commissioning/services/facturx_pdfa3.py``.
-factur-x = "^6.6"
+factur-x = ">=6.6,<8.0"
 # Transitive (pulled in by factur-x, which only asks for >=5.3.0). Pinned to
 # the security floor that fixes CVE-2026-{119203…119209}, crafted PDFs that
 # loop forever or exhaust CPU or memory before 6.21.4. PDF parsing is

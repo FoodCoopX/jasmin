@@ -126,3 +126,30 @@ export function dateForWeekDayNumber(
 ): Dayjs {
   return mondayOfIsoWeek(year, week).add(Number(dayNumber), "day");
 }
+
+/** ISO week keys ("<iso-year>-<iso-week>") of every week ``[from, until]``
+ * touches, oldest first, in the form the API's per-week data is keyed by (the
+ * capacity's ``capacity_by_week``, the statistics' year and week). An
+ * open-ended term (invalid/absent ``until``) falls back to the capacity's
+ * fetched-window depth (104 weeks) from ``from`` — so a full week further than
+ * a year out is still seen (the backend's peak is unbounded; weeks past the
+ * fetched window simply have no key and read as free). */
+export function termWeekKeys(
+  from: dayjs.Dayjs,
+  until: dayjs.Dayjs | null | undefined,
+): string[] {
+  const keys: string[] = [];
+  const end = until && until.isValid() ? until : from.add(104, "week");
+  let cursor = from.startOf("isoWeek");
+  while (cursor.isSameOrBefore(end, "day")) {
+    keys.push(`${cursor.isoWeekYear()}-${cursor.isoWeek()}`);
+    cursor = cursor.add(1, "week");
+  }
+  return keys;
+}
+
+/** "2026-30" -> "30/2026" for user-facing week labels. */
+export function formatWeekKey(weekKey: string): string {
+  const [year, week] = weekKey.split("-");
+  return `${week}/${year}`;
+}

@@ -69,6 +69,7 @@ def recompute_shares(
     share_ids: Iterable[Any],
     *,
     collect_movements: list | None = None,
+    replaced_movements: list | None = None,
 ) -> list[Any]:
     """Rebuild theoreticals + SHARECONTENT movements for the given Shares.
 
@@ -89,6 +90,8 @@ def recompute_shares(
     caller keeps the whole transaction at ONE sorted advisory-lock pass. See
     ``ShareContentService.recompute_for_shares``.
 
+    ``replaced_movements``: see ``ShareContentService.recompute_for_shares``.
+
     Returns the touched ``ShareContent`` ids (from ``recompute_for_shares``) so
     callers can report what changed or invalidate caches.
     """
@@ -103,7 +106,9 @@ def recompute_shares(
 
     try:
         return ShareContentService().recompute_for_shares(
-            ids, collect_movements=collect_movements
+            ids,
+            collect_movements=collect_movements,
+            replaced_movements=replaced_movements,
         )
     except Exception:
         logger.exception(

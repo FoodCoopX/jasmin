@@ -4,7 +4,9 @@ ShareContent and OrderContent sources.
 
 Both sources follow the same algorithm:
 1. Determine the packing datetime (packing_day at 12:00, with ISO-week rollback).
-2. Query available stock per storage (smallest-first via StockService).
+2. Query available stock per storage from each storage's latest snapshot or
+   count and the movements after it, past the CurrentStockBalance projection
+   (smallest-first).
 3. Allocate the required amount across storages.
 4. Bulk-create the movements and cascade snapshots.
 """
@@ -90,7 +92,7 @@ def calculate_current_stock_for_allocation(
     """Return available stock per storage location, sorted smallest-first.
 
     ``stock_map``: pass a precomputed
-    ``StockService.get_theoretical_current_stock(year, week, day)``
+    ``StockService.get_current_stock_without_projection(year, week, day)``
     result when calling this in a loop — for a given snapshot the map
     covers every (unit, size, storage) of whichever articles it was
     fetched for (batch callers scope it to the batch's source articles
@@ -101,8 +103,11 @@ def calculate_current_stock_for_allocation(
     from .stock_service import StockService
 
     if stock_map is None:
-        stock_map = StockService.get_theoretical_current_stock(
-            year, delivery_week, day_number, storage=None
+        stock_map = StockService.get_current_stock_without_projection(
+            year,
+            delivery_week,
+            day_number,
+            entity_filter={"share_article_id": share_article.id},
         )
 
     available_stocks: list[dict[str, Any]] = []
@@ -184,13 +189,18 @@ def create_movements(
         )
 
     # ── Pre-compute stock & collect storage IDs ──
-    # ``get_theoretical_current_stock`` is scoped to the ARTICLES these sources
-    # actually need (``entity_filter``), not the whole ledger: the snapshot only
-    # has to carry the source articles' stock, and a source's allocation only
-    # reads its own (article, unit, size). Without the scope an unfiltered
-    # ``date__lte`` query materialises every article × unit × size × storage
-    # movement (and the full balance table) per snapshot — a near full-ledger
-    # scan once per week on a season-wide recompute, run synchronously while the
+    # The stock comes from each storage's latest snapshot or count and the
+    # movements after it (``get_current_stock_without_projection``), never from
+    # the ``CurrentStockBalance`` projection: a recompute deletes the old
+    # movements and defers the cascade that would bring the projection up to
+    # date, so on the packing day it would still count the deleted movements and
+    # split the new ones across the wrong storages.
+    #
+    # The query is scoped to the ARTICLES these sources actually need
+    # (``entity_filter``), not the whole ledger: a source's allocation only reads
+    # its own (article, unit, size), and an unscoped sum would aggregate every
+    # article's movements once per snapshot — a near full-ledger scan once per
+    # week on a season-wide recompute, run synchronously while the
     # Share/ShareArticle row locks are held. We still compute each snapshot once
     # (all sources read the same pre-bulk_create DB state).
     from .stock_service import StockService
@@ -216,11 +226,10 @@ def create_movements(
         snapshot_key = (rolled_year, rolled_week, src.packing_day)
         stock_map = stock_map_by_snapshot.get(snapshot_key)
         if stock_map is None:
-            stock_map = StockService.get_theoretical_current_stock(
+            stock_map = StockService.get_current_stock_without_projection(
                 rolled_year,
                 rolled_week,
                 src.packing_day,
-                storage=None,
                 entity_filter=snapshot_entity_filter,
             )
             stock_map_by_snapshot[snapshot_key] = stock_map

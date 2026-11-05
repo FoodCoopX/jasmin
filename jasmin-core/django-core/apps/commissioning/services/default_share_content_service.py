@@ -619,9 +619,9 @@ class DefaultShareContentService:
         shares_to_create: list[Share],
         all_share_contents: list[tuple[ShareContent, Share, Any, Any]],
         existing_shares: dict[_ShareKey, Share],
-    ) -> None:
-        """Bulk-persist the built objects, resolve Share references on the
-        ShareContent rows, and trigger the recompute for the created shares."""
+    ) -> set[Any]:
+        """Bulk-persist the built objects and resolve the ShareContent rows'
+        Shares; return the ids of the shares that got contents."""
         # Bulk create
         if all_default_contents:
             DefaultShareContent.objects.bulk_create(
@@ -665,19 +665,19 @@ class DefaultShareContentService:
             ShareContent.objects.bulk_create(
                 final_share_contents, ignore_conflicts=True
             )
-
-            from .recompute import recompute_shares
-
-            recompute_shares(
-                share_content.share_id for share_content in final_share_contents
-            )
+        return {share_content.share_id for share_content in final_share_contents}
 
     @staticmethod
     @transaction.atomic
     def create_default_share_content(
         validated_data: dict[str, Any],
+        *,
+        collect_movements: list[MovementShareArticle] | None = None,
+        replaced_movements: list[MovementShareArticle] | None = None,
     ) -> list[DefaultShareContent]:
-        """Create multiple DefaultShareContent objects from validated data."""
+        """Create multiple DefaultShareContent objects from validated data, and
+        the shares' contents; ``collect_movements`` and ``replaced_movements``
+        (an update's deleted ones) go to their recompute (``recompute_shares``)."""
         amounts = DefaultShareContentService._validate_create_input(validated_data)
 
         (
@@ -701,12 +701,19 @@ class DefaultShareContentService:
             seller,
         )
 
-        DefaultShareContentService._persist_create_objects(
+        share_ids = DefaultShareContentService._persist_create_objects(
             validated_data["year"],
             all_default_contents,
             shares_to_create,
             all_share_contents,
             existing_shares,
+        )
+        from .recompute import recompute_shares
+
+        recompute_shares(
+            share_ids,
+            collect_movements=collect_movements,
+            replaced_movements=replaced_movements,
         )
 
         return all_default_contents
@@ -1007,11 +1014,10 @@ class DefaultShareContentService:
             variation="share_type_variation",
         ).delete()
 
-        # Capture what the ShareContent deletion will cascade away BEFORE it
-        # runs: its MovementShareArticle rows (FK on_delete=CASCADE) and the
-        # parent Share ids. The slot's planned amounts can be non-zero, so
-        # dropping them silently leaves StockSnapshots / INVENTORY balances
-        # stale unless we cascade afterwards — mirror delete_share_planning.
+        # Capture what the ShareContent delete cascades away before it runs:
+        # its movements (FK on_delete=CASCADE) and the parent Share ids. Planned
+        # amounts can be non-zero, so the snapshots and INVENTORY balances would
+        # stay stale without the cascade below.
         affected_movements: list[MovementShareArticle] = []
         emptied_share_ids: set[Any] = set()
         if future_weeks:
@@ -1029,11 +1035,10 @@ class DefaultShareContentService:
             emptied_share_ids = set(
                 share_contents_to_delete.values_list("share_id", flat=True)
             )
-            # Capture BOTH movement halves before the delete: the SHARECONTENT
-            # rows AND the theoretical_* halves (which carry share_content=NULL
-            # and cascade away with the ShareContent) — else their stock
-            # contribution is silently left out of the recompute and the
-            # snapshot stays too high. Mirrors share_content_service's slot paths.
+            # Both movement halves: the SHARECONTENT rows and the theoretical_*
+            # ones (share_content=NULL, cascading away with the ShareContent),
+            # else their stock contribution misses the recompute and the
+            # snapshot stays too high.
             affected_movements = list(
                 MovementShareArticle.objects.for_share_contents(
                     share_contents_to_delete
@@ -1041,20 +1046,20 @@ class DefaultShareContentService:
             )
             share_contents_to_delete.delete()
 
-        result = DefaultShareContentService.create_default_share_content(validated_data)
-
-        # ``create_default_share_content`` recomputes only the rows it recreates.
-        # A slot week the new range / week-pattern / station set no longer
-        # covers is left emptied with no replacement, and ``recompute_for_shares``
-        # early-returns for a share with no remaining ShareContent — so rebuild
-        # the affected shares explicitly (idempotent; a no-op for fully-emptied
-        # shares), then cascade snapshots for the entities whose movements were
-        # removed so downstream stock balances stay correct. The recompute's
-        # cascade is folded into ONE union cascade with the removed movements —
-        # a single sorted ``current_balance:*`` advisory-lock pass for the
-        # transaction (two separate passes could AB/BA-deadlock against a
-        # concurrent overlapping acquirer).
+        # The create's recompute re-derives the deleted rows' corrections first.
         deferred_movements: list[MovementShareArticle] = []
+        result = DefaultShareContentService.create_default_share_content(
+            validated_data,
+            collect_movements=deferred_movements,
+            replaced_movements=affected_movements,
+        )
+
+        # The create recomputes only the shares it refills; a week the new
+        # range, week pattern or station set no longer covers stays emptied, so
+        # its shares are rebuilt here, and the removed movements' corrections
+        # re-derived (a create refilling no share leaves them to the caller).
+        # All of it cascades once: one sorted ``current_balance:*`` lock pass,
+        # since two passes could AB/BA-deadlock against an overlapping acquirer.
         if emptied_share_ids:
             from .recompute import recompute_shares
 

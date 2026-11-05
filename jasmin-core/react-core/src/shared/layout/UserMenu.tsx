@@ -1,14 +1,11 @@
 import {
   BgColorsOutlined,
-  DesktopOutlined,
   DownOutlined,
   GlobalOutlined,
   IdcardOutlined,
   LockOutlined,
   LogoutOutlined,
-  MoonOutlined,
   SafetyOutlined,
-  SunOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import { Avatar, Button, Dropdown, Space } from "antd";
@@ -17,14 +14,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useCommissioningMembersRetrieve } from "@shared/api/generated/commissioning/commissioning";
-import { ThemeEnum } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth/useRoles";
 import { useAuth } from "@shared/contexts/AuthContext";
-import { useLocale } from "@shared/contexts/LocaleContext";
-import { SUPPORTED_LANGUAGES } from "@shared/i18n/languages";
 import { useCapability, useIsMobile } from "@hooks/index";
-import LanguageMenuItemLabel from "./LanguageMenuItemLabel";
+import PreferenceButtons from "./PreferenceButtons";
 import UserProfileModal, { type UserProfileTab } from "./UserProfileModal";
+import { usePreferenceMenuItems } from "./usePreferenceMenuItems";
 
 type MenuItem = NonNullable<MenuProps["items"]>[number];
 
@@ -56,8 +51,7 @@ function displayNameOf(user: MenuUser | null): string {
 export default function UserMenu() {
   const { t } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
-  const { language, saveLanguage, themePreference, saveThemePreference } =
-    useLocale();
+  const { languageItems, themeItems } = usePreferenceMenuItems();
   const { hasMemberRole, isStaff, isMemberOnly } = useRoles();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -65,6 +59,11 @@ export default function UserMenu() {
   const [profileTab, setProfileTab] = useState<UserProfileTab>("profile");
   const offersUserAccounts = useCapability("user_accounts");
   const offersGdpr = useCapability("gdpr");
+  // Where a host owns the logins and the data protection, only the language
+  // and the theme are left for the menu; they then stand in the top bar as
+  // buttons of their own. The staff's link to their member page goes with the
+  // menu: such a host keeps its members itself.
+  const preferencesOnly = !offersUserAccounts && !offersGdpr;
 
   // Member-id lookup pulled BEFORE the early-return below so the hook
   // call order is stable across renders (react-hooks/rules-of-hooks).
@@ -88,7 +87,7 @@ export default function UserMenu() {
   // defensive).
   const { data: ownMember } = useCommissioningMembersRetrieve(
     memberIdForGate ?? "",
-    { query: { enabled: !!memberIdForGate } },
+    { query: { enabled: !!memberIdForGate && !preferencesOnly } },
   );
 
   if (!isAuthenticated) {
@@ -97,6 +96,10 @@ export default function UserMenu() {
         {t("auth.login")}
       </Button>
     );
+  }
+
+  if (preferencesOnly) {
+    return <PreferenceButtons />;
   }
 
   const currentUser = user as MenuUser | null;
@@ -149,57 +152,13 @@ export default function UserMenu() {
       key: "language",
       icon: <GlobalOutlined />,
       label: t("profile.menu_language"),
-      children: SUPPORTED_LANGUAGES.map((lang) => ({
-        key: `language-${lang.code}`,
-        label: (
-          <LanguageMenuItemLabel
-            language={lang}
-            isCurrent={language === lang.code}
-          />
-        ),
-        // LocaleContext has already told the user about a failed save.
-        onClick: () => {
-          saveLanguage(lang.code).catch(() => undefined);
-        },
-      })),
+      children: languageItems,
     },
     {
       key: "theme",
       icon: <BgColorsOutlined />,
       label: t("profile.menu_theme"),
-      children: [
-        {
-          preference: ThemeEnum.system,
-          icon: <DesktopOutlined />,
-          label: t("profile.theme_system"),
-        },
-        {
-          preference: ThemeEnum.light,
-          icon: <SunOutlined />,
-          label: t("profile.theme_light"),
-        },
-        {
-          preference: ThemeEnum.dark,
-          icon: <MoonOutlined />,
-          label: t("profile.theme_dark"),
-        },
-      ].map(({ preference, icon, label }) => ({
-        key: `theme-${preference}`,
-        icon,
-        label: (
-          <Space>
-            <span>{label}</span>
-            {themePreference === preference && (
-              <span aria-hidden className="theme-menu-item__check">
-                ✓
-              </span>
-            )}
-          </Space>
-        ),
-        onClick: () => {
-          saveThemePreference(preference).catch(() => undefined);
-        },
-      })),
+      children: themeItems,
     },
     ...(isStaff && hasMemberRole && memberId
       ? [

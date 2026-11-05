@@ -18,6 +18,14 @@ delivery_day?: string;
  */
 delivery_week?: number;
 /**
+ * Only the shares of the variations with this bulk-packing flag. Only meaningful in MIXED packing mode.
+ */
+is_packed_bulk?: boolean;
+/**
+ * Only the shares of physical variations.
+ */
+physical?: boolean;
+/**
  * Share type ID (Jasmin ID format)
  */
 share_type?: string;

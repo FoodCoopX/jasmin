@@ -18,6 +18,7 @@ import type {
 import { ToolTipIcon } from "@shared/ui";
 import { amountCellText, editableOnlyOnCreate } from "@shared/utils";
 import { useCrates } from "../useCrates";
+import { useTenant } from "@hooks/configuration/useTenant";
 import { useNumberFormat } from "@hooks/useNumberFormat";
 import { useVegetableSizeOptions } from "@hooks/useVegetableSizeOptions";
 import { useAmountUnitSizeColumns } from "./useAmountUnitSizeColumns";
@@ -48,6 +49,55 @@ const shareArticleFilters = {
   is_purchased: "false",
 };
 
+/** Combined "amount + amount/PU" cell, used by both the gardener flat and the
+ *  office grouped layouts. */
+function renderCombinedCell(
+  className: string,
+  suffix: "" | "_share_content" | "_order_content",
+) {
+  return (_: unknown, record: TableRecord) => {
+    const totalText = record[`computed_total_amount_text${suffix}`] as string;
+    const puText = record[`computed_amount_pu_text${suffix}`] as string;
+    return (
+      <div className={className}>
+        {totalText}
+        {puText && <br />}
+        {puText}
+      </div>
+    );
+  };
+}
+
+/** ``columns`` without the resellers' amounts (``…_order_content``), for a
+ *  farm that doesn't sell to resellers. An amount group left with its share
+ *  amount alone becomes that one column, under the group's title and as wide
+ *  as the pair was, rather than a group with a single "share content" child. */
+function withoutResellerColumns(
+  columns: EditableColumnConfig<TableRecord>[],
+): EditableColumnConfig<TableRecord>[] {
+  return columns.flatMap((column) => {
+    if (column.dataIndex.endsWith("_order_content")) return [];
+    if (!column.children) return [column];
+    const children = withoutResellerColumns(column.children);
+    if (children.length !== 1) return [{ ...column, children }];
+    const [shareAmount] = children;
+    return [
+      {
+        ...shareAmount,
+        title: column.title,
+        width: pairWidth(shareAmount.width),
+      },
+    ];
+  });
+}
+
+/** The width of a share/order pair, whose two columns share one width. */
+function pairWidth(width: EditableColumnConfig<TableRecord>["width"]) {
+  return typeof width === "string" && width.endsWith("em")
+    ? `${2 * parseFloat(width)}em`
+    : width;
+}
+
 export function useHarvestingListColumns({
   isMobile,
   isGardenerView,
@@ -56,10 +106,12 @@ export function useHarvestingListColumns({
   isGardenerView: boolean;
 }) {
   const { t } = useTranslation();
+  const { getSetting } = useTenant();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { crates } = useCrates();
   const { noteColumn } = useNoteColumn();
   const { format } = useNumberFormat();
+  const sellsToResellers = Boolean(getSetting("sells_to_resellers", true));
 
   const { shareArticleColumn, handleUnitChange } = useShareArticleColumn({
     filters: shareArticleFilters,
@@ -94,7 +146,7 @@ export function useHarvestingListColumns({
   });
 
   // Memoize so these stable JSX titles don't invalidate the
-  // renderCombinedCell useCallback (which depends on them) on every render.
+  // makeShareOrderChildren useCallback (which depends on them) on every render.
   const titleShareContent: ReactNode = useMemo(
     () => (
       <span style={{ fontSize: "0.7em" }}>
@@ -188,26 +240,6 @@ export function useHarvestingListColumns({
     [isMobile, isGardenerView, titleShareContent, titleOrderContent, format],
   );
 
-  // Combined "amount + amount/PU" cell (used by both gardener flat and
-  // office grouped layouts via the column factories below).
-  const renderCombinedCell = useCallback(
-    (className: string, suffix: "" | "_share_content" | "_order_content") =>
-      (_: unknown, record: TableRecord) => {
-        const totalText = record[
-          `computed_total_amount_text${suffix}`
-        ] as string;
-        const puText = record[`computed_amount_pu_text${suffix}`] as string;
-        return (
-          <div className={className}>
-            {totalText}
-            {puText && <br />}
-            {puText}
-          </div>
-        );
-      },
-    [],
-  );
-
   // Flat version (gardener view): two stand-alone columns, no grouping.
 
   const columnsAmountsSeparateFlat = useMemo<
@@ -232,11 +264,15 @@ export function useHarvestingListColumns({
           },
         ] as const
       ).map(({ suffix, colorClassName, titleSuffix, pdfTitle, className }) => ({
-        title: (
+        // Without resellers the share amount is the only one, so it needs no
+        // "share content" qualifier.
+        title: sellsToResellers ? (
           <>
             {t("commissioning.amount_harvesting_list")}
             <br />({titleSuffix})
           </>
+        ) : (
+          t("commissioning.amount_harvesting_list")
         ),
         dataIndex: `computed_amount_combined${suffix}`,
         key: `amount${suffix}_flat`,
@@ -251,11 +287,13 @@ export function useHarvestingListColumns({
           include: true,
           width: widthAmountCombined,
           align: "center",
-          title: pdfTitle,
+          title: sellsToResellers
+            ? pdfTitle
+            : t("commissioning.amount_harvesting_list"),
           dataKey: `computed_amount_combined${suffix}`,
         },
       })),
-    [t, renderCombinedCell],
+    [t, sellsToResellers],
   );
 
   // Office view: grouped columns with share/order children.
@@ -352,14 +390,7 @@ export function useHarvestingListColumns({
         })),
       },
     ],
-    [
-      t,
-      makeShareOrderChildren,
-      titleShareContent,
-      titleOrderContent,
-      renderCombinedCell,
-      format,
-    ],
+    [t, makeShareOrderChildren, titleShareContent, titleOrderContent, format],
   );
 
   const columns: EditableColumnConfig<TableRecord>[] = useMemo(
@@ -527,7 +558,10 @@ export function useHarvestingListColumns({
         // EditableColumnPdfConfig — the cast keeps the extra key.
         pdf: {
           include: true,
-          width: widthNote,
+          // Without resellers the note takes the resellers' amount's width too.
+          width: sellsToResellers
+            ? widthNote
+            : `${parseFloat(widthNote) + parseFloat(widthAmountCombined)}%`,
           align: "left",
           title: t("commissioning.note"),
           render: (record: TableRecord) => getNoteLines(record).join("\n"),
@@ -546,8 +580,17 @@ export function useHarvestingListColumns({
         },
       },
     ],
-    [shareArticleColumn, columnsAmountsSeparateFlat, t],
+    [shareArticleColumn, columnsAmountsSeparateFlat, sellsToResellers, t],
   );
 
-  return { columns, pdfColumns };
+  return useMemo(
+    () =>
+      sellsToResellers
+        ? { columns, pdfColumns }
+        : {
+            columns: withoutResellerColumns(columns),
+            pdfColumns: withoutResellerColumns(pdfColumns),
+          },
+    [sellsToResellers, columns, pdfColumns],
+  );
 }
