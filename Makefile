@@ -399,7 +399,16 @@ check-backend: deps-check lock-check secrets $(BACKEND_GATES) test-local
 .PHONY: check-frontend
 check-frontend: deps-check secrets $(FRONTEND_GATES) test-cross-stack test-frontend size
 
+# The local version label makes every build a new version, so pip replaces an
+# installed wheel instead of skipping it as already installed.
+.PHONY: poetry-build
+poetry-build: BUILD_ID := $(shell git rev-parse --short HEAD)
+poetry-build: BUILD_TIME := $(shell date -u +%Y%m%d%H%M%S)
 poetry-build:
+	cd $(REACT_DIR) && npm ci && NODE_ENV=production VITE_BUILD_ID=$(BUILD_ID) npm run build
+	rm -rf $(DJANGO_DIR)/apps/static/jasmin-dist/dist
 	mkdir -p $(DJANGO_DIR)/apps/static/jasmin-dist
 	cp -r $(REACT_DIR)/dist $(DJANGO_DIR)/apps/static/jasmin-dist
-	cd $(DJANGO_DIR) && poetry build
+	cd $(DJANGO_DIR) && poetry build --clean -f wheel -c local-version=$(BUILD_TIME).$(BUILD_ID)
+	rm -f jasmin_django_core-*.whl
+	cp $(DJANGO_DIR)/dist/*.whl .
