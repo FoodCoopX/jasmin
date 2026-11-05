@@ -41,11 +41,13 @@ fi
 # Ensure named volumes exist by bringing up the certbot service briefly.
 docker compose up --no-start certbot >/dev/null
 
+# The image is docker-compose.yml's certbot image, which Dependabot moves; keep
+# the two in step.
 docker run --rm \
     -v jasmin-platform_certbot_conf:/etc/letsencrypt \
     -v jasmin-platform_certbot_www:/var/www/certbot \
     -v "$(realpath "${CREDENTIALS}"):/linode.ini:ro" \
-    certbot/dns-linode:v5.6.0 \
+    certbot/dns-linode:v5.9.0 \
     certonly \
     --dns-linode \
     --dns-linode-credentials /linode.ini \

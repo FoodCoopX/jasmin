@@ -5,9 +5,10 @@ import logging
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 from isoweek import Week
+
+from apps.shared.iso_week_filters import iso_week_bound
 
 from ..models import (
     CapacityReservation,
@@ -130,8 +131,9 @@ class SharesDeliveryDayService:
                 CapacityReservation.objects.filter(
                     delivery_station_day_id__in=copy_by_old_id
                 ).filter(
-                    Q(year__gt=vf_week.year)
-                    | Q(year=vf_week.year, week__gte=vf_week.week)
+                    iso_week_bound(
+                        (vf_week.year, vf_week.week), "gte", week_field="week"
+                    )
                 )
             )
             for reservation in reservations:

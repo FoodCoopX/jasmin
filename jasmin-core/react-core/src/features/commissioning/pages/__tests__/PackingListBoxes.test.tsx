@@ -143,6 +143,12 @@ vi.mock("@react-pdf/renderer", async (importOriginal) => ({
     },
   }),
 }));
+// The share weights under the list have tests of their own; here only the
+// week and day the page hands them count.
+const weights = vi.hoisted(() => ({ shownFor: [] as unknown[] }));
+vi.mock("@features/commissioning/components/ShareWeightsSection", () => ({
+  default: (props: unknown) => (weights.shownFor.push(props), null),
+}));
 vi.mock("@shared/utils/downloadBlob", () => ({
   downloadBlob: (_blob: Blob, filename: string) => {
     printed.files.push(filename);
@@ -626,6 +632,16 @@ describe("PackingListBoxes choosing the day", () => {
       ]),
     );
     expect(printed.documents[0].props).toMatchObject({ dayName: "COMMON.WEEKDAY_FRIDAY" });
+  });
+
+  it("shows the share weights of the day it lists", async () => {
+    renderPage();
+    await screen.findByText("Carrots");
+    expect(weights.shownFor.at(-1)).toEqual({ year: 2026, week: 41, deliveryDayId: "day-tue" });
+
+    await choose(selectNamed(DAY), FRIDAY_LABEL);
+
+    await waitFor(() => expect(weights.shownFor.at(-1)).toEqual({ year: 2026, week: 41, deliveryDayId: "day-fri" }));
   });
 });
 

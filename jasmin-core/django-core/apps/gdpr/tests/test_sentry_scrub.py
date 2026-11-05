@@ -1,11 +1,46 @@
 """The Sentry/GlitchTip hooks scrub email/IP/IBAN substrings from breadcrumbs,
 the event's log entry and its exception values, and request bodies are never
 attached, so app-authored PII doesn't accumulate in the monitoring store
-(beyond the reach of the Art. 17 erasure pipeline)."""
+(beyond the reach of the Art. 17 erasure pipeline). The token of a mailed link
+goes from those texts, from breadcrumb data and ``extra``, and from the
+request's URL and header values on error events and transactions, for every URL
+that takes one; the query string goes whole and frame locals are never sent."""
 
 from __future__ import annotations
 
-from core.sentry_scrub import before_breadcrumb, before_send, scrub_pii
+import pytest
+from django.urls import get_resolver
+
+from core.sentry_scrub import (
+    before_breadcrumb,
+    before_send,
+    before_send_transaction,
+    scrub_pii,
+    scrub_secret_paths,
+)
+
+# The URL parameters reviewed as no secret; any other one must be scrubbed.
+NON_SECRET_PARAMS = {
+    "pk",
+    "format",
+    "slug",
+    "path",
+    "composite_id",
+    "request_id",
+    "user_id",
+    "member_id",
+    "reseller_id",
+}
+
+
+def _url_formats(resolver, prefix=""):
+    """Every URL the resolver reverses, as a format string and its params."""
+    for key in list(resolver.reverse_dict):
+        for possibilities, *_ in resolver.reverse_dict.getlist(key):
+            for url_format, params in possibilities:
+                yield prefix + url_format, params
+    for namespace_prefix, namespaced in resolver.namespace_dict.values():
+        yield from _url_formats(namespaced, prefix + namespace_prefix)
 
 
 class TestScrubPii:
@@ -151,6 +186,8 @@ class TestBeforeSendFormattedParamsAndExceptions:
             {"exception": {"values": ["not a dict", {"value": None}, {}]}},
             {"exception": [{"value": "eve@example.com"}]},
             {"breadcrumbs": "not a list"},
+            {"breadcrumbs": [{"data": "not a dict"}]},
+            {"extra": "not a dict"},
         ]
         for event in odd_events:
             assert before_send(event, None) is event
@@ -170,4 +207,138 @@ class TestInitSentry:
         assert captured["send_default_pii"] is False
         assert captured["before_send"] is before_send
         assert captured["before_breadcrumb"] is before_breadcrumb
+        assert captured["before_send_transaction"] is before_send_transaction
+        assert captured["include_local_variables"] is False
         assert captured["environment"] == "production"
+
+
+class TestScrubSecretPaths:
+    @pytest.mark.parametrize(
+        ("url", "scrubbed"),
+        [
+            ("/api/auth/invitations/tok3n/", "/api/auth/invitations/<token>/"),
+            (
+                "/api/commissioning/waiting_list_offers/tok3n/accept/",
+                "/api/commissioning/waiting_list_offers/<token>/accept/",
+            ),
+            (
+                "/api/gdpr/confirm-deletion/tok3n/",
+                "/api/gdpr/confirm-deletion/<token>/",
+            ),
+            ("/waiting-list-offer/tok3n", "/waiting-list-offer/<token>"),
+            (
+                "https://farm.example.org/set-password/tok3n",
+                "https://farm.example.org/set-password/<token>",
+            ),
+            (
+                "https://farm.example.org/reset-password/MQ/tok3n",
+                "https://farm.example.org/reset-password/<token>",
+            ),
+        ],
+    )
+    def test_blanks_the_token(self, url, scrubbed):
+        assert scrub_secret_paths(url) == scrubbed
+
+    def test_leaves_other_urls_alone(self):
+        for url in [
+            "/api/commissioning/resellers/ReSeLlEr0001/",
+            "https://farm.example.org/login",
+            None,
+        ]:
+            assert scrub_secret_paths(url) == url
+
+    def test_leaves_the_invitation_accept_path_alone(self):
+        assert (
+            scrub_secret_paths("/api/auth/invitations/accept/")
+            == "/api/auth/invitations/accept/"
+        )
+
+    def test_before_send_scrubs_the_request_and_the_log_line(self):
+        event = {
+            "transaction": "/api/gdpr/confirm-deletion/tok3n",
+            "request": {
+                "url": "https://farm.example.org/api/auth/invitations/tok3n/",
+                "query_string": "st=signed-media-token",
+                "headers": {
+                    "Referer": "https://farm.example.org/waiting-list-offer/tok3n",
+                    "User-Agent": "Firefox",
+                },
+            },
+            "logentry": {
+                "message": "Unhandled exception in %s: %s",
+                "params": ["/api/auth/invitations/tok3n/", "boom"],
+            },
+        }
+        out = before_send(event, None)
+        assert out["transaction"] == "/api/gdpr/confirm-deletion/<token>"
+        assert out["request"] == {
+            "url": "https://farm.example.org/api/auth/invitations/<token>/",
+            "headers": {
+                "Referer": "https://farm.example.org/waiting-list-offer/<token>",
+                "User-Agent": "Firefox",
+            },
+        }
+        assert out["logentry"]["params"] == ["/api/auth/invitations/<token>/", "boom"]
+
+    def test_before_send_scrubs_extra_and_breadcrumb_data(self):
+        # Serialized, as before_send gets them: a logged request is its repr.
+        event = {
+            "extra": {
+                "status_code": 400,
+                "request": "<WSGIRequest: GET '/api/gdpr/confirm-deletion/tok3n/'>",
+                "who": ["eve@example.org"],
+            },
+            "breadcrumbs": {
+                "values": [
+                    {"data": {"url": "/api/commissioning/waiting_list_offers/tok3n/"}}
+                ]
+            },
+        }
+        out = before_send(event, None)
+        assert out["extra"] == {
+            "status_code": 400,
+            "request": "<WSGIRequest: GET '/api/gdpr/confirm-deletion/<token>/'>",
+            "who": ["<email>"],
+        }
+        assert out["breadcrumbs"]["values"][0]["data"] == {
+            "url": "/api/commissioning/waiting_list_offers/<token>/"
+        }
+
+    def test_before_send_transaction_scrubs_the_request_and_the_name(self):
+        event = {
+            "transaction": "/api/commissioning/waiting_list_offers/tok3n/",
+            "request": {
+                "url": "https://farm.example.org/api/auth/invitations/tok3n/",
+                "query_string": "st=signed-media-token",
+                "headers": {"Referer": "https://farm.example.org/set-password/tok3n"},
+            },
+        }
+        out = before_send_transaction(event, None)
+        assert out == {
+            "transaction": "/api/commissioning/waiting_list_offers/<token>/",
+            "request": {
+                "url": "https://farm.example.org/api/auth/invitations/<token>/",
+                "headers": {"Referer": "https://farm.example.org/set-password/<token>"},
+            },
+        }
+
+    def test_keeps_a_route_pattern_name(self):
+        event = {"transaction": "/api/auth/invitations/{token}/"}
+        assert before_send_transaction(event, None)["transaction"] == (
+            "/api/auth/invitations/{token}/"
+        )
+
+    def test_before_send_transaction_survives_unexpected_shapes(self):
+        for event in [{}, {"request": "not a dict"}, {"transaction": None}]:
+            assert before_send_transaction(event, None) is event
+
+    @pytest.mark.parametrize("urlconf", ["config.tenant_urls", "config.public_urls"])
+    def test_covers_every_url_that_takes_a_secret(self, urlconf):
+        for url_format, params in _url_formats(get_resolver(urlconf)):
+            secret_params = set(params) - NON_SECRET_PARAMS
+            if not secret_params:
+                continue
+            url = "/" + url_format.lstrip("^") % {
+                param: "s3cret" if param in secret_params else "1" for param in params
+            }
+            assert "s3cret" not in scrub_secret_paths(url), url_format

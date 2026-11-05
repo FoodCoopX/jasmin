@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 from django.db.models import Case, IntegerField, TextChoices, Value, When
 
+from ..models import ShareType
 from ..models.choices import (
     ShareTypeVariationSizeOptions,
     UnitOptions,
@@ -13,6 +14,29 @@ from ..models.choices import (
 
 # Units and sizes outside the known choices sort after every known one.
 UNKNOWN_SORT_ORDER = 999
+
+
+def share_type_ranks(
+    variations: Iterable[tuple[ShareType, int, int]],
+) -> dict[str, int]:
+    """Each share type's position among the share types of ``variations``,
+    given as ``(share_type, sort_order, size_order)`` per variation: the base
+    (non-additional) share types first, then the additional ones, each by its
+    lightest variation, then by name and id."""
+    rank_keys: dict[str, tuple[Any, ...]] = {}
+    for share_type, sort_order, size_order in variations:
+        candidate = (
+            share_type.is_additional_share_type,
+            sort_order,
+            size_order,
+            share_type.name or "",
+            str(share_type.id),
+        )
+        existing = rank_keys.get(share_type.id)
+        if existing is None or candidate < existing:
+            rank_keys[share_type.id] = candidate
+    ranked = sorted(rank_keys, key=lambda share_type_id: rank_keys[share_type_id])
+    return {share_type_id: index for index, share_type_id in enumerate(ranked)}
 
 
 def size_order_annotation():

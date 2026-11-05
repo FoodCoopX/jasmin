@@ -4,7 +4,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
+  Line,
   Rectangle,
   ResponsiveContainer,
   Tooltip,
@@ -45,13 +47,17 @@ export interface StatsBarSeries {
   id: string;
   /** Legend / tooltip name (already translated). */
   label: string;
-  /** Bar fill colour. */
+  /** Bar fill colour, or the line colour of a reference series. */
   color: string;
+  /** A dashed line over the bars instead of a bar (e.g. a target), left out
+   *  of the legend. A row without its value leaves a gap in the line. */
+  reference?: boolean;
 }
 
 interface StatsBarChartProps {
-  /** Rows keyed by `xKey` + each series id. */
-  data: Array<Record<string, string | number>>;
+  /** Rows keyed by `xKey` + each series id; `null` where a series has no
+   *  value, which the data table leaves blank. */
+  data: Array<Record<string, string | number | null>>;
   series: StatsBarSeries[];
   /** X-axis category key (default "label"). */
   xKey?: string;
@@ -65,6 +71,10 @@ interface StatsBarChartProps {
   showLegend?: boolean;
   /** Formats bar values for the tooltip (e.g. currency). Raw number by default. */
   valueFormatter?: (value: number) => string;
+  /** Formats the y-axis ticks (e.g. "2,5"). Raw number by default. */
+  axisFormatter?: (value: number) => string;
+  /** The widest a bar gets (default 48px); lower it for many bars per period. */
+  maxBarSize?: number;
   /** Draw zero-value bars as a short dark-grey baseline stub instead of nothing,
    *  so empty periods stay visible. Off by default. */
   showEmptyBars?: boolean;
@@ -89,6 +99,7 @@ interface StatsBarChartProps {
  * period) where each bar is an independent total, not a point on a trend line.
  * Rounded bar tops, recessive token-coloured grid/axes, a per-bar hover tooltip,
  * and a legend only for ≥ 2 series (a single series is named by the card title).
+ * Reference series (a target, say) are drawn as dashed lines over the bars.
  */
 export default function StatsBarChart({
   data,
@@ -99,6 +110,8 @@ export default function StatsBarChart({
   emptyText,
   showLegend,
   valueFormatter,
+  axisFormatter,
+  maxBarSize = 48,
   showEmptyBars = false,
   muteEmptyLabels = false,
   showAllXLabels = false,
@@ -107,9 +120,11 @@ export default function StatsBarChart({
 }: StatsBarChartProps) {
   const { token } = theme.useToken();
 
+  const bars = series.filter((s) => !s.reference);
+  const references = series.filter((s) => s.reference);
   const hasData =
-    series.length > 0 &&
-    data.some((d) => series.some((s) => Number(d[s.id] ?? 0) !== 0));
+    bars.length > 0 &&
+    data.some((d) => bars.some((s) => Number(d[s.id] ?? 0) !== 0));
 
   if (!hasData) {
     return <EmptyHint style={{ padding: "2em 0" }}>{emptyText}</EmptyHint>;
@@ -124,7 +139,7 @@ export default function StatsBarChart({
     boxShadow: token.boxShadowSecondary,
   } as const;
   const tooltipText = { color: token.colorText };
-  const withLegend = showLegend ?? series.length > 1;
+  const withLegend = showLegend ?? bars.length > 1;
 
   // Empty bars: a dark-grey baseline stub. Empty x-labels: a lighter grey.
   const emptyBarShape = showEmptyBars
@@ -139,10 +154,14 @@ export default function StatsBarChart({
   const emptyXValues = muteEmptyLabels
     ? new Set(
         data
-          .filter((d) => series.every((s) => Number(d[s.id] ?? 0) === 0))
+          .filter((d) => bars.every((s) => Number(d[s.id] ?? 0) === 0))
           .map((d) => d[xKey]),
       )
     : null;
+
+  // Reference lines need a composed chart; without them it stays a bar chart,
+  // whose hover highlights the whole period.
+  const Chart = references.length > 0 ? ComposedChart : BarChart;
 
   const renderMutedTick = (tickProps: {
     x?: string | number;
@@ -186,7 +205,9 @@ export default function StatsBarChart({
             <tr key={String(row[rowKey] ?? index)}>
               <th scope="row">{String(row[xKey] ?? "")}</th>
               {series.map((s) => {
-                const value = Number(row[s.id] ?? 0);
+                const raw = row[s.id];
+                if (raw === null) return <td key={s.id} />;
+                const value = Number(raw ?? 0);
                 return (
                   <td key={s.id}>
                     {valueFormatter ? valueFormatter(value) : String(value)}
@@ -198,10 +219,11 @@ export default function StatsBarChart({
         </tbody>
       </table>
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart
+        <Chart
           data={data}
           margin={{ top: 8, right: 8, left: -12, bottom: 0 }}
           aria-label={ariaLabel}
+          barGap={2}
         >
           <CartesianGrid
           strokeDasharray="3 3"
@@ -216,29 +238,57 @@ export default function StatsBarChart({
           minTickGap={showAllXLabels ? 0 : 8}
           interval={showAllXLabels ? 0 : undefined}
         />
-        <YAxis tick={axisTick} axisLine={false} tickLine={false} width={48} />
+        <YAxis
+          tick={axisTick}
+          axisLine={false}
+          tickLine={false}
+          width={48}
+          tickFormatter={
+            axisFormatter ? (value) => axisFormatter(Number(value)) : undefined
+          }
+        />
         <Tooltip
           contentStyle={tooltipStyle}
           labelStyle={tooltipText}
           itemStyle={tooltipText}
-          cursor={{ fill: token.colorFillSecondary }}
+          // A composed chart's cursor is a line, a bar chart's a band.
+          cursor={
+            references.length > 0
+              ? { stroke: token.colorBorder, strokeWidth: 1 }
+              : { fill: token.colorFillSecondary }
+          }
           formatter={
             valueFormatter ? (value) => valueFormatter(Number(value)) : undefined
           }
         />
         {withLegend && <Legend />}
-        {series.map((s) => (
+        {bars.map((s) => (
           <Bar
             key={s.id}
             dataKey={s.id}
             name={s.label}
             fill={s.color}
             radius={[4, 4, 0, 0]}
-            maxBarSize={48}
+            maxBarSize={maxBarSize}
             shape={emptyBarShape}
           />
         ))}
-        </BarChart>
+        {references.map((s) => (
+          <Line
+            key={s.id}
+            type="linear"
+            dataKey={s.id}
+            name={s.label}
+            stroke={s.color}
+            strokeWidth={2}
+            strokeDasharray="6 4"
+            strokeLinecap="round"
+            dot={false}
+            activeDot={false}
+            legendType="none"
+          />
+        ))}
+        </Chart>
       </ResponsiveContainer>
     </>
   );

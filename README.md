@@ -224,6 +224,8 @@ make lint           # ESLint
 
 `make check` runs the whole gate — formatting, lint, backend tests, type-check
 and frontend tests — the same set CI enforces on every push and pull request.
+`make check-backend` and `make check-frontend` run its two halves, for a change
+on one side only.
 
 ### After changing the API
 

@@ -17,6 +17,8 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
+from apps.shared.iso_week_filters import iso_week_bound
+
 from ..errors import (
     EmployeeNotFound,
     InvalidWeeklyPlanAssignment,
@@ -192,7 +194,7 @@ def weeks_stranded_by_shrink(
             weekly_plan_category_id=category_id,
             row_index__gte=new_max_lines,
         )
-        .filter(Q(year__gt=current_year) | Q(year=current_year, week__gte=current_week))
+        .filter(iso_week_bound((current_year, current_week), "gte", week_field="week"))
         .values_list("year", "week")
         .distinct()
         .order_by("year", "week")

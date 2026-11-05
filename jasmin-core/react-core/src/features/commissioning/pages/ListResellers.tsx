@@ -43,6 +43,7 @@ import {
 } from "@shared/ui";
 import { CsvImportButton } from "@shared/modals";
 import {
+  useCapability,
   useContactColumns,
   useNoteColumn,
   useTenant,
@@ -149,6 +150,7 @@ export default function ListResellers() {
   const { offerGroups, offerGroupsCount, defaultOfferGroupId } =
     useOfferGroups();
   const hasDifferentOfferGroups = offerGroupsCount > 0;
+  const offersDeliveryStations = useCapability("delivery_stations");
 
   const {
     isUserInfoModalOpen,
@@ -347,18 +349,22 @@ export default function ListResellers() {
         },
         sorter: getUserStatusSorter,
       },
-      {
-        title: <>{t("resellers.is_also_delivery_station")}</>,
-        dataIndex: "is_also_delivery_station",
-        key: "is_also_delivery_station",
-        inputType: "checkbox",
-        required: false,
-        sortable: true,
-        // Disable unticking when the linked DS has dependants and can't be deleted.
-        disabled: (record: TableRecord) =>
-          !!record.is_also_delivery_station &&
-          record.linked_delivery_station_can_be_deleted === false,
-      },
+      ...(offersDeliveryStations
+        ? ([
+            {
+              title: <>{t("resellers.is_also_delivery_station")}</>,
+              dataIndex: "is_also_delivery_station",
+              key: "is_also_delivery_station",
+              inputType: "checkbox",
+              required: false,
+              sortable: true,
+              // Disable unticking when the linked DS has dependants and can't be deleted.
+              disabled: (record: TableRecord) =>
+                !!record.is_also_delivery_station &&
+                record.linked_delivery_station_can_be_deleted === false,
+            },
+          ] as EditableColumnConfig<TableRecord>[])
+        : []),
       {
         title: <>{t("resellers.is_seller")}</>,
         dataIndex: "is_seller",
@@ -422,6 +428,7 @@ export default function ListResellers() {
       hasDifferentOfferGroups,
       noteColumn,
       offerGroups,
+      offersDeliveryStations,
       t,
     ],
   );

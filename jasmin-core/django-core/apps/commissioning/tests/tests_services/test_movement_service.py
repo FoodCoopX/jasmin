@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+import time_machine
+from django.utils.timezone import make_aware
 
+from apps.commissioning.models import (
+    CurrentStockBalance,
+    MovementShareArticle,
+    StockSnapshot,
+)
 from apps.commissioning.services.movements import (
     MovementSourceData,
     calculate_current_stock_for_allocation,
     create_movements,
 )
+from apps.commissioning.services.snapshot_service import SnapshotService
 from apps.commissioning.tests.factories import (
+    MovementShareArticleFactory,
     ShareArticleFactory,
     ShareContentFactory,
     StorageFactory,
@@ -81,7 +91,7 @@ class TestCalculateCurrentStockForAllocation:
         }
 
         with patch(
-            "apps.commissioning.services.stock_service.StockService.get_theoretical_current_stock",
+            "apps.commissioning.services.stock_service.StockService.get_current_stock_without_projection",
             return_value=mock_stock_map,
         ):
             stocks = calculate_current_stock_for_allocation(
@@ -111,7 +121,7 @@ class TestCalculateCurrentStockForAllocation:
         }
 
         with patch(
-            "apps.commissioning.services.stock_service.StockService.get_theoretical_current_stock",
+            "apps.commissioning.services.stock_service.StockService.get_current_stock_without_projection",
             return_value=mock_stock_map,
         ):
             stocks = calculate_current_stock_for_allocation(
@@ -298,6 +308,226 @@ class TestCreateMovements:
 # ShareContent movement-capture helper — single source of truth for the
 # "both movement halves" filter used by the delete/replace paths.
 # ---------------------------------------------------------------------------
+@pytest.mark.django_db
+class TestCreateMovementsOnThePackingDay:
+    """On today's packing day the allocation reads the snapshots and the
+    movements after them, not the ``CurrentStockBalance`` projection: a
+    recompute deletes the old movements and defers the cascade, so the
+    projection still counts them, and a count's correction delta still answers
+    the old balance, while the new ones are allocated."""
+
+    # Tuesday of ISO week 15, 2026: the packing day of that week's Wednesday
+    # delivery.
+    PACKING_DAY = datetime(2026, 4, 7, 12, 0)
+
+    def test_splits_across_the_storages_by_the_ledger_while_the_projection_lags(
+        self, tenant
+    ):
+        with time_machine.travel(self.PACKING_DAY, tick=False):
+            small = StorageFactory(is_short_term_harvest_storage=True)
+            large = StorageFactory()
+            article = ShareArticleFactory()
+            share_content = ShareContentFactory(share_article=article)
+            # Monday's count: 5 kg in the small storage, 20 kg in the large one.
+            day_before = make_aware(datetime(2026, 4, 6, 12, 0))
+            counted = [
+                MovementShareArticleFactory(
+                    share_article=article,
+                    storage=storage,
+                    amount=amount,
+                    counted_amount=amount,
+                    movement_type="INVENTORY",
+                    date=day_before,
+                )
+                for storage, amount in ((small, Decimal("5")), (large, Decimal("20")))
+            ]
+            # An earlier allocation took the small storage's 5 kg, and the
+            # projection counts it.
+            earlier = MovementShareArticleFactory(
+                share_article=article,
+                storage=small,
+                amount=Decimal("-5"),
+                date=make_aware(self.PACKING_DAY),
+                movement_type="SHARECONTENT",
+                share_content=share_content,
+            )
+            SnapshotService.cascade_for_movements([*counted, earlier])
+            # The recompute deletes it and defers the cascade.
+            MovementShareArticle.objects.filter(pk=earlier.pk).delete()
+            assert CurrentStockBalance.objects.get(
+                share_article=article, storage=small
+            ).balance == Decimal("0")
+
+            movements = create_movements(
+                [
+                    MovementSourceData(
+                        year=2026,
+                        delivery_week=15,
+                        delivery_day=2,
+                        packing_day=1,
+                        share_article=article,
+                        unit="KG",
+                        size="M",
+                        amount=Decimal("8"),
+                        movement_type="SHARECONTENT",
+                        share_content=share_content,
+                    )
+                ],
+                collect_movements=[],
+            )
+
+        # Smallest first, from what the ledger holds: the small storage's 5 kg,
+        # then 3 from the large one.
+        assert sorted((m.storage_id, m.amount) for m in movements) == sorted(
+            [(small.pk, Decimal("-5")), (large.pk, Decimal("-3"))]
+        )
+
+    def test_a_recompute_keeps_the_split_around_a_count_on_the_packing_day(
+        self, tenant
+    ):
+        with time_machine.travel(self.PACKING_DAY, tick=False):
+            small = StorageFactory(is_short_term_harvest_storage=True)
+            large = StorageFactory()
+            article = ShareArticleFactory()
+            share_content = ShareContentFactory(share_article=article)
+            # Counted 20 in the large storage on Monday, 5 in the small one
+            # on the packing day's evening.
+            counts = [
+                MovementShareArticleFactory(
+                    share_article=article,
+                    storage=storage,
+                    amount=amount,
+                    counted_amount=amount,
+                    movement_type="INVENTORY",
+                    date=make_aware(at),
+                )
+                for storage, amount, at in (
+                    (large, Decimal("20"), datetime(2026, 4, 6, 12, 0)),
+                    (small, Decimal("5"), datetime(2026, 4, 7, 23, 0)),
+                )
+            ]
+            SnapshotService.cascade_for_movements(counts)
+
+            def allocate(**kwargs):
+                return create_movements(
+                    [
+                        MovementSourceData(
+                            year=2026,
+                            delivery_week=15,
+                            delivery_day=2,
+                            packing_day=1,
+                            share_article=article,
+                            unit="KG",
+                            size="M",
+                            amount=Decimal("8"),
+                            movement_type="SHARECONTENT",
+                            share_content=share_content,
+                        )
+                    ],
+                    **kwargs,
+                )
+
+            # The first plan cascades, which moves the evening count's delta:
+            # 5 kg counted after 5 kg left that day is a correction of +10.
+            first = allocate()
+            counts[1].refresh_from_db()
+            assert counts[1].amount == Decimal("10")
+            # The recompute deletes those movements and defers the cascade.
+            MovementShareArticle.objects.filter(
+                pk__in=[movement.pk for movement in first]
+            ).delete()
+            again = allocate(collect_movements=[])
+
+        split = sorted((m.storage_id, m.amount) for m in first)
+        assert split == sorted([(small.pk, Decimal("-5")), (large.pk, Decimal("-3"))])
+        assert sorted((m.storage_id, m.amount) for m in again) == split
+
+    def test_a_count_entered_after_the_plan_holds_without_a_snapshot(self, tenant):
+        with time_machine.travel(self.PACKING_DAY, tick=False):
+            small = StorageFactory(is_short_term_harvest_storage=True)
+            large = StorageFactory()
+            article = ShareArticleFactory()
+            share_content = ShareContentFactory(share_article=article)
+            monday = make_aware(datetime(2026, 4, 6, 12, 0))
+            counts = [
+                MovementShareArticleFactory(
+                    share_article=article,
+                    storage=storage,
+                    amount=amount,
+                    counted_amount=amount,
+                    movement_type="INVENTORY",
+                    date=monday,
+                )
+                for storage, amount in ((small, Decimal("10")), (large, Decimal("20")))
+            ]
+            SnapshotService.cascade_for_movements(counts)
+
+            def allocate(**kwargs):
+                return create_movements(
+                    [
+                        MovementSourceData(
+                            year=2026,
+                            delivery_week=15,
+                            delivery_day=2,
+                            packing_day=1,
+                            share_article=article,
+                            unit="KG",
+                            size="M",
+                            amount=Decimal("8"),
+                            movement_type="SHARECONTENT",
+                            share_content=share_content,
+                        )
+                    ],
+                    **kwargs,
+                )
+
+            # The plan takes all 8 kg from the small storage (10 kg).
+            planned = allocate()
+            assert [(m.storage_id, m.amount) for m in planned] == [
+                (small.pk, Decimal("-8"))
+            ]
+            # That evening the office counts 2 kg there, through the entry
+            # path: a delta against the current balance (2 − 2 = 0), then the
+            # day's rebuild, whose cascade drops the snapshot it made.
+            evening = make_aware(datetime(2026, 4, 7, 23, 0))
+            MovementShareArticleFactory(
+                share_article=article,
+                storage=small,
+                amount=Decimal("0"),
+                counted_amount=Decimal("2"),
+                movement_type="INVENTORY",
+                date=evening,
+            )
+            SnapshotService.rebuild_entity_day(
+                str(article.pk),
+                "KG",
+                "M",
+                str(small.pk),
+                day_start=make_aware(datetime(2026, 4, 7, 0, 0)),
+                day_end=make_aware(datetime(2026, 4, 7, 23, 59, 59)),
+                snapshot_date=evening,
+            )
+            assert not StockSnapshot.objects.filter(
+                storage=small, snapshot_date=evening
+            ).exists()
+
+            # Two recomputes in a row, each deleting the last allocation.
+            splits = []
+            last = planned
+            for _ in range(2):
+                MovementShareArticle.objects.filter(
+                    pk__in=[movement.pk for movement in last]
+                ).delete()
+                deferred: list[MovementShareArticle] = []
+                last = allocate(collect_movements=deferred)
+                SnapshotService.cascade_for_movements(deferred)
+                splits.append(sorted((m.storage_id, m.amount) for m in last))
+
+        # The count's 2 kg first, then 6 from the large storage, both times.
+        expected = sorted([(small.pk, Decimal("-2")), (large.pk, Decimal("-6"))])
+        assert splits == [expected, expected]
+
+
 def _q_lookup_paths(node) -> set[str]:
     """Flatten a Q tree to the set of lookup paths (left-hand sides) it uses."""
     paths: set[str] = set()

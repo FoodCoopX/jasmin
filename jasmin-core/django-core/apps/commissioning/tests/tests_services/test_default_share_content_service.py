@@ -7,6 +7,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+import time_machine
 
 from apps.commissioning.models import (
     DefaultShareContent,
@@ -317,67 +318,69 @@ class TestUpdateDefaultShareContentCascades:
     def test_deleting_future_share_content_cascades_snapshots_and_recomputes(
         self, mock_recompute, mock_cascade, tenant
     ):
-        article = ShareArticleFactory()
-        variation = ShareTypeVariationFactory()
-        delivery_day = SharesDeliveryDayFactory(day_number=2)
-        DeliveryStationDayFactory(delivery_day=delivery_day)
+        # Monday of week 8, so week 10 of 2030 stays a future week the update
+        # replaces.
+        with time_machine.travel(datetime.datetime(2030, 2, 18, 12, 0), tick=False):
+            article = ShareArticleFactory()
+            variation = ShareTypeVariationFactory()
+            delivery_day = SharesDeliveryDayFactory(day_number=2)
+            DeliveryStationDayFactory(delivery_day=delivery_day)
 
-        # A far-future share so the slot week counts as "future" (and is
-        # therefore deleted by update_default_share_content).
-        share = ShareFactory(
-            year=2030,
-            delivery_week=10,
-            delivery_day=delivery_day,
-            share_type_variation=variation,
-        )
-        share_content = ShareContentFactory(
-            share=share,
-            share_article=article,
-            unit="KG",
-            size="M",
-            amount=Decimal("5"),
-        )
-        # A real movement on the slot — this is what the ShareContent .delete()
-        # cascades away and what must drive the snapshot cascade afterwards.
-        movement = MovementShareArticleFactory(
-            share_content=share_content,
-            share_article=article,
-            unit="KG",
-            size="M",
-            movement_type="SHARECONTENT",
-        )
+            # The slot's week is two weeks ahead, so the update deletes it.
+            share = ShareFactory(
+                year=2030,
+                delivery_week=10,
+                delivery_day=delivery_day,
+                share_type_variation=variation,
+            )
+            share_content = ShareContentFactory(
+                share=share,
+                share_article=article,
+                unit="KG",
+                size="M",
+                amount=Decimal("5"),
+            )
+            # A real movement on the slot — this is what the ShareContent .delete()
+            # cascades away and what must drive the snapshot cascade afterwards.
+            movement = MovementShareArticleFactory(
+                share_content=share_content,
+                share_article=article,
+                unit="KG",
+                size="M",
+                movement_type="SHARECONTENT",
+            )
 
-        DefaultShareContentService.update_default_share_content(
-            year=2030,
-            share_article_id=str(article.pk),
-            validated_data={
-                "year": 2030,
-                "share_article": str(article.pk),
-                "share_option": "HARVEST_SHARE",
-                "range_1": 10,
-                "range_2": 10,
-                "unit": "KG",
-                "size": "M",
-                f"amount_{variation.pk}": "2",
-            },
-        )
+            DefaultShareContentService.update_default_share_content(
+                year=2030,
+                share_article_id=str(article.pk),
+                validated_data={
+                    "year": 2030,
+                    "share_article": str(article.pk),
+                    "share_option": "HARVEST_SHARE",
+                    "range_1": 10,
+                    "range_2": 10,
+                    "unit": "KG",
+                    "size": "M",
+                    f"amount_{variation.pk}": "2",
+                },
+            )
 
-        # The old slot ShareContent and its movement were removed.
-        assert not ShareContent.objects.filter(pk=share_content.pk).exists()
-        assert not MovementShareArticle.objects.filter(pk=movement.pk).exists()
+            # The old slot ShareContent and its movement were removed.
+            assert not ShareContent.objects.filter(pk=share_content.pk).exists()
+            assert not MovementShareArticle.objects.filter(pk=movement.pk).exists()
 
-        # Snapshots were cascaded for the removed movement — otherwise
-        # downstream balances go stale.
-        mock_cascade.assert_called_once()
-        cascaded_movements = mock_cascade.call_args.args[0]
-        assert any(moved.pk == movement.pk for moved in cascaded_movements)
+            # Snapshots were cascaded for the removed movement — otherwise
+            # downstream balances go stale.
+            mock_cascade.assert_called_once()
+            cascaded_movements = mock_cascade.call_args.args[0]
+            assert any(moved.pk == movement.pk for moved in cascaded_movements)
 
-        # The emptied share was fed into recompute_shares so a share that loses
-        # content with no replacement is rebuilt.
-        recomputed_id_sets = [
-            set(call.args[0]) for call in mock_recompute.call_args_list
-        ]
-        assert any(share.pk in ids for ids in recomputed_id_sets)
+            # The emptied share was fed into recompute_shares so a share that loses
+            # content with no replacement is rebuilt.
+            recomputed_id_sets = [
+                set(call.args[0]) for call in mock_recompute.call_args_list
+            ]
+            assert any(share.pk in ids for ids in recomputed_id_sets)
 
 
 # ---------------------------------------------------------------------------

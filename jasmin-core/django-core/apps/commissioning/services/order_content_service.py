@@ -837,21 +837,21 @@ class OrderContentService:
         OrderContentService.create_all_theoretical_objects(
             loaded_order_contents, collect_movements=deferred_movements
         )
-        OrderContentService.create_movements(
-            loaded_order_contents, collect_movements=deferred_movements
-        )
-
         if old_movements:
             deferred_movements.extend(old_movements)
-            # Re-derive actual harvest/purchase corrections for the OLD
-            # theoretical dimensions too — create_theoretical_objects only
-            # recalcs the NEW theoretical movements' dimensions, so a dimension
-            # whose theoreticals dropped to zero / relocated would keep a stale
-            # correction (entity total ≠ counted). (ORDERCONTENT keys match no
-            # actual correction, so they are harmless no-ops here.)
+            # Re-derive actual harvest/purchase corrections for the OLD theoretical
+            # dimensions too, before the ORDERCONTENT movements are allocated from
+            # the ledger: create_theoretical_objects only recalcs the NEW ones'
+            # dimensions, so a dimension whose theoreticals dropped to zero or
+            # relocated would keep a stale correction (entity total ≠ counted).
+            # (ORDERCONTENT keys match no actual correction: harmless no-ops.)
             recalculate_actual_corrections(
                 old_movements, collect_movements=deferred_movements
             )
+
+        OrderContentService.create_movements(
+            loaded_order_contents, collect_movements=deferred_movements
+        )
 
         if deferred_movements:
             SnapshotService.cascade_for_movements(deferred_movements)

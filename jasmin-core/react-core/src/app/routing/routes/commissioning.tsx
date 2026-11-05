@@ -113,14 +113,14 @@ const PurchaseList = lazy(
 const StatisticsPurchase = lazy(
   () => import("@features/commissioning/pages/StatisticsPurchase"),
 );
+const StatisticsShareWeights = lazy(
+  () => import("@features/commissioning/pages/StatisticsShareWeights"),
+);
 const DocumentationOverview = lazy(
   () => import("@features/commissioning/pages/DocumentationOverview"),
 );
 const LoggingStorage = lazy(
   () => import("@features/commissioning/pages/LoggingStorage"),
-);
-const ShareWeights = lazy(
-  () => import("@features/commissioning/pages/ShareWeights"),
 );
 const ImportShares = lazy(
   () => import("@features/commissioning/pages/ImportShares"),
@@ -152,18 +152,18 @@ export const commissioningRoutes: AppRoute[] = [
     ),
   },
   {
-    path: "/commissioning/logging-storage",
+    path: "/commissioning/statistics-share-weights",
     element: (
-      <RequireRole flag="isStaff">
-        <LoggingStorage />
+      <RequireRole flag="isOffice">
+        <StatisticsShareWeights />
       </RequireRole>
     ),
   },
   {
-    path: "/commissioning/share-weights",
+    path: "/commissioning/logging-storage",
     element: (
       <RequireRole flag="isStaff">
-        <ShareWeights />
+        <LoggingStorage />
       </RequireRole>
     ),
   },

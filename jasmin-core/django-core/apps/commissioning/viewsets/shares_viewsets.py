@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Iterator
+from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
@@ -41,6 +42,7 @@ from apps.authz.permissions import (
     RolePermissionsMixin,
 )
 from apps.shared.csv_safety import CsvEchoBuffer, escape_csv_row
+from apps.shared.iso_week_filters import iso_week_bound, iso_week_window_for_dates
 from apps.shared.request_utils import auth_user, body
 from core.errors import ForbiddenError
 from core.pagination import OptionalLimitOffsetPagination
@@ -117,7 +119,7 @@ from ..utils.iso_week_utils import week_day_to_date
 from ..utils.lookup import get_or_404
 from ..utils.query_params import validate_query_params
 from ..utils.sort_order import size_order_annotation
-from ..utils.weight import quantize_weight
+from ..utils.weight import mean_weight, quantize_weight
 from .base_viewsets import BaseArchivableViewSet, CanBeDeletedDestroyMixin
 
 
@@ -1094,15 +1096,15 @@ class ShareDeliveryViewSet(
             target_delivery_day = new_delivery_station_day.delivery_day
             future_deliveries = (
                 ShareDelivery.objects.filter(
+                    iso_week_bound(
+                        (original_share.year, original_share.delivery_week),
+                        "gte",
+                        prefix="share__",
+                    ),
                     subscription=instance.subscription,
                     share__delivery_day=original_share.delivery_day,
-                    share__year__gte=original_share.year,
                 )
                 .exclude(pk=instance.pk)
-                .exclude(
-                    share__year=original_share.year,
-                    share__delivery_week__lt=original_share.delivery_week,
-                )
                 .select_related("share", "share__delivery_day")
             )
 
@@ -1226,6 +1228,14 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             get_delivery_day_parameter(required=False),
             get_share_type_parameter(required=False),
             get_share_type_variation_parameter(),
+            catalogue_param(
+                "is_packed_bulk",
+                description="Only the shares of the variations with this "
+                "bulk-packing flag. Only meaningful in MIXED packing mode.",
+            ),
+            catalogue_param(
+                "physical", description="Only the shares of physical variations."
+            ),
         ],
     )
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -1241,6 +1251,8 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 "delivery_day",
                 "share_type",
                 "share_type_variation",
+                "is_packed_bulk",
+                "physical",
             ],
         )
         year = params["year"]
@@ -1259,6 +1271,15 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(share_type_variation__share_type=share_type)
         if share_type_variation is not None:
             queryset = queryset.filter(share_type_variation=share_type_variation)
+        if params["is_packed_bulk"] is not None:
+            queryset = queryset.filter(
+                share_type_variation__is_packed_bulk=params["is_packed_bulk"]
+            )
+        # As on the variation list, only an explicit true filters.
+        if params["physical"]:
+            queryset = queryset.filter(
+                share_type_variation__variation_type=ShareTypeVariation.VariationType.PHYSICAL
+            )
 
         queryset = queryset.annotate(
             delivery_day_number=F("delivery_day__day_number"),
@@ -1268,10 +1289,10 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 "share_type_variation__average_weight"
             ),
         )
-        # Order by ``sort_order`` on the underlying variation so
-        # ShareWeights.tsx (and any other consumer of the shares list)
-        # matches the office's configured display order. ``id`` is the
-        # final tiebreaker for stability when ``sort_order`` ties.
+        # Order by ``sort_order`` on the underlying variation so the share
+        # weights (and any other consumer of the shares list) match the
+        # office's configured display order. ``id`` is the final tiebreaker
+        # for stability when ``sort_order`` ties.
         queryset = queryset.order_by(
             "share_type_variation__sort_order",
             "id",
@@ -1395,33 +1416,15 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         start = params["date_from"]
         end = params["date_to"]
 
-        start_iso = start.isocalendar()
-        end_iso = end.isocalendar()
-
-        # Narrow to the (ISO year, ISO week) window in SQL rather than pulling
-        # whole calendar years and discarding weeks in Python. Share.year /
+        # Narrow to the (ISO year, ISO week) window in SQL: Share.year /
         # delivery_week are ISO (week_day_to_date reads them as ISO), so the
-        # (year, week) tuple orders monotonically with the date and this
-        # lexicographic range is a safe superset of the exact day-level filter
-        # applied below.
-        if start_iso[0] == end_iso[0]:
-            week_window = Q(
-                year=start_iso[0],
-                delivery_week__gte=start_iso[1],
-                delivery_week__lte=end_iso[1],
-            )
-        else:
-            week_window = (
-                Q(year=start_iso[0], delivery_week__gte=start_iso[1])
-                | Q(year__gt=start_iso[0], year__lt=end_iso[0])
-                | Q(year=end_iso[0], delivery_week__lte=end_iso[1])
-            )
-
+        # window is a safe superset of the exact day-level filter applied
+        # below.
         shares = (
             Share.objects.select_related(
                 "share_type_variation__share_type",
             )
-            .filter(week_window)
+            .filter(iso_week_window_for_dates(start, end))
             .order_by("year", "delivery_week")
         )
 
@@ -1458,21 +1461,18 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
         # Build averages: (year, week, variation_key) -> avg
         average_weights_by_week_and_variation: dict[
-            tuple[int, int, str], list[float]
+            tuple[int, int, str], list[Decimal]
         ] = {}
         for share in filtered:
             variation = share.share_type_variation
             key = f"{variation.share_type.name} {variation.get_size_display()}"
-            weights = [
-                w
-                for w in [share.weight1, share.weight2, share.weight3, share.weight4]
-                if w is not None and w > 0
-            ]
-            if weights:
-                avg = sum(weights) / len(weights)
+            share_weight = mean_weight(
+                [share.weight1, share.weight2, share.weight3, share.weight4]
+            )
+            if share_weight is not None:
                 average_weights_by_week_and_variation.setdefault(
                     (share.year, share.delivery_week, key), []
-                ).append(avg)
+                ).append(share_weight)
 
         from ..utils.csv_format import get_csv_dialect
 
@@ -1506,11 +1506,12 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             for year, week in weeks:
                 row = [f"KW {week}/{year}"]
                 for variation in sorted_variations:
-                    average_weights = average_weights_by_week_and_variation.get(
-                        (year, week, variation), []
+                    overall = mean_weight(
+                        average_weights_by_week_and_variation.get(
+                            (year, week, variation), []
+                        )
                     )
-                    if average_weights:
-                        overall = sum(average_weights) / len(average_weights)
+                    if overall is not None:
                         row.append(dialect.format(quantize_weight(overall)))
                     else:
                         row.append("")

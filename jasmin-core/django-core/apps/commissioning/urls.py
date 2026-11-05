@@ -45,6 +45,8 @@ from .views import (
     offer_sending_status,
     purchase_cost_by_week,
     share_options_list,
+    share_weights_by_week,
+    share_weights_summary,
     subscription_member_emails,
 )
 from .views.waiting_list_offer_views import (
@@ -389,6 +391,16 @@ urlpatterns = [
         "purchase_cost_by_week/",
         purchase_cost_by_week,
         name="purchase_cost_by_week",
+    ),
+    path(
+        "share_weights_by_week/",
+        share_weights_by_week,
+        name="share_weights_by_week",
+    ),
+    path(
+        "share_weights_summary/",
+        share_weights_summary,
+        name="share_weights_summary",
     ),
     path(
         "subscription_member_emails/",

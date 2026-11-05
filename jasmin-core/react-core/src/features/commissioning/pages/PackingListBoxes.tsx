@@ -46,6 +46,7 @@ import {
   PackingListBoxesCountCard,
   PackingListBoxesMobileCard,
 } from "@features/commissioning/components/mobileCards";
+import ShareWeightsSection from "@features/commissioning/components/ShareWeightsSection";
 import { PackingBoxesMatrixPDFGenerator } from "@features/commissioning/pdfs";
 import {
   useIsMobile,
@@ -470,6 +471,11 @@ export default function PackingListBoxes() {
           {t("explainers.packing_list_boxes")}
         </ExplainerText>
       )}
+      <ShareWeightsSection
+        year={selectedYear}
+        week={selectedWeek}
+        deliveryDayId={getDeliveryDayId}
+      />
     </div>
   );
 }

@@ -49,16 +49,21 @@ the matching section of Part 1.
 ## Working agreements
 
 - **DO NOT commit.** The user commits manually.
-- **No commit message before the code review and `make check`.** Before
+- **No commit message before the code review and the checks.** Before
   suggesting a commit message or saying a change can be committed, run the
-  `code-reviewer` agent over the whole uncommitted diff and `make check`, both on
-  the code as it will be committed. Fix the failures and the blocking and
-  should-fix findings, and name any finding left for the user to decide. A small
-  fix made after them needs only the checks it touches — the affected tests and
-  gates, and a look at the changed lines; a larger one, or one that reaches into
-  other code, means running both again. Report what ran and its result alongside
-  the message; if something couldn't run or still fails, say so instead of
-  giving the message.
+  `code-reviewer` agent over the whole uncommitted diff and the checks for what
+  it touches, both on the code as it will be committed: `make check-backend`
+  for a diff only in `django-core`, `make check-frontend` for one only in
+  `react-core` (it runs the backend tests that read react-core files too), and
+  the full `make check` for a diff in both or in anything they share —
+  `schema.yml` and the generated client, the lock files, the Makefile, CI,
+  Docker, compose or nginx config — and whenever unsure. Fix the failures and
+  the blocking and should-fix findings, and name any finding left for the user
+  to decide. A small fix made after them needs only the checks it touches — the
+  affected tests and gates, and a look at the changed lines; a larger one, or
+  one that reaches into other code, means running both again. Report what ran
+  and its result alongside the message; if something couldn't run or still
+  fails, say so instead of giving the message.
   They can run side by side as long as the reviewer reads only: a second test
   run would clobber the suite's schema.
 - **Never guess paths.** Always check which ones this repository actually uses —
@@ -216,6 +221,12 @@ Every `JasminError` code needs `de` **and** `en` entries in the locale
 - **For params: use the ones in the catalogue if possible.**
 - **ALWAYS use the generated types and API clients** — see
   [Data fetching](#data-fetching) for the frontend half of this rule.
+- **Help texts sparingly.** A serializer field's `help_text` or a parameter's
+  `description` lands in the schema and the generated client, so it follows
+  the comment rule: write one only when it tells what the name doesn't — a
+  unit, a format, what `null` means, a constraint, a counting rule. `year =
+  IntegerField(help_text="The year.")` is noise; leave it bare. Facts shared
+  by several fields go once into the serializer's docstring.
 
 **OpenAPI query params come from the catalogue — never hand-roll
 `OpenApiParameter` in `@extend_schema`.** A query parameter is declared ONCE as
@@ -418,8 +429,8 @@ time.
 
 Four more CI gates hold size, naming and layering still, and all four ratchet
 in BOTH directions like the mypy baseline above: a finding the change introduces
-fails, and so does a register entry that no longer occurs. The register can only
-shrink.
+fails, and so does a register entry that no longer occurs. The finding registers
+can only shrink; a size pin may grow a little, as below.
 
 | Gate | Command | Register |
 | ---- | ------- | -------- |
@@ -428,15 +439,21 @@ shrink.
 | Backend module length (1000 lines, the frontend's `max-lines`; tests and migrations don't count) | `poetry run python scripts/module_length.py check` / `make module-length` | `jasmin-core/django-core/module-length-baseline.txt` |
 | Frontend size & complexity (`max-lines`, `max-lines-per-function`, `complexity`) | `npm run lint` **and** `npm run lint:pins` / `make lint-pins` | `jasmin-core/react-core/eslint.hygiene-pins.js` |
 
-- **Never hand-edit a baseline.** Re-freeze it: `poetry run python
-  scripts/ruff_baseline.py freeze` (or `make ruff-freeze`) and commit the result.
-- **A pin may only go DOWN.** Split the function or the file, then lower the
-  number to whatever `npm run lint:pins` reports — or delete the entry once the
-  file is under the global threshold. `npm run lint` alone can't see below a
-  pin, which is why `lint:pins` re-measures; raising a pin is how a gate quietly
-  stops gating. The backend's module-length pins work the same way: split the
-  module, then `poetry run python scripts/module_length.py freeze` (or `make
-  module-length-freeze`), which only ever lowers or drops a pin.
+- **Never hand-edit a finding baseline** (mypy, ruff). Re-freeze it: `poetry
+  run python scripts/ruff_baseline.py freeze` (or `make ruff-freeze`) and commit
+  the result. The size pins below are the one exception.
+- **A pin follows the code down, and goes up only a little.** When a function
+  or file gets shorter, lower the number to whatever `npm run lint:pins`
+  reports — or delete the entry once the file is under the global threshold.
+  `npm run lint` alone can't see below a pin, which is why `lint:pins`
+  re-measures. A change that adds a few lines to a pinned function or file — an
+  extra conditional entry, a guard — may raise its pin to the new measured
+  value; say so in the report. Growth beyond a few lines means splitting the
+  function or the file instead: pins raised by whole features are how a gate
+  quietly stops gating. The backend's module-length pins work the same way:
+  split the module, then `poetry run python scripts/module_length.py freeze`
+  (or `make module-length-freeze`), which only ever lowers or drops a pin, so
+  a small raise there is a hand edit of that module's line.
 - **An exemption is a documented extraction blocker, not a permission slip.** A
   new one carries its unwind plan; one that stops matching a real import is an
   error and has to be deleted rather than left standing.
@@ -906,10 +923,10 @@ Located in `jasmin-core/django-core/apps/`:
 `apps/shared/` also holds standalone always-shared utility modules (importable
 from `commissioning`): `auth_cookies.py`, `csp_report.py`, `csv_safety.py`,
 `deferred_email.py`, `iban_validator.py`, `image_upload.py`, `invitations.py`,
-`languages.py`, `model_fields.py`, `money.py`, `openapi_params.py`,
-`pii_logging.py`, `pii_masking.py`, `query_params.py`, `request_utils.py`,
-`retention.py`, `sepa_mandate_hooks.py`, `smtp_host_validator.py`,
-`subscription_hooks.py`, `tenant_urls.py`.
+`iso_week_filters.py`, `languages.py`, `model_fields.py`, `money.py`,
+`openapi_params.py`, `pii_logging.py`, `pii_masking.py`, `query_params.py`,
+`request_utils.py`, `retention.py`, `sepa_mandate_hooks.py`,
+`smtp_host_validator.py`, `subscription_hooks.py`, `tenant_urls.py`.
 
 **Key Django patterns:**
 
@@ -1152,6 +1169,13 @@ mount. `deps-check` comes first because the containers' venv and `node_modules`
 are named volumes a lock change never reaches; when it fails, `make
 dev-sync-deps` installs the locks into them (the host venv: `poetry sync`). `secrets` (`scripts/secret_scan.sh`) runs CI's
 gitleaks over the files a commit would carry, not the gitignored ones.
+
+`make check-backend` and `make check-frontend` run its two halves. The
+frontend half adds `test-cross-stack`: the backend test modules that name
+`react-core` and read its files — the role list, the error-code locales, shared
+constants, the tier-price cases, and the comment guard over `src`. No frontend
+test reads a backend file; the backend reaches the frontend only through
+`schema.yml` and the generated client.
 
 Much of it also runs on `git commit` through pre-commit (once you have run
 `pre-commit install`): gitleaks secret scanning, `ruff --fix` and `black` over

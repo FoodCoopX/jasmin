@@ -8,7 +8,8 @@
  *
  * The packing lists follow the tenant's ``packing_mode`` as in the desktop
  * sidebar: box packing (``BOXES`` / ``MIXED``) links them, bulk packing hides
- * them.
+ * them. The resellers' commissioning list shows only where the farm sells to
+ * resellers.
  *
  * ``t`` is stubbed to return the key, so the assertions read as i18n keys.
  */
@@ -34,19 +35,30 @@ vi.mock("react-i18next", () => ({
 }));
 
 let packingMode: string | undefined;
+let sellsToResellers: boolean | undefined;
 
 vi.mock("@hooks/index", () => ({
   useTenant: () =>
     makeUseTenantMock({
-      getSetting: (key: string, defaultValue?: unknown) =>
-        key === "packing_mode" && packingMode !== undefined
-          ? packingMode
-          : defaultValue,
+      getSetting: (key: string, defaultValue?: unknown) => {
+        if (key === "packing_mode" && packingMode !== undefined) {
+          return packingMode;
+        }
+        if (key === "sells_to_resellers" && sellsToResellers !== undefined) {
+          return sellsToResellers;
+        }
+        return defaultValue;
+      },
     }),
+}));
+
+vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
+  useCommissioningShareTypeVariationsList: () => ({ data: [] }),
 }));
 
 afterEach(() => {
   packingMode = undefined;
+  sellsToResellers = undefined;
 });
 
 const routePaths = routeGroups.flatMap((group) =>
@@ -123,6 +135,31 @@ describe("MobileSidebar", () => {
         name: "commissioning.commissioning_list_resellers_short",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("hides the resellers' commissioning list on a farm that doesn't sell to resellers", async () => {
+    sellsToResellers = false;
+    const drawer = await openDrawer();
+    expect(
+      within(drawer).queryByRole("link", {
+        name: "commissioning.commissioning_list_resellers_short",
+      }),
+    ).toBeNull();
+    expect(
+      within(drawer).getByRole("link", { name: "commissioning.harvesting_lists" }),
+    ).toBeInTheDocument();
+  });
+
+  it("lists the commissioning lists before the packing list", async () => {
+    const drawer = await openDrawer();
+    const hrefs = within(drawer)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+    expect(hrefs.slice(-3)).toEqual([
+      "/commissioning/commissioning-list-packing",
+      "/commissioning/commissioning-list-resellers",
+      "/commissioning/packing-list-boxes",
+    ]);
   });
 
   it("translates its title and renders no empty group header", async () => {

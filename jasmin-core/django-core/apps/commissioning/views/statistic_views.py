@@ -27,21 +27,62 @@ from ..serializers import (
     MemberDashboardStatisticsSerializer,
     MemberGrowthStatisticSerializer,
     PurchaseCostByWeekSerializer,
+    ShareWeightsByWeekSerializer,
+    ShareWeightsSummarySerializer,
 )
 from ..services import (
     ShareContentService,
     calculate_historical_share_type_variation_averages,
     calculate_member_dashboard_statistics,
     calculate_member_growth_statistics,
+    calculate_share_weights_by_week,
+    calculate_share_weights_summary,
 )
 from ..utils.query_params import validate_query_params
 
-# The purchase-cost report walks one iteration per ISO week in the range and
-# widens its year/week IN-clauses to match, so the span is bounded here: an
-# ``end_date`` of 9999-12-31 would otherwise ask for ~400 000 weeks. Five
-# years is past the longest comparison the statistics page offers.
-_MAX_PURCHASE_COST_SPAN_YEARS = 5
-_MAX_PURCHASE_COST_SPAN_DAYS = _MAX_PURCHASE_COST_SPAN_YEARS * 366
+# The weekly reports (purchase cost, share weights) take one bounded range: the
+# purchase cost walks every week of it, and the weight chart lays every week of
+# it out. An ``end_date`` of 9999-12-31 would otherwise ask for ~400 000 weeks.
+# Five years is past the longest comparison the statistics pages offer.
+_MAX_REPORT_SPAN_YEARS = 5
+_MAX_REPORT_SPAN_DAYS = _MAX_REPORT_SPAN_YEARS * 366
+
+# What every weekly report documents about its range.
+_WEEKLY_REPORT_PARAMETERS = [
+    get_start_date_parameter(required=True),
+    get_end_date_parameter(
+        required=True,
+        description=(
+            "Inclusive range end (YYYY-MM-DD). At most "
+            f"{_MAX_REPORT_SPAN_YEARS} years after `start_date`."
+        ),
+    ),
+]
+_WEEKLY_REPORT_BOUNDS = (
+    "The range is bounded: `start_date` must be on or before `end_date`, and "
+    f"the two may span at most {_MAX_REPORT_SPAN_YEARS} years."
+)
+
+
+def _weekly_report_range(request: Request) -> tuple[date, date]:
+    """A weekly report's ``start_date`` and ``end_date``, refused beyond the
+    span the reports serve."""
+    params = validate_query_params(request, required=["start_date", "end_date"])
+    start_date: date = params["start_date"]
+    end_date: date = params["end_date"]
+    # The order of the pair is the catalogue's rule; the SPAN is this
+    # module's, because the weeks walked and laid out are what the cap
+    # protects.
+    if (end_date - start_date).days > _MAX_REPORT_SPAN_DAYS:
+        raise InvalidQueryParam(
+            f"The range must not exceed {_MAX_REPORT_SPAN_YEARS} years.",
+            field="end_date",
+            details={
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+        )
+    return start_date, end_date
 
 
 @extend_schema(
@@ -94,19 +135,9 @@ def member_growth_statistics(request: Request) -> Response:
     purchase figure (price_per_unit × amount × variation demand), aggregated
     server-side so only the per-week points cross the wire. Office only.
 
-    The range is bounded: `start_date` must be on or before `end_date`, and
-    the two may span at most {_MAX_PURCHASE_COST_SPAN_YEARS} years.
+    {_WEEKLY_REPORT_BOUNDS}
     """,
-    parameters=[
-        get_start_date_parameter(required=True),
-        get_end_date_parameter(
-            required=True,
-            description=(
-                "Inclusive range end (YYYY-MM-DD). At most "
-                f"{_MAX_PURCHASE_COST_SPAN_YEARS} years after `start_date`."
-            ),
-        ),
-    ],
+    parameters=_WEEKLY_REPORT_PARAMETERS,
     responses={
         200: PurchaseCostByWeekSerializer(many=True),
         400: ErrorResponseSerializer,
@@ -116,23 +147,68 @@ def member_growth_statistics(request: Request) -> Response:
 @permission_classes([IsOffice])
 def purchase_cost_by_week(request: Request) -> Response:
     """Total purchase ("Zukauf") cost per ISO week within [start_date, end_date]."""
-    params = validate_query_params(request, required=["start_date", "end_date"])
-    start_date: date = params["start_date"]
-    end_date: date = params["end_date"]
-    # The order of the pair is the catalogue's rule; the SPAN is this
-    # endpoint's, because the week walk below is what the cap protects.
-    if (end_date - start_date).days > _MAX_PURCHASE_COST_SPAN_DAYS:
-        raise InvalidQueryParam(
-            f"The range must not exceed {_MAX_PURCHASE_COST_SPAN_YEARS} years.",
-            field="end_date",
-            details={
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-            },
-        )
-
+    start_date, end_date = _weekly_report_range(request)
     data = ShareContentService().purchase_cost_by_week(start_date, end_date)
     serializer = PurchaseCostByWeekSerializer(data, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Get share weights per week",
+    description=f"""
+    Average weight of the shares weighed per ISO week and share type variation
+    over a date range, next to each variation's target weight, for the weight
+    statistics. A share's weight is the mean of the weights taken of it, a
+    week's the mean over its weighed shares. Every variation delivered in a
+    week gets a point, with a null average when none of its shares was
+    weighed. Only the variations packed in boxes, physical and not packed in
+    bulk, as only they are weighed. Office only.
+
+    {_WEEKLY_REPORT_BOUNDS}
+    """,
+    parameters=_WEEKLY_REPORT_PARAMETERS,
+    responses={
+        200: ShareWeightsByWeekSerializer(many=True),
+        400: ErrorResponseSerializer,
+    },
+)
+@api_view(["GET"])
+@permission_classes([IsOffice])
+def share_weights_by_week(request: Request) -> Response:
+    """Average share weight per ISO week and share type variation within
+    [start_date, end_date]."""
+    start_date, end_date = _weekly_report_range(request)
+    data = calculate_share_weights_by_week(start_date, end_date)
+    serializer = ShareWeightsByWeekSerializer(data, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Get the share weights of a date range per share type size",
+    description=f"""
+    Per share type size packed in boxes, over a date range: how many of its
+    boxes were weighed (each weight taken of a share one box), their average
+    weight and the standard deviation between them, the size's target weight,
+    and how much the weighed boxes weighed over or under their targets in sum.
+    A size takes in the variations succeeding each other in it. Only the
+    variations packed in boxes, physical and not packed in bulk, as only they
+    are weighed. Office only.
+
+    {_WEEKLY_REPORT_BOUNDS}
+    """,
+    parameters=_WEEKLY_REPORT_PARAMETERS,
+    responses={
+        200: ShareWeightsSummarySerializer(many=True),
+        400: ErrorResponseSerializer,
+    },
+)
+@api_view(["GET"])
+@permission_classes([IsOffice])
+def share_weights_summary(request: Request) -> Response:
+    """The weighed boxes of [start_date, end_date] per share type size."""
+    start_date, end_date = _weekly_report_range(request)
+    data = calculate_share_weights_summary(start_date, end_date)
+    serializer = ShareWeightsSummarySerializer(data, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 

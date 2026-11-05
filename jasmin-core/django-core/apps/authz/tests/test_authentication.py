@@ -11,7 +11,7 @@ import datetime
 
 import pytest
 import time_machine
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connection, connections
 from rest_framework.test import APIRequestFactory
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.tokens import AccessToken
@@ -73,7 +73,10 @@ class TestTenantBinding:
         u = JasminUserFactory()
         raw = _mint(u, tenant_id=tenant.schema_name)
         # Force an unresolvable (falsy) schema for the duration of the call.
-        monkeypatch.setattr(connection, "schema_name", "")
+        # On the database wrapper itself: ``django.db.connection`` is a proxy
+        # whose own ``__dict__`` lacks the attribute, so pytest (9.2 on) would
+        # undo the patch by deleting ``schema_name`` from the wrapper.
+        monkeypatch.setattr(connections[DEFAULT_DB_ALIAS], "schema_name", "")
         with pytest.raises(InvalidToken) as exc:
             auth.get_validated_token(raw)
         assert "resolved" in str(exc.value).lower()

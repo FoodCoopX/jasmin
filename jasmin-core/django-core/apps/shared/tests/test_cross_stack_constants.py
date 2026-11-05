@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from apps.commissioning.constants import DEFAULT_CRATE_TAX_RATE, DEFAULT_TAX_RATE
-from apps.commissioning.views.statistic_views import _MAX_PURCHASE_COST_SPAN_YEARS
+from apps.commissioning.views.statistic_views import _MAX_REPORT_SPAN_YEARS
 
 # This file lives at apps/shared/tests/<file>, so django-core is three up.
 DJANGO_CORE = Path(__file__).resolve().parents[3]
@@ -33,8 +33,8 @@ REACT_SRC = DJANGO_CORE.parent / "react-core" / "src"
 TAX_RATES_MODULE = (
     REACT_SRC / "shared" / "hooks" / "configuration" / "useDefaultTaxRates.ts"
 )
-PURCHASE_RANGE_MODULE = (
-    REACT_SRC / "features" / "commissioning" / "utils" / "purchaseCostRange.ts"
+STATISTICS_RANGE_MODULE = (
+    REACT_SRC / "features" / "commissioning" / "utils" / "statisticsRange.ts"
 )
 
 
@@ -92,14 +92,14 @@ class TestDefaultTaxRatesMatchAcrossTheWire:
         )
 
 
-class TestPurchaseCostRangeMatchesTheServerCap:
+class TestStatisticsRangeMatchesTheServerCap:
     def test_the_picker_bound_matches_the_server_cap(self):
-        """``purchase_cost_by_week`` walks one iteration per ISO week, so the
-        server caps the span and 400s past it; the picker greys out the same
-        range so the bound is never met as an error. Raising the server cap
-        without the client would hide range the report can now serve.
+        """The weekly statistics walk one iteration per ISO week, so the server
+        caps the span and 400s past it; the picker greys out the same range so
+        the bound is never met as an error. Raising the server cap without the
+        client would hide range the reports can now serve.
         """
         assert (
-            _numeric_const(PURCHASE_RANGE_MODULE, "MAX_PURCHASE_COST_RANGE_YEARS")
-            == _MAX_PURCHASE_COST_SPAN_YEARS
+            _numeric_const(STATISTICS_RANGE_MODULE, "MAX_STATISTICS_RANGE_YEARS")
+            == _MAX_REPORT_SPAN_YEARS
         )

@@ -3,16 +3,17 @@ import { t } from "../support/i18n";
 
 // The phone drawer is a curated list of the field jobs; the office pages stay
 // on the desktop. The e2e tenant packs in boxes (the default packing mode), so
-// the box packing lists are among them.
+// the box packing lists are among them; as in the desktop sidebar, the
+// commissioning lists come before the packing list.
 const FIELD_JOBS = [
   "commissioning.forecast",
   "commissioning.documentation_amounts",
   "commissioning.documentation_harvest",
   "commissioning.washing_list",
   "commissioning.harvesting_lists",
-  "commissioning.packing_lists",
   "commissioning.commissioning_list_packing",
   "commissioning.commissioning_list_resellers_short",
+  "commissioning.packing_lists",
 ].map((key) => t(key));
 
 test.use({ persona: "office", viewport: { width: 390, height: 844 } });

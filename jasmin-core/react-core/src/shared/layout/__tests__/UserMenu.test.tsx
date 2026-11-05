@@ -1,10 +1,11 @@
 /**
- * UserMenu: picking a language or a theme. LocaleContext shows a failed save
- * to the user and rethrows, so the menu must take up the rejection rather than
- * leave it unhandled, which Vitest reports as an error of the run. The locale
- * context is the mocking boundary.
+ * UserMenu: picking a language or a theme, from the menu or, where a host
+ * application owns the logins, from the two buttons that stand in for it.
+ * LocaleContext shows a failed save to the user and rethrows, so the menu must
+ * take up the rejection rather than leave it unhandled, which Vitest reports
+ * as an error of the run. The locale context is the mocking boundary.
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -126,20 +127,6 @@ describe("UserMenu account entries", () => {
     }
   });
 
-  it("keeps only the preferences inside a host that owns logins and data protection", async () => {
-    capabilities.user_accounts = false;
-    capabilities.gdpr = false;
-    await openMenu();
-
-    for (const entry of accountEntries) {
-      expect(screen.queryByText(entry)).not.toBeInTheDocument();
-    }
-    expect(screen.getByText("profile.menu_theme")).toBeInTheDocument();
-    // An emptied group leaves no divider behind.
-    expect(
-      document.querySelectorAll(".ant-dropdown-menu-item-divider"),
-    ).toHaveLength(0);
-  });
 
   it("gives a member awaiting confirmation only the logout", async () => {
     viewer.isMemberOnly = true;
@@ -155,7 +142,18 @@ describe("UserMenu account entries", () => {
     expect(screen.queryByText("profile.menu_language")).not.toBeInTheDocument();
   });
 
-  it("gives that member the preferences, not an empty menu, where the host owns the session", async () => {
+
+  it("keeps the menu for my data where a host owns the logins but not the data protection", async () => {
+    capabilities.user_accounts = false;
+    await openMenu();
+
+    expect(screen.getByText("profile.tab_my_data")).toBeInTheDocument();
+    for (const entry of ["profile.title", "profile.tab_two_factor", "common.logout"]) {
+      expect(screen.queryByText(entry)).not.toBeInTheDocument();
+    }
+  });
+
+  it("gives a member awaiting confirmation the preferences, not an empty menu, where the host owns the session", async () => {
     viewer.isMemberOnly = true;
     viewer.ownMember = { admin_confirmed: false };
     capabilities.user_accounts = false;
@@ -172,5 +170,61 @@ describe("UserMenu account entries", () => {
     expect(screen.queryByText("profile.tab_my_data")).not.toBeInTheDocument();
     expect(screen.getByText("profile.tab_two_factor")).toBeInTheDocument();
     expect(screen.getByText("common.logout")).toBeInTheDocument();
+  });
+});
+
+describe("UserMenu inside a host that owns the logins and the data protection", () => {
+  beforeEach(() => {
+    capabilities.user_accounts = false;
+    capabilities.gdpr = false;
+  });
+
+  const renderInHost = () =>
+    render(
+      <MemoryRouter>
+        <UserMenu />
+      </MemoryRouter>,
+    );
+
+  it("shows the language and the theme as two buttons instead of the menu", () => {
+    renderInHost();
+
+    expect(screen.queryByRole("button", { name: "profile.menu_aria" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "profile.menu_language" })).toBeInTheDocument();
+    // The theme button shows the theme picked: the device's.
+    const themeButton = screen.getByRole("button", { name: "profile.menu_theme" });
+    expect(within(themeButton).getByRole("img", { name: "desktop" })).toBeInTheDocument();
+  });
+
+  it("catches a language save the context refused", async () => {
+    renderInHost();
+    await userEvent.click(screen.getByRole("button", { name: "profile.menu_language" }));
+    await userEvent.click(await screen.findByText("English"));
+
+    await waitFor(() => expect(saves).toEqual(["en"]));
+  });
+
+  it("catches a theme save the context refused", async () => {
+    renderInHost();
+    await userEvent.click(screen.getByRole("button", { name: "profile.menu_theme" }));
+    await userEvent.click(await screen.findByText("profile.theme_dark"));
+
+    await waitFor(() => expect(saves).toEqual(["dark"]));
+  });
+
+  it("shows the buttons, not the logout-only menu, to a member awaiting confirmation", () => {
+    viewer.isMemberOnly = true;
+    viewer.ownMember = { admin_confirmed: false };
+    renderInHost();
+
+    expect(screen.getByRole("button", { name: "profile.menu_theme" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "profile.menu_aria" })).not.toBeInTheDocument();
+  });
+
+  it("drops the staff's link to their member page with the menu", () => {
+    renderInHost();
+
+    expect(screen.queryByText("profile.my_member_page")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "profile.menu_aria" })).not.toBeInTheDocument();
   });
 });

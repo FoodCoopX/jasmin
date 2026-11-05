@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews a diff against this repository's own conventions (CLAUDE.md rulebook, prod-safety, money, migrations, i18n, frontend building blocks, test conventions) and reports findings without changing anything. Use before committing or opening a pull request, or when asked to review a diff, a commit, a branch or a PR.
+description: Reviews a diff against this repository's own conventions (CLAUDE.md rulebook, prod-safety, money, migrations, i18n, reuse of existing code, test conventions) and reports findings without changing anything. Use before committing or opening a pull request, or when asked to review a diff, a commit, a branch or a PR.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -34,7 +34,10 @@ You cannot run these tools, so never state what one would report or whether CI s
 - A change to a wire format, response shape, persisted enum value, signed token/URL or bookmarked URL without an accept-old-and-new path → blocking.
 - Migrations are additive; a dropped/renamed column still read by code deployed alongside needs a two-step rollout; an irreversible op gets a `noop` reverse, not fake reversibility (shape: `commissioning/migrations/0011_backfill_over_default_variation_capacity.py`).
 - A change to `ALLOWED_FINALIZED_UPDATES` needs a migration rebuilding the trigger with the same `PROTECTED_TABLES[...]["allowed"]` list and a real `reverse_sql`; the six content tables copy 0024's builder (`_function_sql` / `_parent_move_block` / `_build`), not 0002's.
-- A raised hygiene pin (`eslint.hygiene-pins.js`), a hand-added baseline entry (`mypy-baseline.txt`, `ruff-baseline.txt`, `module-length-baseline.txt`) or a new `EXEMPTIONS` entry without an unwind plan → blocking, unless it only moves an existing entry.
+- A size pin (`eslint.hygiene-pins.js`, `module-length-baseline.txt`) raised by more than a few lines → should-fix: split the function or file instead; a raise of a few lines for a small addition, at the measured value, is fine. A hand-added finding entry (`mypy-baseline.txt`, `ruff-baseline.txt`) or a new `EXEMPTIONS` entry without an unwind plan → blocking, unless it only moves an existing entry.
+
+**Reuse** (all code; CLAUDE.md "Follow the codebase's established patterns", "Reuse the building blocks")
+- For every helper, hook, component, service function or query the diff writes, search both stacks for one that already does the job: grep for what it does (the domain words, the computation, the library call it would make), not only for its name. One that fits as-is → should-fix: call it. One that would need a small change → nitpick: extend it rather than keep two. Logic copied from a sibling instead of shared (a second averaging, week loop, ranking or range check) counts too.
 
 **Backend**
 - Business logic in `services.py` / `services/`, called explicitly; no new Django signals.

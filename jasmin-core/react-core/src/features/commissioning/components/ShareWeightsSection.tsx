@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "antd";
-import { mondayOfIsoWeek, toApiDate } from "@shared/utils";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -13,10 +12,7 @@ import type {
   Share,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
-import { useShareDeliveryDays } from "@features/commissioning/hooks";
 import { ExportCsvShareWeights } from "@features/commissioning/modals";
-import { WeekSelector } from "@shared/selectors";
-import { SharesDeliveryDaySelector } from "@features/commissioning/selectors";
 import {
   EditableTable,
   gatedByPermissionOnlyEdit,
@@ -27,18 +23,39 @@ import type {
   EditableColumnConfig,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
-import { EmptyHint, ExplainerText } from "@shared/ui";
+import { ExplainerText } from "@shared/ui";
 import {
   useInvalidateAfterTableMutation,
+  useIsMobile,
   useNumberFormat,
   useShareTypeVariationSizeOptions,
-  useYearWeekState,
+  useTenant,
 } from "@hooks/index";
 
 type ShareRow = Share & TableRecord;
 
-export default function ShareWeights() {
+interface ShareWeightsSectionProps {
+  year: number;
+  week: number;
+  /** The delivery day the shares are packed for; ``null`` while the week's
+   *  days are still loading, or in a week without any. */
+  deliveryDayId: string | null;
+}
+
+/**
+ * Up to four sample weights of each share packed for one delivery day, next
+ * to the share size's target weight and the average of the weights taken,
+ * recorded inline by the office; plus the CSV export of the average weights
+ * over a date range. Shown under the boxes packing list, for the week and day
+ * picked there.
+ */
+export default function ShareWeightsSection({
+  year,
+  week,
+  deliveryDayId,
+}: ShareWeightsSectionProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const { format } = useNumberFormat();
   const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
   // Writes here are office-only on the backend (ShareViewSet, IsOffice);
@@ -48,49 +65,36 @@ export default function ShareWeights() {
     () => gatedByPermissionOnlyEdit(isOffice),
     [isOffice],
   );
-
-  const { selectedYear, setSelectedYear, selectedWeek, setSelectedWeek } =
-    useYearWeekState();
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [csvExportVisible, setCsvExportVisible] = useState(false);
+  const { getSetting } = useTenant();
+  const packingMode = getSetting("packing_mode", "BOXES");
 
-  const activeAtDate = useMemo(() => {
-    if (!selectedWeek) return undefined;
-    return toApiDate(mondayOfIsoWeek(selectedYear, selectedWeek))!;
-  }, [selectedYear, selectedWeek]);
-
+  // Only boxes are weighed, as the boxes list above packs them: physical
+  // variations, and in mixed packing not the ones packed in bulk.
   const listParams = useMemo<CommissioningSharesListParams>(
     () => ({
-      year: selectedYear,
-      delivery_week: selectedWeek,
-      delivery_day: selectedDay!,
+      year,
+      delivery_week: week,
+      delivery_day: deliveryDayId ?? "",
+      physical: true,
+      ...(packingMode === "MIXED" ? { is_packed_bulk: false } : {}),
     }),
-    [selectedYear, selectedWeek, selectedDay],
+    [year, week, deliveryDayId, packingMode],
   );
-
-  // The week's delivery days, from the same query as the day selector. A day
-  // picked in another week stays picked until they arrive and may not be one
-  // of them, so the shares are asked for only once it is.
-  const { shareDeliveryDays: weekDays, noDaysListed: weekHasNoDays } =
-    useShareDeliveryDays(activeAtDate ? { active_at_date: activeAtDate } : {});
-  const canFetch =
-    !!selectedWeek && weekDays.some((day) => day.value === selectedDay);
   const queryClient = useQueryClient();
 
   // React Query — failures route through the global queryCache.onError
   // toast. Writes call `invalidateData()` to trigger a refetch.
   const { data: rawData, isFetching } = useCommissioningSharesList(listParams, {
-    query: { enabled: canFetch },
+    query: { enabled: deliveryDayId !== null },
   });
   const data = useMemo<ShareRow[]>(
     () =>
-      canFetch
-        ? ((rawData ?? []) as unknown as Share[]).map((item) => ({
-            ...item,
-            key: item.id ?? "",
-          }))
-        : [],
-    [rawData, canFetch],
+      ((rawData ?? []) as unknown as Share[]).map((item) => ({
+        ...item,
+        key: item.id ?? "",
+      })),
+    [rawData],
   );
   const invalidateData = useCallback(() => {
     queryClient.invalidateQueries({
@@ -178,55 +182,41 @@ export default function ShareWeights() {
   );
 
   return (
-    <div>
-      <h1>{t("commissioning.share_weights")}</h1>
+    <div className="section-divider--lg">
+      <h2>{t("commissioning.share_weights")}</h2>
 
-      <WeekSelector
-        selectedYear={selectedYear}
-        setSelectedYear={setSelectedYear}
-        selectedWeek={selectedWeek}
-        setSelectedWeek={setSelectedWeek}
-      />
-
-      <SharesDeliveryDaySelector
-        selectedSharesDeliveryDay={selectedDay}
-        setSelectedSharesDeliveryDay={setSelectedDay}
-        active_at_date={activeAtDate}
-        selectedYear={selectedYear}
-        selectedWeek={selectedWeek}
-      />
-
-      {/* A pick still waiting for its week's days keeps the table, spinning. */}
-      {selectedDay ? (
+      {deliveryDayId !== null && (
         <EditableTable
-          key={`${selectedYear}-${selectedWeek}-${selectedDay}`}
+          key={`${year}-${week}-${deliveryDayId}`}
           columns={columns}
           apiFunctions={apiFunctions}
           initialData={data}
           onSaveSuccess={onSaveSuccess}
           onDeleteSuccess={onDeleteSuccess}
-          loading={!canFetch || isFetching}
+          loading={isFetching}
           className="w-max custom-jasmin-table"
           permissions={permissions}
         />
-      ) : weekHasNoDays ? (
-        <EmptyHint>{t("commissioning.no_delivery_days_in_week")}</EmptyHint>
-      ) : null}
-      <ExplainerText title={t("common.info")}>
-        {t("explainers.share_weights")}
-      </ExplainerText>
-      <div style={{ marginTop: 16, marginBottom: 16 }}>
-        <Button
-          onClick={() => setCsvExportVisible(true)}
-          className="download-button"
-        >
-          {t("commissioning.csv_export_average_weight")}
-        </Button>
-      </div>
-      <ExportCsvShareWeights
-        open={csvExportVisible}
-        onClose={() => setCsvExportVisible(false)}
-      />
+      )}
+      {!isMobile && (
+        <>
+          <ExplainerText title={t("common.info")}>
+            {t("explainers.share_weights")}
+          </ExplainerText>
+          <div className="section-divider">
+            <Button
+              onClick={() => setCsvExportVisible(true)}
+              className="download-button"
+            >
+              {t("commissioning.csv_export_average_weight")}
+            </Button>
+          </div>
+          <ExportCsvShareWeights
+            open={csvExportVisible}
+            onClose={() => setCsvExportVisible(false)}
+          />
+        </>
+      )}
     </div>
   );
 }

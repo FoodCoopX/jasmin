@@ -1,4 +1,5 @@
-"""Tests for StockService.get_theoretical_current_stock."""
+"""Tests for StockService.get_theoretical_current_stock and
+StockService.get_current_stock_without_projection."""
 
 from __future__ import annotations
 
@@ -314,3 +315,133 @@ class TestGetTheoreticalCurrentStockFastPath:
             key = (str(article.pk), "KG", "M", str(storage.pk))
             assert result[key]["theoretical_current_stock"] == 25.0
             assert result[key]["current_stock_amount"] == 30.0
+
+
+@pytest.mark.django_db
+class TestGetCurrentStockWithoutProjection:
+    """A day's stock from the snapshots and the movements after them, past a
+    lagging ``CurrentStockBalance`` projection — and past an inventory whose
+    correction delta still answers an earlier balance. The stock comes from
+    inventory counts, the movements that need no source."""
+
+    def test_reads_past_a_lagging_projection(self, tenant):
+        import time_machine
+
+        from apps.commissioning.tests.factories import CurrentStockBalanceFactory
+
+        article = ShareArticleFactory()
+        storage = StorageFactory(is_short_term_harvest_storage=True)
+
+        with time_machine.travel(_dt(2026, 20, 1, hour=10), tick=False):
+            # The projection still counts 42; the ledger holds last week's
+            # count of 20 and today's count of 25 (a +5 correction).
+            CurrentStockBalanceFactory(
+                share_article=article,
+                storage=storage,
+                unit="KG",
+                size="M",
+                balance=Decimal("42.000"),
+            )
+            MovementShareArticleFactory(
+                share_article=article,
+                storage=storage,
+                amount=Decimal("20"),
+                counted_amount=Decimal("20"),
+                movement_type="INVENTORY",
+                date=_dt(2026, 19, 1),
+            )
+            MovementShareArticleFactory(
+                share_article=article,
+                storage=storage,
+                amount=Decimal("5"),
+                counted_amount=Decimal("25"),
+                movement_type="INVENTORY",
+                date=_dt(2026, 20, 1, hour=8),
+            )
+
+            result = StockService.get_current_stock_without_projection(2026, 20, 1)
+
+        key = (str(article.pk), "KG", "M", str(storage.pk))
+        assert result[key]["theoretical_current_stock"] == 20.0
+        assert result[key]["current_stock_amount"] == 25.0
+
+    def test_a_counts_snapshot_holds_while_its_correction_is_stale(self, tenant):
+        article = ShareArticleFactory()
+        storage = StorageFactory()
+        # Counted 5 at 18:00; the snapshot holds the count, while the
+        # inventory's delta (+9) still answers a balance that has since changed.
+        MovementShareArticleFactory(
+            share_article=article,
+            storage=storage,
+            amount=Decimal("9"),
+            counted_amount=Decimal("5"),
+            movement_type="INVENTORY",
+            date=_dt(2026, 15, 1, hour=18),
+        )
+        StockSnapshotFactory(
+            share_article=article,
+            storage=storage,
+            unit="KG",
+            size="M",
+            balance=Decimal("5"),
+            snapshot_date=_dt(2026, 15, 1, hour=18),
+        )
+
+        result = StockService.get_current_stock_without_projection(2026, 15, 1)
+
+        key = (str(article.pk), "KG", "M", str(storage.pk))
+        assert result[key]["current_stock_amount"] == 5.0
+
+    def test_leaves_out_the_movements_after_the_day(self, tenant):
+        article = ShareArticleFactory()
+        storage = StorageFactory()
+        # Counted 8 on Monday and 5 on Wednesday; Tuesday has no count.
+        MovementShareArticleFactory(
+            share_article=article,
+            storage=storage,
+            amount=Decimal("8"),
+            counted_amount=Decimal("8"),
+            movement_type="INVENTORY",
+            date=_dt(2026, 15, 0),
+        )
+        MovementShareArticleFactory(
+            share_article=article,
+            storage=storage,
+            amount=Decimal("-3"),
+            counted_amount=Decimal("5"),
+            movement_type="INVENTORY",
+            date=_dt(2026, 15, 2),
+        )
+
+        result = StockService.get_current_stock_without_projection(2026, 15, 1)
+
+        key = (str(article.pk), "KG", "M", str(storage.pk))
+        assert result[key]["theoretical_current_stock"] == 8.0
+        assert result[key]["current_stock_amount"] is None
+
+    def test_reads_only_the_articles_asked_for(self, tenant):
+        wanted = ShareArticleFactory()
+        other = ShareArticleFactory()
+        storage = StorageFactory()
+        for article in (wanted, other):
+            MovementShareArticleFactory(
+                share_article=article,
+                storage=storage,
+                movement_type="INVENTORY",
+                date=_dt(2026, 15, 0),
+            )
+            StockSnapshotFactory(
+                share_article=article,
+                storage=storage,
+                unit="KG",
+                size="M",
+                balance=Decimal("10"),
+                snapshot_date=_dt(2026, 15, 0),
+            )
+
+        result = StockService.get_current_stock_without_projection(
+            2026, 15, 1, entity_filter={"share_article_id": [wanted.pk]}
+        )
+
+        # The snapshots are scoped as well as the movements.
+        assert {key[0] for key in result} == {str(wanted.pk)}

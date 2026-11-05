@@ -145,6 +145,8 @@ import type {
   CommissioningShareTypeVariationsListParams,
   CommissioningShareTypeVariationsTotalsRetrieveParams,
   CommissioningShareTypesListParams,
+  CommissioningShareWeightsByWeekListParams,
+  CommissioningShareWeightsSummaryListParams,
   CommissioningSharesBulkUpdateUpdateParams,
   CommissioningSharesDeliveryDaysListParams,
   CommissioningSharesExportCsvRetrieveParams,
@@ -341,6 +343,8 @@ import type {
   ShareTypeVariation,
   ShareTypeVariationGrossPrice,
   ShareTypeVariationsTotalsResponse,
+  ShareWeightsByWeek,
+  ShareWeightsSummary,
   SharesDeliveryDay,
   StationMemberMatrix,
   StockComparison,
@@ -19872,8 +19876,7 @@ export function useCommissioningPurchaseExportCsvRetrieve<TData = Awaited<Return
     purchase figure (price_per_unit × amount × variation demand), aggregated
     server-side so only the per-week points cross the wire. Office only.
 
-    The range is bounded: `start_date` must be on or before `end_date`, and
-    the two may span at most 5 years.
+    The range is bounded: `start_date` must be on or before `end_date`, and the two may span at most 5 years.
     
  * @summary Get purchase cost per week
  */
@@ -25646,7 +25649,215 @@ const {mutation: mutationOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
-    export const commissioningSharesList = (
+    /**
+ * 
+    Average weight of the shares weighed per ISO week and share type variation
+    over a date range, next to each variation's target weight, for the weight
+    statistics. A share's weight is the mean of the weights taken of it, a
+    week's the mean over its weighed shares. Every variation delivered in a
+    week gets a point, with a null average when none of its shares was
+    weighed. Only the variations packed in boxes, physical and not packed in
+    bulk, as only they are weighed. Office only.
+
+    The range is bounded: `start_date` must be on or before `end_date`, and the two may span at most 5 years.
+    
+ * @summary Get share weights per week
+ */
+export const commissioningShareWeightsByWeekList = (
+    params: CommissioningShareWeightsByWeekListParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<ShareWeightsByWeek[]>(
+      {url: `/api/commissioning/share_weights_by_week/`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getCommissioningShareWeightsByWeekListQueryKey = (params?: CommissioningShareWeightsByWeekListParams,) => {
+    return [
+    `/api/commissioning/share_weights_by_week/`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getCommissioningShareWeightsByWeekListQueryOptions = <TData = Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError = ErrorResponse>(params: CommissioningShareWeightsByWeekListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCommissioningShareWeightsByWeekListQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>> = ({ signal }) => commissioningShareWeightsByWeekList(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CommissioningShareWeightsByWeekListQueryResult = NonNullable<Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>>
+export type CommissioningShareWeightsByWeekListQueryError = ErrorResponse
+
+
+export function useCommissioningShareWeightsByWeekList<TData = Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError = ErrorResponse>(
+ params: CommissioningShareWeightsByWeekListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>,
+          TError,
+          Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCommissioningShareWeightsByWeekList<TData = Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError = ErrorResponse>(
+ params: CommissioningShareWeightsByWeekListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>,
+          TError,
+          Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCommissioningShareWeightsByWeekList<TData = Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError = ErrorResponse>(
+ params: CommissioningShareWeightsByWeekListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get share weights per week
+ */
+
+export function useCommissioningShareWeightsByWeekList<TData = Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError = ErrorResponse>(
+ params: CommissioningShareWeightsByWeekListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsByWeekList>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCommissioningShareWeightsByWeekListQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * 
+    Per share type size packed in boxes, over a date range: how many of its
+    boxes were weighed (each weight taken of a share one box), their average
+    weight and the standard deviation between them, the size's target weight,
+    and how much the weighed boxes weighed over or under their targets in sum.
+    A size takes in the variations succeeding each other in it. Only the
+    variations packed in boxes, physical and not packed in bulk, as only they
+    are weighed. Office only.
+
+    The range is bounded: `start_date` must be on or before `end_date`, and the two may span at most 5 years.
+    
+ * @summary Get the share weights of a date range per share type size
+ */
+export const commissioningShareWeightsSummaryList = (
+    params: CommissioningShareWeightsSummaryListParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<ShareWeightsSummary[]>(
+      {url: `/api/commissioning/share_weights_summary/`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getCommissioningShareWeightsSummaryListQueryKey = (params?: CommissioningShareWeightsSummaryListParams,) => {
+    return [
+    `/api/commissioning/share_weights_summary/`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getCommissioningShareWeightsSummaryListQueryOptions = <TData = Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError = ErrorResponse>(params: CommissioningShareWeightsSummaryListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCommissioningShareWeightsSummaryListQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>> = ({ signal }) => commissioningShareWeightsSummaryList(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CommissioningShareWeightsSummaryListQueryResult = NonNullable<Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>>
+export type CommissioningShareWeightsSummaryListQueryError = ErrorResponse
+
+
+export function useCommissioningShareWeightsSummaryList<TData = Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError = ErrorResponse>(
+ params: CommissioningShareWeightsSummaryListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>,
+          TError,
+          Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCommissioningShareWeightsSummaryList<TData = Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError = ErrorResponse>(
+ params: CommissioningShareWeightsSummaryListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>,
+          TError,
+          Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCommissioningShareWeightsSummaryList<TData = Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError = ErrorResponse>(
+ params: CommissioningShareWeightsSummaryListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the share weights of a date range per share type size
+ */
+
+export function useCommissioningShareWeightsSummaryList<TData = Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError = ErrorResponse>(
+ params: CommissioningShareWeightsSummaryListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningShareWeightsSummaryList>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCommissioningShareWeightsSummaryListQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+export const commissioningSharesList = (
     params?: CommissioningSharesListParams,
  signal?: AbortSignal
 ) => {

@@ -18,6 +18,7 @@ from apps.authz.permissions import (
     IsStaffOrMemberOrCustomer,
     RolePermissionsMixin,
 )
+from apps.shared.iso_week_filters import iso_week_bound
 from core.serializers import ErrorResponseSerializer
 
 from ..errors import (
@@ -268,8 +269,7 @@ class SharesDeliveryDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             # its week starts after the new end (a Sunday). Compare iso tuples.
             vu_week = Week.withdate(new_valid_until)
             stranded += instance.share_set.filter(
-                Q(year__gt=vu_week.year)
-                | Q(year=vu_week.year, delivery_week__gt=vu_week.week)
+                iso_week_bound((vu_week.year, vu_week.week), "gt")
             ).count()
             if stranded:
                 raise SharesDeliveryDayShorteningStrandsChildren(
@@ -312,8 +312,7 @@ class SharesDeliveryDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             # if its week starts before the new start. Compare iso tuples.
             vf_week = Week.withdate(new_valid_from)
             stranded += instance.share_set.filter(
-                Q(year__lt=vf_week.year)
-                | Q(year=vf_week.year, delivery_week__lt=vf_week.week)
+                iso_week_bound((vf_week.year, vf_week.week), "lt")
             ).count()
             if stranded:
                 raise SharesDeliveryDayStartMoveStrandsChildren(

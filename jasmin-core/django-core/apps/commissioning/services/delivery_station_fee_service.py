@@ -20,6 +20,7 @@ from fractions import Fraction
 
 from django.db.models import Q, QuerySet
 
+from apps.shared.iso_week_filters import iso_week_window_for_dates
 from apps.shared.money import round_money, to_decimal
 
 from ..models import DeliveryStation, ExternalShareDemand, ShareDelivery
@@ -99,18 +100,6 @@ class DeliveryStationFeeService:
                 station, start, end
             )
 
-        years: set[int] = set()
-        weeks: set[int] = set()
-        day = start
-        while day <= end:
-            iso_year, iso_week, _ = day.isocalendar()
-            years.add(iso_year)
-            weeks.add(iso_week)
-            day += datetime.timedelta(days=7)
-        iso_year, iso_week, _ = end.isocalendar()
-        years.add(iso_year)
-        weeks.add(iso_week)
-
         counts: dict[tuple[int, int], int] = {}
         # Pull only the columns the date refine + quantity weighting need via
         # ``.values()`` — instantiating full ShareDelivery models (with two
@@ -118,9 +107,8 @@ class DeliveryStationFeeService:
         for row in (
             ShareDelivery.objects.shippable()
             .filter(
+                iso_week_window_for_dates(start, end, prefix="share__"),
                 delivery_station_day__delivery_station=station,
-                share__year__in=years,
-                share__delivery_week__in=weeks,
                 # Only STANDALONE (non-additional) boxes drive the per-box
                 # station fee — the exact shares that consume station-day
                 # capacity. An additional share (is_additional_share_type) is
@@ -170,23 +158,10 @@ class DeliveryStationFeeService:
         import bills its per-box fee instead of always 0. External demand has no
         per-share ``changed_day_number``, so the day comes from the station-day's
         delivery day. Locked by ``test_delivery_station_fee_service.py``."""
-        years: set[int] = set()
-        weeks: set[int] = set()
-        day = start
-        while day <= end:
-            iso_year, iso_week, _ = day.isocalendar()
-            years.add(iso_year)
-            weeks.add(iso_week)
-            day += datetime.timedelta(days=7)
-        iso_year, iso_week, _ = end.isocalendar()
-        years.add(iso_year)
-        weeks.add(iso_week)
-
         counts: dict[tuple[int, int], int] = {}
         for row in ExternalShareDemand.objects.filter(
+            iso_week_window_for_dates(start, end),
             delivery_station_day__delivery_station=station,
-            year__in=years,
-            delivery_week__in=weeks,
             # Same standalone-only gate as the subscription path: an
             # additional (packed-along) share rides in another box, takes no
             # station slot, and must not be billed per-box.

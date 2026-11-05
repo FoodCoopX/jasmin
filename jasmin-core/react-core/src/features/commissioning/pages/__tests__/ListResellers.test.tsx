@@ -15,6 +15,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OfferGroup, Reseller } from "@shared/api/generated/models";
+import { TenantContext } from "@shared/contexts/TenantContext";
 import i18n from "@shared/i18n";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
@@ -38,6 +39,9 @@ vi.mock("@hooks/configuration/useTenant", async () => {
   });
   return { useTenant: () => tenant };
 });
+
+// What the deployment offers, per test; a capability left unset is offered.
+const deployment = { capabilities: {} as Record<string, boolean> };
 
 // `useRoles` is real; it reads the signed-in user's roles from here.
 const auth = vi.hoisted(() => ({ roles: ["office"] as string[] }));
@@ -245,6 +249,7 @@ function axiosError(status: number, data: Row) {
 beforeEach(() => {
   auth.roles = ["office"];
   tenantSettings.values = {};
+  deployment.capabilities = {};
   invoiceSettings.changes = {};
   Object.assign(stubs, { invite: null, exportCsv: null, csvImport: null });
   serverResellers = [HOFLADEN, BIOMARKT, CAFE, KANTINE];
@@ -284,9 +289,12 @@ function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   });
+  const tenantContext = { tenant: deployment } as unknown as Parameters<typeof TenantContext.Provider>[0]["value"];
   render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{profiler.wrap(<ListResellers />)}</MemoryRouter>
+      <TenantContext.Provider value={tenantContext}>
+        <MemoryRouter>{profiler.wrap(<ListResellers />)}</MemoryRouter>
+      </TenantContext.Provider>
     </QueryClientProvider>,
   );
   return { user, profiler };
@@ -488,6 +496,19 @@ describe("ListResellers columns", () => {
 
     expect(columnTitles()).not.toContain("resellers.offer_group");
     expect(columnTitles()).toContain("resellers.offer_via_email");
+  });
+
+  it("leaves out the delivery station flag, in the table and the export, where the host keeps its pickup locations", async () => {
+    deployment.capabilities = { delivery_stations: false };
+    const { user } = await renderLoaded();
+
+    expect(columnTitles()).not.toContain("resellers.is_also_delivery_station");
+    expect(columnTitles()).toContain("resellers.is_seller");
+
+    await user.click(screen.getByRole("button", { name: /commissioning\.csv_export_resellers/ }));
+    const exported = stubs.exportCsv?.columns.map((column) => column.dataIndex);
+    expect(exported).not.toContain("is_also_delivery_station");
+    expect(exported).toContain("is_seller");
   });
 });
 
