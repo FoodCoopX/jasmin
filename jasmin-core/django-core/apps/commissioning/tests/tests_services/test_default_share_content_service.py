@@ -225,8 +225,8 @@ class TestCreateDefaultShareContent:
 
         # The bulk-create path bypasses ``Share.save()``, so it must default
         # ALL day fields (including ``get_current_stock_day``) from the delivery
-        # day in memory — a NULL one would silently drop the share from that
-        # day-filtered list.
+        # day in memory — a NULL one would cost the share its theoretical
+        # amounts.
         assert share.harvesting_day == delivery_day.default_harvesting_day
         assert share.packing_day == delivery_day.default_packing_day
         assert share.washing_day == delivery_day.default_washing_day

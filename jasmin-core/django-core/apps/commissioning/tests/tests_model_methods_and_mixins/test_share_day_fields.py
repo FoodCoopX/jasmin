@@ -1,8 +1,8 @@
 """Day-field defaulting / self-healing on Share.
 
-A Share whose ``packing_day`` (or any of the five day fields) is NULL is
-silently dropped from every day-filtered list (packing / harvesting / washing
-/ cleaning). ``save()`` defaults them from the ``delivery_day``, but
+A Share with a NULL day field gets no theoretical harvest, wash or clean
+amount for it, or packs on the delivery day (``Share.DAY_FIELD_DEFAULTS``).
+``save()`` defaults them from the ``delivery_day``, but
 ``bulk_create`` and ``get_or_create`` on a *reused* row both bypass ``save()``
 — so the model exposes explicit healers. These tests pin that behaviour down
 through the REAL entry points.

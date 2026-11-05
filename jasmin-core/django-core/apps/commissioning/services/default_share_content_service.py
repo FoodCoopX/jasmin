@@ -148,8 +148,8 @@ class DefaultShareContentService:
             existing[key] = share
 
         # Self-heal reused shares that an earlier bulk_create left with NULL
-        # day fields — otherwise the ShareContent we attach to them inherits
-        # the NULL packing_day and silently drops out of the packing lists.
+        # day fields — otherwise the ShareContent we attach to them would be
+        # planned without its theoretical amounts (see ``DAY_FIELD_DEFAULTS``).
         Share.heal_day_fields(existing.values())
         return existing
 
@@ -579,8 +579,8 @@ class DefaultShareContentService:
                         # from the delivery day. Apply them in memory via the
                         # model's own helper (driven by ``DAY_FIELD_DEFAULTS``,
                         # the single source of truth) so none are missed — a
-                        # NULL day field silently excludes the share from that
-                        # day-filtered list.
+                        # NULL day field costs the share its theoretical
+                        # amounts (see ``DAY_FIELD_DEFAULTS``).
                         share = Share(
                             year=year,
                             delivery_week=week,

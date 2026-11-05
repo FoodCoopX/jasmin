@@ -691,10 +691,10 @@ class Share(JasminModel):
             ),
         ]
 
-    # Day field -> the SharesDeliveryDay default it falls back to when NULL.
-    # A NULL day field silently drops the Share from every day-filtered list
-    # (packing / harvesting / washing / cleaning), so these must always be
-    # populated whenever there's a delivery_day to source them from.
+    # Day field -> the SharesDeliveryDay default it falls back to when NULL. A
+    # NULL harvesting, washing or cleaning day builds no theoretical amount for
+    # the Share's contents, which then miss that list and the theoretical
+    # stock; a NULL packing day packs them on the delivery day.
     DAY_FIELD_DEFAULTS = {
         "harvesting_day": "default_harvesting_day",
         "packing_day": "default_packing_day",
@@ -730,7 +730,7 @@ class Share(JasminModel):
 
         ``bulk_create`` and ``get_or_create`` on a *reused* row both bypass
         the defaulting in ``save()``, so a Share can end up with NULL day
-        fields and vanish from day-filtered queries. Call this after
+        fields (see ``DAY_FIELD_DEFAULTS``). Call this after
         fetching/reusing a Share to self-heal. No-op (no write) when there's
         no delivery_day or every field is already set.
 
@@ -780,7 +780,7 @@ class Share(JasminModel):
 
         ``bulk_create`` bypasses ``save()``, so the day-field defaulting that
         ``save()`` performs must be applied up front — otherwise the row lands
-        with NULL day fields and vanishes from day-filtered queries. Use this
+        with NULL day fields (see ``DAY_FIELD_DEFAULTS``). Use this
         for the batch-materialization paths where a per-row
         ``get_or_create_for_delivery`` would be an N+1.
         """

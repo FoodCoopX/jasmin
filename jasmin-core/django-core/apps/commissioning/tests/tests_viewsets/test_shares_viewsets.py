@@ -899,8 +899,8 @@ class TestShareBulkUpdateDayValidation:
         # The office grid has always sent this string for a blanked cell, so the
         # serializer has to keep taking it as "no day" instead of rejecting it.
         # A cleared day then falls back to the delivery day's default in
-        # ``Share.save`` — a NULL would drop the share out of every day-filtered
-        # list.
+        # ``Share.save`` — a NULL would cost the share its theoretical
+        # amounts.
         share = ShareFactory(year=2026, delivery_week=30)
         assert (
             self._put(api_client, {"washing_day": 4}).status_code == status.HTTP_200_OK
