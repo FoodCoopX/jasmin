@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 from datetime import timedelta
+from typing import TypeVar
 
 from django.db import transaction
 from django.utils import timezone
@@ -13,6 +14,7 @@ from apps.shared.iso_week_filters import iso_week_bound
 from ..models import (
     CapacityReservation,
     DeliveryStationDay,
+    ExternalShareDemand,
     Share,
     ShareDelivery,
     SharesDeliveryDay,
@@ -36,6 +38,28 @@ def _is_future_and_within_validity(
     if timebound.valid_until and record_date > timebound.valid_until:
         return False
     return True
+
+
+_StationDayRow = TypeVar("_StationDayRow", CapacityReservation, ExternalShareDemand)
+
+
+def _move_onto_copies(
+    model: type[_StationDayRow],
+    week_field: str,
+    from_week: tuple[int, int],
+    copy_by_old_id: dict[str, DeliveryStationDay],
+) -> None:
+    """Move ``model``'s rows of ``from_week`` on from each closed station day
+    onto its copy."""
+    rows = list(
+        model.objects.filter(delivery_station_day_id__in=copy_by_old_id).filter(
+            iso_week_bound(from_week, "gte", week_field=week_field)
+        )
+    )
+    for row in rows:
+        row.delivery_station_day = copy_by_old_id[row.delivery_station_day_id]
+    if rows:
+        model.objects.bulk_update(rows, fields=["delivery_station_day"])
 
 
 class SharesDeliveryDayService:
@@ -115,35 +139,35 @@ class SharesDeliveryDayService:
             )
         if copies:
             DeliveryStationDay.objects.bulk_create(copies)
-            # A draft subscription with an OPEN default DSD holds a
-            # CapacityReservation for EVERY week on that single id. After the
-            # copy, post-boundary weeks materialize against the new copy's id —
-            # but occupancy is strictly id-keyed, so a stale reservation left on
-            # the closed original stops counting, freeing the slot for a
-            # concurrent over-book. Repoint each closed DSD's post-boundary
-            # reservations onto its copy. (copies carry their nanoid PK from the
-            # JasminModel default, set at __init__, so the FK assign is valid.)
+            # Post-boundary weeks belong to the copy, so each closed DSD's
+            # rows for those weeks move onto it. A draft subscription with an
+            # OPEN default DSD holds a CapacityReservation for EVERY week on
+            # that single id, and occupancy is strictly id-keyed: a stale
+            # reservation on the closed original stops counting, freeing the
+            # slot for a concurrent over-book. Imported demand is found through
+            # its DSD's delivery day: left on the original, the moved Shares
+            # find none, and a host's unchanged re-import is skipped as already
+            # applied. It moves only for the weeks whose Shares move, those not
+            # begun (``update_shares_for_delivery_day``). (copies carry their
+            # nanoid PK from the JasminModel default, set at __init__, so the FK
+            # assign is valid.)
             copy_by_old_id = {
                 old.id: copy for old, copy in zip(rows_to_close, copies, strict=True)
             }
             vf_week = Week.withdate(valid_from)
-            reservations = list(
-                CapacityReservation.objects.filter(
-                    delivery_station_day_id__in=copy_by_old_id
-                ).filter(
-                    iso_week_bound(
-                        (vf_week.year, vf_week.week), "gte", week_field="week"
-                    )
-                )
+            _move_onto_copies(
+                CapacityReservation,
+                "week",
+                (vf_week.year, vf_week.week),
+                copy_by_old_id,
             )
-            for reservation in reservations:
-                reservation.delivery_station_day = copy_by_old_id[
-                    reservation.delivery_station_day_id
-                ]
-            if reservations:
-                CapacityReservation.objects.bulk_update(
-                    reservations, fields=["delivery_station_day"]
-                )
+            demand_week = max(vf_week, Week.withdate(timezone.now().date()) + 1)
+            _move_onto_copies(
+                ExternalShareDemand,
+                "delivery_week",
+                (demand_week.year, demand_week.week),
+                copy_by_old_id,
+            )
 
         return copies
 

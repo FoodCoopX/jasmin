@@ -6,7 +6,10 @@ import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+import time_machine
 
+from apps.commissioning.models import ExternalShareDemand, ShareImportBatch
+from apps.commissioning.services.share_demand_service import ExternalDemandBackend
 from apps.commissioning.services.shares_delivery_day_service import (
     SharesDeliveryDayService,
     _is_future_and_within_validity,
@@ -103,6 +106,68 @@ class TestUpdateDeliveryStationDays:
         assert len(new_copies) == 1
         assert new_copies[0].delivery_day == new_day
         assert new_copies[0].valid_from == valid_from
+
+    @pytest.mark.parametrize(
+        ("today", "moved_weeks"),
+        [
+            # The Monday before the boundary: week 27 (from the boundary Monday,
+            # 29 June) on moves.
+            (datetime.date(2026, 6, 22), {27, 28}),
+            # The boundary Monday itself: its week has begun, so its Shares and
+            # their demand stay on the old day; only the next week moves.
+            (datetime.date(2026, 6, 29), {28}),
+        ],
+    )
+    def test_moves_the_imported_demand_of_the_weeks_whose_shares_move(
+        self, tenant, today, moved_weeks
+    ):
+        with time_machine.travel(
+            datetime.datetime.combine(today, datetime.time(12)), tick=False
+        ):
+            old_day = SharesDeliveryDayFactory(
+                day_number=2, valid_until=datetime.date(2026, 6, 28)
+            )
+            new_day = SharesDeliveryDayFactory(
+                day_number=2, valid_from=datetime.date(2026, 6, 29)
+            )
+            dsd = DeliveryStationDayFactory(delivery_day=old_day)
+            variation = ShareTypeVariationFactory()
+            batch = ShareImportBatch.objects.create(
+                year=2026,
+                delivery_week=26,
+                file_checksum="0" * 64,
+                original_filename="tapir.csv",
+                status=ShareImportBatch.STATUS_APPLIED,
+            )
+            rows = {
+                week: ExternalShareDemand.objects.create(
+                    batch=batch,
+                    year=2026,
+                    delivery_week=week,
+                    delivery_station_day=dsd,
+                    share_type_variation=variation,
+                    quantity=5,
+                )
+                for week in (26, 27, 28)
+            }
+
+            copies = SharesDeliveryDayService.update_delivery_station_days(
+                instance=new_day,
+                existing_delivery_day=old_day,
+                validated_data={"valid_from": datetime.date(2026, 6, 29)},
+            )
+
+        for week, row in rows.items():
+            row.refresh_from_db()
+            expected = copies[0].id if week in moved_weeks else dsd.id
+            assert row.delivery_station_day_id == expected, week
+        moved_share = ShareFactory(
+            year=2026,
+            delivery_week=28,
+            delivery_day=new_day,
+            share_type_variation=variation,
+        )
+        assert ExternalDemandBackend().quantity_for_share(moved_share) == 5
 
     def test_empty_when_no_station_days(self, tenant):
         old_day = SharesDeliveryDayFactory(
