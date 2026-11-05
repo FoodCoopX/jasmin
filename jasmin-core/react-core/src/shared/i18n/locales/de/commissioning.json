@@ -780,6 +780,14 @@
   "no_variation_columns_title": "Keine Anteilsgrößen konfiguriert.",
   "no_orders_title": "Keine Bestellungen vorhanden.",
   "no_variation_columns_message": "Für die ausgewählte Woche gibt es keine Anteilsgrößen. Bitte richte Anteilstypen und Liefertage (mit Verteilstationen) ein, damit diese Tabelle angezeigt werden kann.",
+  "missing_work_days": {
+    "title": "Bei Liefertagen fehlen Arbeitstage",
+    "day": "{{day}} – fehlt: {{missing}}",
+    "day_from": "{{day}} ab {{date}} – fehlt: {{missing}}",
+    "consequence": "Ohne diese Tage rechnet das Programm die Erntelisten etc. nicht korrekt. Bitte eintragen!",
+    "link": "Zu den Liefertagen",
+    "ask_admin": "Eine Person mit Admin-Rechten kann sie unter Konfiguration → Liefertage eintragen."
+  },
   "organic": {
     "conventional": "Konventionell",
     "in_conversion": "Umstellung",

@@ -20,6 +20,7 @@ export {
 export { default as ReadOnlyReportTable } from './ReadOnlyReportTable';
 export type { ReadOnlyReportTableProps } from './ReadOnlyReportTable';
 export { useCrudListPage } from './useCrudListPage';
+export { withNewRowDefaults } from './newRowDefaults';
 export type {
   CrudListPageApi,
   CrudResource,

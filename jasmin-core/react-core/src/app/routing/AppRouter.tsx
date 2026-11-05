@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 // barrel and its static PDF templates, pulling @react-pdf into the app
 // shell chunk every authenticated user loads.
 import ImportSharesModeBanner from "@features/commissioning/components/ImportSharesModeBanner";
+import MissingWorkDaysBanner from "@features/commissioning/components/MissingWorkDaysBanner";
 import TenantDashboardPage from "@features/platform/pages/TenantDashboard";
 import UnauthorizedPage from "../UnauthorizedPage";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -71,6 +72,7 @@ export const AppRouter = ({ defaultRedirect = "/" }: AppRouterProps) => {
                   {IMPORT_SHARES_BANNER_GROUPS.has(groupPath) && (
                     <ImportSharesModeBanner />
                   )}
+                  {groupPath === "/commissioning" && <MissingWorkDaysBanner />}
                   {/* Configuration pages get a primary-coloured border on
                       every card via this scoping wrapper (see
                       card-headers.css). */}

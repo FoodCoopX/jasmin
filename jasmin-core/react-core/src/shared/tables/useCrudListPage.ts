@@ -11,6 +11,7 @@ import type {
   TableRecord,
 } from "./BasicEditableTable/types";
 import { wrapApiFunctions } from "./BasicEditableTable/wrapApiFunctions";
+import { withNewRowDefaults } from "./newRowDefaults";
 
 /** Minimal slice of an Orval `useQuery` result the CRUD list page reads. */
 interface ListQueryResult {
@@ -137,14 +138,8 @@ export function useCrudListPage<TRow extends TableRecord>({
     [resource],
   );
 
-  const customEdit = useCallback(
-    (record: TRow, form: FormInstance): TRow => {
-      if (record.key === -1) {
-        form.setFieldsValue(newRowDefaults);
-        return { ...record, ...newRowDefaults };
-      }
-      return record;
-    },
+  const customEdit = useMemo(
+    () => withNewRowDefaults<TRow>(newRowDefaults),
     [newRowDefaults],
   );
 
