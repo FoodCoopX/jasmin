@@ -162,7 +162,7 @@ const LoggingModal: FC<LoggingModalProps> = ({
       width={480}
     >
       {visibleEntries.length === 0 ? (
- <span className="text-muted">
+ <span className="color-text-tertiary">
           {t("logging.no_data")}
         </span>
       ) : (

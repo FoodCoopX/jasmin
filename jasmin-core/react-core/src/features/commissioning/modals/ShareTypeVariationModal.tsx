@@ -514,7 +514,7 @@ export default function ShareTypeVariationModal({
           disabled: true,
           render: (_: unknown, record: ShareTypeVariationRecord) => {
             if (record.key === -1 || !record.id) {
-              return <span className="text-muted">-</span>;
+              return <span className="color-text-tertiary">-</span>;
             }
 
             return (
@@ -540,7 +540,7 @@ export default function ShareTypeVariationModal({
           disabled: true,
           render: (_: unknown, record: ShareTypeVariationRecord) => {
             if (record.key === -1 || !record.id) {
-              return <span className="text-muted">-</span>;
+              return <span className="color-text-tertiary">-</span>;
             }
             return (
               <Button

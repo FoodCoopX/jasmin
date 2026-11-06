@@ -466,7 +466,7 @@ export default function WaitingListAbos() {
                 ? t("abos.availability_station_full")
                 : t("abos.availability_waiting");
             return (
-              <span className="text-muted">
+              <span className="color-text-tertiary">
                 {reason}
               </span>
             );

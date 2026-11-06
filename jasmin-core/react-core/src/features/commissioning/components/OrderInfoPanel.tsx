@@ -128,8 +128,8 @@ export function OrderInfoPanel({
                 }
               }}
             >
-              {orderNote || <span className="text-muted">—</span>}
-              <EditOutlined className="text-label-sm text-muted" />
+              {orderNote || <span className="color-text-tertiary">—</span>}
+              <EditOutlined className="text-label-sm color-text-tertiary" />
             </span>
           )}
         </div>

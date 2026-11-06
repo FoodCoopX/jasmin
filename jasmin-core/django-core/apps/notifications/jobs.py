@@ -26,6 +26,7 @@ from typing import Any
 from django.db import transaction
 from django.utils import timezone
 from django_tenants.utils import get_public_schema_name, schema_context
+from huey.exceptions import CancelExecution
 
 from core.tenant_db import connection
 
@@ -92,9 +93,13 @@ def _current_schema_name() -> str:
     return schema_name
 
 
-class JobNotQueued(Exception):
+class JobNotQueued(CancelExecution):
     """The job's row was no longer queued when its task started, so the task
-    did nothing: the stale-job sweep had already failed it."""
+    did nothing: the stale-job sweep had already failed it.
+
+    An expected outcome, not a fault: Huey logs a cancelled task as a one-line
+    warning, without the traceback of an error, and doesn't retry one raised
+    with ``retry=False``."""
 
 
 def mark_running(job_id: str) -> bool:
@@ -195,7 +200,12 @@ def run_job(schema_name: str, job_id: str):
     handle = _JobHandle(job_id)
     with schema_context(schema_name):
         if not mark_running(job_id):
-            raise JobNotQueued(f"background job {job_id} is no longer queued")
+            _task_logger.warning(
+                "background_job.not_queued schema=%s job=%s", schema_name, job_id
+            )
+            raise JobNotQueued(
+                f"background job {job_id} is no longer queued", retry=False
+            )
         try:
             yield handle
             mark_done(job_id, handle.result)

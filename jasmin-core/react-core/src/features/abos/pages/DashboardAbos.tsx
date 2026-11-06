@@ -37,7 +37,7 @@ interface PriceRow {
 export default function DashboardAbos() {
   const { t } = useTranslation();
   const { formatCurrency } = useCurrency();
-  const { dateFormat, shortMonthFormat, formatDateForAPI } = useDateFormat();
+  const { dateFormat, formatDateForAPI } = useDateFormat();
   const presets = useDateRangePresets();
   const { getSetting } = useTenant();
   const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
@@ -66,13 +66,8 @@ export default function DashboardAbos() {
   // One line per variation: active subscription quantity per month.
   const { data: chartData, series } = useMemo(
     () =>
-      buildMonthlyActiveByVariation(
-        subscriptions,
-        variationLegendById,
-        range,
-        shortMonthFormat,
-      ),
-    [subscriptions, variationLegendById, range, shortMonthFormat],
+      buildMonthlyActiveByVariation(subscriptions, variationLegendById, range),
+    [subscriptions, variationLegendById, range],
   );
 
   // Billed income (sum of due amounts) per month, over the same range — the
@@ -101,9 +96,8 @@ export default function DashboardAbos() {
           label: t("statistics.income"),
           color: "var(--color-chart-money)",
         },
-        shortMonthFormat,
       ),
-    [incomeData, range, t, shortMonthFormat],
+    [incomeData, range, t],
   );
   // Solidarity: prices actually paid per variation for subs STARTED in range.
   const paidPricesByVariation = useMemo(() => {

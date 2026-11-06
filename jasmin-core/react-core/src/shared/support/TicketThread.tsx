@@ -17,7 +17,7 @@ export default function TicketThread({
   const { formatDate } = useDateFormat();
 
   if (!messages.length) {
-    return <div className="text-muted">{t("support.thread.no_messages")}</div>;
+    return <div className="color-text-tertiary">{t("support.thread.no_messages")}</div>;
   }
 
   return (

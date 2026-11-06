@@ -18,7 +18,6 @@ describe("buildMonthlyIncomeSeries", () => {
       ],
       range,
       SERIES,
-      "MMM 'YY",
     );
     // The 12-month floor means the window is wider than the 3-month range, but
     // the three range months carry the mapped/zero-filled values.
@@ -30,7 +29,7 @@ describe("buildMonthlyIncomeSeries", () => {
   });
 
   it("spans at least 12 months even for a short range", () => {
-    const { data } = buildMonthlyIncomeSeries([], range, SERIES, "MMM 'YY");
+    const { data } = buildMonthlyIncomeSeries([], range, SERIES);
     // end = 2026-03, minStart = 2026-03 - 11 = 2025-04 → 12 months inclusive.
     expect(data.length).toBe(12);
     expect(data[0].label).toBe("Apr '25");
@@ -47,7 +46,6 @@ describe("buildMonthlyIncomeSeries", () => {
       ],
       range,
       SERIES,
-      "MMM 'YY",
     );
     const byLabel = new Map(data.map((d) => [d.label, d.income]));
     expect(byLabel.get("Feb '26")).toBe(1234.56);

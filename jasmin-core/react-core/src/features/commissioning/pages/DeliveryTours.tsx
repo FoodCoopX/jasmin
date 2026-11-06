@@ -353,7 +353,7 @@ export default function DeliveryTours() {
             <h3>{t("commissioning.available_delivery_stations")}</h3>
             <div className="delivery-tours-palette-box">
               {availableStations.length === 0 ? (
-                <p className="text-muted text-center">
+                <p className="color-text-tertiary text-center">
                   {stationsLoading || (selectedDay === null && openingDaysPending)
                     ? t("common.loading")
                     : deliveryStations.length === 0

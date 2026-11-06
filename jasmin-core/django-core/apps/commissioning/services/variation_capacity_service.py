@@ -33,8 +33,13 @@ from django.db.models import Q
 from django.utils import timezone
 
 from ..errors import ShareTypeVariationOverCapacity
-from ..models import DeliveryExceptionPeriod, ShareTypeVariation, Subscription
+from ..models import ShareTypeVariation, Subscription
 from ..utils.iso_week_utils import previous_monday, week_day_to_date
+from .delivery_exceptions import (
+    first_unpaused_monday,
+    pause_periods_for_variation,
+    paused_weeks_by_variation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,8 +138,6 @@ class VariationCapacityService:
         # Paused (Lieferpause) weeks deliver nothing, so they consume no
         # production capacity — exclude them (mirrors the delivery-based DSD
         # occupancy, which is naturally 0 on a paused week). Batched: ONE query.
-        from .delivery_exceptions import paused_weeks_by_variation
-
         paused = paused_weeks_by_variation(ids, [(b[0], b[1]) for b in bounds])
 
         subscription_terms = (
@@ -192,28 +195,11 @@ class VariationCapacityService:
         if not others:
             return 0
 
-        pauses = [
-            (start, end)
-            for start, end in DeliveryExceptionPeriod.objects.filter(
-                share_type_variation_id=variation_id
-            ).values_list("valid_from", "valid_until")
-            if end is not None
-        ]
-
-        def first_delivering_monday(monday: _dt.date) -> _dt.date:
-            moved = True
-            while moved:
-                moved = False
-                for start, end in pauses:
-                    if start <= monday <= end:
-                        monday = previous_monday(end) + _dt.timedelta(days=7)
-                        moved = True
-            return monday
-
+        pauses = pause_periods_for_variation(variation_id)
         candidate_mondays = set()
         for start in [valid_from, *(ofrom for ofrom, _ountil, _oqty in others)]:
-            monday = first_delivering_monday(
-                previous_monday(start if start > valid_from else valid_from)
+            monday = first_unpaused_monday(
+                previous_monday(start if start > valid_from else valid_from), pauses
             )
             if valid_until is not None and monday > valid_until:
                 continue

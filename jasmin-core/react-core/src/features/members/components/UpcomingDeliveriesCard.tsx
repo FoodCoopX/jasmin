@@ -194,7 +194,7 @@ const UpcomingDeliveriesCard = ({
               }}
             >
               <Space>
-                <Text className="text-muted">
+                <Text className="color-text-tertiary">
                   {t("commissioning.KW")} {gap.delivery_week}/{gap.year}
                   <Tag color="default" className="ml-8">
                     {t("members.delivery_paused")}

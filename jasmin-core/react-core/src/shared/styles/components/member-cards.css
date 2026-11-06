@@ -10,10 +10,6 @@
   margin-bottom: 24px;
   border: 1px solid;
 }
-.member-card-top {
-  margin-top: 24;
-  background-color: var(--color-future-blue);
-}
 
 /* PaymentsCard: greyish "batch subtotal" row — what a member pays across one
  * non-weekly cycle (e.g. a month), summed from the weekly + non-weekly charges
@@ -132,11 +128,6 @@
   justify-content: space-between;
   gap: 8px;
   padding: 2px 0;
-}
-
-/* The member's details in the office's confirmation modal. */
-.member-confirmation-body {
-  padding: 20px 0;
 }
 
 /* The heading row over the GDPR deletion request tables. */

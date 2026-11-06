@@ -93,7 +93,7 @@ function MyTickets({
       {loading ? (
         <Spin />
       ) : tickets.length === 0 ? (
-        <div className="text-muted">{t("support.thread.empty")}</div>
+        <div className="color-text-tertiary">{t("support.thread.empty")}</div>
       ) : (
         <List
           dataSource={tickets}

@@ -37,7 +37,7 @@ export default function HarvestingCrateSummary({
         }
       >
         {crateSummary.length === 0 ? (
-          <div className="text-muted">{t("table.no_data")}</div>
+          <div className="color-text-tertiary">{t("table.no_data")}</div>
         ) : (
           crateSummary.map((item) => (
             <div key={item.key} className="harvesting-crate-summary-row">

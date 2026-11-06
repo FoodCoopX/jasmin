@@ -12,6 +12,7 @@ long-running job from the sweep.
 from __future__ import annotations
 
 import datetime
+import logging
 
 import pytest
 from django.utils import timezone
@@ -186,6 +187,43 @@ class TestAJobAfterTheSweep:
         assert ran == []
         assert job.status == BackgroundJob.STATUS_FAILED
         assert "worker lost" in job.error
+
+    def test_huey_logs_the_skipped_job_as_a_cancelled_task(self, tenant, caplog):
+        """Huey logs the skip as a one-line warning instead of an error with its
+        traceback, and doesn't retry it even for a task that allows retries.
+        The ``tasks`` logger doesn't propagate to the root logger caplog listens
+        on, so caplog's handler is attached to it."""
+        from huey import MemoryHuey
+
+        from apps.notifications.jobs import run_job
+
+        huey = MemoryHuey(immediate=True)
+        ran = []
+
+        @huey.task(retries=1)
+        def job_task(schema_name, job_id):
+            with run_job(schema_name, job_id):
+                ran.append(True)
+
+        job = _job(status=BackgroundJob.STATUS_FAILED)
+        tasks_logger = logging.getLogger("tasks")
+        tasks_logger.addHandler(caplog.handler)
+        try:
+            with caplog.at_level(logging.WARNING, logger="huey"):
+                job_task(tenant.schema_name, job.pk)
+        finally:
+            tasks_logger.removeHandler(caplog.handler)
+
+        records = [r for r in caplog.records if r.name in ("tasks", "huey")]
+        assert ran == []
+        assert [(r.name, r.levelname) for r in records] == [
+            ("tasks", "WARNING"),
+            ("huey", "WARNING"),
+        ]
+        assert records[0].getMessage() == (
+            f"background_job.not_queued schema={tenant.schema_name} job={job.pk}"
+        )
+        assert "aborted, will not be retried" in records[1].getMessage()
 
     def test_a_job_that_finishes_after_all_is_done_without_the_sweeps_error(
         self, tenant

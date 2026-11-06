@@ -54,6 +54,7 @@ export type { TrialAllowable } from './trialVariations';
 export { formatApiDate, toApiDate, todayApiDate } from './apiDate';
 export { unwrapList } from './unwrapList';
 export { buildMonthAxis } from './monthAxis';
+export { MONTH_FORMAT, SHORT_MONTH_FORMAT } from './monthFormats';
 export { colorRamp } from './colorRamp';
 export { VARIATION_PALETTE, VARIATION_PALETTE_DARK, variationLabel } from './variationPalette';
 export type { MonthAxis } from './monthAxis';

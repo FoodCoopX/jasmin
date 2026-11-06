@@ -163,7 +163,7 @@ export default function DebitsAbos() {
             pain.008 XML
           </a>
         ) : (
-          <span className="text-muted">pain.008 XML</span>
+          <span className="color-text-tertiary">pain.008 XML</span>
         ),
     },
     {

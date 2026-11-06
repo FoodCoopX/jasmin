@@ -110,7 +110,7 @@ export const AdminConfirmationModalMembers: FC<
       width={600}
       destroyOnHidden
     >
-      <div className="member-confirmation-body">
+      <div className="admin-confirmation-body">
         <Title level={4} className="mb-24">
           # {member.member_number} - {member.first_name} {member.last_name}
         </Title>

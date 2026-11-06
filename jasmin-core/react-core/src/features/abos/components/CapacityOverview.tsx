@@ -272,7 +272,7 @@ export function CapacityOverview({
               />
 
               {!rangeInWindow ? (
-                <div className="text-muted">
+                <div className="color-text-tertiary">
                   {t("abos.capacity_out_of_window")}
                 </div>
               ) : null}

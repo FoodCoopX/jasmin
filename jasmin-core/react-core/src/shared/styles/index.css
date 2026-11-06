@@ -20,6 +20,7 @@
 
 /* 3. Components (reusable building blocks) */
 @import './components/about-modal.css';
+@import './components/admin-confirmation.css';
 @import './components/alerts.css';
 @import './components/app-shell.css';
 @import './components/auto-save-indicator.css';

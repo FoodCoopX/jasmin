@@ -614,12 +614,12 @@ const EditableTable = <T extends TableRecord = TableRecord>({
                         >
                           {displayValue}
                           {isLabelColumn && summaryRow.subLabel && (
-                            <div className="text-2xs text-muted font-normal">
+                            <div className="text-2xs color-text-tertiary font-normal">
                               {summaryRow.subLabel}
                             </div>
                           )}
                           {subDisplayValue && (
-                            <div className="text-2xs text-muted font-normal">
+                            <div className="text-2xs color-text-tertiary font-normal">
                               {subDisplayValue}
                             </div>
                           )}

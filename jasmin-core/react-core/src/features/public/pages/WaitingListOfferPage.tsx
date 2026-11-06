@@ -170,7 +170,7 @@ export default function WaitingListOfferPage() {
           <Descriptions.Item label={t("abos.offer_page.station")}>
             {data.delivery_station_name}
             {data.delivery_station_address ? (
-              <div className="text-muted text-sm">
+              <div className="color-text-tertiary text-sm">
                 {data.delivery_station_address}
               </div>
             ) : null}

@@ -146,7 +146,7 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
         ) : null}
         {accountStatus === "active" && !lastLogin ? (
           <Descriptions.Item label={t("users.last_login")}>
-            <span className="text-muted text-italic">
+            <span className="color-text-tertiary text-italic">
               {t("users.never")}
             </span>
           </Descriptions.Item>

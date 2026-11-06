@@ -162,7 +162,7 @@ export const AdminConfirmationModalAbos: FC<
       width={600}
       destroyOnHidden
     >
-      <div className="subscription-confirmation-body">
+      <div className="admin-confirmation-body">
         {isRejected && (
           <ModalStatusBanner
             kind="rejected"
