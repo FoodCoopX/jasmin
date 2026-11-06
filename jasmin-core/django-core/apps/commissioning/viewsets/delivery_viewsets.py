@@ -105,7 +105,7 @@ def _subscribed_station_ids(member):
     station-id subquery rather than reverse-joining, which also keeps a
     caller's queryset free of row multiplication.
     """
-    today = timezone.now().date()
+    today = timezone.localdate()
     return (
         Subscription.objects.filter(member=member, admin_confirmed=True)
         .filter(cancelled_at__isnull=True)
@@ -467,7 +467,7 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # are theoretically delivered at the new station without re-running
         # planning by hand.
         valid_from = serializer.validated_data["valid_from"]
-        today = timezone.now().date()
+        today = timezone.localdate()
         if valid_from < today:
             raise DeliveryDayValidFromInPast(
                 "Cannot create a station-day with valid_from in the past.",
@@ -509,7 +509,7 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     def _migrate_succession_children(
         station_day: DeliveryStationDay, valid_from: date
     ) -> None:
-        today = timezone.now().date()
+        today = timezone.localdate()
         predecessor = (
             DeliveryStationDay.objects.filter(
                 delivery_station_id=station_day.delivery_station_id,
@@ -820,7 +820,7 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # ``default_delivery_station_day`` has related_name="+" (no reverse
         # accessor), so filter FORWARD from Subscription for (a).
         if member is not None:
-            today = timezone.now().date()
+            today = timezone.localdate()
             subscription_station_day_ids = (
                 Subscription.objects.filter(member=member, admin_confirmed=True)
                 .filter(cancelled_at__isnull=True)

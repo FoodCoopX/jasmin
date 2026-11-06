@@ -85,7 +85,7 @@ def date_from_order(order) -> _dt.date:
     Order-keyed lookups.
     """
     if order is None:
-        return timezone.now().date()
+        return timezone.localdate()
     day_index = order.day_number if order.day_number is not None else 0
     return week_day_to_date(order.year, order.delivery_week, day_index)
 

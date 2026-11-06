@@ -337,7 +337,7 @@ class ShareArticleViewSet(
         get_price_info = params["get_price_info"]
         # ``price_date`` defaults to today when not supplied (catalogue default
         # is ``None``); the annotation below only fires when it's non-null.
-        price_date = params["price_date"] or timezone.now().date()
+        price_date = params["price_date"] or timezone.localdate()
         is_data_list = params["is_data_list"]
         is_sold_to_resellers = params["is_sold_to_resellers"]
         share_option = params["share_option"]
@@ -549,7 +549,7 @@ class CrateViewSet(
         return super().list(request, *args, **kwargs)
 
     def get_current_price_annotations(self) -> dict[str, Subquery]:
-        today = timezone.now().date()
+        today = timezone.localdate()
         current_pricing = CrateNetPrice.objects.filter(
             active_on_date_q(today),
             crate=OuterRef("pk"),

@@ -84,7 +84,7 @@ def subscription_member_emails(request: Request) -> Response:
     date_from = params["date_from"]
     date_to = params["date_to"]
 
-    today = timezone.now().date()
+    today = timezone.localdate()
     # The cancellation cutoff is the start of the requested window: a
     # subscription cancelled effective before it was already gone by then.
     # A window open at the start (``date_to`` alone) has no such cutoff — the

@@ -4,9 +4,9 @@
  * Tier convention (per tenant setting ``used_tiers_for_offers``):
  *   - ``finalTiers`` is the array of tier thresholds (in PU) as
  *     configured by the tenant. May have 1, 2, or 3 entries.
- *   - If ``finalTiers[2]`` exists, ``puCount >= finalTiers[2]``, and
+ *   - If ``finalTiers[2]`` is a number, ``puCount >= finalTiers[2]``, and
  *     ``price_3 > 0`` → use ``price_3``.
- *   - Else if ``finalTiers[1]`` exists, ``puCount >= finalTiers[1]``,
+ *   - Else if ``finalTiers[1]`` is a number, ``puCount >= finalTiers[1]``,
  *     and ``price_2 > 0`` → use ``price_2``.
  *   - Else ``price_1`` (the single / base tier).
  *
@@ -45,18 +45,18 @@ export interface TierPrices {
 export function pickTierPrice(
   puCount: number,
   prices: TierPrices,
-  finalTiers: number[] = [],
+  finalTiers: (number | null)[] = [],
 ): number {
   const p1 = parseDecimalInput(prices.price_1) ?? 0;
   const p2 = parseDecimalInput(prices.price_2) ?? 0;
   const p3 = parseDecimalInput(prices.price_3) ?? 0;
-  // ``undefined`` t2 / t3 means the tenant didn't configure that tier
-  // — never escalate, even for huge quantities.
+  // A tier the tenant didn't configure (``undefined``) or added without a
+  // threshold yet (``null``) is never reached, even by a huge quantity.
   const t2 = finalTiers[1];
   const t3 = finalTiers[2];
 
-  if (t3 !== undefined && puCount >= t3 && p3 > 0) return p3;
-  if (t2 !== undefined && puCount >= t2 && p2 > 0) return p2;
+  if (typeof t3 === "number" && puCount >= t3 && p3 > 0) return p3;
+  if (typeof t2 === "number" && puCount >= t2 && p2 > 0) return p2;
   return p1;
 }
 
@@ -73,7 +73,7 @@ export function pickTierPriceFromAmount(
   amount: number | string | null | undefined,
   amountPerPu: number | string | null | undefined,
   prices: TierPrices,
-  finalTiers: number[] = [],
+  finalTiers: (number | null)[] = [],
 ): number {
   const numAmount = parseDecimalInput(amount) ?? 0;
   const perPu = parseDecimalInput(amountPerPu) || 1;

@@ -279,7 +279,7 @@ class ShareTypeVariationSerializer(
 
         peak = VariationCapacityService.peak_occupied_from_week(
             variation_id=self.instance.pk,
-            from_date=timezone.now().date(),
+            from_date=timezone.localdate(),
         )
         if value < peak:
             raise ShareTypeVariationCapacityBelowOccupancy(capacity=value, peak=peak)

@@ -6,6 +6,8 @@ Used by :class:`apps.notifications.viewsets.EmailTemplateViewSet` and
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rest_framework import serializers
 
 from .errors import UndeclaredPlaceholders
@@ -32,7 +34,15 @@ def _reject_unsafe_placeholders(value: str, field: str) -> str:
     return value
 
 
-class _SafeTemplateFieldsMixin:
+# Typed as a Serializer for mypy (``super().validate``, ``self.context``), but a
+# plain mixin at runtime.
+if TYPE_CHECKING:
+    _SerializerBase = serializers.Serializer
+else:
+    _SerializerBase = object
+
+
+class _SafeTemplateFieldsMixin(_SerializerBase):
     """Validates the editable template fields:
 
     * Per field: reject private/dunder placeholders (security).
@@ -54,8 +64,8 @@ class _SafeTemplateFieldsMixin:
         return _reject_unsafe_placeholders(value, "body_text")
 
     def validate(self, attrs: dict) -> dict:
-        attrs = super().validate(attrs)  # type: ignore[misc]
-        spec: EmailTemplateSpec | None = self.context.get("spec")  # type: ignore[attr-defined]
+        attrs = super().validate(attrs)
+        spec: EmailTemplateSpec | None = self.context.get("spec")
         if spec is None:
             # No spec in context → can't check declarations. The viewset always
             # supplies one; this guard keeps the serializer usable standalone.

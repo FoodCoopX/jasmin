@@ -24,7 +24,7 @@ _FRESH = IMPORT_BATCH_RETENTION_DAYS - 1
 
 def _batch(status: str, *, checksum: str, age_days: int) -> ShareImportBatch:
     return ShareImportBatch.objects.create(
-        year=timezone.now().year,
+        year=timezone.localdate().year,
         delivery_week=15,
         file_checksum=checksum * 64,
         original_filename=f"{checksum}.csv",

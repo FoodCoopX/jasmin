@@ -913,7 +913,7 @@ class DynamicDeliveryDayFieldsMixin:
 
         from ..models import SharesDeliveryDay
 
-        now = timezone.now().date()
+        now = timezone.localdate()
 
         try:
             current_shares_delivery_days = list(

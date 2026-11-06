@@ -278,7 +278,8 @@ class HealthCheckMiddleware:
 
 
 class RequestIdMiddleware:
-    """Attach a stable id to every request.
+    """Give every request a stable id: ``get_current_request_id()`` returns it
+    while the request runs, and the response carries it in ``X-Request-ID``.
 
     Order matters: place this NEAR THE TOP of ``MIDDLEWARE`` so the id is
     available to every downstream middleware (including the tenant middleware
@@ -297,7 +298,6 @@ class RequestIdMiddleware:
             f"HTTP_{REQUEST_ID_HEADER.upper().replace('-', '_')}"
         )
         request_id = self._sanitize(incoming) or uuid.uuid4().hex[: self.HEX_LENGTH]
-        request.id = request_id  # type: ignore[attr-defined]
 
         token = _request_id_var.set(request_id)
         try:

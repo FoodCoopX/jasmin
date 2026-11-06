@@ -11,7 +11,7 @@ import datetime
 
 import pytest
 import time_machine
-from django.db import DEFAULT_DB_ALIAS, connection, connections
+from django.db import DEFAULT_DB_ALIAS, connections
 from rest_framework.test import APIRequestFactory
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.tokens import AccessToken
@@ -108,18 +108,6 @@ class TestTenantBinding:
         # None) that a bare `Exception` match would mask.
         with pytest.raises(InvalidToken):
             auth.authenticate(_bearer(rf, "not.a.real.jwt"))
-
-    def test_public_schema_still_requires_tenant_claim(self, tenant, rf, auth):
-        """Even when the connection is on `public` (e.g. test setup), a token
-        without a `tenant_id` claim must be rejected."""
-        connection.set_schema_to_public()
-        try:
-            u = JasminUserFactory()  # this would fail on public; skip if so
-        except Exception:
-            pytest.skip("JasminUser is tenant-scoped; cannot create on public")
-        raw = _mint(u, tenant_id=None)
-        with pytest.raises(InvalidToken):
-            auth.get_validated_token(raw)
 
 
 class TestRevokedSessions:

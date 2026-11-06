@@ -187,7 +187,7 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "filters": {
-        # Injects request.id onto every LogRecord as ``request_id`` so the
+        # Injects the request id onto every LogRecord as ``request_id`` so the
         # formatter below can render it. Logs that run outside a request
         # (Huey tasks, management commands) get "-".
         "request_id": {"()": "core.middleware.RequestIdLogFilter"},
@@ -596,7 +596,7 @@ MIDDLEWARE = [
     # (Bunny) can never cache + cross-serve a per-tenant API response. Near the
     # top so it wraps the final response regardless of what any view sets.
     "core.middleware.ApiNoStoreCacheControlMiddleware",
-    # Must be near the top: assigns request.id and exposes it via contextvars
+    # Must be near the top: assigns the request id and exposes it via contextvars
     # so every downstream middleware, view, and log line can correlate.
     "core.middleware.RequestIdMiddleware",
     # App-layer IP allowlist for /api/super-admin/ — defense-in-depth mirror of

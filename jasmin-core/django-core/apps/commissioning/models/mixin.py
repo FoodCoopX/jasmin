@@ -1191,12 +1191,17 @@ class NumberedDocumentMixin(models.Model):
         lock ever fails (migration mismatch, manual SQL writer, etc.)
         the unique constraint still refuses duplicate numbers.
 
+        A document that has its number skips the lock: there is nothing to
+        number, and a writer holding its row must not wait for the lock that
+        ``assign_final_number`` holds while it bumps a draft's row.
+
         Despite the name there is no retry loop; the name stays because callers
         grep for it.
         """
         with transaction.atomic():
-            acquire_advisory_xact_lock(self._advisory_lock_key())
-            self.generate_number()
+            if not self.number:
+                acquire_advisory_xact_lock(self._advisory_lock_key())
+                self.generate_number()
             super().save(*args, **kwargs)
 
     def assign_final_number(self) -> None:

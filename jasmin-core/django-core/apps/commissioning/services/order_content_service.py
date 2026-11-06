@@ -249,7 +249,7 @@ class OrderContentService:
             "price_2": offer.price_2,
             "price_3": offer.price_3,
             "rabatt": None,
-            "tax_rate": resolve_article_tax_rate(offer, timezone.now().date()),
+            "tax_rate": resolve_article_tax_rate(offer, timezone.localdate()),
             "washing": offer.washing,
             "cleaning": offer.cleaning,
             "comes_from_long_term_storage": offer.comes_from_long_term_storage,
@@ -506,6 +506,9 @@ class OrderContentService:
             defaults={"created_by": kwargs.pop("created_by", None)},
         )
 
+        # Locked after the offer, as in every line write (``order_content_locks``),
+        # so the line can't go into an order being finalized.
+        order = Order.objects.select_for_update().get(pk=order.pk)
         apply_order_days(order, created=created, day_number=day_number, sent=kwargs)
 
         # tax_rate is NOT NULL on OrderableItem — resolve from the canonical

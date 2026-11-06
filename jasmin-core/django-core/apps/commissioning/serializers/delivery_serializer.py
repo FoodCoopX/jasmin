@@ -341,7 +341,7 @@ class DeliveryStationDaySerializer(
         from ..errors import DeliveryStationCapacityBelowOccupancy
         from ..services.share_demand_service import ShareDemandService
 
-        iso = timezone.now().date().isocalendar()
+        iso = timezone.localdate().isocalendar()
         peak, peak_year, peak_week = ShareDemandService.peak_occupied_from_week(
             delivery_station_day_id=self.instance.id,
             from_year=iso[0],

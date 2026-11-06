@@ -40,16 +40,13 @@ class TierPrices(NamedTuple):
 def _reaches(pu_count: Decimal, tiers: Sequence[object], index: int) -> bool:
     """Whether ``pu_count`` reaches the threshold at ``tiers[index]``.
 
-    A threshold ``tiers`` doesn't list is never reached. One stored as ``None``
-    (a tier the office added but left empty) compares as 0, as the browser's
-    ``null`` does, so every count reaches it. Any other entry that is no number
-    is never reached.
+    Only a number is reached. A threshold ``tiers`` doesn't list, one stored as
+    ``None`` (a tier the office added and hasn't filled in yet) and any other
+    entry that is no number are never reached, so they never price a line.
     """
     if index >= len(tiers):
         return False
     threshold = tiers[index]
-    if threshold is None:
-        return pu_count >= 0
     if isinstance(threshold, bool) or not isinstance(threshold, (int, float, Decimal)):
         return False
     return pu_count >= to_decimal(threshold)

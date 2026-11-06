@@ -95,9 +95,11 @@ class OfferService:
         )
 
     @staticmethod
-    def _copy_offers(offer_ids, *, key_fn, exists_filter, mutate_fn) -> dict:
+    def _copy_offers(
+        offer_ids, *, key_fn, exists_filter, mutate_fn, in_scope=None
+    ) -> dict:
         """Clone the given offers, skipping any whose target slot already exists
-        (persisted) OR was already queued in this batch.
+        (persisted), was already queued in this batch, or ``in_scope`` refuses.
 
         ``key_fn(offer)`` -> the per-batch dedup key (the exists() check only
         dedups against PERSISTED rows, so two source offers collapsing to the
@@ -113,7 +115,7 @@ class OfferService:
 
         for offer in offers_to_copy:
             key = key_fn(offer)
-            if key in queued_keys:
+            if key in queued_keys or (in_scope and not in_scope(offer)):
                 skipped_count += 1
                 continue
 
@@ -185,7 +187,11 @@ class OfferService:
         delivery_week: int,
         offer_group: str,
     ) -> dict:
-        """Copy selected offers to a different offer group in the same week."""
+        """Copy the selected offers of ``year`` / ``delivery_week``, where the
+        already-present check looks, to another group; others are skipped."""
+
+        def in_scope(offer):
+            return (offer.year, offer.delivery_week) == (year, delivery_week)
 
         def key_fn(offer):
             return (offer.share_article_id, offer.unit, offer.size, offer_group)
@@ -208,6 +214,7 @@ class OfferService:
             key_fn=key_fn,
             exists_filter=exists_filter,
             mutate_fn=mutate_fn,
+            in_scope=in_scope,
         )
 
     @staticmethod

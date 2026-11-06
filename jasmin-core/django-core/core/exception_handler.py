@@ -44,6 +44,7 @@ from .errors import (
     JasminError,
     NotFoundError,
 )
+from .middleware import get_current_request_id
 
 logger = logging.getLogger("jasmin.errors")
 
@@ -51,8 +52,7 @@ logger = logging.getLogger("jasmin.errors")
 def jasmin_exception_handler(
     exc: Exception, context: dict[str, Any]
 ) -> Response | None:
-    request = context.get("request")
-    request_id = getattr(request, "id", None)
+    request_id = get_current_request_id()
     view = context.get("view")
     view_name = view.__class__.__name__ if view is not None else "<unknown>"
 

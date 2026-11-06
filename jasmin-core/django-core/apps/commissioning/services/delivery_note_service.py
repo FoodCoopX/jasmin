@@ -8,10 +8,11 @@ from django.db import models, transaction
 from apps.shared.display_formats import DisplayFormats
 from apps.shared.tenants.models import RateLimitedAction
 from apps.shared.tenants.rate_limits import enforce_action_quota
+from core.db_locks import acquire_advisory_xact_lock
 from core.errors import ConflictError
 
 from ..constants import crates_should_be_on_documents
-from ..errors import CommissioningError
+from ..errors import CommissioningError, OrderNotFound
 from ..models import (
     CrateDeliveryNoteContent,
     CrateOrderContent,
@@ -42,6 +43,20 @@ class DeliveryNoteService:
         Raises:
             ValidationError: If delivery note already exists
         """
+        # The delivery-note and the order sequence first, then the order's row:
+        # a finalization holding the order sequence may bump this order's number.
+        # Holding the row keeps every line write out (``order_content_locks``)
+        # between the copy below and the order's finalization at the end, and
+        # the checks read the order as it stands, not as the caller loaded it.
+        acquire_advisory_xact_lock(DeliveryNoteReseller()._advisory_lock_key())
+        acquire_advisory_xact_lock(order._advisory_lock_key())
+        try:
+            order.refresh_from_db(from_queryset=Order.objects.select_for_update())
+        except Order.DoesNotExist as exc:
+            raise OrderNotFound(
+                "The order was deleted meanwhile.", details={"order_id": order.pk}
+            ) from exc
+
         if getattr(order, "delivery_note", None):
             raise ConflictError(
                 "Delivery note already exists for this order",
