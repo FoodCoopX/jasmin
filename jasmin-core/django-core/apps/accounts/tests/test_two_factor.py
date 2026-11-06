@@ -17,6 +17,7 @@ typos, middleware, decorators, serializer drift).
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
@@ -272,6 +273,32 @@ class TestChallengeToken:
             two_factor_service.consume_challenge_token(
                 challenge="not-a-jwt", tenant_schema=tenant.schema_name
             )
+
+
+class TestTokenLifetimes:
+    @pytest.mark.parametrize(
+        ("issue", "token_class", "setting"),
+        [
+            (
+                two_factor_service.issue_challenge_token,
+                two_factor_service._ChallengeToken,
+                "TWO_FACTOR_CHALLENGE_LIFETIME",
+            ),
+            (
+                two_factor_service.issue_enrolment_token,
+                two_factor_service._EnrolmentToken,
+                "TWO_FACTOR_ENROLMENT_LIFETIME",
+            ),
+        ],
+    )
+    def test_a_token_lives_as_long_as_its_setting_says(
+        self, tenant, settings, issue, token_class, setting
+    ):
+        setattr(settings, setting, timedelta(minutes=7))
+        encoded = issue(user=JasminUserFactory(), tenant_schema=tenant.schema_name)
+
+        token = token_class(encoded)
+        assert token["exp"] - token["iat"] == 7 * 60
 
 
 # --------------------------------------------------------------------------- #

@@ -2,13 +2,11 @@
 # Managed by scripts/mypy_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/mypy_baseline.py freeze
-# 301 finding(s).
+# 299 finding(s).
 
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "update_last_login" has incompatible type "None"; expected "type[JasminUser]"  [arg-type]
-apps/accounts/services/two_factor_service.py: Argument 1 to "_ChallengeToken" has incompatible type "str"; expected "Token | None"  [arg-type]
-apps/accounts/services/two_factor_service.py: Argument 1 to "_EnrolmentToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/commissioning/management/commands/seed_test_users.py: Argument 1 to "_seed_one" of "Command" has incompatible type "object"; expected "dict[str, Any]"  [arg-type]
 apps/commissioning/management/commands/seed_test_users.py: Incompatible types in assignment (expression has type "Reseller", variable has type "Member")  [assignment]
 apps/commissioning/management/commands/seed_user_status_demo.py: Argument 1 to "_create_invitation" of "Command" has incompatible type "JasminUser | None"; expected "JasminUser"  [arg-type]

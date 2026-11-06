@@ -1250,7 +1250,7 @@ export const useCommissioningBulkCopyOffersToOfferGroupCreate = <TError = ErrorR
     /**
  * 
         Create delivery notes or invoices from multiple orders.
-        
+
         - For delivery_note: Creates delivery note from order
         - For invoice: Creates/finalizes delivery note, then creates invoice
         
@@ -1450,13 +1450,13 @@ export const useCommissioningBulkDeleteDocumentsCreate = <TError = ErrorResponse
     /**
  * 
         Finalize multiple objects at once.
-        
+
         Supports:
         - Finalizable commissioning models, by model name (case-insensitive)
         - offer, forecast and harvest need a staff role; every other model
           (orders, delivery notes, invoices, their lines, share contents)
           needs office
-        
+
         Returns counts of:
         - Successfully finalized objects
         - Already finalized objects
@@ -1933,13 +1933,13 @@ export const useCommissioningBulkSetToPaidDocumentsCreate = <TError = ErrorRespo
     /**
  * 
         Unfinalize multiple objects at once.
-        
+
         Supports:
         - Finalizable commissioning models, by model name (case-insensitive)
         - offer, forecast and harvest need a staff role; every other model
           (orders, delivery notes, invoices, their lines, share contents)
           needs office
-        
+
         Only processes objects that are currently finalized.
         
  * @summary Bulk Unfinalize Objects
@@ -2013,7 +2013,7 @@ export const useCommissioningBulkUnfinalizeCreate = <TError = ErrorResponse,
         year_week_shareArticleId_unit_size_shareOption; an id without the
         share option matches the slot in every option.
         Only processes objects that are currently finalized.
-        
+
         Returns unfinalization count and a per-ID finalization status map.
         
  * @summary Bulk Unfinalize Share Content
@@ -9026,7 +9026,7 @@ export function useCommissioningDeliveryStationFeesList<TData = Awaited<ReturnTy
  * 
         Provides an overview of all delivery stations with share counts,
         organized by tours and stations.
-        
+
         The response includes:
         - List of tours with their stations
 
@@ -10092,12 +10092,12 @@ const {mutation: mutationOptions} = options ?
     /**
  * 
         Aggregates documentation data (harvest, purchase, or waste) by share article.
-        
+
         Returns sum of amounts grouped by:
         - Share article name
         - Unit (kg, pieces, etc.)
         - Size specification
-        
+
         Can be filtered by year, week, and day_number.
 
         ``delivery_day`` is accepted as an alias for ``day_number``, carrying
@@ -11567,7 +11567,7 @@ const {mutation: mutationOptions} = options ?
         Check if ShareContent data for a given year and week supports:
         - Day-level granularity (same amounts per day)
         - Tour-level granularity (same amounts per tour)
-        
+
         Returns:
         - days_ok: true if all items have same amount per day
         - tours_ok: true if all items have same amount per tour
@@ -17618,7 +17618,7 @@ const {mutation: mutationOptions} = options ?
         - Related delivery note (if exists)
         - Related invoice (if exists)
         - Payment status
-        
+
         Results can be filtered by year, week, day_number, and reseller.
         
  * @summary Get Combined Order Overview
@@ -24242,11 +24242,11 @@ export function useCommissioningShareOptionsActiveRetrieve<TData = Awaited<Retur
  * 
         Get comprehensive planning data for all variations, days, tours, and stations
         for a given week. Returns a dictionary with keys for different planning modes:
-        
+
         - **Basic mode**: `day_{day_id}_variation_{variation_id}`
         - **Tour mode**: `day_{day_id}_variation_{variation_id}_tour_{tour_number}`
         - **Station mode**: `day_{day_id}_variation_{variation_id}_station_{station_id}`
-        
+
         Use this endpoint to get a complete overview for weekly planning across all
         delivery scenarios.
         

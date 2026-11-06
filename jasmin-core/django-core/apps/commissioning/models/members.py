@@ -202,6 +202,51 @@ class Member(
             )
         return name or self.get_display_id()
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        # Validate on every save so the cross-field date-order guards in clean()
+        # actually fire on the normal write path — a DjangoValidationError maps
+        # to a 400 with the offending field, instead of the DB CheckConstraint
+        # tripping a generic 409. validate_unique=False: ``member_number``
+        # uniqueness is already DB-enforced, and a per-save uniqueness query on
+        # this frequently-saved model (role syncs re-save on every change) isn't
+        # worth it — a duplicate still surfaces as the DB IntegrityError.
+        # ``email`` is deliberately NOT unique (shared inboxes), so
+        # there is nothing to validate for it on either side.
+        self.full_clean(validate_unique=False)
+        # Capture the previously-linked user BEFORE the write so an unlink
+        # (user→None) or relink (A→B) retracts Role.MEMBER from the old user —
+        # the linking invariant is bidirectional. Granting the role alone would
+        # leave an offboarded/relinked user still carrying MEMBER.
+        prev_user_id = (
+            Member.objects.filter(pk=self.pk).values_list("user_id", flat=True).first()
+            if not self._state.adding
+            else None
+        )
+        super().save(*args, **kwargs)
+        # A user linked to a Member row always carries Role.MEMBER.
+        if self.user_id:
+            from apps.commissioning.services.member_role_sync import (
+                ensure_member_role,
+            )
+
+            ensure_member_role(self.user)
+        # The previously-linked user, if no longer linked to ANY member, loses
+        # the role (retract_member_role also deactivates a now-role-less user).
+        if (
+            prev_user_id
+            and prev_user_id != self.user_id
+            and not Member.objects.filter(user_id=prev_user_id).exists()
+        ):
+            from django.contrib.auth import get_user_model
+
+            from apps.commissioning.services.member_role_sync import (
+                retract_member_role,
+            )
+
+            prev_user = get_user_model().objects.filter(pk=prev_user_id).first()
+            if prev_user is not None:
+                retract_member_role(prev_user)
+
     @property
     def display_name(self) -> str:
         """Canonical display name — the company name when set, otherwise the
@@ -250,51 +295,6 @@ class Member(
                 }
             )
 
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        # Validate on every save so the cross-field date-order guards in clean()
-        # actually fire on the normal write path — a DjangoValidationError maps
-        # to a 400 with the offending field, instead of the DB CheckConstraint
-        # tripping a generic 409. validate_unique=False: ``member_number``
-        # uniqueness is already DB-enforced, and a per-save uniqueness query on
-        # this frequently-saved model (role syncs re-save on every change) isn't
-        # worth it — a duplicate still surfaces as the DB IntegrityError.
-        # ``email`` is deliberately NOT unique (shared inboxes), so
-        # there is nothing to validate for it on either side.
-        self.full_clean(validate_unique=False)
-        # Capture the previously-linked user BEFORE the write so an unlink
-        # (user→None) or relink (A→B) retracts Role.MEMBER from the old user —
-        # the linking invariant is bidirectional. Granting the role alone would
-        # leave an offboarded/relinked user still carrying MEMBER.
-        prev_user_id = (
-            Member.objects.filter(pk=self.pk).values_list("user_id", flat=True).first()
-            if not self._state.adding
-            else None
-        )
-        super().save(*args, **kwargs)
-        # A user linked to a Member row always carries Role.MEMBER.
-        if self.user_id:
-            from apps.commissioning.services.member_role_sync import (
-                ensure_member_role,
-            )
-
-            ensure_member_role(self.user)
-        # The previously-linked user, if no longer linked to ANY member, loses
-        # the role (retract_member_role also deactivates a now-role-less user).
-        if (
-            prev_user_id
-            and prev_user_id != self.user_id
-            and not Member.objects.filter(user_id=prev_user_id).exists()
-        ):
-            from django.contrib.auth import get_user_model
-
-            from apps.commissioning.services.member_role_sync import (
-                retract_member_role,
-            )
-
-            prev_user = get_user_model().objects.filter(pk=prev_user_id).first()
-            if prev_user is not None:
-                retract_member_role(prev_user)
-
     def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
         user = self.user if self.user_id else None
         result = super().delete(*args, **kwargs)
@@ -322,7 +322,7 @@ class Member(
         cached = self.__dict__.get("_active_subscriptions_count_annotation")
         if cached is not None:
             return cached
-        today = timezone.now().date()
+        today = timezone.localdate()
         # The badge counts subscriptions active RIGHT NOW (``active_at_date``
         # adds ``valid_from <= today``), which is deliberately NARROWER than the
         # cancellation restraint ``Subscription.active_for_member`` (that guards
@@ -495,6 +495,10 @@ class CoopShare(JasminModel, PayableMixin, AdminConfirmableMixin, CancellableMix
     def __str__(self) -> str:
         return f"CoopShare {self.amount_of_coop_shares} for {self.member}"
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
         # Date-order guards (the cancel/payback equity-return lifecycle).
@@ -549,10 +553,6 @@ class CoopShare(JasminModel, PayableMixin, AdminConfirmableMixin, CancellableMix
                         new_amount=0,
                         exclude_pk=self.pk,
                     )
-
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        self.full_clean()
-        super().save(*args, **kwargs)
 
     def confirm(
         self,
@@ -712,6 +712,16 @@ class Subscription(
     the prior term.
     """
 
+    # Why this subscription is on the waiting list — ``WaitingListMixin`` only
+    # records THAT it is.
+    class WaitingListReason(models.TextChoices):
+        DELIVERY_STATION_FULL = (
+            "delivery_station_full",
+            "Delivery station full",
+        )
+        VARIATION_FULL = "variation_full", "Share type sold out"
+        MANUAL = "manual", "Manually queued"
+
     # NOTE: no ``overlap_unique_fields`` — subscriptions are intentionally
     # independent. Two subscriptions for the same member + variation may
     # coexist (e.g. a renewal term materialised before the prior term ends);
@@ -725,17 +735,8 @@ class Subscription(
 
     cancellation_reason = models.TextField(blank=True, null=True)
 
-    # Why this subscription is on the waiting list — ``WaitingListMixin`` only
-    # records THAT it is. Set server-side at enqueue so the office can see which
-    # capacity gate was full. ``None`` when the sub isn't waiting_listed.
-    class WaitingListReason(models.TextChoices):
-        DELIVERY_STATION_FULL = (
-            "delivery_station_full",
-            "Delivery station full",
-        )
-        VARIATION_FULL = "variation_full", "Share type sold out"
-        MANUAL = "manual", "Manually queued"
-
+    # Set server-side at enqueue so the office can see which capacity gate was
+    # full. ``None`` when the sub isn't waiting_listed.
     waiting_list_reason = models.CharField(
         max_length=32,
         choices=WaitingListReason.choices,
@@ -835,6 +836,67 @@ class Subscription(
         trial_text = "Trial " if self.is_trial else ""
         return f"{trial_text}Subscription for {self.member} ({self.valid_from} - {self.valid_until or 'ongoing'})"
 
+    # NOTE: NO ``overlap_unique_fields`` — subscriptions are independent, so
+    # ``TimeBoundMixin`` runs neither the overlap check nor succession-closing.
+    # ``save()`` is overridden ONLY to assign the renewal-chain identifier; it
+    # still calls ``super().save()`` (TimeBoundMixin → ``clean()``, incl. the
+    # DSD validity-window check below).
+    def save(self, *args, **kwargs) -> None:
+        # A subscription must have a finite, billable term. Open-ended subs
+        # materialise no ShareDeliveries and silently never bill. The
+        # serializer blocks this on the API; this is the model-level backstop
+        # for factories / imports / seed scripts / direct ORM writes — every
+        # save path lands here, so an open-ended subscription is not possible.
+        if self.valid_until is None:
+            from apps.commissioning.errors import OpenEndedSubscriptionNotAllowed
+
+            raise OpenEndedSubscriptionNotAllowed(
+                "A subscription must have an end date (valid_until); "
+                "open-ended subscriptions are not allowed.",
+                field="valid_until",
+            )
+        if self.subscription_number is not None:
+            super().save(*args, **kwargs)
+            return
+        # On a renewal, inherit the chain's number and bump the generation.
+        if self.previous_subscription_id:
+            predecessor = (
+                Subscription.objects.filter(pk=self.previous_subscription_id)
+                .values("subscription_number", "renewal_generation")
+                .first()
+            )
+            if predecessor and predecessor["subscription_number"] is not None:
+                self.subscription_number = predecessor["subscription_number"]
+                self.renewal_generation = predecessor["renewal_generation"] + 1
+                super().save(*args, **kwargs)
+                return
+            # A renewal must NEVER become a chain root: falling through to the
+            # fresh-Max()+1 branch would assign a DIFFERENT number at
+            # generation=0, silently splitting the shared-number-across-the-
+            # chain invariant. A NULL predecessor number is only reachable when
+            # the predecessor was created bypassing save() (bulk_create /
+            # partial import) — refuse loudly instead of forking the chain.
+            from apps.commissioning.errors import RenewalChainNumberMissing
+
+            raise RenewalChainNumberMissing(
+                "The predecessor subscription has no subscription_number to "
+                "inherit — fix the predecessor's numbering before renewing."
+            )
+        # Otherwise take the next sequential number, serialising the ``Max()+1``
+        # AND the insert under one advisory lock so two concurrent creates can't
+        # claim the same number (mirrors ``Member._generate_member_number``).
+        from django.db import transaction
+
+        from core.db_locks import acquire_advisory_xact_lock
+
+        with transaction.atomic():
+            acquire_advisory_xact_lock("subscription_number:sequence")
+            last = Subscription.objects.aggregate(
+                max_number=models.Max("subscription_number")
+            )["max_number"]
+            self.subscription_number = (last or 0) + 1
+            super().save(*args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
 
@@ -897,67 +959,6 @@ class Subscription(
             valid_until=self.valid_until,
         )
 
-    # NOTE: NO ``overlap_unique_fields`` — subscriptions are independent, so
-    # ``TimeBoundMixin`` runs neither the overlap check nor succession-closing.
-    # ``save()`` is overridden ONLY to assign the renewal-chain identifier; it
-    # still calls ``super().save()`` (TimeBoundMixin → ``clean()``, incl. the
-    # DSD validity-window check above).
-    def save(self, *args, **kwargs) -> None:
-        # A subscription must have a finite, billable term. Open-ended subs
-        # materialise no ShareDeliveries and silently never bill. The
-        # serializer blocks this on the API; this is the model-level backstop
-        # for factories / imports / seed scripts / direct ORM writes — every
-        # save path lands here, so an open-ended subscription is not possible.
-        if self.valid_until is None:
-            from apps.commissioning.errors import OpenEndedSubscriptionNotAllowed
-
-            raise OpenEndedSubscriptionNotAllowed(
-                "A subscription must have an end date (valid_until); "
-                "open-ended subscriptions are not allowed.",
-                field="valid_until",
-            )
-        if self.subscription_number is not None:
-            super().save(*args, **kwargs)
-            return
-        # On a renewal, inherit the chain's number and bump the generation.
-        if self.previous_subscription_id:
-            predecessor = (
-                Subscription.objects.filter(pk=self.previous_subscription_id)
-                .values("subscription_number", "renewal_generation")
-                .first()
-            )
-            if predecessor and predecessor["subscription_number"] is not None:
-                self.subscription_number = predecessor["subscription_number"]
-                self.renewal_generation = predecessor["renewal_generation"] + 1
-                super().save(*args, **kwargs)
-                return
-            # A renewal must NEVER become a chain root: falling through to the
-            # fresh-Max()+1 branch would assign a DIFFERENT number at
-            # generation=0, silently splitting the shared-number-across-the-
-            # chain invariant. A NULL predecessor number is only reachable when
-            # the predecessor was created bypassing save() (bulk_create /
-            # partial import) — refuse loudly instead of forking the chain.
-            from apps.commissioning.errors import RenewalChainNumberMissing
-
-            raise RenewalChainNumberMissing(
-                "The predecessor subscription has no subscription_number to "
-                "inherit — fix the predecessor's numbering before renewing."
-            )
-        # Otherwise take the next sequential number, serialising the ``Max()+1``
-        # AND the insert under one advisory lock so two concurrent creates can't
-        # claim the same number (mirrors ``Member._generate_member_number``).
-        from django.db import transaction
-
-        from core.db_locks import acquire_advisory_xact_lock
-
-        with transaction.atomic():
-            acquire_advisory_xact_lock("subscription_number:sequence")
-            last = Subscription.objects.aggregate(
-                max_number=models.Max("subscription_number")
-            )["max_number"]
-            self.subscription_number = (last or 0) + 1
-            super().save(*args, **kwargs)
-
     def _post_confirm(self, *, admin_user) -> None:
         """Materialise Shares + ShareDeliveries + ChargeSchedule on confirm.
 
@@ -1011,7 +1012,7 @@ class Subscription(
     @property
     def is_current(self) -> bool:
         """Check if this subscription period is currently active"""
-        today = timezone.now().date()
+        today = timezone.localdate()
         if self.valid_until is None:
             return today >= self.valid_from
         return self.valid_from <= today <= self.valid_until
@@ -1020,13 +1021,13 @@ class Subscription(
     def is_expired(self) -> bool:
         if self.valid_until is None:
             return False
-        return timezone.now().date() > self.valid_until
+        return timezone.localdate() > self.valid_until
 
     @property
     def days_until_expiry(self) -> int | None:
         if self.valid_until is None:
             return None
-        return max(0, (self.valid_until - timezone.now().date()).days)
+        return max(0, (self.valid_until - timezone.localdate()).days)
 
     @classmethod
     def active_for_member(
@@ -1090,6 +1091,10 @@ class MemberLoan(JasminModel, AdminConfirmableMixin, CreatedMixin):
     def __str__(self) -> str:
         return f"Loan {self.amount} for {self.member}"
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
 
@@ -1115,7 +1120,3 @@ class MemberLoan(JasminModel, AdminConfirmableMixin, CreatedMixin):
             raise ValidationError(
                 {"paid_back_date": "Paid back date cannot be after end date"}
             )
-
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        self.full_clean()
-        super().save(*args, **kwargs)

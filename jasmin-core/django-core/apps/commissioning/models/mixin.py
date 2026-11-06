@@ -152,23 +152,6 @@ class TimeBoundMixin(models.Model):
         # via ``time_bound_valid_range_constraint(<name>)`` in its own
         # ``Meta.constraints`` — see the helper just below this class.
 
-    def is_active_at(self, on_date: datetime.date) -> bool:
-        """Python mirror of ``active_on_date_q``: is this row's validity window
-        open on ``on_date``? ``valid_from <= on_date`` AND (``valid_until`` is
-        NULL OR ``>= on_date``). Keep the truth table in lockstep with
-        ``active_on_date_q`` (the ORM-side SSOT for the window) so a future
-        inclusive/exclusive change lands in exactly these two places."""
-        return self.valid_from <= on_date and (
-            self.valid_until is None or self.valid_until >= on_date
-        )
-
-    def clean(self) -> None:
-        super().clean()
-        self.validate_week_boundaries(self.valid_from, self.valid_until)
-        self.validate_date_range(self.valid_from, self.valid_until)
-        if self.overlap_unique_fields is not None:
-            self._validate_no_overlap()
-
     def save(self, *args, **kwargs) -> None:
         """Run ``full_clean()`` so the overlap / date-range checks always fire.
 
@@ -211,8 +194,22 @@ class TimeBoundMixin(models.Model):
             self.full_clean()
             super().save(*args, **kwargs)
 
-    # NOTE: The CheckConstraint in Meta enforces ``valid_until >= valid_from``
-    # at the DB level for the bulk paths that bypass ``save()``.
+    def is_active_at(self, on_date: datetime.date) -> bool:
+        """Python mirror of ``active_on_date_q``: is this row's validity window
+        open on ``on_date``? ``valid_from <= on_date`` AND (``valid_until`` is
+        NULL OR ``>= on_date``). Keep the truth table in lockstep with
+        ``active_on_date_q`` (the ORM-side SSOT for the window) so a future
+        inclusive/exclusive change lands in exactly these two places."""
+        return self.valid_from <= on_date and (
+            self.valid_until is None or self.valid_until >= on_date
+        )
+
+    def clean(self) -> None:
+        super().clean()
+        self.validate_week_boundaries(self.valid_from, self.valid_until)
+        self.validate_date_range(self.valid_from, self.valid_until)
+        if self.overlap_unique_fields is not None:
+            self._validate_no_overlap()
 
     @staticmethod
     def validate_week_boundaries(valid_from, valid_until) -> None:
@@ -1065,6 +1062,9 @@ class NumberedDocumentMixin(models.Model):
     Subclasses should define DOCUMENT_TYPE to specify the document type.
     """
 
+    # Subclasses must define this
+    DOCUMENT_TYPE = None  # e.g., 'order', 'delivery_note', 'invoice'
+
     # ``prefix`` must NOT be nullable: PostgreSQL treats NULL as distinct
     # in the ``UNIQUE (prefix, number)`` constraints declared on each
     # subclass, so a tenant without TenantSettings (empty prefix) would
@@ -1073,9 +1073,6 @@ class NumberedDocumentMixin(models.Model):
     # constraint can compare on.
     prefix = models.CharField(max_length=10, blank=True, default="")
     number = models.IntegerField(blank=True, null=True)
-
-    # Subclasses must define this
-    DOCUMENT_TYPE = None  # e.g., 'order', 'delivery_note', 'invoice'
 
     class Meta:
         abstract = True
@@ -1104,7 +1101,7 @@ class NumberedDocumentMixin(models.Model):
         if self.DOCUMENT_TYPE == "order":
             return {"year": self.year}
         if self.DOCUMENT_TYPE in ("delivery_note", "invoice_reseller"):
-            year = self.date.year if self.date else timezone.now().year
+            year = self.date.year if self.date else timezone.localdate().year
             return {"date__year": year}
         raise ValueError(f"Unknown DOCUMENT_TYPE: {self.DOCUMENT_TYPE}")
 
@@ -1113,7 +1110,7 @@ class NumberedDocumentMixin(models.Model):
         if self.DOCUMENT_TYPE == "order":
             return self.year
         if self.DOCUMENT_TYPE in ("delivery_note", "invoice_reseller"):
-            return self.date.year if self.date else timezone.now().year
+            return self.date.year if self.date else timezone.localdate().year
         raise ValueError(f"Unknown DOCUMENT_TYPE: {self.DOCUMENT_TYPE}")
 
     def _base_number_queryset(self) -> models.QuerySet:

@@ -50,7 +50,7 @@ class ShareContentGranularityView(APIViewRolePermissionsMixin, APIView):
         Check if ShareContent data for a given year and week supports:
         - Day-level granularity (same amounts per day)
         - Tour-level granularity (same amounts per tour)
-        
+
         Returns:
         - days_ok: true if all items have same amount per day
         - tours_ok: true if all items have same amount per tour
@@ -342,11 +342,11 @@ class ShareTypeVariationAmountsForPlanningView(APIViewRolePermissionsMixin, APIV
         description="""
         Get comprehensive planning data for all variations, days, tours, and stations
         for a given week. Returns a dictionary with keys for different planning modes:
-        
+
         - **Basic mode**: `day_{day_id}_variation_{variation_id}`
         - **Tour mode**: `day_{day_id}_variation_{variation_id}_tour_{tour_number}`
         - **Station mode**: `day_{day_id}_variation_{variation_id}_station_{station_id}`
-        
+
         Use this endpoint to get a complete overview for weekly planning across all
         delivery scenarios.
         """,

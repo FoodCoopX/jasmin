@@ -308,8 +308,6 @@ class OrderableItem(LinePricingMixin, JasminModel):
 class Offer(FinalizableMixin, FinalizedProtectedMixin, JasminModel):
     ALLOWED_FINALIZED_UPDATES = ["amount"]
 
-    objects = FinalizedProtectedQuerySet.as_manager()
-
     year = models.PositiveSmallIntegerField(db_index=True)
     delivery_week = delivery_week_field(db_index=True)
     share_article = models.ForeignKey("ShareArticle", on_delete=models.PROTECT)
@@ -339,6 +337,8 @@ class Offer(FinalizableMixin, FinalizedProtectedMixin, JasminModel):
     cleaning = models.BooleanField(default=False)
     washing = models.BooleanField(default=False)
     comes_from_long_term_storage = models.BooleanField(default=False)
+
+    objects = FinalizedProtectedQuerySet.as_manager()
 
     class Meta:
         indexes = [
@@ -441,8 +441,6 @@ class Order(
     # save() layer and the Postgres trigger. See FinalizedProtectedMixin.
     IS_FINALIZED_ONE_WAY = True
 
-    objects = FinalizedProtectedQuerySet.as_manager()
-
     year = models.PositiveSmallIntegerField(db_index=True)
     delivery_week = delivery_week_field(db_index=True)
     day_number = models.PositiveSmallIntegerField(
@@ -467,6 +465,8 @@ class Order(
     reseller = models.ForeignKey("Reseller", on_delete=models.PROTECT)
     is_donation = models.BooleanField(default=False)
     note = models.CharField(max_length=500, blank=True, null=True)
+
+    objects = FinalizedProtectedQuerySet.as_manager()
 
     class Meta:
         indexes = [
@@ -538,8 +538,6 @@ class OrderContent(FinalizableMixin, FinalizedProtectedMixin, OrderableItem):
     IS_FINALIZED_ONE_WAY = True
     order = models.ForeignKey("Order", on_delete=models.PROTECT)
 
-    objects = FinalizedProtectedQuerySet.as_manager()
-
     amount = models.DecimalField(max_digits=7, decimal_places=3, blank=True, null=True)
 
     cleaning = models.BooleanField(default=False, blank=True, null=True)
@@ -547,6 +545,8 @@ class OrderContent(FinalizableMixin, FinalizedProtectedMixin, OrderableItem):
     comes_from_long_term_storage = models.BooleanField(
         default=False, blank=True, null=True
     )
+
+    objects = FinalizedProtectedQuerySet.as_manager()
 
     class Meta:
         constraints = [
@@ -656,7 +656,6 @@ class CrateOrderContent(
     PARENT_FK_FIELDS = ["order", "order_content"]
     # One-way like its parent document (see OrderContent).
     IS_FINALIZED_ONE_WAY = True
-    objects = FinalizedProtectedQuerySet.as_manager()
 
     order_content = models.ForeignKey(
         "OrderContent", on_delete=models.CASCADE, blank=True, null=True
@@ -673,6 +672,8 @@ class CrateOrderContent(
     )
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2)
     note = models.CharField(max_length=500, blank=True, null=True)
+
+    objects = FinalizedProtectedQuerySet.as_manager()
 
     class Meta:
         constraints = [
@@ -720,7 +721,6 @@ class CrateDeliveryNoteContent(
     PARENT_FK_FIELDS = ["delivery_note"]
     # One-way like its parent document (see OrderContent).
     IS_FINALIZED_ONE_WAY = True
-    objects = FinalizedProtectedQuerySet.as_manager()
 
     delivery_note = models.ForeignKey(
         "DeliveryNoteReseller",
@@ -742,6 +742,8 @@ class CrateDeliveryNoteContent(
         decimal_places=2,
     )
     note = models.CharField(max_length=500, blank=True, null=True)
+
+    objects = FinalizedProtectedQuerySet.as_manager()
 
     def __str__(self) -> str:
         return f"{self.crate_type} x{self.amount}"
@@ -768,7 +770,6 @@ class CrateContentInvoiceReseller(
     PARENT_FK_FIELDS = ["invoice"]
     # One-way like its parent document (see OrderContent).
     IS_FINALIZED_ONE_WAY = True
-    objects = FinalizedProtectedQuerySet.as_manager()
 
     invoice = models.ForeignKey(
         "InvoiceReseller",
@@ -801,6 +802,8 @@ class CrateContentInvoiceReseller(
         related_name="+",
     )
 
+    objects = FinalizedProtectedQuerySet.as_manager()
+
     def __str__(self) -> str:
         return f"{self.crate_type} x{self.amount} (Invoice {self.invoice_id})"
 
@@ -823,7 +826,6 @@ class DeliveryNoteContent(
     PARENT_FK_FIELDS = ["delivery_note"]
     # One-way like its parent document (see OrderContent).
     IS_FINALIZED_ONE_WAY = True
-    objects = FinalizedProtectedQuerySet.as_manager()
 
     delivery_note = models.ForeignKey(
         "DeliveryNoteReseller", on_delete=models.CASCADE, related_name="items"
@@ -832,6 +834,8 @@ class DeliveryNoteContent(
         "OrderContent", on_delete=models.PROTECT, blank=True, null=True
     )
     amount = models.DecimalField(max_digits=7, decimal_places=3, blank=True, null=True)
+
+    objects = FinalizedProtectedQuerySet.as_manager()
 
     def __str__(self) -> str:
         return f"{self.share_article} x{self.amount}"
@@ -854,8 +858,6 @@ class InvoiceResellerContent(
     # One-way like its parent InvoiceReseller (see OrderContent).
     IS_FINALIZED_ONE_WAY = True
 
-    objects = FinalizedProtectedQuerySet.as_manager()
-
     invoice = models.ForeignKey(
         "InvoiceReseller", on_delete=models.CASCADE, related_name="items"
     )
@@ -868,6 +870,8 @@ class InvoiceResellerContent(
         related_name="+",
     )
     amount = models.DecimalField(max_digits=10, decimal_places=3)
+
+    objects = FinalizedProtectedQuerySet.as_manager()
 
     def __str__(self) -> str:
         return f"{self.share_article} x{self.amount} (Invoice {self.invoice_id})"
@@ -900,8 +904,6 @@ class DeliveryNoteReseller(
     # HGB §257: issued Lieferscheine are archived unchanged.
     IS_FINALIZED_ONE_WAY = True
 
-    objects = FinalizedProtectedQuerySet.as_manager()
-
     order = models.OneToOneField(
         "Order", on_delete=models.CASCADE, related_name="delivery_note"
     )
@@ -915,6 +917,8 @@ class DeliveryNoteReseller(
     has_been_sent_to_reseller_at = models.DateTimeField(blank=True, null=True)
 
     is_cancelled = models.BooleanField(default=False)
+
+    objects = FinalizedProtectedQuerySet.as_manager()
 
     # The document ``date`` is deliberately NOT ordered against ``finalized_at``
     # or ``has_been_sent_to_reseller_at``: a Lieferschein is issued with or
@@ -998,7 +1002,6 @@ class InvoiceReseller(
     # a storno; to revise, issue a correction document.
     IS_FINALIZED_ONE_WAY = True
 
-    objects = FinalizedProtectedQuerySet.as_manager()
     reseller = models.ForeignKey(
         "Reseller", on_delete=models.PROTECT, related_name="invoices"
     )
@@ -1061,6 +1064,8 @@ class InvoiceReseller(
     items_are_grouped = models.BooleanField(default=False)
     note = models.CharField(max_length=500, blank=True, null=True)
 
+    objects = FinalizedProtectedQuerySet.as_manager()
+
     class Meta:
         constraints = [
             # ``document_type`` is part of the key because invoice and
@@ -1101,6 +1106,19 @@ class InvoiceReseller(
 
     def __str__(self) -> str:
         return f"Invoice {self.display_number} - {self.reseller}"
+
+    def save(self, *args, **kwargs) -> None:
+        # See ``DeliveryNoteReseller.save``: invoices are GoBD / UStG
+        # documents — refuse to silently date them to "today" when the
+        # caller forgot to resolve the date via
+        # ``coerce_document_date`` / the service layer.
+        if not self.date:
+            raise DocumentDateRequired(
+                "InvoiceReseller.date is required — pass it explicitly"
+                " or go through InvoiceService."
+            )
+        self.full_clean()
+        self.save_with_number_retry(*args, **kwargs)
 
     def clean(self) -> None:
         super().clean()
@@ -1144,19 +1162,6 @@ class InvoiceReseller(
             raise ValidationError(
                 "Regular invoice cannot have cancellation/replacement references"
             )
-
-    def save(self, *args, **kwargs) -> None:
-        # See ``DeliveryNoteReseller.save``: invoices are GoBD / UStG
-        # documents — refuse to silently date them to "today" when the
-        # caller forgot to resolve the date via
-        # ``coerce_document_date`` / the service layer.
-        if not self.date:
-            raise DocumentDateRequired(
-                "InvoiceReseller.date is required — pass it explicitly"
-                " or go through InvoiceService."
-            )
-        self.full_clean()
-        self.save_with_number_retry(*args, **kwargs)
 
     @property
     def has_been_sent_to_reseller(self) -> bool:

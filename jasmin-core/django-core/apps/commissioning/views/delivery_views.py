@@ -49,7 +49,7 @@ class DeliveryStationsToursOverviewView(APIViewRolePermissionsMixin, APIView):
         description="""
         Provides an overview of all delivery stations with share counts,
         organized by tours and stations.
-        
+
         The response includes:
         - List of tours with their stations
 

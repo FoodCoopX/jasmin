@@ -397,7 +397,7 @@ class ShareTypeVariationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # + upcoming variations, excluding only the already-ended ones. The
         # reference date is the explicit ``active_at_date`` if given, else today.
         if include_future:
-            reference_date = active_at_date or timezone.now().date()
+            reference_date = active_at_date or timezone.localdate()
             queryset = queryset.filter(
                 id__in=ShareTypeVariation.current.active_at_date_or_future(
                     reference_date
@@ -677,7 +677,7 @@ class ShareDeliveryViewSet(
     def get_permissions(self):
         if self.action in self._MEMBER_ACTIONS:
             base = [permission() for permission in self.permission_classes]
-            return base + [IsOfficeOrMember()]
+            return [*base, IsOfficeOrMember()]
         return super().get_permissions()
 
     @extend_schema(
@@ -2248,7 +2248,7 @@ class VirtualComponentsViewSet(RolePermissionsMixin, viewsets.ViewSet):
         share_ids = list(
             Share.objects.filter(
                 share_type_variation_id__in=physical_variation_ids,
-                year__gte=timezone.now().year,
+                year__gte=timezone.localdate().year,
             ).values_list("id", flat=True)
         )
         recompute_shares(share_ids)

@@ -4,7 +4,8 @@
 Why a baseline
 --------------
 ``[tool.ruff.lint] select`` carries two kinds of rule. The strict set
-(``E,F,B,BLE,UP,I``) is clean and contributes no baseline entry — a finding
+(``E,F,B,BLE,UP,I`` and the Django-style ``W291,W293,G004,RUF005,DJ012``) is
+clean and contributes no baseline entry — a finding
 there is a defect introduced by the change under review. The hygiene set (``N``
 naming, ``C901`` complexity, ``PLR0913``/``PLR0915`` signature and function
 size) carries 201 accepted findings. Blocking every pull request on all of them

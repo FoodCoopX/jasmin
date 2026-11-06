@@ -161,7 +161,7 @@ class SharesDeliveryDayService:
                 (vf_week.year, vf_week.week),
                 copy_by_old_id,
             )
-            demand_week = max(vf_week, Week.withdate(timezone.now().date()) + 1)
+            demand_week = max(vf_week, Week.withdate(timezone.localdate()) + 1)
             _move_onto_copies(
                 ExternalShareDemand,
                 "delivery_week",
@@ -179,7 +179,7 @@ class SharesDeliveryDayService:
     ) -> int:
         """Update future Share objects to use the new delivery day if it has
         the same day_number as the old delivery day they were using."""
-        today = timezone.now().date()
+        today = timezone.localdate()
 
         if old_delivery_day is None:
             old_delivery_day = (
@@ -236,7 +236,7 @@ class SharesDeliveryDayService:
                     )
 
         if future_shares:
-            update_fields = ["delivery_day"] + list(day_fields_mapping.keys())
+            update_fields = ["delivery_day", *day_fields_mapping]
             Share.objects.bulk_update(future_shares, fields=update_fields)
 
             # The reassigned harvesting/packing/washing/cleaning/stock days are
@@ -260,7 +260,7 @@ class SharesDeliveryDayService:
     ) -> int:
         """Update future ShareDelivery objects to use the new delivery station
         days when a delivery day is replaced."""
-        today = timezone.now().date()
+        today = timezone.localdate()
 
         if old_delivery_day is None:
             return 0

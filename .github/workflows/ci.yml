@@ -177,7 +177,8 @@ jobs:
         # Runs the FULL rule set from pyproject.toml and fails on any finding not
         # already in jasmin-core/django-core/ruff-baseline.txt.
         #
-        # The strict rules (E,F,B,BLE,UP,I) contribute ZERO baseline entries, so
+        # The strict rules (E,F,B,BLE,UP,I and the Django-style
+        # W291,W293,G004,RUF005,DJ012) contribute ZERO baseline entries, so
         # anything they report is a hard failure. The hygiene rules (N naming,
         # C901 complexity, PLR0913/PLR0915 signature and function size) carry 201
         # accepted findings, held still by the baseline: blocking every PR on all
