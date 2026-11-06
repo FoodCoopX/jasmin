@@ -215,10 +215,7 @@ export default function SuperAdminOpsChecklist() {
         <div>
           <Text strong>{row.title}</Text>
           {row.description && (
-            <Paragraph
-              type="secondary"
-              style={{ marginBottom: 0, fontSize: 12, whiteSpace: "pre-wrap" }}
-            >
+            <Paragraph type="secondary" className="mb-0 text-12 text-prewrap">
               {row.description}
             </Paragraph>
           )}
@@ -243,7 +240,7 @@ export default function SuperAdminOpsChecklist() {
           <Tooltip
             title={
               row.last_run.notes ? (
-                <span style={{ whiteSpace: "pre-wrap" }}>
+                <span className="text-prewrap">
                   {row.last_run.notes}
                 </span>
               ) : (
@@ -309,9 +306,9 @@ export default function SuperAdminOpsChecklist() {
   ];
 
   return (
-    <div style={{ padding: "24px 32px" }}>
-      <div style={{ marginBottom: 16 }}>
-        <Title level={2} style={{ marginBottom: 4 }}>
+    <div className="sa-ops-page">
+      <div className="mb-16">
+        <Title level={2} className="mb-4">
           Operational checklist
         </Title>
         <Text type="secondary">
@@ -322,7 +319,7 @@ export default function SuperAdminOpsChecklist() {
       </div>
 
       {error && (
-        <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />
+        <Alert type="error" showIcon message={error} className="mb-16" />
       )}
 
       {overdueCount > 0 && (
@@ -330,7 +327,7 @@ export default function SuperAdminOpsChecklist() {
           type="warning"
           showIcon
           message={`${overdueCount} task(s) overdue`}
-          style={{ marginBottom: 16 }}
+          className="mb-16"
         />
       )}
 
@@ -370,35 +367,24 @@ export default function SuperAdminOpsChecklist() {
               <Alert
                 type="warning"
                 showIcon
-                style={{ marginBottom: 16 }}
+                className="mb-16"
                 message="Save this secret now — it won't be shown again"
                 description={
                   <>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text type="secondary" className="text-12">
                       We don't store the new value anywhere on the
                       platform; we just generated it. Copy it into
                       your password manager / .env file BEFORE you
                       close this modal.
                     </Text>
-                    <div
-                      style={{
-                        marginTop: 8,
-                        padding: 12,
-                        background: "var(--color-bg-subtle)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 4,
-                        fontFamily: "monospace",
-                        fontSize: 13,
-                        wordBreak: "break-all",
-                      }}
-                    >
+                    <div className="sa-rotation-secret">
                       {rotationResult.generated_secret}
                     </div>
                     <Button
                       size="small"
                       icon={<CopyOutlined />}
                       onClick={handleCopySecret}
-                      style={{ marginTop: 8 }}
+                      className="mt-8"
                     >
                       Copy to clipboard
                     </Button>
@@ -410,22 +396,12 @@ export default function SuperAdminOpsChecklist() {
               <Alert
                 type="info"
                 showIcon
-                style={{ marginBottom: 16 }}
+                className="mb-16"
                 message={`${rotationResult.items_affected} record(s) modified.`}
               />
             )}
             <Paragraph strong>Next steps</Paragraph>
-            <Paragraph
-              style={{
-                whiteSpace: "pre-wrap",
-                fontFamily: "monospace",
-                fontSize: 12,
-                padding: 12,
-                background: "var(--color-bg-elevated)",
-                border: "1px solid var(--color-border-light)",
-                borderRadius: 4,
-              }}
-            >
+            <Paragraph className="sa-rotation-instructions">
               {rotationResult.instructions}
             </Paragraph>
           </>

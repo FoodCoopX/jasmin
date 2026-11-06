@@ -358,8 +358,7 @@ export default function ConfigurationEmail() {
       {/* Verification status */}
       {config.from_email && (
         <Alert
-          className="page-narrow"
-          style={{ marginBottom: "16px" }}
+          className="page-narrow mb-16"
           type={config.is_verified ? "success" : "warning"}
           showIcon
           icon={
@@ -394,7 +393,7 @@ export default function ConfigurationEmail() {
                   <Tag
                     color="green"
                     icon={<CheckCircleOutlined />}
-                    style={{ marginLeft: 12 }}
+                    className="email-verified-tag"
                   >
                     {t("email_config.verified_tag")}
                   </Tag>
@@ -405,10 +404,7 @@ export default function ConfigurationEmail() {
         </Card>
         {/* Test email — disabled until the config is saved (autosave settled), so
           the test always runs against what's actually persisted. */}
-        <Card
-          className="page-narrow"
-          style={{ textAlign: "center", marginBottom: "1em" }}
-        >
+        <Card className="page-narrow text-center mb-1em">
           <Button
             icon={<SendOutlined />}
             onClick={() => setTestModalOpen(true)}
@@ -437,7 +433,7 @@ export default function ConfigurationEmail() {
             showIcon
             icon={<EyeInvisibleOutlined />}
             message={t("email_config.credentials_info")}
-            style={{ marginBottom: 16 }}
+            className="mb-16"
           />
 
           <Row gutter={[16, 16]}>
@@ -449,7 +445,7 @@ export default function ConfigurationEmail() {
                   updateField("smtp_host", e.target.value, "input")
                 }
                 placeholder="smtp.gmail.com"
-                style={{ marginTop: 4 }}
+                className="mt-4"
               />
             </Col>
             <Col span={8}>
@@ -457,7 +453,7 @@ export default function ConfigurationEmail() {
               <Select
                 value={config.smtp_port ?? 587}
                 onChange={handlePortChange}
-                style={{ width: "100%", marginTop: 4 }}
+                className="w-full mt-4"
                 aria-label={t("email_config.smtp_port")}
                 options={portOptions}
               />
@@ -470,7 +466,7 @@ export default function ConfigurationEmail() {
                   updateField("smtp_username", e.target.value, "input")
                 }
                 placeholder="user@gmail.com"
-                style={{ marginTop: 4 }}
+                className="mt-4"
               />
             </Col>
             <Col span={12}>
@@ -485,10 +481,10 @@ export default function ConfigurationEmail() {
                     ? "••••••••  (saved)"
                     : t("email_config.enter_password")
                 }
-                style={{ marginTop: 4 }}
+                className="mt-4"
               />
               {config.has_smtp_password && !credentialFields.smtp_password && (
-                <Text type="secondary" style={{ fontSize: 12 }}>
+                <Text type="secondary" className="text-12">
                   {t("email_config.password_set")}
                 </Text>
               )}

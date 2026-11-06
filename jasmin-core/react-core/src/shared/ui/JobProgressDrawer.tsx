@@ -159,7 +159,7 @@ export const JobProgressDrawer: FC<JobProgressDrawerProps> = ({
           />
 
           <div role="status" aria-live="polite" aria-atomic="true">
-            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            <Paragraph type="secondary" className="mb-0">
               {t(
                 "job_progress.counters",
                 {
@@ -195,7 +195,7 @@ export const JobProgressDrawer: FC<JobProgressDrawerProps> = ({
 
           {job.status === "done" && rows.length > 0 && (
             <>
-              <Title level={5} style={{ marginBottom: 0 }}>
+              <Title level={5} className="mb-0">
                 {t("job_progress.per_item_results")}
               </Title>
               <ReadOnlyReportTable<PerItemResult>

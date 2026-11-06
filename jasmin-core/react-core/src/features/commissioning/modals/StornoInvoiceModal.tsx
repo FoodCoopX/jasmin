@@ -50,7 +50,7 @@ export default function StornoInvoiceModal({
       okText={t("commissioning.create_storno")}
       okButtonProps={{ danger: true, disabled: !reason.trim() }}
     >
-      <div style={{ marginBottom: 16 }}>
+      <div className="mb-16">
         <Text>
           {t("commissioning.storno_for_invoice")}:{" "}
           <Text strong>{invoiceLabel}</Text>
@@ -63,7 +63,7 @@ export default function StornoInvoiceModal({
           onChange={(e) => setReason(e.target.value)}
           rows={3}
           placeholder={t("commissioning.storno_reason_placeholder")}
-          style={{ marginTop: 8 }}
+          className="mt-8"
         />
       </div>
     </Modal>

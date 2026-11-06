@@ -467,7 +467,9 @@ class TestConcurrentWritesOfOneLine:
     ):
         line_pk = committed.line.pk
         other_offer = committed.other_offer
-        move_to_other_offer = _save(line_pk, "10", offer=other_offer)
+
+        def move_to_other_offer() -> None:
+            OrderContent.objects.filter(pk=line_pk).update(offer=other_offer)
 
         with _runs_before_the_first_offer_lock(tenant.schema_name, move_to_other_offer):
             _save(line_pk, "15")()

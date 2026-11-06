@@ -114,7 +114,7 @@ export default function Invoices() {
     mutation: { meta: { silent: true } },
   });
 
-  const { formatDate } = useDateFormat();
+  const { formatDate, monthFormat } = useDateFormat();
 
   const listParams = useMemo<CommissioningOrdersOverviewListParams>(
     () => ({
@@ -245,7 +245,7 @@ export default function Invoices() {
         case GROUPING_MODES.MONTH: {
           const monthDate = dayjs(item.delivery_note_date);
           groupKey = `${monthDate.year()}-${String(monthDate.month() + 1).padStart(2, "0")}`;
-          groupName = monthDate.format("MMMM YYYY");
+          groupName = monthDate.format(monthFormat);
           break;
         }
         default:
@@ -280,7 +280,7 @@ export default function Invoices() {
       });
 
     return sortedGroups;
-  }, [filteredData, groupingMode, t, data]);
+  }, [filteredData, groupingMode, t, data, monthFormat]);
 
   const handleOpenModal = useCallback((record: CombinedOrderOverview) => {
     setSelectedInvoiceId(record.invoice_id);

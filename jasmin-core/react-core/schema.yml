@@ -36743,7 +36743,7 @@ components:
       type: object
       description: |-
         One order-content row as returned by create / update / partial_update
-        (``OrderContentService._serialize_order_content``) — the flat per-row dict
+        (``serialize_order_content``) — the flat per-row dict
         WITHOUT the delivery-note / invoice document block. The list endpoint
         augments each row with that block: see ``OrderContentListItemSerializer``.
       properties:

@@ -724,8 +724,8 @@ class OrderContentViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 continue
             if getattr(validated_data[field], "pk", None) != current_id:
                 raise OrderContentItemChangeForbidden(
-                    "Only office staff may change the offer or article of an "
-                    "order line."
+                    "An order line's offer can't be changed, and only office "
+                    "staff may change its article."
                 )
 
     @staticmethod

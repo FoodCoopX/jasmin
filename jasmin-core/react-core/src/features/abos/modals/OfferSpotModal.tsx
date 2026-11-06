@@ -118,7 +118,7 @@ export function OfferSpotModal({
             step={0.5}
             precision={2}
             addonBefore={currencySymbol}
-            style={{ width: "12em" }}
+            className="offer-spot-price"
           />
         </Descriptions.Item>
       </Descriptions>

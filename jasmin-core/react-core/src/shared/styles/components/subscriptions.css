@@ -1,0 +1,32 @@
+/* Subscription pages, columns and modals (features/abos). */
+
+/* The capacity overview's date range sits in a flex column; it keeps its
+   own width instead of stretching across the panel. */
+.capacity-overview-range {
+  align-self: flex-start;
+}
+
+.subscription-display-id {
+  font-size: 0.7em;
+}
+
+.subscription-confirmation-body {
+  padding: 20px 0;
+}
+
+.offer-spot-price {
+  width: 12em;
+}
+
+.solidarity-price-table {
+  width: 40%;
+}
+
+.income-chart-hint {
+  margin-top: 0.75em;
+}
+
+/* Space between the jokers page's switches and its first table. */
+.jokers-spacer {
+  height: 2em;
+}

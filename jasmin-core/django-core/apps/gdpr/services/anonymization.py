@@ -126,8 +126,14 @@ class AnonymizationMixin:
         # subject was built with can be stale, and ``_anonymize_member`` saves
         # the row in full: an office cancellation committed in the meantime
         # would be overwritten and replaced by one dated today. Locked before
-        # anything is written, as the cancellation path locks it too.
+        # anything is written, as the cancellation path locks it too, and after
+        # the member's subscriptions, as that path takes them.
         if subject.member is not None:
+            from apps.commissioning.services.member_cancellation import (
+                lock_open_subscriptions,
+            )
+
+            lock_open_subscriptions(subject.member.pk)
             subject = replace(
                 subject,
                 member=Member.objects.select_for_update().get(pk=subject.member.pk),

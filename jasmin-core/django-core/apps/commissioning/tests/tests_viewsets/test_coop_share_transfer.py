@@ -1063,3 +1063,33 @@ class TestCoopShareTransferReversal:
 
         assert resp.status_code == 401
         assert CoopShareTransfer.objects.exists()
+
+
+@pytest.mark.django_db
+def test_a_transfer_locks_the_givers_subscriptions_before_the_members(
+    api_client, tenant
+):
+    """The giver's cancellation writes their subscriptions after the members'
+    rows, so the transfer takes them first, as a reject or a subscription
+    confirm of the giver does."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.commissioning.tests.factories import SubscriptionFactory
+
+    giver, _ = _member_with_shares(3)
+    receiver, _ = _member_with_shares(3)
+    SubscriptionFactory(member=giver, admin_confirmed=False)
+
+    with CaptureQueriesContext(connection) as queries:
+        resp = _post(api_client, giver, receiver, 3, confirm_member_cancellation=True)
+
+    assert resp.status_code == 201, resp.data
+    locks = [query["sql"] for query in queries if "FOR UPDATE" in query["sql"]]
+    first_subscription = next(
+        i for i, sql in enumerate(locks) if 'FROM "commissioning_subscription"' in sql
+    )
+    first_member = next(
+        i for i, sql in enumerate(locks) if 'FROM "commissioning_member"' in sql
+    )
+    assert first_subscription < first_member

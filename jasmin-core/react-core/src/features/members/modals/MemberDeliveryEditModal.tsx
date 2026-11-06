@@ -187,12 +187,7 @@ const MemberDeliveryEditModal: FC<MemberDeliveryEditModalProps> = ({
               <div>
                 <div>{option.label}</div>
                 {option.data.free != null && (
-                  <div
-                    style={{
-                      fontSize: "0.75em",
-                      color: "var(--color-primary)",
-                    }}
-                  >
+                  <div className="text-2xs color-primary">
                     {t("delivery.free_spots_remaining", {
                       count: option.data.free as number,
                     })}

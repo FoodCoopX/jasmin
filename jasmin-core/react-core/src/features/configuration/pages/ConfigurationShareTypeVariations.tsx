@@ -365,7 +365,7 @@ export default function ConfigurationShareTypeVariations() {
         },
         {
           title: (
-            <div style={{ fontSize: "0.85em" }}>
+            <div className="text-label-sm">
               {t("commissioning.share_type_variation_sizes_in_use")}
             </div>
           ),
@@ -495,14 +495,14 @@ export default function ConfigurationShareTypeVariations() {
           key: option,
           label: (
             <Flex align="center" gap={10}>
-              <span style={{ fontWeight: 500 }}>
+              <span className="font-medium">
                 {getShareOptionLabel(option)}
               </span>
               {isActive && (
                 <Tag
                   icon={<CheckCircleOutlined />}
                   color="success"
-                  style={{ borderRadius: 12, margin: 0 }}
+                  className="share-option-active-tag m-0"
                 >
                   {t("configuration.active")}
                 </Tag>
@@ -539,7 +539,7 @@ export default function ConfigurationShareTypeVariations() {
   return (
     <div>
       <h1>{t("configuration.share_type_variations")}</h1>
-      <div style={{ marginTop: "4em" }}></div>
+      <div className="mt-4em"></div>
       {/* Share Option Sections — wrapped in a titled Card so the light-blue
           ``settings-card-header`` bar matches the visual rhythm of the other
           config cards. Full width on purpose: the embedded ShareType tables
@@ -548,10 +548,7 @@ export default function ConfigurationShareTypeVariations() {
       <Collapse
         accordion={false}
         expandIcon={({ isActive }) => (
-          <CaretRightOutlined
-            rotate={isActive ? 90 : 0}
-            style={{ fontSize: 14 }}
-          />
+          <CaretRightOutlined rotate={isActive ? 90 : 0} className="text-14" />
         )}
         items={shareOptionCollapseItems}
         className="w-full"

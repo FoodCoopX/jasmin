@@ -107,15 +107,15 @@ export default function CoopSharesCard({
       }
     >
       {entryDate && member.admin_confirmed && (
-        <Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
+        <Text type="secondary" className="d-block mb-12">
           {t("members.entry_date_long")}:{" "}
           <Text strong>{formatDate(entryDate)}</Text>
         </Text>
       )}
-      <Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
+      <Text type="secondary" className="d-block mb-12">
         {t("members.amount_of_coop_shares")}: <Text strong>{totalShares}</Text>
       </Text>
-      <Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
+      <Text type="secondary" className="d-block mb-12">
         {t("members.value_of_coop_shares")}:{" "}
         <Text strong>{formatCurrency(totalValue)}</Text>
       </Text>
@@ -123,30 +123,22 @@ export default function CoopSharesCard({
       {/* Per-purchase payment status (member self-view): paid shares show their
           paid-on date in grey; unpaid ones show the due date in amber. */}
       {selfService && liveShares.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
+        <div className="mb-12">
           {liveShares.map((s) => {
             const amount = Number(s.amount_of_coop_shares ?? 0);
             return (
-              <div
-                key={s.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  padding: "2px 0",
-                }}
-              >
-                <Text type="secondary" style={{ fontSize: "0.9em" }}>
+              <div key={s.id} className="coop-share-purchase-row">
+                <Text type="secondary" className="text-sm">
                   {t("members.coop_share_purchase", { n: amount })}
                 </Text>
                 {s.paid_at ? (
-                  <Text type="secondary" style={{ fontSize: "0.9em" }}>
+                  <Text type="secondary" className="text-sm">
                     {t("members.coop_share_paid_on", {
                       date: formatDate(s.paid_at),
                     })}
                   </Text>
                 ) : (
-                  <Text type="warning" style={{ fontSize: "0.9em" }}>
+                  <Text type="warning" className="text-sm">
                     {s.due_date
                       ? t("members.coop_share_due_by", {
                           date: formatDate(s.due_date),
@@ -162,7 +154,7 @@ export default function CoopSharesCard({
 
       {cancelledEffectiveAt && (
         <Alert
-          style={{ marginTop: 16 }}
+          className="mt-16"
           type="warning"
           showIcon
           message={
@@ -180,7 +172,7 @@ export default function CoopSharesCard({
 
       {pending > 0 && (
         <Alert
-          style={{ marginTop: 16 }}
+          className="mt-16"
           type="info"
           showIcon
           message={t("members.coop_pending_banner", { count: pending })}

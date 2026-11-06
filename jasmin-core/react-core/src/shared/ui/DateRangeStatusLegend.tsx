@@ -44,7 +44,7 @@ export default function DateRangeStatusLegend({
       }}
     >
       {Object.entries(statusConfig).map(([key, config]) => (
-        <span key={key} className="flex-center-y" style={{ gap: "4px" }}>
+        <span key={key} className="flex-center-y gap-4">
           <span
             style={{
               width: "10px",

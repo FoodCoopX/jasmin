@@ -87,11 +87,7 @@ export default function StepShareTypeVariation({
       {chosenId ? (
         <Card
           size="small"
-          style={{
-            marginBottom: 16,
-            borderColor: "var(--color-primary)",
-            borderWidth: 2,
-          }}
+          className="registration-chosen-variation"
         >
           <Flex justify="space-between" align="center" gap="middle" wrap>
             <Space direction="vertical" size={0}>
@@ -108,7 +104,7 @@ export default function StepShareTypeVariation({
                 </Text>
               )}
               {data.default_delivery_station_day && (
-                <Text type="secondary" style={{ fontSize: 12 }}>
+                <Text type="secondary" className="text-12">
                   {t("auth.registration.variation.station_chosen")}
                 </Text>
               )}
@@ -123,7 +119,7 @@ export default function StepShareTypeVariation({
           type="primary"
           size="large"
           onClick={() => setModalOpen(true)}
-          style={{ marginBottom: 16 }}
+          className="mb-16"
         >
           {t("auth.registration.variation.choose")}
         </Button>
@@ -144,11 +140,11 @@ export default function StepShareTypeVariation({
           type="info"
           showIcon
           message={t("auth.registration.variation.optional_hint")}
-          style={{ marginBottom: 12 }}
+          className="mb-12"
         />
       )}
 
-      <Flex justify="space-between" style={{ marginTop: 8 }}>
+      <Flex justify="space-between" className="mt-8">
         <Button onClick={back}>{t("auth.registration.actions.back")}</Button>
         <Button type="primary" onClick={next}>
           {chosenId

@@ -261,7 +261,8 @@
     "offer_not_in_offer_group": "This offer is not part of your offer group.",
     "offer_not_finalized": "This offer is not approved yet.",
     "offer_week_mismatch": "This offer is for a different week than the order.",
-    "item_change_forbidden": "Only office staff can change the offer or article of an order line.",
+    "item_change_forbidden": "An order line's offer can't be changed, and only office staff can change its article.",
+    "offer_change_refused": "An order line's offer can't be changed: delete the line and add it again with the other offer.",
     "amount_negative": "The ordered amount cannot be negative."
   },
   "orderable_item": {

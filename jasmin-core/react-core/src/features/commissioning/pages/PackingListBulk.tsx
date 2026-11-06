@@ -467,9 +467,7 @@ export default function PackingListBulk() {
         </div>
       )}
 
-      <div
-        style={{ marginTop: "1em", marginLeft: "-2em", marginBottom: "1em" }}
-      >
+      <div className="packing-list-bulk__station-selector">
         <DeliveryStationSelector
           selectedDeliveryStation={selectedDeliveryStation}
           setSelectedDeliveryStation={setSelectedDeliveryStation}

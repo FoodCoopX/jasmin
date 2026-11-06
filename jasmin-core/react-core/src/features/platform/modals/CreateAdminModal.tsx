@@ -119,13 +119,13 @@ export default function CreateAdminModal({
           </div>
 
           {error && (
-            <div className="alert-error" style={{ marginBottom: 20 }}>
+            <div className="alert-error mb-20">
               {error}
             </div>
           )}
 
           {successMessage && (
-            <div className="alert-success" style={{ marginBottom: 20 }}>
+            <div className="alert-success mb-20">
               {successMessage}
             </div>
           )}

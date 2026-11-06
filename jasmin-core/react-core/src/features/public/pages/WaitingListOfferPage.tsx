@@ -75,7 +75,7 @@ export default function WaitingListOfferPage() {
   if (isLoading) {
     return (
       <PublicCard logoUrl={logoUrl}>
-        <div style={{ textAlign: "center", padding: 24 }}>
+        <div className="text-center p-24">
           <Spin />
         </div>
       </PublicCard>
@@ -170,12 +170,7 @@ export default function WaitingListOfferPage() {
           <Descriptions.Item label={t("abos.offer_page.station")}>
             {data.delivery_station_name}
             {data.delivery_station_address ? (
-              <div
-                style={{
-                  color: "var(--color-text-tertiary)",
-                  fontSize: "0.9em",
-                }}
-              >
+              <div className="text-muted text-sm">
                 {data.delivery_station_address}
               </div>
             ) : null}
@@ -203,9 +198,7 @@ export default function WaitingListOfferPage() {
           </Descriptions.Item>
         ) : null}
       </Descriptions>
-      <Space
-        style={{ marginTop: 24, width: "100%", justifyContent: "flex-end" }}
-      >
+      <Space className="waiting-list-offer-actions mt-24">
         <Button danger onClick={onDecline} loading={submitting}>
           {t("abos.offer_page.decline")}
         </Button>

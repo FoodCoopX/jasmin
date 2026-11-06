@@ -48,6 +48,8 @@ vi.mock("react-quill-new", () => ({
     />
   ),
 }));
+// The textarea stands in for Quill, so there is no clipboard to register.
+vi.mock("@shared/quill/SanitizingClipboard", () => ({}));
 
 const tenantSettings = vi.hoisted(() => ({
   values: {} as Record<string, unknown>,

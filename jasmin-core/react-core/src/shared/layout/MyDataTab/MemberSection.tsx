@@ -116,7 +116,7 @@ export default function MemberSection({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div>
-      <Title level={5} style={{ marginTop: 0 }}>
+      <Title level={5} className="mt-0">
         {t("profile.member_facts")}
       </Title>
       <Descriptions column={1} bordered size="small">
@@ -134,7 +134,7 @@ export default function MemberSection({ onSaved }: { onSaved: () => void }) {
       </Descriptions>
       <Divider />
 
-      <Title level={5} style={{ marginTop: 16 }}>
+      <Title level={5} className="mt-16">
         {t("profile.coop_shares")}
       </Title>
       <CoopSharesList shares={data.coop_shares ?? []} />

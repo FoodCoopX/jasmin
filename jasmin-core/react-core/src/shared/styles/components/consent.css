@@ -9,3 +9,36 @@
   background: var(--color-bg-elevated);
   color: var(--color-text-primary);
 }
+
+/* The office's preview of a published version. */
+.consent-document-preview {
+  max-height: 480px;
+  font-size: 13px;
+}
+
+/* The consent block shown when registering or subscribing. */
+.consent-document-block {
+  max-height: 200px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+/* A document the member opens from their own consents: plain text, so its
+   line breaks are kept. */
+.consent-document-own {
+  max-height: 360px;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+/* A consent's status icon in the member's consents card: green while the
+   consent is active, grey once it isn't. ``.anticon`` outranks AntD's own
+   ``.anticon`` colour, which is injected at runtime after this stylesheet. */
+.anticon.consent-status-icon {
+  font-size: 20px;
+  color: var(--color-success);
+}
+
+.anticon.consent-status-icon--inactive {
+  color: var(--color-text-tertiary);
+}

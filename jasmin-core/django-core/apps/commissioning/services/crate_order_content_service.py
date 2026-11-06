@@ -385,7 +385,7 @@ class CrateOrderContentService:
             crate_order_content.pk,
         )
         result["order_id"] = order.id
-        # Mirror the OrderContent path (_serialize_order_metadata) and the
+        # Mirror the OrderContent path (serialize_order_metadata) and the
         # refresh metadata block: the frontend formats the order number as
         # "{prefix}-{display_number}" and seeds those two fields identically
         # from the create response and from a reload. A crates-first save must

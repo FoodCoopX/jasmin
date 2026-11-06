@@ -118,7 +118,7 @@ export const useShareTypeVariationColumns = (
       const children: EditableColumnConfig<TableRecord>[] =
         group.variations.map((variation, childIdx) => ({
           title: (
-            <span style={{ fontSize: "0.85em" }}>
+            <span className="text-label-sm">
               {getShareTypeVariationSizeLabel(variation.size)}
             </span>
           ),

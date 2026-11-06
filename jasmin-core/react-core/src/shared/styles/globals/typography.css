@@ -41,17 +41,89 @@ h5 {
 /* ---- Inline text helpers ---- */
 
 /* Pure font-size utilities (no color/margin side effects). Use these
-   instead of inline style={{ fontSize: "0.Xem" }} for the common ramp. */
+   instead of inline style={{ fontSize: … }}: the ramp relative to the
+   surrounding text, and the pixel sizes. Like the spacing steps they outrank
+   AntD's own rules (a heading's size) as the inline style did: hence
+   !important. */
 .text-sm {
-  font-size: 0.9em;
+  font-size: 0.9em !important;
 }
 
 .text-xs {
-  font-size: 0.8em;
+  font-size: 0.8em !important;
 }
 
 .text-2xs {
-  font-size: 0.75em;
+  font-size: 0.75em !important;
+}
+
+.text-11 {
+  font-size: 11px !important;
+}
+
+.text-12 {
+  font-size: 12px !important;
+}
+
+.text-13 {
+  font-size: 13px !important;
+}
+
+.text-14 {
+  font-size: 14px !important;
+}
+
+.text-18 {
+  font-size: 18px !important;
+}
+
+.font-normal {
+  font-weight: normal !important;
+}
+
+.font-medium {
+  font-weight: 500 !important;
+}
+
+.font-semibold {
+  font-weight: 600 !important;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-nowrap {
+  white-space: nowrap;
+}
+
+.text-prewrap {
+  white-space: pre-wrap;
+}
+
+.text-italic {
+  font-style: italic;
+}
+
+/* Text colours by their token, for an element that only needs the colour. */
+.color-text-primary {
+  color: var(--color-text-primary);
+}
+
+.color-text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.color-text-muted {
+  color: var(--color-text-muted);
+}
+
+.color-primary {
+  color: var(--color-primary);
 }
 
 .text-meta {
@@ -79,7 +151,7 @@ h5 {
 /* Same size step as .text-secondary but without a color, for labels that take
    their color from the component (e.g. AntD <Text type="secondary">). */
 .text-label-sm {
-  font-size: 0.85em;
+  font-size: 0.85em !important;
 }
 
 /* Slightly larger / darker meta hint, used for inline secondary info that

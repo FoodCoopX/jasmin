@@ -149,7 +149,7 @@ export function useHarvestingListColumns({
   // makeShareOrderChildren useCallback (which depends on them) on every render.
   const titleShareContent: ReactNode = useMemo(
     () => (
-      <span style={{ fontSize: "0.7em" }}>
+      <span className="harvesting-list-content-title">
         {t("commissioning.title_share_content")}
       </span>
     ),
@@ -158,7 +158,7 @@ export function useHarvestingListColumns({
 
   const titleOrderContent: ReactNode = useMemo(
     () => (
-      <span style={{ fontSize: "0.7em" }}>
+      <span className="harvesting-list-content-title">
         {t("commissioning.title_order_content")}
       </span>
     ),

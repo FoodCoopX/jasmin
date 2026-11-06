@@ -1002,17 +1002,8 @@ export default function PlanningShareContentBase({
         setSelectedWeek={setSelectedWeek}
       />
       {showGrid && (
-        <div
-          style={{
-            marginTop: "1em",
-            marginBottom: "2em",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "flex-start",
-            gap: "1.5em 2.5em",
-          }}
-        >
-          <div className="flex-col" style={{ gap: "0.5em" }}>
+        <div className="planning-controls">
+          <div className="flex-col gap-0-5em">
             <LabeledSwitch
               value={showDetailedColumns}
               onChange={setShowDetailedColumns}
@@ -1041,7 +1032,7 @@ export default function PlanningShareContentBase({
           </div>
 
           {/* Planning-view controls: granularity + how days are grouped. */}
-          <div className="flex-col" style={{ gap: "0.75em" }}>
+          <div className="flex-col planning-controls__view">
             <PlanningModeSelector
               key={`${daysOk}-${toursOk}`}
               value={planningMode}
@@ -1070,7 +1061,7 @@ export default function PlanningShareContentBase({
           </div>
 
           {/* Weekly buy-in ("Zukauf") cost, computed from the loaded grid. */}
-          <div className="flex-col" style={{ gap: "0.25em" }}>
+          <div className="flex-col planning-controls__purchase-cost">
             <span className="text-secondary">
               {t("commissioning.total_purchase_cost_week")}
             </span>

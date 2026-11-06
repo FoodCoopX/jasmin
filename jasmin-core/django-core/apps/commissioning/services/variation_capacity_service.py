@@ -33,7 +33,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from ..errors import ShareTypeVariationOverCapacity
-from ..models import ShareTypeVariation, Subscription
+from ..models import DeliveryExceptionPeriod, ShareTypeVariation, Subscription
 from ..utils.iso_week_utils import previous_monday, week_day_to_date
 
 logger = logging.getLogger(__name__)
@@ -180,7 +180,9 @@ class VariationCapacityService:
         The peak of a set of intervals is always reached at some interval's
         START, so we evaluate only the term's own start week plus each
         overlapping sub's start week (clamped into the term) — no need to walk,
-        or even bound, an open-ended term week-by-week.
+        or even bound, an open-ended term week-by-week. A paused week delivers
+        nothing, so a start week that falls in a pause moves on to the first
+        week after it: every term covering a later week covers that one too.
         """
         others = list(
             cls._overlapping_qs(
@@ -190,9 +192,29 @@ class VariationCapacityService:
         if not others:
             return 0
 
-        candidate_mondays = {previous_monday(valid_from)}
-        for ofrom, _ountil, _oqty in others:
-            monday = previous_monday(ofrom if ofrom > valid_from else valid_from)
+        pauses = [
+            (start, end)
+            for start, end in DeliveryExceptionPeriod.objects.filter(
+                share_type_variation_id=variation_id
+            ).values_list("valid_from", "valid_until")
+            if end is not None
+        ]
+
+        def first_delivering_monday(monday: _dt.date) -> _dt.date:
+            moved = True
+            while moved:
+                moved = False
+                for start, end in pauses:
+                    if start <= monday <= end:
+                        monday = previous_monday(end) + _dt.timedelta(days=7)
+                        moved = True
+            return monday
+
+        candidate_mondays = set()
+        for start in [valid_from, *(ofrom for ofrom, _ountil, _oqty in others)]:
+            monday = first_delivering_monday(
+                previous_monday(start if start > valid_from else valid_from)
+            )
             if valid_until is not None and monday > valid_until:
                 continue
             candidate_mondays.add(monday)

@@ -164,3 +164,55 @@ class TestPruneOldBackgroundJobs:
         assert recent_done.pk in surviving
         assert old_queued.pk in surviving
         assert old_running.pk in surviving
+
+
+@pytest.mark.django_db
+class TestAJobAfterTheSweep:
+    """The sweep and a job's own task can meet: its queue message can wait past
+    the timeout, or a long step can go without a heartbeat."""
+
+    def test_a_job_the_sweep_failed_does_not_run_when_its_message_comes(self, tenant):
+        from apps.notifications.jobs import JobNotQueued, run_job
+
+        job = _job(status=BackgroundJob.STATUS_QUEUED, created_age=STALE)
+        notification_tasks.reconcile_stale_background_jobs.call_local()
+        ran = []
+
+        with pytest.raises(JobNotQueued):
+            with run_job(tenant.schema_name, job.pk):
+                ran.append(True)
+
+        job.refresh_from_db()
+        assert ran == []
+        assert job.status == BackgroundJob.STATUS_FAILED
+        assert "worker lost" in job.error
+
+    def test_a_job_that_finishes_after_all_is_done_without_the_sweeps_error(
+        self, tenant
+    ):
+        from apps.notifications.jobs import run_job
+
+        job = _job(status=BackgroundJob.STATUS_QUEUED)
+
+        with run_job(tenant.schema_name, job.pk) as handle:
+            BackgroundJob.objects.filter(pk=job.pk).update(
+                status=BackgroundJob.STATUS_FAILED,
+                error="worker lost — no heartbeat within timeout",
+            )
+            handle.result = {"sent": 3}
+
+        job.refresh_from_db()
+        assert job.status == BackgroundJob.STATUS_DONE
+        assert job.error == ""
+        assert job.result == {"sent": 3}
+
+    def test_a_queued_job_runs(self, tenant):
+        from apps.notifications.jobs import run_job
+
+        job = _job(status=BackgroundJob.STATUS_QUEUED)
+
+        with run_job(tenant.schema_name, job.pk) as handle:
+            handle.result = {"sent": 1}
+
+        job.refresh_from_db()
+        assert job.status == BackgroundJob.STATUS_DONE

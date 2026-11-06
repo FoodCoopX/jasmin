@@ -409,6 +409,13 @@ class SubscriptionService:
           and re-runs the schedule for the truncated term.
         ISSUED/PAID/FAILED/WAIVED charges are NEVER touched.
         """
+        # The checks below read the row as it stands under its lock: two cancels
+        # of one subscription would otherwise both pass them on what they
+        # loaded, and the second save would put back a ``valid_until`` past the
+        # deliveries the first one dropped.
+        subscription.refresh_from_db(
+            from_queryset=Subscription.objects.select_for_update()
+        )
         if not subscription.admin_confirmed:
             raise SubscriptionNotConfirmed(
                 "Only admin-confirmed subscriptions can be cancelled."
@@ -760,6 +767,9 @@ class SubscriptionService:
                 share_type_variation=share_type_variation,
             ).select_related("delivery_day")
         }
+        # A reused row skips save()'s defaulting: heal it, as
+        # Share.get_or_create_for_delivery does.
+        Share.heal_day_fields(existing_shares.values())
 
         delivery_day_stays_the_same = delivery_day.valid_until is None
 

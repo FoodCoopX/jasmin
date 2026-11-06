@@ -98,7 +98,7 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div>
-      <Title level={5} style={{ marginTop: 0 }}>
+      <Title level={5} className="mt-0">
         {t("profile.customer_data")}
       </Title>
 
@@ -146,7 +146,7 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
           <Form.Item
             name="city"
             label={t("profile.city")}
-            style={{ flex: 2 }}
+            className="profile-city-field"
           >
             <Input />
           </Form.Item>

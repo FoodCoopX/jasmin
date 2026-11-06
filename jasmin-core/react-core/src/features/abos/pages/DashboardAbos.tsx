@@ -37,7 +37,7 @@ interface PriceRow {
 export default function DashboardAbos() {
   const { t } = useTranslation();
   const { formatCurrency } = useCurrency();
-  const { dateFormat, formatDateForAPI } = useDateFormat();
+  const { dateFormat, shortMonthFormat, formatDateForAPI } = useDateFormat();
   const presets = useDateRangePresets();
   const { getSetting } = useTenant();
   const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
@@ -65,8 +65,14 @@ export default function DashboardAbos() {
 
   // One line per variation: active subscription quantity per month.
   const { data: chartData, series } = useMemo(
-    () => buildMonthlyActiveByVariation(subscriptions, variationLegendById, range),
-    [subscriptions, variationLegendById, range],
+    () =>
+      buildMonthlyActiveByVariation(
+        subscriptions,
+        variationLegendById,
+        range,
+        shortMonthFormat,
+      ),
+    [subscriptions, variationLegendById, range, shortMonthFormat],
   );
 
   // Billed income (sum of due amounts) per month, over the same range — the
@@ -87,12 +93,17 @@ export default function DashboardAbos() {
   // of the per-variation palette colours.
   const income = useMemo(
     () =>
-      buildMonthlyIncomeSeries(incomeData ?? [], range, {
-        id: "income",
-        label: t("statistics.income"),
-        color: "var(--color-chart-money)",
-      }),
-    [incomeData, range, t],
+      buildMonthlyIncomeSeries(
+        incomeData ?? [],
+        range,
+        {
+          id: "income",
+          label: t("statistics.income"),
+          color: "var(--color-chart-money)",
+        },
+        shortMonthFormat,
+      ),
+    [incomeData, range, t, shortMonthFormat],
   );
   // Solidarity: prices actually paid per variation for subs STARTED in range.
   const paidPricesByVariation = useMemo(() => {
@@ -176,9 +187,8 @@ export default function DashboardAbos() {
           allowClear={false}
         />
         <Card
-          className="dark-green-border"
+          className="dark-green-border mt-1em"
           title={t("statistics.chart_active_subscriptions_by_variation")}
-          style={{ marginTop: "1em" }}
         >
           <Text type="secondary">
             {t("statistics.chart_active_subscriptions_by_variation")}
@@ -193,26 +203,23 @@ export default function DashboardAbos() {
 
         {allowsSolidarity && (
           <Card
-            className="dark-green-border"
+            className="dark-green-border mt-1em"
             title={t("statistics.solidarity_title")}
-            style={{ marginTop: "1em" }}
           >
             <ReadOnlyReportTable<PriceRow>
               rowKey="id"
               pagination={false}
               columns={priceColumns}
               dataSource={priceRows}
-              style={{ width: "40%" }}
-              className="custom-jasmin-table"
+              className="custom-jasmin-table solidarity-price-table"
               emptyText={t("statistics.no_subscription_data")}
             />
           </Card>
         )}
 
         <Card
-          className="dark-green-border"
+          className="dark-green-border mt-1em"
           title={t("statistics.chart_income_by_month")}
-          style={{ marginTop: "1em" }}
         >
           <Text type="secondary">{t("statistics.chart_income_by_month")}</Text>
           <StatsAreaChart
@@ -223,7 +230,7 @@ export default function DashboardAbos() {
           />
           <Typography.Paragraph
             type="secondary"
-            style={{ marginTop: "0.75em", marginBottom: 0 }}
+            className="mb-0 income-chart-hint"
           >
             {t("statistics.income_hint")}
           </Typography.Paragraph>

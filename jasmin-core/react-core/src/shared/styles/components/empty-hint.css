@@ -1,0 +1,10 @@
+/* The "nothing here" line (EmptyHint). */
+.empty-hint {
+  padding: 12px 0;
+  text-align: center;
+}
+
+/* In place of a chart: as tall as a short one. */
+.empty-hint--chart {
+  padding: 2em 0;
+}

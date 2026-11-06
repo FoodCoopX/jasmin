@@ -130,7 +130,7 @@ export const ResellerInvoiceSettingsModal: FC<
     );
 
   const sectionTitle = (key: string) => (
-    <Title level={5} style={{ marginBottom: 8, marginTop: 16 }}>
+    <Title level={5} className="mt-16 mb-8">
       {t(key)}
     </Title>
   );
@@ -152,7 +152,7 @@ export const ResellerInvoiceSettingsModal: FC<
         </Space>
       }
       description={
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+        <Paragraph type="secondary" className="mb-0">
           {t("resellers.invoice_settings_intro")}
         </Paragraph>
       }
@@ -206,7 +206,7 @@ export const ResellerInvoiceSettingsModal: FC<
         </Col>
       </Row>
 
-      <Divider style={{ margin: "8px 0 0" }} />
+      <Divider className="mt-8 mb-0" />
 
       {sectionTitle("resellers.invoice_section_address")}
       <Form.Item name="invoice_name" label={t("resellers.invoice_name")}>
@@ -231,7 +231,7 @@ export const ResellerInvoiceSettingsModal: FC<
         </Col>
       </Row>
 
-      <Divider style={{ margin: "8px 0 0" }} />
+      <Divider className="mt-8 mb-0" />
 
       {sectionTitle("resellers.invoice_section_delivery")}
       <Row gutter={12} align="middle">
@@ -260,7 +260,7 @@ export const ResellerInvoiceSettingsModal: FC<
         </Col>
       </Row>
 
-      <Divider style={{ margin: "8px 0 0" }} />
+      <Divider className="mt-8 mb-0" />
 
       {sectionTitle("resellers.invoice_section_payment")}
       <Row gutter={12}>

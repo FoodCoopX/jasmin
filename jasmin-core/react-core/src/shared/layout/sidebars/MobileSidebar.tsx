@@ -108,21 +108,11 @@ export default function MobileSidebar() {
         role="button"
         tabIndex={0}
         aria-label={t("nav.open_menu")}
-        style={{
-          position: "fixed",
-          top: "10px",
-          left: "10px",
-          zIndex: 1000,
-          cursor: "pointer",
-          padding: "4px",
-          backgroundColor: "var(--color-bg-base)",
-          borderRadius: "4px",
-          boxShadow: "0 2px 8px var(--color-shadow)",
-        }}
+        className="mobile-sidebar-trigger"
         onClick={() => setVisible(true)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVisible(true); } }}
       >
-        <MenuOutlined style={{ fontSize: "30px" }} />
+        <MenuOutlined className="mobile-sidebar-trigger-icon" />
       </div>
 
       {/* Sidebar drawer */}

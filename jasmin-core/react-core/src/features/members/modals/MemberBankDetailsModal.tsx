@@ -122,7 +122,7 @@ export default function MemberBankDetailsModal({
       width={560}
     >
       <Space direction="vertical" size="middle" className="w-full">
-        <Text type="secondary" style={{ fontSize: 12 }}>
+        <Text type="secondary" className="text-12">
           {t("members.edit_bank_details_intro")}
         </Text>
         <Form form={form} layout="vertical">

@@ -203,7 +203,7 @@ const MemberDetail = () => {
   // "not found" screen is reserved for a genuine 404 (not a loading flash).
   if (memberLoading) {
     return (
-      <div className="flex-center" style={{ minHeight: "60vh" }}>
+      <div className="flex-center member-detail-placeholder">
         <Spin size="large" />
       </div>
     );
@@ -211,15 +211,8 @@ const MemberDetail = () => {
 
   if (!member) {
     return (
-      <div
-        className="flex-center"
-        style={{
-          minHeight: "60vh",
-          flexDirection: "column",
-          gap: "16px",
-        }}
-      >
-        <Text type="secondary" style={{ fontSize: "18px" }}>
+      <div className="flex-center flex-col gap-16 member-detail-placeholder">
+        <Text type="secondary" className="text-18">
           {t("members.member_not_found")}
         </Text>
         <Button type="primary" onClick={() => window.history.back()}>
@@ -244,21 +237,11 @@ const MemberDetail = () => {
   // error screen. Falls back gracefully when the tenant has no logo
   // configured (the <img> simply doesn't render).
   const gateLogo = logoUrl ? (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        marginBottom: 16,
-      }}
-    >
+    <div className="flex-row justify-center mb-16">
       <img
         src={logoUrl}
         alt={tenantName ?? t("common.logo")}
-        style={{
-          maxHeight: 80,
-          maxWidth: 200,
-          objectFit: "contain",
-        }}
+        className="member-application-gate__logo"
       />
     </div>
   ) : null;
@@ -276,14 +259,7 @@ const MemberDetail = () => {
   const bilingual = (deKey: string, enFallback?: string) => (
     <>
       <div>{t(deKey, { lng: "de" })}</div>
-      <div
-        style={{
-          marginTop: 4,
-          fontSize: "0.85em",
-          color: "var(--color-text-muted)",
-          fontStyle: "italic",
-        }}
-      >
+      <div className="mt-4 text-secondary text-italic">
         {t(deKey, { lng: "en", defaultValue: enFallback })}
       </div>
     </>
@@ -291,7 +267,7 @@ const MemberDetail = () => {
 
   if (selfService && member.admin_rejected_at) {
     return (
-      <div style={{ padding: "24px", maxWidth: 720, margin: "0 auto" }}>
+      <div className="member-application-gate">
         {gateLogo}
         <Result
           status="error"
@@ -305,14 +281,7 @@ const MemberDetail = () => {
               <>
                 {t("members.reject_reason_label", { lng: "de" })}:{" "}
                 {member.admin_rejection_reason}
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontSize: "0.85em",
-                    color: "var(--color-text-muted)",
-                    fontStyle: "italic",
-                  }}
-                >
+                <div className="mt-4 text-secondary text-italic">
                   {t("members.reject_reason_label", {
                     lng: "en",
                     defaultValue: "Reason",
@@ -334,7 +303,7 @@ const MemberDetail = () => {
 
   if (selfService && !member.admin_confirmed) {
     return (
-      <div style={{ padding: "24px", maxWidth: 720, margin: "0 auto" }}>
+      <div className="member-application-gate">
         {gateLogo}
         <Result
           status="info"
@@ -357,7 +326,7 @@ const MemberDetail = () => {
   }
 
   return (
-    <div style={{ padding: "24px", maxWidth: "1400px", margin: "0 auto" }}>
+    <div className="member-detail-page">
       {/* Header Section */}
       <Card
         className="profile-header-card"
@@ -431,11 +400,11 @@ const MemberDetail = () => {
               while active subscriptions remain (the office can force-cancel
               from the members table instead). */}
           {selfService && member.admin_confirmed && !member.cancelled_at && (
-            <Card style={{ marginTop: 16 }}>
+            <Card className="mt-16">
               <Text type="secondary">
                 {t("members.cancel_membership_self_hint")}
               </Text>
-              <div style={{ marginTop: 12 }}>
+              <div className="mt-12">
                 <Button
                   danger
                   icon={<StopOutlined />}

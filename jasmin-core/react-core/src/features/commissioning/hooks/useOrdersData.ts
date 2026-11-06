@@ -289,8 +289,8 @@ export function useOrdersData() {
 
   // `data` mixes real OrderContent rows with placeholder rows for offers
   // that don't yet have an OrderContent. Each row carries an explicit
-  // `is_placeholder` flag (see `_serialize_unused_offer` in
-  // order_content_service.py). We need the freshest array inside the api
+  // `is_placeholder` flag (see `serialize_unused_offer` in
+  // order_content_rows.py). We need the freshest array inside the api
   // closures to look records up; a ref avoids re-creating apiFunctions on
   // every data change (which would invalidate EditableTable's initialData).
   const dataRef = useRef(data);

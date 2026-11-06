@@ -101,7 +101,7 @@ export default function StepYourDetails({ data, update, next, back }: StepProps)
           <Form.Item
             name="zip_code"
             label={t("auth.registration.details.zip_code")}
-            style={{ width: 140 }}
+            className="registration-zip-code"
           >
             <Input autoComplete="postal-code" />
           </Form.Item>

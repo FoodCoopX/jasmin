@@ -59,3 +59,30 @@
   font-weight: 400;
   color: var(--color-text-muted);
 }
+
+/* A subscription tile's per-variation breakdown: one row per variation, its
+   colour dot and name on the left (the name cut with an ellipsis), its count
+   on the right. */
+.summary-stats-card__breakdown {
+  margin-top: 6px;
+}
+
+.summary-stats-card__breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+.summary-stats-card__breakdown-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.summary-stats-card__breakdown-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

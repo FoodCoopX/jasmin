@@ -21,11 +21,11 @@ from .mixin import (
     CreatedMixin,
     PayableMixin,
     TimeBoundMixin,
-    WaitingListMixin,
     nullable_date_order_constraint,
     time_bound_valid_range_constraint,
     validate_nullable_date_order,
 )
+from .waiting_list import WaitingListMixin
 
 
 class Member(

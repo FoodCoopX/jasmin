@@ -140,9 +140,10 @@ export function buildMonthlyActiveByVariation(
   subscriptions: SubRow[] | undefined,
   variationLegendById: Map<string, VariationLegendEntry>,
   range: [Dayjs, Dayjs] | null,
+  labelFormat: string,
 ) {
   const rows = subscriptions ?? [];
-  const { months, labelOf } = buildMonthAxis(range);
+  const { months, labelOf } = buildMonthAxis(range, labelFormat);
 
   // Eligible = confirmed, not cancelled, not waiting, and actually started.
   const eligible = rows.filter(

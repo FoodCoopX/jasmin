@@ -21,8 +21,9 @@ export function buildMonthlyIncomeSeries(
   points: MonthlyIncomePoint[] | undefined,
   range: [Dayjs, Dayjs] | null,
   series: StatsAreaSeries,
+  labelFormat: string,
 ): { data: Array<Record<string, number | string>>; series: StatsAreaSeries[] } {
-  const { months, labelOf } = buildMonthAxis(range);
+  const { months, labelOf } = buildMonthAxis(range, labelFormat);
 
   const byMonth = new Map<string, number>();
   for (const p of points ?? []) {

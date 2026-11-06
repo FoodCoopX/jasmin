@@ -32,14 +32,7 @@ function SuperAdminRoutes() {
 
   if (bootstrapping) {
     return (
-      <div
-        className="flex-center"
-        style={{
-          height: "100vh",
-          fontSize: "18px",
-          color: "var(--color-text-secondary)",
-        }}
-      >
+      <div className="flex-center h-screen text-18 color-text-secondary">
         <div>Loading Platform...</div>
       </div>
     );

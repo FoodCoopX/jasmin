@@ -210,13 +210,13 @@ export default function DebitsAbos() {
     <div>
       <h1>{t("abos.debits")}</h1>
 
-      <div style={{ margin: "16px 0" }}>
+      <div className="mt-16 mb-16">
         <YearSelector
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
         />
       </div>
-      <div style={{ marginBottom: "2em", marginTop: "2em" }}>
+      <div className="mt-2em mb-2em">
         <Button type="primary" onClick={() => setCreateOpen(true)}>
           {t("abos.debits_create_run")}
         </Button>

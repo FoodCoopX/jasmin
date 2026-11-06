@@ -25,3 +25,9 @@
 .delivery-station-fees__table {
   width: 50%;
 }
+
+/* A station's picture in the member's delivery station modal. */
+.delivery-station-picture {
+  max-height: 200px;
+  object-fit: cover;
+}

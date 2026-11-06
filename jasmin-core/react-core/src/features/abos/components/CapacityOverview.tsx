@@ -251,17 +251,15 @@ export function CapacityOverview({
 
   return (
     <Collapse
-      style={{ borderColor: "var(--color-primary)" }}
+      className="dark-green-border"
       items={[
         {
           key: "capacities",
           label: `${t("abos.capacities_overview")} (${rangeLabel})`,
           children: (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="flex-col gap-16">
               <DatePicker.RangePicker
-                // Size to content instead of stretching to the full panel
-                // width in the flex column.
-                style={{ alignSelf: "flex-start" }}
+                className="capacity-overview-range"
                 value={range}
                 onChange={(dates) => {
                   if (dates && dates[0] && dates[1]) {

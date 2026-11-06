@@ -8,3 +8,25 @@
   padding: 8px 12px;
   margin-bottom: 8px;
 }
+
+/* A ticket in the support drawer's list: a full-width text button. Doubled
+   with .ant-btn so it outranks AntD's own button height, padding and
+   alignment. */
+.ant-btn.support-ticket-button {
+  height: auto;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+/* The ticket's subject and date beside its status tag; a long subject is cut
+   off. */
+.support-ticket-summary {
+  display: block;
+  overflow: hidden;
+}
+
+/* The link back to the ticket list, flush with the drawer's edge. Doubled
+   with .ant-btn so it outranks AntD's own button padding. */
+.ant-btn.support-back-button {
+  padding-left: 0;
+}

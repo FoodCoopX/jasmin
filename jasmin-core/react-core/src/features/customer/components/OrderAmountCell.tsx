@@ -68,7 +68,7 @@ export default function OrderAmountCell({
         }
         onPressEnter={onSubmit}
         disabled={saving}
-        style={{ width: "80px" }}
+        className="order-amount-input"
         suffix={t("commissioning.pu")}
         aria-label={t("customer.order_amount")}
       />

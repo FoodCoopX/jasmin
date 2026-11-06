@@ -133,12 +133,7 @@ const LoginPage = () => {
 
   if (tenantLoading) {
     return (
-      <div
-        className="flex-center"
-        style={{
-          height: "100vh",
-        }}
-      >
+      <div className="flex-center h-screen">
         <div>{t("auth.login_card.loading_tenant")}</div>
       </div>
     );
@@ -175,10 +170,10 @@ const LoginPage = () => {
                 // prop yet (React 19); lowercase passes through as a plain
                 // HTML attribute.
                 {...({ fetchpriority: "high" } as Record<string, string>)}
-                style={{ height: "75px", width: "auto", objectFit: "contain" }}
+                className="auth-banner-logo"
               />
             ) : (
-              <Title level={3} style={{ margin: 0 }}>
+              <Title level={3} className="m-0">
                 {tenant?.name}
               </Title>
             )}
@@ -278,14 +273,8 @@ const LoginPage = () => {
                     />
                   </Form.Item>
 
-                  <div
-                    style={{
-                      textAlign: "right",
-                      marginTop: -12,
-                      marginBottom: 12,
-                    }}
-                  >
-                    <Link to="/forgot-password" style={{ fontSize: 13 }}>
+                  <div className="auth-forgot-password">
+                    <Link to="/forgot-password" className="text-13">
                       {t("auth.login_card.forgot_password")}
                     </Link>
                   </div>
@@ -319,13 +308,13 @@ const LoginPage = () => {
                   size="large"
                 >
                   <Text strong>{t("auth.two_factor.prompt_title")}</Text>
-                  <Text type="secondary" style={{ display: "block" }}>
+                  <Text type="secondary" className="d-block">
                     {t("auth.two_factor.prompt_subtitle")}
                   </Text>
                   <Form.Item
                     name="code"
                     label={t("auth.two_factor.code_label")}
-                    style={{ marginTop: 16 }}
+                    className="mt-16"
                     rules={[
                       {
                         required: true,
@@ -342,10 +331,10 @@ const LoginPage = () => {
                       maxLength={20}
                     />
                   </Form.Item>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
+                  <Text type="secondary" className="text-12">
                     {t("auth.two_factor.recovery_hint")}
                   </Text>
-                  <Form.Item style={{ marginTop: 16 }}>
+                  <Form.Item className="mt-16">
                     <Button
                       type="primary"
                       htmlType="submit"
@@ -442,18 +431,18 @@ const LoginPage = () => {
           styles={{ body: { padding: "12px 24px" } }}
         >
           {tenant && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" className="text-12">
               {isSuperAdminDomain
                 ? t("auth.login_card.super_admin_portal")
                 : tenant.name}
             </Text>
           )}
-          <div style={{ marginTop: 4 }}>
+          <div className="mt-4">
             <Space split={<Text type="secondary">·</Text>} wrap>
-              <Link to="/privacy-policy" style={{ fontSize: 12 }}>
+              <Link to="/privacy-policy" className="text-12">
                 {t("privacy.title")}
               </Link>
-              <Link to="/impressum" style={{ fontSize: 12 }}>
+              <Link to="/impressum" className="text-12">
                 {t("impressum.link")}
               </Link>
               <Text
@@ -467,11 +456,7 @@ const LoginPage = () => {
                     setAboutOpen(true);
                   }
                 }}
-                style={{
-                  fontSize: 12,
-                  cursor: "pointer",
-                  color: "var(--color-primary)",
-                }}
+                className="text-12 cursor-pointer color-primary"
               >
                 2026 created by Chance
               </Text>

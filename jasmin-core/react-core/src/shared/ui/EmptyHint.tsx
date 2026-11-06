@@ -1,13 +1,13 @@
 import { Typography } from "antd";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 const { Text } = Typography;
 
 interface EmptyHintProps {
   /** Already-translated placeholder message. */
   children: ReactNode;
-  /** Extra styles merged onto the wrapper (e.g. taller padding for charts). */
-  style?: CSSProperties;
+  /** Taller, for the space a chart would fill. */
+  chart?: boolean;
 }
 
 /**
@@ -15,9 +15,9 @@ interface EmptyHintProps {
  * Deliberately icon-less: the replacement for AntD's `<Empty>`, whose large
  * illustration is too heavy for inline "nothing here yet" states.
  */
-export default function EmptyHint({ children, style }: EmptyHintProps) {
+export default function EmptyHint({ children, chart = false }: EmptyHintProps) {
   return (
-    <div style={{ padding: "12px 0", textAlign: "center", ...style }}>
+    <div className={chart ? "empty-hint empty-hint--chart" : "empty-hint"}>
       <Text type="secondary">{children}</Text>
     </div>
   );

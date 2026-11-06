@@ -21,6 +21,8 @@ vi.mock("react-i18next", () => ({
 vi.mock("react-quill-new", () => ({
   default: () => <textarea aria-label="body" />,
 }));
+// The textarea stands in for Quill, so there is no clipboard to register.
+vi.mock("@shared/quill/SanitizingClipboard", () => ({}));
 
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   useCommissioningConsentDocumentsCreate: () => ({

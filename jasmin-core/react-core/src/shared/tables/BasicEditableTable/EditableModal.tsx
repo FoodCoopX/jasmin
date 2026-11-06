@@ -284,18 +284,7 @@ const EditableModal = <T extends TableRecord = TableRecord>({
           .map((column) => {
             if (column.type === "section-header") {
               return (
-                <div
-                  key={column.key}
-                  style={{
-                    marginTop: "24px",
-                    marginBottom: "12px",
-                    paddingBottom: "8px",
-                    borderBottom: "1px solid var(--color-border)",
-                    fontWeight: "600",
-                    fontSize: "14px",
-                    color: "var(--color-text-primary)",
-                  }}
-                >
+                <div key={column.key} className="editable-modal-section-header">
                   {column.title}
                 </div>
               );
@@ -307,24 +296,16 @@ const EditableModal = <T extends TableRecord = TableRecord>({
               column.inputType === "switch"
             ) {
               return (
-                <div
-                  key={column.dataIndex}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    marginBottom: "2px",
-                  }}
-                >
+                <div key={column.dataIndex} className="editable-modal-boolean-row">
                   <Form.Item
                     name={column.dataIndex}
                     rules={getFormRules(column)}
                     valuePropName={getFormItemProps(column).valuePropName}
-                    style={{ margin: 0 }}
+                    className="m-0"
                   >
                     {renderFormInput(column)}
                   </Form.Item>
-                  <span style={{ whiteSpace: "nowrap" }}>{column.title}</span>
+                  <span className="text-nowrap">{column.title}</span>
                 </div>
               );
             }

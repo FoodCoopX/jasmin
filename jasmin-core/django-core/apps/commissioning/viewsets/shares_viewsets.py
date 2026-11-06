@@ -629,7 +629,7 @@ class _ShareDeliveryWriteChoreographyMixin:
         Share, creating it the first time a delivery lands on that day."""
         if share.delivery_day_id == target_delivery_day.id:
             return share
-        new_share, _ = Share.objects.get_or_create(
+        new_share, _ = Share.get_or_create_for_delivery(
             year=share.year,
             delivery_week=share.delivery_week,
             delivery_day=target_delivery_day,

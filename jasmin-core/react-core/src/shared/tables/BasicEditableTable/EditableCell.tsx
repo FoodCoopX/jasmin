@@ -342,8 +342,7 @@ const EditingCell = <T extends TableRecord = TableRecord>({
     >
       <Form.Item
         name={dataIndex}
-        className="editable-cell-form-item"
-        style={{ margin: 0 }}
+        className="editable-cell-form-item m-0"
         validateStatus={errorMessage ? "error" : "success"}
         valuePropName={valuePropName}
         getValueFromEvent={getValueFromEvent}

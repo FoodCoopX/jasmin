@@ -88,17 +88,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children;
 
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--color-page-bg)",
-          padding: 16,
-        }}
-      >
-        <Card style={{ maxWidth: 560, width: "100%" }}>
+      <div className="error-boundary-page">
+        <Card className="error-boundary-card">
           <Result
             status="warning"
             title={i18n.t("errors.boundary.title")}
@@ -125,7 +116,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             // the error tracker either way.
             <Paragraph
               type="secondary"
-              style={{ marginTop: 16, fontSize: 12, wordBreak: "break-word" }}
+              className="error-boundary-details mt-16 text-12"
             >
               <strong>{i18n.t("errors.boundary.details")}</strong>{" "}
               {this.state.error.message}

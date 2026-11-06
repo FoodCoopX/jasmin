@@ -51,3 +51,11 @@
   text-align: center;
   color: var(--color-text-tertiary);
 }
+
+/* The banner that says the browser is offline, kept in view while the page
+   scrolls. Doubled with .ant-alert so it outranks AntD's own position. */
+.ant-alert.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+}

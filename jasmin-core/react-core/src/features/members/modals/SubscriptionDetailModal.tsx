@@ -116,7 +116,7 @@ export default function SubscriptionDetailModal({
             <Alert
               type="info"
               showIcon
-              style={{ marginTop: 12 }}
+              className="mt-12"
               message={t("members.optin_required")}
             />
           )}

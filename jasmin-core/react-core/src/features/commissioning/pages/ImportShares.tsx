@@ -233,7 +233,7 @@ export default function ImportShares() {
       <Card
         size="small"
         title={`${title} (${rows.length})`}
-        style={{ marginTop: 12 }}
+        className="mt-12"
       >
         <ReadOnlyReportTable
           rowKey={(r) => `${r.variation_id}|${r.delivery_station_day_id}`}
@@ -281,7 +281,7 @@ export default function ImportShares() {
         type="primary"
         loading={busy}
         onClick={handleUpload}
-        style={{ marginTop: 12 }}
+        className="mt-12"
         disabled={fileList.length === 0 || !selectedWeek}
       >
         {t("import_shares.upload_btn")}
@@ -300,7 +300,7 @@ export default function ImportShares() {
               </Tag>
             </Space>
           }
-          style={{ marginTop: 16 }}
+          className="mt-16"
           extra={
             <Space>
               <Button
@@ -338,7 +338,7 @@ export default function ImportShares() {
               message={t("import_shares.has_errors", {
                 n: activeBatch.error_count,
               })}
-              style={{ marginBottom: 12 }}
+              className="mb-12"
             />
           )}
 
@@ -372,7 +372,7 @@ export default function ImportShares() {
                 u: activeBatch.diff_report.totals.updated,
                 r: activeBatch.diff_report.totals.removed,
               })}
-              style={{ marginTop: 12 }}
+              className="mt-12"
             />
           )}
           {diffSection(
@@ -390,7 +390,7 @@ export default function ImportShares() {
         </Card>
       )}
 
-      <Card title={t("import_shares.history")} style={{ marginTop: 16 }}>
+      <Card title={t("import_shares.history")} className="mt-16">
         <Spin spinning={loading}>
           <ReadOnlyReportTable
             rowKey="id"
@@ -453,32 +453,23 @@ export default function ImportShares() {
 
           <div>
             <strong>{t("import_shares.explainer.csv_heading")}</strong>
-            <div style={{ marginTop: 4 }}>
+            <div className="mt-4">
               {t("import_shares.explainer.csv_intro")}
             </div>
-            <div style={{ marginTop: 4 }}>
+            <div className="mt-4">
               <strong>{t("import_shares.explainer.csv_required")}:</strong>{" "}
               <code>year</code>, <code>delivery_week</code>,{" "}
               <code>delivery_station_code</code>, <code>delivery_day_code</code>
               , <code>variation_code</code>, <code>quantity</code>
             </div>
-            <div style={{ marginTop: 4 }}>
+            <div className="mt-4">
               <strong>{t("import_shares.explainer.csv_optional")}:</strong>{" "}
               <code>external_ref</code>, <code>note</code>
             </div>
-            <div style={{ marginTop: 8, fontWeight: 500 }}>
+            <div className="mt-8 font-medium">
               {t("import_shares.explainer.csv_example")}:
             </div>
-            <pre
-              style={{
-                background: "var(--color-bg-subtle)",
-                padding: 8,
-                marginTop: 4,
-                marginBottom: 8,
-                fontSize: 12,
-                overflowX: "auto",
-              }}
-            >
+            <pre className="import-shares__csv-example">
               {`year,delivery_week,delivery_station_code,delivery_day_code,variation_code,quantity
 ${selectedYear},${selectedWeek ?? 14},STN-001,WED,VEG-S,12
 ${selectedYear},${selectedWeek ?? 14},STN-001,WED,VEG-M,18
@@ -491,7 +482,7 @@ ${selectedYear},${selectedWeek ?? 14},STN-002,THU,VEG-L,7`}
               <Button
                 type="link"
                 onClick={() => setMappingsOpen(true)}
-                style={{ padding: 0, height: "auto" }}
+                className="import-shares__codes-link"
               >
                 {t("import_shares.explainer.csv_codes_link")}
               </Button>

@@ -101,16 +101,7 @@ function DeliveryWeeksTimeline({ record }: { record: TableRecord }) {
   const padding = 4;
 
   return (
-    <div
-      style={{
-        position: "relative",
-        height: "10px",
-        backgroundColor: "var(--color-bg-hover)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "2px",
-        margin: "0 auto",
-      }}
-    >
+    <div className="delivery-weeks-timeline">
       {actualWeeks.map((week) => {
         const position = (week - 1) * weekWidth + padding / 2;
         return (
@@ -708,7 +699,7 @@ export default function PlanningShareContentLongTermBase({
         selectedYear={selectedYear}
         setSelectedYear={setSelectedYear}
       />
-      <div style={{ marginTop: "2em" }}>
+      <div className="mt-2em">
         {allowTotalMode && (
           <Space.Compact
             aria-label={t("commissioning.planning_long_term.mode_label")}

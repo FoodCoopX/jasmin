@@ -16,7 +16,7 @@ const { Text } = Typography;
 
 export default function DashboardMembers() {
   const { t } = useTranslation();
-  const { dateFormat } = useDateFormat();
+  const { dateFormat, shortMonthFormat } = useDateFormat();
   const presets = useDateRangePresets();
 
   // Default window: the tenant's current fiscal year (1st of
@@ -37,7 +37,7 @@ export default function DashboardMembers() {
     // Continuous monthly buckets across the window, ALWAYS spanning at least
     // one year (12 months) ending at the range end. total_members is cumulative,
     // so months without a data point carry the previous total forward.
-    const { months, labelOf } = buildMonthAxis(range);
+    const { months, labelOf } = buildMonthAxis(range, shortMonthFormat);
     const windowStartMs = months[0]?.valueOf() ?? dayjs().valueOf();
 
     const byMonth = new Map(raw.map((r) => [r.ms, r.total]));
@@ -55,7 +55,7 @@ export default function DashboardMembers() {
       out.push({ label: labelOf(month), members: running });
     }
     return out;
-  }, [growth, range]);
+  }, [growth, range, shortMonthFormat]);
 
   const series: StatsAreaSeries[] = [
     {
@@ -77,9 +77,8 @@ export default function DashboardMembers() {
           allowClear={false}
         />
         <Card
-          className="dark-green-border"
+          className="dark-green-border mt-1em"
           title={t("statistics.chart_members_over_time")}
-          style={{ marginTop: "1em" }}
         >
           <StatsAreaChart
             data={growthSeries}

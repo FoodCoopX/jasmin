@@ -1,0 +1,23 @@
+/* RichTextEditorModal's body: the validation warnings, the length counters
+   and the Quill editor. */
+.rich-text-editor-body {
+  min-height: 300px;
+}
+
+/* Doubled with .ant-alert so it outranks AntD's own alert and banner padding,
+   margin and radius. */
+.ant-alert.rich-text-editor-warnings {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.rich-text-editor-counter {
+  margin-right: 16px;
+}
+
+.rich-text-editor-quill {
+  height: 250px;
+  margin-bottom: 50px;
+}

@@ -121,14 +121,14 @@ export default function EmailLog() {
   return (
     <div>
       <h1>{t("members.title_email_log")}</h1>
-      <div className="filter-bar" style={{ marginBottom: "2em" }}>
+      <div className="filter-bar mb-2em">
         <Input
           placeholder={t("email_matrix.recipient")}
           aria-label={t("email_matrix.recipient")}
           value={recipientFilter}
           onChange={(e) => setRecipientFilter(e.target.value)}
           allowClear
-          style={{ width: 220 }}
+          className="email-log-recipient-filter"
         />
         <Select
           placeholder={t("email_matrix.purpose")}
@@ -136,7 +136,7 @@ export default function EmailLog() {
           value={purposeFilter}
           onChange={setPurposeFilter}
           allowClear
-          style={{ width: 220 }}
+          className="email-log-purpose-filter"
           options={purposeOptions}
         />
         <Select
@@ -145,7 +145,7 @@ export default function EmailLog() {
           value={statusFilter}
           onChange={setStatusFilter}
           allowClear
-          style={{ width: 160 }}
+          className="email-log-status-filter"
           options={ALL_STATUSES.map((s) => ({
             value: s,
             label: t(`email_matrix.status.${s}`),

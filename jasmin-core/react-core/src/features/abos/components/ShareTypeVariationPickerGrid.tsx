@@ -71,8 +71,8 @@ export default function ShareTypeVariationPickerGrid({
   return (
     <div>
       {variationsByType.map((group) => (
-        <div key={group.typeName} style={{ marginBottom: 24 }}>
-          <Title level={5} style={{ marginBottom: 12 }}>
+        <div key={group.typeName} className="mb-24">
+          <Title level={5} className="mb-12">
             {group.typeName}
           </Title>
           <Row gutter={[12, 12]}>
@@ -129,19 +129,19 @@ export default function ShareTypeVariationPickerGrid({
                           </div>
                         )}
                         <div className="flex-min">
-                          <Text strong style={{ fontSize: 14 }}>
+                          <Text strong className="text-14">
                             {getShareTypeVariationSizeLabel(variation.size)}
                           </Text>
                           {variation.active_price_per_delivery && (
                             <div>
-                              <Text type="secondary" style={{ fontSize: 13 }}>
+                              <Text type="secondary" className="text-13">
                                 {variation.active_price_per_delivery}{" "}
                                 {currencySymbol} / {t("abos.delivery")}
                               </Text>
                             </div>
                           )}
                           {soldOut && (
-                            <div style={{ marginTop: 4 }}>
+                            <div className="mt-4">
                               <Tag color="red">{t("abos.sold_out")}</Tag>
                             </div>
                           )}

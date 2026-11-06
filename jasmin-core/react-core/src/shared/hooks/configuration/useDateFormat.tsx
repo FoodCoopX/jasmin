@@ -23,6 +23,10 @@ export const useDateFormat = () => {
       .replace(/Y+/g, "")
       .replace(/^[\s./-]+/, "")
       .replace(/[\s/-]+$/, "") || dateFormat;
+  // Months read the same whatever the tenant's date format: in full where
+  // there is room, short on a chart axis. The names follow the UI language.
+  const monthFormat = "MMMM YYYY";
+  const shortMonthFormat = "MMM 'YY";
 
   const formatDate = useCallback(
     (value: ConfigType, customFormat: string | null = null) => {
@@ -64,6 +68,8 @@ export const useDateFormat = () => {
   return {
     dateFormat,
     mobileDateFormat,
+    monthFormat,
+    shortMonthFormat,
     formatDate,
     formatDateWithFallback,
     formatDateForAPI,

@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
+import "@shared/quill/SanitizingClipboard";
 
 import type {
   PatchedEmailTemplateUpdate,
@@ -264,7 +265,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
         <Row gutter={16}>
           <Col span={16}>
             <Space direction="vertical" size="middle" className="w-full">
-              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              <Paragraph type="secondary" className="mb-0">
                 {localizedDescription}
               </Paragraph>
 
@@ -291,7 +292,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                   onFocus={() => setActiveField("body_html")}
                   modules={QUILL_MODULES}
                   formats={QUILL_FORMATS}
-                  style={{ background: "var(--color-bg-base)", marginTop: 4 }}
+                  className="bg-base mt-4"
                 />
               </div>
 
@@ -312,15 +313,12 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                         size="small"
                         className="w-full"
                       >
-                        <Paragraph
-                          type="secondary"
-                          style={{ marginBottom: 4, fontSize: 12 }}
-                        >
+                        <Paragraph type="secondary" className="mb-4 text-12">
                           {t("email_templates.default_reference_help")}
                         </Paragraph>
 
                         <div className="email-tpl-default-subject">
-                          <Text type="secondary" style={{ fontSize: 12 }}>
+                          <Text type="secondary" className="text-12">
                             {t("email_templates.subject")}
                           </Text>
                           <ReactQuill
@@ -333,7 +331,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                         </div>
 
                         <div className="email-tpl-default-body">
-                          <Text type="secondary" style={{ fontSize: 12 }}>
+                          <Text type="secondary" className="text-12">
                             {t("email_templates.body")}
                           </Text>
                           <ReactQuill
@@ -342,10 +340,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                             readOnly
                             modules={{ toolbar: false }}
                             formats={QUILL_FORMATS}
-                            style={{
-                              background: "var(--color-bg-elevated)",
-                              marginTop: 4,
-                            }}
+                            className="email-tpl-default-body-editor mt-4"
                           />
                         </div>
                       </Space>
@@ -359,7 +354,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                   placeholder={t("email_templates.test_recipient")}
                   value={testRecipient}
                   onChange={(e) => setTestRecipient(e.target.value)}
-                  style={{ width: 280 }}
+                  className="email-tpl-test-recipient"
                 />
                 <Button
                   icon={<SendOutlined />}
@@ -380,10 +375,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
 
           <Col span={8}>
             <Card size="small" title={t("email_templates.variables")}>
-              <Paragraph
-                type="secondary"
-                style={{ marginBottom: 8, fontSize: 12 }}
-              >
+              <Paragraph type="secondary" className="mb-8 text-12">
                 {t("email_templates.variables_help")}
               </Paragraph>
               <Space wrap size={[6, 6]}>
@@ -394,15 +386,13 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                       <span>
                         {v.description}
                         {v.description ? <br /> : null}
-                        <code
-                          style={{ fontSize: 11 }}
-                        >{`{{ ${v.name} }}`}</code>
+                        <code className="text-11">{`{{ ${v.name} }}`}</code>
                       </span>
                     }
                   >
                     <Tag
                       color="geekblue"
-                      style={{ cursor: "pointer", userSelect: "none" }}
+                      className="email-tpl-var-tag"
                       onClick={() => insertVariable(v.name, v.label)}
                     >
                       {v.label}

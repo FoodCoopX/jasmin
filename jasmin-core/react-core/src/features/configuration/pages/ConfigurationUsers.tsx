@@ -102,7 +102,7 @@ const UsersSection = memo(function UsersSection({
   // UserRow already intersects TableRecord, so this is a plain widening.
   const data = useMemo<TableRecord[]>(() => rows, [rows]);
   return (
-    <div style={{ marginBottom: 32 }}>
+    <div className="users-section">
       <h4>
         {t(titleKey)} ({rows.length})
       </h4>
@@ -451,7 +451,7 @@ export default function ConfigurationUsers() {
   return (
     <div>
       <h1>{t("users.title")}</h1>
-      <div style={{ marginBottom: "2em", marginTop: "2em" }}>
+      <div className="mt-2em mb-2em">
         {smtpConfigured === false && (
           <PastWarningMessage width="100%" className="mb-1em">
             {t("users.smtp_missing_warning")}{" "}

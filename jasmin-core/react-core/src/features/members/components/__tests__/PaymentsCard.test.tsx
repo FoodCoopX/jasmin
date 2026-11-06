@@ -36,6 +36,7 @@ vi.mock("@hooks/index", () => ({
   useDateFormat: () => ({
     dateFormat: "DD.MM.YYYY",
     mobileDateFormat: "DD.MM.",
+    monthFormat: "MMMM YYYY",
     formatDate: (v: unknown) =>
       v == null || v === ""
         ? null

@@ -121,7 +121,7 @@ export default function PendingDeletionsTable({
           ) : (
             <Space direction="vertical" size={2}>
               {blockers.map((reason, i) => (
-                <Tag key={i} color="orange" style={{ whiteSpace: "normal" }}>
+                <Tag key={i} color="orange" className="deletion-blocker-tag">
                   {reason}
                 </Tag>
               ))}
@@ -164,7 +164,7 @@ export default function PendingDeletionsTable({
 
   return (
     <div>
-      <div className="flex-between" style={{ marginBottom: "0.5em" }}>
+      <div className="flex-between deletions-table-header">
         <h3>
           <Space>
             {t("gdpr.pending_deletions")}

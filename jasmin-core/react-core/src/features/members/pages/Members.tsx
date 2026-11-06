@@ -329,13 +329,7 @@ export default function Members() {
         render: (value: unknown, record: MemberRecord) => {
           const display =
             record.is_trial && !value ? (
-              <span
-                style={{
-                  fontSize: "0.85em",
-                  color: "var(--color-text-muted)",
-                  fontStyle: "italic",
-                }}
-              >
+              <span className="text-secondary text-italic">
                 {t("commissioning.trial_member")}
               </span>
             ) : (

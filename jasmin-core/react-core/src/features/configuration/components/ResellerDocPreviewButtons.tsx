@@ -371,11 +371,10 @@ export default function ResellerDocPreviewButtons({
   return (
     <Card
       title={t("settings.reseller.preview.title")}
-      style={{ width: "100%", maxWidth: 900 }}
       styles={{ body: { padding: "16px" } }}
-      className="settings-card-header"
+      className="settings-card-header reseller-doc-preview-card"
     >
-      <Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
+      <Text type="secondary" className="d-block mb-12">
         {t("settings.reseller.preview.description")}
       </Text>
       <Flex gap="middle" wrap="wrap">

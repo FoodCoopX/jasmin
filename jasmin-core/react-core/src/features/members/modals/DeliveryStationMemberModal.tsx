@@ -101,7 +101,7 @@ export default function DeliveryStationMemberModal({
             <Image
               src={pictureSrc}
               alt={stationDay.delivery_station_short_name ?? ""}
-              style={{ maxHeight: 200, objectFit: "cover" }}
+              className="delivery-station-picture"
             />
           )}
           <Descriptions column={1} size="small" bordered>

@@ -301,7 +301,7 @@ export default function DeliveryNoteModal({
           />
           {(showCratesOnDocuments || !!deliveryNoteData.crate_items?.length) && (
             <>
-              <div style={{ marginTop: "4em", marginBottom: "-1em" }}>
+              <div className="document-crates-title">
                 <h5>{t("commissioning.crates")}</h5>
               </div>
               <EditableTable

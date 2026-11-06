@@ -114,7 +114,7 @@ export default function StepCoopShares({ data, update, next }: StepProps) {
             />
             {paperRequired && (
               <Alert
-                style={{ marginTop: 8 }}
+                className="mt-8"
                 type="info"
                 showIcon
                 message={t("auth.registration.coop.paper_hint")}
@@ -128,7 +128,7 @@ export default function StepCoopShares({ data, update, next }: StepProps) {
             type="error"
             showIcon
             message={error}
-            style={{ marginBottom: 12 }}
+            className="mb-12"
           />
         )}
 

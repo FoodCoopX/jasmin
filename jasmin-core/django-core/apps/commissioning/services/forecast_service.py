@@ -613,10 +613,13 @@ class ForecastService:
             delivery_week=delivery_week,
             delivery_day__in=days,
             share_type_variation_id__in=variation_ids,
-        ):
+        ).select_related("delivery_day"):
             existing_shares[
                 (s.year, s.delivery_week, s.delivery_day_id, s.share_type_variation_id)
             ] = s
+        # A reused row skips save()'s defaulting: heal it, as
+        # Share.get_or_create_for_delivery does.
+        Share.heal_day_fields(existing_shares.values())
 
         # Batch the "does a ShareContent already exist for this (share,
         # station)?" lookup ONCE, instead of a ``.filter().exists()`` per

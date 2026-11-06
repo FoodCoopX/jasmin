@@ -71,11 +71,19 @@ def cleanup_expired_capacity_reservations() -> None:
 _RENEWAL_FAIL_REASON_TEXT = {
     "de": {
         "no_variation": "Keine passende Anteils-Variante deckt die neue Laufzeit ab.",
+        "no_price": (
+            "Für die neue Laufzeit ist kein Preis hinterlegt: einen Preis der "
+            "Anteils-Variante ab dem neuen Start eintragen und erneut verlängern."
+        ),
         "dsd_coverage": "Der Verteilstationstag reicht nicht in die neue Laufzeit.",
         "invalid": "Der Verlängerungs-Entwurf konnte nicht erstellt werden.",
     },
     "en": {
         "no_variation": "No matching share variation covers the new term.",
+        "no_price": (
+            "No price is set for the new term: add a price for the share "
+            "variation from the new start, then renew again."
+        ),
         "dsd_coverage": "The delivery station-day does not reach into the new term.",
         "invalid": "The renewal draft could not be created.",
     },
@@ -185,7 +193,8 @@ def daily_subscription_renewals() -> None:
     Only runs for tenants with ``subscriptions_are_auto_renewed`` enabled. Each
     renewal is an UNCONFIRMED draft — the office reviews and confirms it, and
     the confirm flow then materialises Shares / ShareDeliveries / charges.
-    Per-subscription failures (no covering variation, station-day out of range)
+    Per-subscription failures (no covering variation, no price for the new
+    term, station-day out of range)
     are captured with a reason code, logged per row (member + reason), and — so
     the at-risk members aren't invisible — emailed to the office as a digest of
     who could NOT be renewed and why. One bad row never aborts the run.

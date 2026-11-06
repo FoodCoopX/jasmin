@@ -106,7 +106,7 @@ export function OrderInfoPanel({
               onChange={(e) => onOrderNoteChange(e.target.value)}
               placeholder={t("commissioning.note")}
               autoSize={{ minRows: 1, maxRows: 3 }}
-              style={{ maxWidth: "30em" }}
+              className="order-note-input"
               maxLength={500}
               autoFocus
               onPressEnter={(e) => {
@@ -117,14 +117,7 @@ export function OrderInfoPanel({
             />
           ) : (
             <span
-              className="order-value"
-              style={{
-                cursor: "pointer",
-                minWidth: "10em",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.5em",
-              }}
+              className="order-value order-note"
               role="button"
               tabIndex={0}
               onClick={() => setIsEditingNote(true)}
@@ -136,12 +129,7 @@ export function OrderInfoPanel({
               }}
             >
               {orderNote || <span className="text-muted">—</span>}
-              <EditOutlined
-                style={{
-                  fontSize: "0.85em",
-                  color: "var(--color-text-tertiary)",
-                }}
-              />
+              <EditOutlined className="text-label-sm text-muted" />
             </span>
           )}
         </div>
@@ -185,11 +173,13 @@ export function OrderInfoPanel({
                 commissioningBulkCreateDocumentsFromOrdersCreate(payload)
               }
               buttonText={t("commissioning.create_delivery_note")}
-              buttonProps={{ type: "primary" }}
+              buttonProps={{
+                type: "primary",
+                className: "bulk-action-button--flush",
+              }}
               disabled={!orderNumber}
               onSuccess={fetchData}
               payload={{ model: "delivery_note" }}
-              style={{ marginTop: "0em" }}
             />
           )}
           {!isDeliveryNoteFinalized && deliveryNoteNumber && (
@@ -199,10 +189,12 @@ export function OrderInfoPanel({
                 commissioningBulkFinalizeDocumentsCreate(payload)
               }
               buttonText={t("commissioning.finalize_delivery_note")}
-              buttonProps={{ type: "primary" }}
+              buttonProps={{
+                type: "primary",
+                className: "bulk-action-button--flush",
+              }}
               onSuccess={handleFinalizeDeliveryNotesSuccess}
               payload={{ model: "delivery_note" }}
-              style={{ marginTop: "0em" }}
             />
           )}
           {!isDeliveryNoteFinalized && deliveryNoteNumber && (
@@ -212,10 +204,13 @@ export function OrderInfoPanel({
                 commissioningBulkDeleteDocumentsCreate(payload)
               }
               buttonText={t("commissioning.delete_delivery_note")}
-              buttonProps={{ type: "primary", danger: true }}
+              buttonProps={{
+                type: "primary",
+                danger: true,
+                className: "bulk-action-button--flush",
+              }}
               onSuccess={fetchData}
               payload={{ model: "delivery_note" }}
-              style={{ marginTop: "0em" }}
             />
           )}
         </div>
@@ -260,11 +255,13 @@ export function OrderInfoPanel({
                 commissioningBulkCreateDocumentsFromOrdersCreate(payload)
               }
               buttonText={t("commissioning.create_invoice")}
-              buttonProps={{ type: "primary" }}
+              buttonProps={{
+                type: "primary",
+                className: "bulk-action-button--flush",
+              }}
               onSuccess={handleCreateInvoiceSuccess}
               disabled={!deliveryNoteNumber}
               payload={{ model: "invoice" }}
-              style={{ marginTop: "0em" }}
             />
           )}
           {!hasFinalizedInvoice && invoiceNumber && (
@@ -274,10 +271,12 @@ export function OrderInfoPanel({
                 commissioningBulkFinalizeDocumentsCreate(payload)
               }
               buttonText={t("commissioning.finalize_invoice")}
-              buttonProps={{ type: "primary" }}
+              buttonProps={{
+                type: "primary",
+                className: "bulk-action-button--flush",
+              }}
               onSuccess={handleFinalizeInvoicesSuccess}
               payload={{ model: "invoice" }}
-              style={{ marginTop: "0em" }}
             />
           )}
           {!hasFinalizedInvoice && invoiceNumber && (
@@ -287,10 +286,13 @@ export function OrderInfoPanel({
                 commissioningBulkDeleteDocumentsCreate(payload)
               }
               buttonText={t("commissioning.delete_invoice")}
-              buttonProps={{ type: "primary", danger: true }}
+              buttonProps={{
+                type: "primary",
+                danger: true,
+                className: "bulk-action-button--flush",
+              }}
               onSuccess={fetchData}
               payload={{ model: "invoice" }}
-              style={{ marginTop: "0em" }}
             />
           )}
         </div>

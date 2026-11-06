@@ -531,7 +531,7 @@ export function useAbosColumns({
       record.requires_optin ? (
         <span>
           {value as string}
-          <Tag color="cyan" bordered={false} style={{ marginLeft: 8 }}>
+          <Tag color="cyan" bordered={false} className="ml-8">
             {t("abos.on_off_tag")}
           </Tag>
         </span>
@@ -774,7 +774,7 @@ export function useAbosColumns({
             typeof count === "number" && Number.isFinite(count) ? count : 0;
           return (
             <div className="text-center">
-              <div style={{ fontWeight: "bold" }}>{display}x</div>
+              <div className="text-bold">{display}x</div>
             </div>
           );
         },

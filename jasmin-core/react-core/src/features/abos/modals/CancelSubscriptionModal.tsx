@@ -151,7 +151,7 @@ export const CancelSubscriptionModal: FC<CancelSubscriptionModalProps> = ({
       destroyOnHidden
     >
       <Space direction="vertical" size="middle" className="w-full">
-        <Title level={5} style={{ margin: 0 }}>
+        <Title level={5} className="m-0">
           {abo.member_first_name} {abo.member_last_name}
           {abo.share_type_variation_string
             ? ` — ${variationLabel(abo.share_type_variation_string)}`
@@ -159,7 +159,7 @@ export const CancelSubscriptionModal: FC<CancelSubscriptionModalProps> = ({
         </Title>
 
         {(validFrom || validUntil) && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <Text type="secondary" className="text-13">
             {validFrom && (
               <>
                 {t("members.valid_from")}:{" "}
@@ -181,7 +181,7 @@ export const CancelSubscriptionModal: FC<CancelSubscriptionModalProps> = ({
           showIcon
           message={t("members.cancel_abo_warning_title")}
           description={
-            <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+            <ul className="mb-0 pl-20">
               <li>
                 {t("members.cancel_abo_warning_deliveries")}
               </li>
@@ -218,7 +218,7 @@ export const CancelSubscriptionModal: FC<CancelSubscriptionModalProps> = ({
                 return false;
               }}
             />
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" className="text-12">
               {t("members.cancel_abo_effective_at_hint")}
             </Text>
           </Form.Item>
@@ -237,7 +237,7 @@ export const CancelSubscriptionModal: FC<CancelSubscriptionModalProps> = ({
           </Form.Item>
         </Form>
 
-        <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
+        <Paragraph type="secondary" className="mb-0 text-12">
           {t("members.cancel_abo_footnote")}
         </Paragraph>
       </Space>

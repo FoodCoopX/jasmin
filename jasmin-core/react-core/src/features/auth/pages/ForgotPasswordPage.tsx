@@ -61,7 +61,7 @@ const ForgotPasswordPage = () => {
       <Card className="auth-card">
         <Space direction="vertical" size="large" className="w-full">
           <div className="text-center">
-            <Title level={3} style={{ marginBottom: 4 }}>
+            <Title level={3} className="mb-4">
               {t("auth.forgot_password.title")}
             </Title>
             <Text type="secondary">
@@ -107,7 +107,7 @@ const ForgotPasswordPage = () => {
                 onSolution={setCaptchaSolution}
               />
 
-              <Form.Item style={{ marginBottom: 0 }}>
+              <Form.Item className="mb-0">
                 <Button
                   type="primary"
                   htmlType="submit"

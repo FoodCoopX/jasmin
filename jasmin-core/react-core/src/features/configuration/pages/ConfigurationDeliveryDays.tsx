@@ -482,7 +482,7 @@ export default function ConfigurationDeliveryDays() {
         className="custom-jasmin-table mb-1em"
       />
       <DateRangeStatusLegend />
-      <h4 style={{ marginTop: "3em" }}>
+      <h4 className="order-days-heading">
         {t("configuration.time_manamagent_for_orders")}
       </h4>
 
@@ -499,7 +499,7 @@ export default function ConfigurationDeliveryDays() {
         onSaveSuccess={onOrdersSaveSuccess}
         onDeleteSuccess={onOrdersDeleteSuccess}
       />
-      <ExplainerText title={t("common.info")} style={{ marginTop: "2em" }}>
+      <ExplainerText title={t("common.info")}>
         {t("explainers.configuration_time_management")}
       </ExplainerText>
     </div>

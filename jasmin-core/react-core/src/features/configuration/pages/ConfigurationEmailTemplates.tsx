@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import type { EmailTemplateListItem } from "@shared/api/generated/models";
 import { useNotificationsEmailTemplatesList } from "@shared/api/generated/notifications/notifications";
-import { useTenant } from "@hooks/index";
+import { useTenant, useTimeFormat } from "@hooks/index";
 
 import EmailTemplateEditorModal from "@features/configuration/modals/EmailTemplateEditorModal";
 
@@ -30,7 +30,7 @@ export default function ConfigurationEmailTemplates({
   categories,
   titleKey = "email_templates.page_title",
 }: ConfigurationEmailTemplatesProps = {}) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { getSetting } = useTenant();
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
 
@@ -40,16 +40,7 @@ export default function ConfigurationEmailTemplates({
 
   const { data, isLoading } = useNotificationsEmailTemplatesList();
 
-  const formatDate = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat(i18n.language, {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    return (iso: string | null) => (iso ? fmt.format(new Date(iso)) : "—");
-  }, [i18n.language]);
+  const { formatDateTimeWithFallback } = useTimeFormat();
 
   const grouped = useMemo(() => {
     const rows: EmailTemplateListItem[] = Array.isArray(data) ? data : [];
@@ -103,7 +94,7 @@ export default function ConfigurationEmailTemplates({
       render: (_: unknown, row: EmailTemplateListItem) => (
         <Space direction="vertical" size={0}>
           <Text strong>{translatedLabel(row)}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" className="text-12">
             {translatedDescription(row)}
           </Text>
         </Space>
@@ -128,7 +119,7 @@ export default function ConfigurationEmailTemplates({
       title: t("email_templates.col_updated"),
       dataIndex: "updated_at",
       width: 200,
-      render: (val: string | null) => formatDate(val),
+      render: (val: string | null) => formatDateTimeWithFallback(val, "—"),
     },
     {
       title: "",

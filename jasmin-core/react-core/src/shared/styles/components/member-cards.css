@@ -28,6 +28,20 @@
   background-color: var(--color-bg-subtle);
 }
 
+/* PaymentsCard: one charge of a payment date, its amount on the right. */
+.payment-charge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* PaymentsCard: the rule above a payment date's total. ``.ant-divider``
+   outranks AntD's own divider margin. */
+.payment-total-divider.ant-divider {
+  margin: 4px 0;
+}
+
 /* Members list header row: summary stats on the left, the CSV export button
  * pushed to the right of the page. Wraps on narrow viewports. */
 .members-list-toolbar {
@@ -111,9 +125,71 @@
   color: var(--color-text-muted);
 }
 
+/* One coop share purchase and its payment status, in the member's own coop
+   shares card. */
+.coop-share-purchase-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+/* The member's details in the office's confirmation modal. */
+.member-confirmation-body {
+  padding: 20px 0;
+}
+
+/* The heading row over the GDPR deletion request tables. */
+.deletions-table-header {
+  margin-bottom: 0.5em;
+}
+
+/* Why a deletion request can't be approved yet; long reasons wrap. */
+.deletion-blocker-tag.ant-tag {
+  white-space: normal;
+}
+
 /* Members list "needs attention" chips, between the toolbar and the table. */
 .members-attention-chips {
   margin-bottom: 12px;
+}
+
+/* The email log's filters above its table. ``.ant-input-affix-wrapper``
+   outranks AntD's full-width input. */
+.email-log-recipient-filter.ant-input-affix-wrapper,
+.email-log-purpose-filter {
+  width: 220px;
+}
+
+.email-log-status-filter {
+  width: 160px;
+}
+
+/* A member's page (MemberDetail). */
+.member-detail-page {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* The page a member sees while the office hasn't confirmed their
+   application, or has rejected it. */
+.member-application-gate {
+  padding: 24px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* The tenant's logo above the application gate. */
+.member-application-gate__logo {
+  max-height: 80px;
+  max-width: 200px;
+  object-fit: contain;
+}
+
+/* The spinner, or the "not found" notice, in place of a member's page. */
+.member-detail-placeholder {
+  min-height: 60vh;
 }
 
 /* The member and customer page headers: the brand gradient, with text that
@@ -145,6 +221,61 @@
     var(--color-bg-base) 100%
   );
   box-shadow: 0 2px 8px rgba(82, 196, 26, 0.1);
+}
+
+/* An article in "this week's delivery": its name, and its amount at the end
+   of the line. ``.ant-typography`` outranks AntD's own text colour. */
+.current-week-article-name.ant-typography {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.current-week-article-amount.ant-typography {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* An article's organic-status tag, after its name. */
+.current-week-organic-tag.ant-tag {
+  margin-inline-end: 0;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+/* The heading over the farm's own articles in "this week's delivery". */
+.current-week-source-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* A joker tag on a delivery in the upcoming deliveries card. */
+.delivery-joker-tag.ant-tag {
+  margin-top: 4px;
+  margin-left: 2px;
+}
+
+/* A delivery station day in the member's delivery stations card, as a link
+   lined up with the card's text. */
+.delivery-station-day-link.ant-btn {
+  padding-left: 0;
+  text-align: left;
+}
+
+/* The jokers taken in a past subscription, in the past subscriptions modal. */
+.past-subscription-jokers.ant-typography {
+  color: var(--color-joker);
+  font-size: 12px;
+}
+
+/* The signature date picker in the SEPA setup modal, on its own line under
+   its label. */
+.sepa-signed-at-picker.ant-picker {
+  display: block;
+  margin-top: 4px;
 }
 
 /* The withdrawn-consent warning at the top of a member's page. */

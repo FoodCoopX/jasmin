@@ -162,7 +162,7 @@ export const AdminConfirmationModalAbos: FC<
       width={600}
       destroyOnHidden
     >
-      <div style={{ padding: "20px 0" }}>
+      <div className="subscription-confirmation-body">
         {isRejected && (
           <ModalStatusBanner
             kind="rejected"
@@ -184,7 +184,7 @@ export const AdminConfirmationModalAbos: FC<
           column={1}
           bordered
           size="small"
-          style={{ marginBottom: 20 }}
+          className="mb-20"
         >
           <Descriptions.Item label={t("members.trial")}>
             {abo.is_trial ? (

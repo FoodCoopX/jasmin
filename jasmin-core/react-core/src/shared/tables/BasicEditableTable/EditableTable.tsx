@@ -614,24 +614,12 @@ const EditableTable = <T extends TableRecord = TableRecord>({
                         >
                           {displayValue}
                           {isLabelColumn && summaryRow.subLabel && (
-                            <div
-                              style={{
-                                fontSize: "0.75em",
-                                color: "var(--color-text-tertiary)",
-                                fontWeight: "normal",
-                              }}
-                            >
+                            <div className="text-2xs text-muted font-normal">
                               {summaryRow.subLabel}
                             </div>
                           )}
                           {subDisplayValue && (
-                            <div
-                              style={{
-                                fontSize: "0.75em",
-                                color: "var(--color-text-tertiary)",
-                                fontWeight: "normal",
-                              }}
-                            >
+                            <div className="text-2xs text-muted font-normal">
                               {subDisplayValue}
                             </div>
                           )}
@@ -1045,13 +1033,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
         </>
       ) : (
         <>
-          <div
-            className="flex-between"
-            style={{
-              marginBottom: 8,
-              marginTop: 24,
-            }}
-          >
+          <div className="flex-between mb-8 mt-24">
             <div>
               {permissions.canAdd && (
                 <Button
@@ -1060,7 +1042,7 @@ const EditableTable = <T extends TableRecord = TableRecord>({
                   aria-label={t("table.add_record")}
                   title={t("table.add_record")}
                   onClick={handleAddClick}
-                  style={{ width: "2em" }}
+                  className="editable-table-add-button"
                 />
               )}
             </div>

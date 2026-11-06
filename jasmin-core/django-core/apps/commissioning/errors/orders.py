@@ -137,10 +137,19 @@ class OrderContentOfferNotInOfferGroup(ForbiddenError):
 
 class OrderContentItemChangeForbidden(ForbiddenError):
     """A customer tried to re-point an existing order line at another offer or
-    article. Stock was reserved on the line's current offer, so only office
-    staff may change what a line orders."""
+    article. Nobody may change a line's offer (stock was reserved on it, see
+    ``OrderContentOfferChangeRefused``), and only office staff its article."""
 
     code = "order_content.item_change_forbidden"
+
+
+class OrderContentOfferChangeRefused(ConflictError):
+    """An update tried to move an order line to another offer. The line's
+    amount is stock taken from its own offer; moving it would have to give that
+    back and take it from the other, so the line is deleted and added again
+    instead."""
+
+    code = "order_content.offer_change_refused"
 
 
 class OrderContentOfferNotFinalized(ForbiddenError):

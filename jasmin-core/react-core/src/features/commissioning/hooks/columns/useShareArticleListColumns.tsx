@@ -156,10 +156,12 @@ export function useShareArticleListColumns({
                 opt.value.toLowerCase() === activeFilter,
             )
         ).map((opt: { value: string; label: string }, idx: number) => ({
+          // A fragment, not the span itself: EditableTable sets a checkbox
+          // column's title vertical only when it carries no className.
           title: (
-            <span style={{ fontSize: "0.85em" }}>
-              {getShareOptionLabel(opt.value, t)}
-            </span>
+            <>
+              <span className="text-label-sm">{getShareOptionLabel(opt.value, t)}</span>
+            </>
           ),
           dataIndex: opt.value.toLowerCase(),
           key: opt.value.toLowerCase(),

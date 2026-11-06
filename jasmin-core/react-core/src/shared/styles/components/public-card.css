@@ -22,3 +22,22 @@
   max-width: 60%;
   object-fit: contain;
 }
+
+/* The reply buttons under a waiting-list offer. */
+.waiting-list-offer-actions {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+/* A public legal page: the privacy policy and the legal notice. */
+.public-legal-page {
+  min-height: 100vh;
+  background: var(--color-page-bg);
+  padding: 40px 24px;
+}
+
+/* AntD's card rule sets the margin too: hence the doubled class. */
+.ant-card.public-legal-card {
+  max-width: 800px;
+  margin: 0 auto;
+}

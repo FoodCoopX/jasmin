@@ -104,7 +104,6 @@ export default function DeliveryStationMap({
         center={center}
         zoom={points.length ? SINGLE_MARKER_ZOOM : DEFAULT_ZOOM}
         scrollWheelZoom={false}
-        style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

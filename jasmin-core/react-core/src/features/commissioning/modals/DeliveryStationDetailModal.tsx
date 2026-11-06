@@ -206,13 +206,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
           )}
           <strong>{dayName}</strong>
           {datePart && (
-            <span
-              style={{
-                color: "var(--color-text-muted)",
-                fontSize: "0.85em",
-                marginLeft: "8px",
-              }}
-            >
+            <span className="color-text-muted text-label-sm ml-8">
               {datePart}
             </span>
           )}

@@ -553,12 +553,7 @@ export default function ShareTypeVariationModal({
                   <img
                     src={record.picture}
                     alt=""
-                    style={{
-                      width: 28,
-                      height: 28,
-                      objectFit: "cover",
-                      borderRadius: 4,
-                    }}
+                    className="table-picture-thumbnail"
                   />
                 ) : (
                   <UploadOutlined />

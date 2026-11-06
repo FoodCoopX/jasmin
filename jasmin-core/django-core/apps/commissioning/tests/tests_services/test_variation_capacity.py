@@ -23,6 +23,7 @@ from apps.commissioning.services.variation_capacity_service import (
     VariationCapacityService,
 )
 from apps.commissioning.tests.factories import (
+    DeliveryExceptionPeriodFactory,
     DeliveryStationDayFactory,
     ShareTypeVariationFactory,
     SubscriptionFactory,
@@ -141,6 +142,52 @@ class TestVariationCapacity:
         _confirmed(variation, dsd, quantity=1)
         _confirmed(variation, dsd, quantity=1)
         new = _confirmed(variation, dsd, quantity=1)
+        with pytest.raises(ShareTypeVariationOverCapacity):
+            VariationCapacityService.assert_capacity_available(new)
+
+    def test_a_term_inside_a_pause_occupies_nothing(self, tenant, dsd):
+        # The existing term's every week is paused (Lieferpause), so it delivers
+        # nothing and leaves the one slot free for the whole-year term.
+        variation = ShareTypeVariationFactory(capacity=1)
+        DeliveryExceptionPeriodFactory(
+            share_type_variation=variation,
+            valid_from=datetime.date(2026, 8, 3),  # Monday
+            valid_until=datetime.date(2026, 8, 16),  # Sunday
+        )
+        _confirmed(
+            variation,
+            dsd,
+            quantity=1,
+            valid_from=datetime.date(2026, 8, 3),
+            valid_until=datetime.date(2026, 8, 16),
+        )
+        new = _confirmed(variation, dsd, quantity=1)
+
+        VariationCapacityService.assert_capacity_available(new)  # no raise
+        # The capacity-edit floor counts the whole-year term alone.
+        assert (
+            VariationCapacityService.peak_occupied_from_week(
+                variation_id=variation.pk, from_date=datetime.date(2026, 7, 20)
+            )
+            == 1
+        )
+
+    def test_a_term_that_outlasts_a_pause_counts_after_it(self, tenant, dsd):
+        variation = ShareTypeVariationFactory(capacity=1)
+        DeliveryExceptionPeriodFactory(
+            share_type_variation=variation,
+            valid_from=datetime.date(2026, 8, 3),  # Monday
+            valid_until=datetime.date(2026, 8, 16),  # Sunday
+        )
+        _confirmed(
+            variation,
+            dsd,
+            quantity=1,
+            valid_from=datetime.date(2026, 8, 3),
+            valid_until=datetime.date(2026, 8, 30),  # two weeks past the pause
+        )
+        new = _confirmed(variation, dsd, quantity=1)
+
         with pytest.raises(ShareTypeVariationOverCapacity):
             VariationCapacityService.assert_capacity_available(new)
 

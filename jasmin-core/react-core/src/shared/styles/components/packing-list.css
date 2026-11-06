@@ -9,3 +9,11 @@
 .commissioning-list-packing-section__heading {
   margin-bottom: -1em;
 }
+
+/* Bulk packing list (PackingListBulk): the delivery station selector is
+   pulled left by its own margin, so it lines up with the selectors above. */
+.packing-list-bulk__station-selector {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  margin-left: -2em;
+}
