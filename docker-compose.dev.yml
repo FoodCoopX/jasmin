@@ -167,13 +167,15 @@ services:
       - ./jasmin-core/react-core:/app
       - frontend_node_modules_dev:/app/node_modules
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     networks: [jasmin-dev]
 
   gateway:
     image: nginx:1.31-alpine
     ports:
-      - "3000:80"
+      # Loopback-only, like every port here: the gateway serves the backend
+      # with the seeded, publicly known logins.
+      - "127.0.0.1:3000:80"
     volumes:
       - ./nginx/nginx.conf.local:/etc/nginx/nginx.conf:ro
       - static_volume_dev:/app/staticfiles:ro
@@ -186,8 +188,8 @@ services:
   mailhog:
     image: mailhog/mailhog:v1.0.1
     ports:
-      - "1025:1025" # SMTP
-      - "8025:8025" # Web UI
+      - "127.0.0.1:1025:1025" # SMTP
+      - "127.0.0.1:8025:8025" # Web UI
     networks: [jasmin-dev]
 
   uptime-kuma:
@@ -213,7 +215,7 @@ services:
     # observability extras with ``docker compose --profile observability up``.
     profiles: ["observability"]
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     volumes:
       - uptime_kuma_data_dev:/app/data
     extra_hosts:
@@ -251,7 +253,7 @@ services:
       ENABLE_USER_REGISTRATION: "true" # dev only — flip to false in prod
       REDIS_URL: redis://redis:6379/2
     ports:
-      - "8004:8000"
+      - "127.0.0.1:8004:8000"
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

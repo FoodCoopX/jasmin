@@ -45,11 +45,21 @@ BACKUP_ENCRYPTION_KEY="${BACKUP_ENCRYPTION_KEY:?BACKUP_ENCRYPTION_KEY must be se
 RCLONE_REMOTE="${RCLONE_REMOTE:-}"
 
 # ── Helpers ────────────────────────────────────────────────────
-# Encrypt stdin -> $1 with the shared AES256 passphrase.
+# The passphrase reaches gpg on a pipe, never on its command line, which ``ps``
+# shows to everyone on the host while gpg runs.
+# Encrypt stdin -> $1 with the shared AES256 passphrase. Stdin carries the
+# data, so the passphrase comes in on fd 3: the pipe arrives as stdin, moves to
+# fd 3, and fd 4 hands the data back to stdin.
 encrypt_gpg() {
-    gpg --batch --yes --symmetric --cipher-algo AES256 \
-        --passphrase "$BACKUP_ENCRYPTION_KEY" \
-        --output "$1"
+    { printf '%s\n' "$BACKUP_ENCRYPTION_KEY" \
+        | gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase-fd 3 --output "$1" 3<&0 0<&4 4<&-; } 4<&0
+}
+
+# Decrypt $1 to stdout with the shared passphrase.
+decrypt_gpg() {
+    printf '%s\n' "$BACKUP_ENCRYPTION_KEY" \
+        | gpg --batch --quiet --decrypt --passphrase-fd 0 "$1"
 }
 
 # Copy $1 off-host if RCLONE_REMOTE is configured. No-op (with a warning) when
@@ -78,7 +88,7 @@ push_offsite() {
 # Succeeds when the dump $1 decrypts with the current key, decompresses, and
 # ends with pg_dump's completion trailer (absent on a truncated dump).
 dump_is_complete() {
-    gpg --batch --quiet --decrypt --passphrase "$BACKUP_ENCRYPTION_KEY" "$1" 2>/dev/null \
+    decrypt_gpg "$1" 2>/dev/null \
         | gunzip \
         | tail -n 5 \
         | grep -q 'PostgreSQL database dump complete'
@@ -94,12 +104,12 @@ do_backup() {
 
     echo "[$(date)] Starting encrypted DB backup → ${FILENAME}"
 
-    # ash has no ``pipefail``: a pg_dump that dies mid-stream would otherwise be
-    # masked by gpg's success and stored as a truncated but "successful" dump.
-    # The ``if`` below only sees gpg's exit status, so the REAL guard is the
-    # post-write verification: the dump is accepted only if it (a) clears a
-    # sanity-floor size and (b) decrypts, decompresses, and ends with pg_dump's
-    # completion trailer (absent on a truncated dump).
+    # The script sets no ``pipefail``, so the ``if`` below sees only gpg's exit
+    # status, and a pg_dump that dies mid-stream would pass it as a truncated
+    # but "successful" dump. The guard is the post-write verification: the dump
+    # is accepted only if it (a) clears a sanity-floor size and (b) decrypts,
+    # decompresses, and ends with pg_dump's completion trailer (absent on a
+    # truncated dump).
     if ! pg_dump \
             -h "$DB_HOST" \
             -p "$DB_PORT" \
@@ -273,7 +283,7 @@ EOF
 # Succeeds when the archive $1 decrypts with the current key, decompresses,
 # and lists cleanly.
 archive_is_complete() {
-    gpg --batch --quiet --decrypt --passphrase "$BACKUP_ENCRYPTION_KEY" "$1" 2>/dev/null \
+    decrypt_gpg "$1" 2>/dev/null \
         | gunzip \
         | tar -tf - >/dev/null 2>&1
 }

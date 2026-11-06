@@ -222,8 +222,6 @@ http {
         ssl_prefer_server_ciphers on;
         ssl_session_cache   shared:SSL:10m;
         ssl_session_timeout 1d;
-        ssl_stapling        on;
-        ssl_stapling_verify on;
 
         # The origin gate (see its maps above); empty while it is off.
         include /etc/nginx/origin_gate/tenant.conf;
@@ -444,8 +442,6 @@ http {
         ssl_prefer_server_ciphers on;
         ssl_session_cache   shared:SSL:10m;
         ssl_session_timeout 1d;
-        ssl_stapling        on;
-        ssl_stapling_verify on;
 
         # Security headers (stricter than the tenant block: DENY + no-referrer
         # + X-Robots-Tag). As above, nginx add_header inheritance is

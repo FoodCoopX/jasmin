@@ -53,8 +53,10 @@
 #       the backup container's image; BACKUP_IMAGE=<image> names another)
 #     - for .sql.gz.gpg files: BACKUP_ENCRYPTION_KEY in the environment
 #       (sourced from .env on prod, kept in your password manager)
-#     - room under $TMPDIR for the decrypted dump, which restore.sh stages
-#       next to the dump (point TMPDIR elsewhere if /tmp is small)
+#     - room in docker's storage for the decrypted dump, which restore.sh
+#       stages in its container's own filesystem, and under $TMPDIR for the
+#       drill's encrypted copy of a plain .sql dump (point TMPDIR elsewhere if
+#       /tmp is small)
 #     - for the media archive: gpg + tar on the host, and room under $TMPDIR
 #       for one unpacked copy of the media tree (the media tree is PDFs and
 #       images, not rows)
@@ -114,8 +116,9 @@ MEDIA_FAILED=0
 APP_ENV_FILE=""
 REPLAY_STATUS="not run"
 REPLAY_FAILED=0
-# Restore state. SCRATCH_DIR is restore.sh's /backups: the dump and, while a
-# restore runs, its decrypted copy. Declared up front for the exit trap.
+# Restore state. SCRATCH_DIR is restore.sh's /backups and holds the dump; the
+# decrypted copy goes into the restore container's own filesystem. Declared up
+# front for the exit trap.
 RESTORE_SH="$(pwd)/backups/restore.sh"
 APP_DB_ROLE_SH="$(pwd)/postgres/app_db_role.sh"
 SCRATCH_DIR=""
@@ -281,7 +284,7 @@ case "$BACKUP" in
             -v "${SCRATCH_DIR}:/backups" \
             -e RESTORE_KEY \
             --entrypoint sh "$BACKUP_IMAGE" \
-            -c 'gzip | gpg --batch --yes --quiet --symmetric --cipher-algo AES256 --passphrase "$RESTORE_KEY" --output "/backups/$1"' \
+            -c 'gzip | { printf "%s\n" "$RESTORE_KEY" | gpg --batch --yes --quiet --symmetric --cipher-algo AES256 --passphrase-fd 3 --output "/backups/$1" 3<&0 0<&4 4<&-; } 4<&0' \
             sh "$DUMP_NAME" < "$BACKUP"
         ;;
     *)
@@ -364,6 +367,18 @@ ORDER BY n.nspname, c.relname
 SQL
 }
 
+# The last lines of a failed step's output, for the log, which nothing prunes.
+# Postgres quotes the failing data (a member's row, say) on DETAIL and CONTEXT
+# lines, their continuation lines and the echoed statement, and an ERROR line
+# can quote a value too. So the log keeps only restore.sh's own "[date]" lines
+# and the error lines, every quoted string masked; the terminal gets the whole
+# output.
+log_tail() {
+    { grep -E '^\[|ERROR|Error' || true; } \
+        | sed -E "s/\"[^\"]*\"/\"…\"/g; s/'[^']*'/'…'/g" \
+        | tail -n 40
+}
+
 # restore.sh's comparison of the restored copy with the database it replaced,
 # and the swap; its closing banner is for a real restore only.
 restore_report() {
@@ -400,7 +415,7 @@ else
         echo "- **Result:** FAIL — the backup did not restore. Treat this as an incident."
         echo ""
         echo '```'
-        echo "$RESTORE_OUTPUT" | tail -n 40
+        echo "$RESTORE_OUTPUT" | log_tail
         echo '```'
     } >> "$OUTPUT_FILE"
     echo ""
@@ -529,13 +544,14 @@ else
     else
         REPLAY_STATUS="FAIL"
         REPLAY_FAILED=1
-        echo "ERROR: the GDPR erasure replay failed against the sandbox" >&2
+        echo "ERROR: the GDPR erasure replay failed against the sandbox:" >&2
+        echo "$REPLAY_OUTPUT" | tail -n 40 >&2
         {
             echo "- **Result:** FAIL — after a real restore, erasures made after this"
             echo "  backup could not be re-applied. Treat this as an incident."
             echo ""
             echo '```'
-            echo "$REPLAY_OUTPUT" | tail -n 40
+            echo "$REPLAY_OUTPUT" | log_tail
             echo '```'
         } >> "$OUTPUT_FILE"
     fi
@@ -626,13 +642,16 @@ else
     MIGRATED_STATUS="FAIL"
     MIGRATED_FAILED=1
     echo "ERROR: restore over a migrated copy: ${MIGRATED_DETAIL}" >&2
+    if [ -n "$MIGRATED_OUTPUT" ]; then
+        echo "$MIGRATED_OUTPUT" | tail -n 40 >&2
+    fi
     {
         echo "- **Result:** FAIL — ${MIGRATED_DETAIL}. A real restore meets a live"
         echo "  database like this one. Treat this as an incident."
         if [ -n "$MIGRATED_OUTPUT" ]; then
             echo ""
             echo '```'
-            echo "$MIGRATED_OUTPUT" | tail -n 40
+            echo "$MIGRATED_OUTPUT" | log_tail
             echo '```'
         fi
     } >> "$OUTPUT_FILE"
@@ -691,7 +710,9 @@ else
     echo "Verifying media archive: $MEDIA_ARCHIVE"
     echo "  unpacking into $MEDIA_EXTRACT_DIR (removed on exit)"
 
-    if gpg --batch --quiet --decrypt --passphrase "$BACKUP_ENCRYPTION_KEY" "$MEDIA_ARCHIVE" \
+    # The passphrase goes in on a pipe: on gpg's command line ``ps`` shows it.
+    if printf '%s\n' "$BACKUP_ENCRYPTION_KEY" \
+         | gpg --batch --quiet --decrypt --passphrase-fd 0 "$MEDIA_ARCHIVE" \
          | gunzip \
          | tar -C "$MEDIA_EXTRACT_DIR" -xf -; then
         media_files=$(find "$MEDIA_EXTRACT_DIR" -type f | wc -l | tr -d ' ' || true)

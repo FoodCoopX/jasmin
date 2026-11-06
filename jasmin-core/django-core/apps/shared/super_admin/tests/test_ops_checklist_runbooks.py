@@ -25,6 +25,7 @@ class TestSeededRunbooks:
         ("kind", "expected"),
         [
             ("restore_drill", "./scripts/restore_drill.sh"),
+            ("restore_drill", "two copies of the database"),
             ("csp_audit", "nginx/security_headers.conf"),
             ("rotate_django_secret", "DJANGO_SECRET_KEY_FALLBACK"),
             ("rotate_db_password", "docker compose exec postgres"),

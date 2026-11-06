@@ -206,7 +206,7 @@ Not in the patch:
   same instance as huey and the cache. The DB index separates keys, not memory:
   all share the 384 MB `noeviction` cap, so a Celery backlog that fills it makes
   Redis refuse huey's enqueues and the cache writes. Watch
-  `docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning info memory'`
+  `docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli info memory'`
   for the first weeks. If GlitchTip's share grows, give it its own small
   `redis:7-alpine` service (its own `mem_limit` and `--maxmemory`, no volume
   needed) and point both GlitchTip `REDIS_URL`s at it.

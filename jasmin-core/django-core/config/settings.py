@@ -1069,12 +1069,15 @@ DATABASES = {
         "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
             "connect_timeout": 10,
-            # Per-STATEMENT timeout so one pathological query can't pin a
-            # gunicorn gthread worker for the full request timeout. Being
-            # per-statement, it doesn't bite fast migrations at current scale;
-            # raise it (or set 0 to disable) via DB_STATEMENT_TIMEOUT_MS for a
-            # slow migration deploy.
-            "options": f"-c statement_timeout={_DB_STATEMENT_TIMEOUT_MS}",
+            # statement_timeout: one pathological query can't pin a gunicorn
+            # worker for the whole request; per statement, so fast migrations
+            # pass. Raise it (0 disables) via DB_STATEMENT_TIMEOUT_MS for a slow
+            # migration deploy. idle_in_transaction_session_timeout: a stuck task
+            # can't hold its row locks past 5 minutes (psql: docker-compose.yml).
+            "options": (
+                f"-c statement_timeout={_DB_STATEMENT_TIMEOUT_MS}"
+                " -c idle_in_transaction_session_timeout=5min"
+            ),
         },
     }
 }

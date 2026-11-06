@@ -35,7 +35,8 @@ this page in the same commit.
    page (`/members/data-protection`).
 5. **Execution checks retention first.** While the subject has open coop
    shares (a payback still due included), active subscriptions, open charges or
-   unpaid finalized invoices, it refuses with `gdpr.retention_active` (HTTP
+   unpaid finalized invoices (credit notes, and invoices a storno cancelled,
+   don't count), it refuses with `gdpr.retention_active` (HTTP
    409, the reasons in `details`). The request then stays in `pending_admin`
    until the office has resolved them and approves again.
 

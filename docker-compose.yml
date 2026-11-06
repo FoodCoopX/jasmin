@@ -124,6 +124,11 @@ x-logging: &default-logging
 services:
   postgres:
     image: postgres:15-alpine
+    # A session idle inside an open transaction is ended after 10 minutes: an
+    # operator's psql left in one would otherwise hold its row locks, and every
+    # billing run, export or delete waiting on them, until someone ends it.
+    # The app sets its own, shorter limit (DATABASES in settings.py).
+    command: ["postgres", "-c", "idle_in_transaction_session_timeout=10min"]
     restart: unless-stopped
     logging: *default-logging
     mem_limit: 2g
@@ -183,11 +188,12 @@ services:
       - redis_data:/data
     healthcheck:
       # $$ defers expansion to the container shell so the password is
-      # read from the environment at probe time.
+      # read from the environment at probe time. It reaches redis-cli through
+      # REDISCLI_AUTH, not -a, which ps shows on the host every 10 s.
       test:
         [
           "CMD-SHELL",
-          'redis-cli --no-auth-warning -a "$$REDIS_PASSWORD" ping | grep -q PONG',
+          'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG',
         ]
       interval: 10s
       timeout: 5s

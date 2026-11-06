@@ -336,6 +336,65 @@ class TestCheckRetentionBlocks:
         reasons = GDPRService.check_retention_blocks(user)
         assert not any("unpaid" in r for r in reasons)
 
+    def test_a_storno_and_the_invoice_it_cancels_do_not_block(self, tenant):
+        """A reseller whose only unpaid documents are a storno and the invoice
+        it cancelled owes nothing, so erasure isn't refused for them."""
+        from apps.commissioning.models import InvoiceReseller
+        from apps.commissioning.services.delivery_note_service import (
+            DeliveryNoteService,
+        )
+        from apps.commissioning.services.invoice_service import InvoiceService
+        from apps.commissioning.tests.factories import (
+            OrderContentFactory,
+            OrderFactory,
+            ResellerFactory,
+            ShareArticleFactory,
+        )
+
+        user = JasminUserFactory()
+        reseller = ResellerFactory(linked_user=user)
+        order = OrderFactory(reseller=reseller)
+        OrderContentFactory(
+            order=order,
+            share_article=ShareArticleFactory(),
+            amount=Decimal("2"),
+            price_per_unit=Decimal("3.00"),
+            tax_rate=Decimal("7"),
+        )
+        delivery_note = DeliveryNoteService.create_from_order(order=order)
+        DeliveryNoteService.finalize_delivery_note(delivery_note)
+        invoice = InvoiceService.create_from_delivery_note(delivery_note)
+        InvoiceService.finalize_invoice(invoice)
+        InvoiceService.create_storno(invoice, reason="wrong amounts")
+        assert (
+            InvoiceReseller.objects.filter(
+                reseller=reseller, is_finalized=True, has_been_paid=False
+            ).count()
+            == 2
+        )
+
+        assert GDPRService.check_retention_blocks(user) == []
+        assert GDPRService.check_retention_blocks_bulk([user]) == {user.id: []}
+
+    def test_an_unpaid_correction_does_not_block(self, tenant):
+        """A correction is a credit note: nothing in it is owed."""
+        from apps.commissioning.tests.factories import (
+            InvoiceResellerFactory,
+            ResellerFactory,
+        )
+
+        user = JasminUserFactory()
+        reseller = ResellerFactory(linked_user=user)
+        InvoiceResellerFactory(
+            reseller=reseller,
+            document_type="correction",
+            is_finalized=True,
+            has_been_paid=False,
+        )
+
+        assert GDPRService.check_retention_blocks(user) == []
+        assert GDPRService.check_retention_blocks_bulk([user]) == {user.id: []}
+
     def test_multiple_blocks_aggregated(self, tenant):
         """When several obligations exist, all are reported so the
         admin sees the full list, not just the first failure."""

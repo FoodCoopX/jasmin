@@ -30,6 +30,7 @@ Usage::
 from __future__ import annotations
 
 import getpass
+import os
 import re
 import sys
 from typing import Any
@@ -77,8 +78,9 @@ class Command(BaseCommand):
                 "Create the SuperAdmin only while no SuperAdmin exists at all, "
                 "and leave every existing account untouched — so a password "
                 "rotated in the UI or an account deactivated during an incident "
-                "survives the next container start. Missing --email/--password "
-                "with no SuperAdmin yet prints a hint instead of failing."
+                "survives the next container start. Without --password it reads "
+                "DJANGO_SUPERUSER_PASSWORD. Missing an email or a password with "
+                "no SuperAdmin yet prints a hint instead of failing."
             ),
         )
 
@@ -88,6 +90,12 @@ class Command(BaseCommand):
                 raise CommandError(
                     "--bootstrap never updates an existing SuperAdmin; "
                     "drop --update-if-exists."
+                )
+            # The container start passes no password: on the command line, ps
+            # would show it on every start.
+            if options["password"] is None:
+                options["password"] = (
+                    os.environ.get("DJANGO_SUPERUSER_PASSWORD") or None
                 )
             if self._bootstrap_is_done(options):
                 return
