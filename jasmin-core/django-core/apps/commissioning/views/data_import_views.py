@@ -137,7 +137,7 @@ class DataImportView(APIViewRolePermissionsMixin, APIView):
         # security boundary (an attacker could rename anything), but it
         # cuts off the accidental "I uploaded the wrong file" case and
         # documents the contract.
-        if os.path.splitext(upload.name)[1].lower() != ".csv":
+        if os.path.splitext(upload.name or "")[1].lower() != ".csv":
             raise DataImportInvalid("file must be a .csv", field="file")
 
         # Accepts a boolean or true/false, 1/0, yes/no, on/off (the form part
