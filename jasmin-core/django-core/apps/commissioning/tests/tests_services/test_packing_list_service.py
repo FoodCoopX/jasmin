@@ -44,6 +44,7 @@ def _bulk_station_totals(delivery_day, per_station: dict) -> dict:
 # get_packing_list
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetPackingList:
     def test_returns_entries_grouped_by_article(self, tenant):
         variation = ShareTypeVariationFactory()
@@ -508,6 +509,7 @@ class TestGetPackingList:
 # get_packing_list_bulk
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetPackingListBulk:
     def test_returns_empty_when_no_packing_list(self, tenant):
         result = PackingListService.get_packing_list_bulk(
@@ -1494,6 +1496,7 @@ class TestDefaultContentMaterializationVisibility:
 # get_member_amounts_matrix ("Was ihr nehmen könnt")
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetMemberAmountsMatrix:
     def _content(self, variation, station, article, amount, day):
         share = ShareFactory(

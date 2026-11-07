@@ -201,6 +201,7 @@ def _build_share_contents(
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestHarvestingListAggregation:
     """Several ShareContents pointing at the same article must aggregate into
     a single harvesting-list summary row whose ``theoretical_harvest_amount``
@@ -415,6 +416,7 @@ class TestHarvestingListAggregation:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestWashingListAggregation:
     """Only ShareContents flagged ``washing=True`` produce
     ``TheoreticalWashAmount`` rows; the washing-list summary must aggregate
@@ -479,6 +481,7 @@ class TestWashingListAggregation:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestCleaningListAggregation:
     """Mirror of the washing test for ``cleaning=True``."""
 

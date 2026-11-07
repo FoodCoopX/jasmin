@@ -6,6 +6,7 @@ import type { ShareArticle } from "@shared/api/generated/models";
 import { useModalMutation } from "@shared/modals/shared";
 import { syncPurchasedName } from "@shared/utils";
 import { useActiveShareOptions } from "@hooks/useActiveShareOptions";
+import { useTenantLanguageT } from "@hooks/configuration/useTenantLanguageT";
 import { useUnitOptions } from "@hooks/useUnitOptions";
 import { newShareArticleShareFlag } from "@features/commissioning/utils/newShareArticleShare";
 
@@ -15,6 +16,7 @@ export const useShareArticleModal = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [form] = Form.useForm();
   const { t } = useTranslation();
+  const tenantT = useTenantLanguageT();
   const { activeShareOptions } = useActiveShareOptions();
   const { unitOptions } = useUnitOptions();
   const { saving: loading, run } = useModalMutation();
@@ -77,7 +79,7 @@ export const useShareArticleModal = () => {
             syncPurchasedName(
               (values.name as string) || "",
               !!values.is_purchased,
-              t,
+              tenantT,
             );
 
           const transformedData = {
@@ -100,7 +102,7 @@ export const useShareArticleModal = () => {
         },
       );
     },
-    [form, t, run, closeModal],
+    [form, t, tenantT, run, closeModal],
   );
 
   return {

@@ -66,6 +66,7 @@ export {
   organicStatusTagColor,
   type OrganicStatus,
 } from './configuration/useOrganicGate';
+export { useTenantLanguageT } from './configuration/useTenantLanguageT';
 export { useTheme } from './configuration/useTheme';
 export { useUnconfirmedMembers } from './useUnconfirmedMembers';
 export { useUnconfirmedCoopShares } from './useUnconfirmedCoopShares';

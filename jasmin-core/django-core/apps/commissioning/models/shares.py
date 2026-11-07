@@ -815,6 +815,8 @@ class Share(JasminModel):
 
 
 class ShareContent(CreatedMixin, FinalizableMixin, ArchivableMixin, JasminModel):
+    archive_week_of = "share"  # a content's delivery week is its share's
+
     share = models.ForeignKey("Share", on_delete=models.CASCADE)
     share_article = models.ForeignKey(
         "ShareArticle", on_delete=models.PROTECT, related_name="+"

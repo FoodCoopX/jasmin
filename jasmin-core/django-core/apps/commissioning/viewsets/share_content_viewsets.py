@@ -114,6 +114,8 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
             200: HarvestSharePlanningRowSerializer,
             # DRF field validation (is_valid) / ``ShareContentError`` below.
             400: ErrorResponseSerializer,
+            # ``ShareContentAlreadyPlanned``: the slot was planned meanwhile.
+            409: ErrorResponseSerializer,
         },
         description="Create new share content from planning data.",
     )

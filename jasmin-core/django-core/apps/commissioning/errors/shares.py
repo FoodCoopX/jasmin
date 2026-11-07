@@ -51,6 +51,14 @@ class ShareContentError(BadRequestError):
     code = "share_content.invalid"
 
 
+class ShareContentAlreadyPlanned(ConflictError):
+    """A planning slot asked to be created already has a row for one of its
+    shares and stations — planned meanwhile in another tab or by someone
+    else, after the page was loaded."""
+
+    code = "share_content.already_planned"
+
+
 class ShareContentNotFound(NotFoundError):
     """No ShareContent rows exist for the requested
     (year, week, share_article, unit, size) planning slot."""

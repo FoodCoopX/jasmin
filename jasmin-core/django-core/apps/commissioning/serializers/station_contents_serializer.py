@@ -3,6 +3,8 @@ delivery station."""
 
 from rest_framework import serializers
 
+from ..models import ShareArticle
+
 
 class StationContentsItemSerializer(serializers.Serializer):
     """One article of a share, at the amount one share holds."""
@@ -14,6 +16,11 @@ class StationContentsItemSerializer(serializers.Serializer):
     unit = serializers.CharField(allow_blank=True)
     size = serializers.CharField(allow_blank=True)
     note = serializers.CharField(allow_blank=True)
+    seller_name_for_member_pages = serializers.CharField(
+        allow_blank=True,
+        help_text="The name the article's seller shows members; blank without one.",
+    )
+    organic_status = serializers.ChoiceField(choices=ShareArticle.OrganicStatus.choices)
 
 
 class StationContentsShareSerializer(serializers.Serializer):

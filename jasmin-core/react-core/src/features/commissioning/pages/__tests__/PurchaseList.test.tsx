@@ -630,7 +630,25 @@ describe("PurchaseList saves", () => {
       screen.getByRole("button", { name: "pick 2026 week 52" }),
     );
 
-    expect(lastNextWeekParams()).toMatchObject({ year: 2026, delivery_week: 53 });
+    expect(lastNextWeekParams()).toMatchObject({
+      year: 2026,
+      delivery_week: 53,
+      is_past: false,
+    });
+  });
+
+  it("asks for next week's stored amounts once that week lies more than a week back", async () => {
+    vi.setSystemTime(new Date(2027, 2, 1, 12, 0));
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: "pick 2026 week 52" }),
+    );
+
+    expect(lastNextWeekParams()).toMatchObject({
+      year: 2026,
+      delivery_week: 53,
+      is_past: true,
+    });
   });
 });
 

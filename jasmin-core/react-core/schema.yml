@@ -8602,7 +8602,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - in: query
         name: is_preparation_lists
         schema:
@@ -9191,7 +9191,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - name: limit
         required: false
         in: query
@@ -9619,7 +9619,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - name: limit
         required: false
         in: query
@@ -10003,7 +10003,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - in: query
         name: share_article
         schema:
@@ -10082,6 +10082,12 @@ paths:
                 $ref: '#/components/schemas/HarvestSharePlanningRow'
           description: ''
         '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
           content:
             application/json:
               schema:
@@ -14241,7 +14247,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - in: query
         name: packing_station
         schema:
@@ -14355,7 +14361,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - in: query
         name: tour
         schema:
@@ -14454,7 +14460,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - in: query
         name: tour
         schema:
@@ -14547,7 +14553,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - in: query
         name: year
         schema:
@@ -14642,7 +14648,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - in: query
         name: share_type
         schema:
@@ -15195,7 +15201,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - name: limit
         required: false
         in: query
@@ -17007,7 +17013,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - name: limit
         required: false
         in: query
@@ -22334,7 +22340,7 @@ paths:
           type: boolean
           default: false
         description: When true, includes archived/historical data. When false (default),
-          only recent data is returned.
+          delivery weeks more than about two months back are left out.
       - name: limit
         required: false
         in: query
@@ -46862,10 +46868,18 @@ components:
           type: string
         note:
           type: string
+        seller_name_for_member_pages:
+          type: string
+          description: The name the article's seller shows members; blank without
+            one.
+        organic_status:
+          $ref: '#/components/schemas/OrganicStatusEnum'
       required:
       - amount
       - id
       - note
+      - organic_status
+      - seller_name_for_member_pages
       - share_article_id
       - share_article_name
       - size

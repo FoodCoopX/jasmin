@@ -5,11 +5,13 @@ import { getCommissioningPackingListStationContentsRetrieveQueryOptions } from "
 import type { PackingModeEnum } from "@shared/api/generated/models";
 import {
   useNumberFormat,
+  useOrganicGate,
   useShareTypeVariationSizeOptions,
   useTenant,
   useVegetableSizeOptions,
+  useTenantLanguageT,
 } from "@hooks/index";
-import { isWeekInPast } from "@shared/utils";
+import { isWeekInPast, removePurchasedSuffix } from "@shared/utils";
 import {
   buildStationContentsCards,
   marksPackingKind,
@@ -35,12 +37,17 @@ export function useStationContentsPages(
   slots: StationContentsSlot[],
 ): StationContentsPage[] | null {
   const { t } = useTranslation();
+  const tenantT = useTenantLanguageT();
   const { getSetting } = useTenant();
   const { format } = useNumberFormat();
   const { tints, dateLabel } = useStationSheetLabels(year, week);
+  const { enabled: marksOrganic, controlNumber } = useOrganicGate();
   const { getShareTypeVariationSizeLabel } = useShareTypeVariationSizeOptions();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const packingMode = getSetting("packing_mode", "BOXES") as PackingModeEnum;
+  const showsSellers = Boolean(
+    getSetting("show_seller_name_of_share_article_in_share_for_member_on_page"),
+  );
   const isPast = isWeekInPast(year, week);
 
   const queries = useQueries({
@@ -60,6 +67,10 @@ export function useStationContentsPages(
     const labels = {
       packingMode,
       tints,
+      marksOrganic,
+      showsSellers,
+      // Members don't read that an article was bought in.
+      articleName: (name: string) => removePurchasedSuffix(name, tenantT),
       shareSizeLabel: getShareTypeVariationSizeLabel,
       articleSizeLabel: getVegetableSizeLabel,
       // Every unit an amount can come in, grams too: the unit options offer
@@ -79,6 +90,7 @@ export function useStationContentsPages(
           stationName: slot.stationName,
           dateLabel: dateLabel(slot.dayNumber),
           marksKind: marksPackingKind(packingMode),
+          organicControlNumber: controlNumber,
           cards,
         },
       ];
@@ -88,10 +100,14 @@ export function useStationContentsPages(
     queries,
     packingMode,
     tints,
+    marksOrganic,
+    showsSellers,
+    controlNumber,
     dateLabel,
     getShareTypeVariationSizeLabel,
     getVegetableSizeLabel,
     format,
+    tenantT,
     t,
   ]);
 }

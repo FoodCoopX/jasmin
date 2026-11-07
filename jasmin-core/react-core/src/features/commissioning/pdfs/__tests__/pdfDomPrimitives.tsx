@@ -7,9 +7,15 @@ import type { ReactNode } from "react";
  * factory on top of the real module (which keeps ``StyleSheet`` / ``Font``).
  *
  * A ``Text`` with a ``render`` prop prints what it returns for page
- * ``PDF_PAGE_INFO.pageNumber`` of ``PDF_PAGE_INFO.totalPages``.
+ * ``PDF_PAGE_INFO.pageNumber`` of ``PDF_PAGE_INFO.totalPages``, the page being
+ * the first of two that one ``<Page>`` runs over.
  */
-export const PDF_PAGE_INFO = { pageNumber: 2, totalPages: 5 };
+export const PDF_PAGE_INFO = {
+  pageNumber: 2,
+  totalPages: 5,
+  subPageNumber: 1,
+  subPageTotalPages: 2,
+};
 
 type StyleInput = unknown;
 

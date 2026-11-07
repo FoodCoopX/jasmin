@@ -211,6 +211,15 @@ describe("CommissioningSidebar", () => {
     expect(routes.has("/commissioning/list-storages")).toBe(true);
   });
 
+  it("gives the members' notices a page of their own where the farm imports its share amounts", () => {
+    settings.uploads_weekly_share_amount = true;
+
+    const routes = linkedRoutes();
+
+    expect(routes.has("/commissioning/delivery-stations-details")).toBe(true);
+    expect(routes.has("/commissioning/station-notices")).toBe(true);
+  });
+
   it("offers the members' notices on the pickup lists, not on a page of their own", () => {
     const routes = linkedRoutes();
 

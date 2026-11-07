@@ -5,6 +5,7 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
+import type { OrganicStatusEnum } from './organicStatusEnum';
 
 /**
  * One article of a share, at the amount one share holds.
@@ -18,4 +19,7 @@ export interface StationContentsItem {
   unit: string;
   size: string;
   note: string;
+  /** The name the article's seller shows members; blank without one. */
+  seller_name_for_member_pages: string;
+  organic_status: OrganicStatusEnum;
 }

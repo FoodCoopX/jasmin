@@ -170,6 +170,7 @@ class TestCalculateTheoreticalStock:
 # get_summary (integration-level)
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetSummary:
     @patch.object(
         DocumentationSummaryService,

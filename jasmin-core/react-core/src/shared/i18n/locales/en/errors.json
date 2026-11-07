@@ -194,6 +194,7 @@
   },
   "share_content": {
     "invalid": "Invalid share content input — please check the data.",
+    "already_planned": "This article is already planned for this share — reload the page and change the existing entry.",
     "not_found": "Share content not found.",
     "invalid_composite_id": "Invalid share content id.",
     "invalid_pk": "Invalid share content id.",

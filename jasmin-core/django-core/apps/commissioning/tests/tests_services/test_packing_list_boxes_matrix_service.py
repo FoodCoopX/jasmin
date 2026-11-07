@@ -215,6 +215,7 @@ def _share(variation, delivery_day):
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetBoxesMatrix:
     def test_base_plus_addon_single_combination(self, tenant):
         delivery_day = SharesDeliveryDayFactory(day_number=_DAY)
@@ -966,6 +967,7 @@ class TestGetWeeklyCombinationMatrix:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestVirtualFolding:
     """A virtual variation is folded into its physical components before box
     derivation: it packs as its component boxes (× component quantity), the

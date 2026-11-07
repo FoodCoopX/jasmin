@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import time_machine
 
+from apps.commissioning.errors import ShareContentAlreadyPlanned
 from apps.commissioning.models import ShareContent
 from apps.commissioning.services.planning_slots import PlanningSlot
 from apps.commissioning.services.share_content_service import ShareContentService
@@ -253,6 +254,37 @@ class TestProcessSharePlanningData:
         assert all(isinstance(sc, ShareContent) for sc in result)
         assert result[0].share_article == article
         assert result[0].amount == Decimal("3.5")
+
+    @patch.object(
+        ShareContentService, "create_all_theoretical_objects", return_value={}
+    )
+    @patch.object(ShareContentService, "create_movements", return_value=[])
+    def test_refuses_a_slot_planned_since_the_page_was_loaded(
+        self, _mock_movements, _mock_theo, tenant
+    ):
+        """A second create of the same slot, from a page loaded before the
+        first, is refused in words instead of with a bare integrity error."""
+        article = ShareArticleFactory()
+        variation = ShareTypeVariationFactory()
+        delivery_day = SharesDeliveryDayFactory(day_number=2)
+        DeliveryStationDayFactory(delivery_day=delivery_day)
+        data = {
+            "year": 2026,
+            "delivery_week": 15,
+            "share_article": str(article.pk),
+            "unit": "KG",
+            "size": "M",
+            f"day_{delivery_day.pk}_variation_{variation.pk}": "3.5",
+        }
+        svc = ShareContentService()
+        svc.process_share_planning_data(data)
+
+        with pytest.raises(ShareContentAlreadyPlanned):
+            svc.process_share_planning_data(
+                {**data, f"day_{delivery_day.pk}_variation_{variation.pk}": "2"}
+            )
+
+        assert ShareContent.objects.filter(share_article=article).count() == 1
 
     def test_raises_for_missing_fields(self, tenant):
         svc = ShareContentService()
@@ -775,6 +807,7 @@ class TestGetShareContentAsFrontendData:
 # get_share_content_for_week
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetShareContentForWeek:
     @patch(
         "apps.commissioning.services.share_content_frontend.StockService.get_theoretical_current_stock",

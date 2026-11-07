@@ -36,6 +36,7 @@ import {
   useOrganicGate,
   useTenant,
   useUnitOptions,
+  useTenantLanguageT,
 } from "@hooks/index";
 import {
   useCrates,
@@ -75,6 +76,7 @@ const shareArticlesResource: CrudResource<TableRecord> = {
 
 export default function ListShareArticles() {
   const { t } = useTranslation();
+  const tenantT = useTenantLanguageT();
   const { getSetting } = useTenant();
   const { canEdit, isOffice: canManagePrices } = useRoles();
   const { enabled: organicGateEnabled } = useOrganicGate();
@@ -185,7 +187,7 @@ export default function ListShareArticles() {
       const synced = syncPurchasedName(
         (transformedData.name as string) || "",
         !!transformedData.is_purchased,
-        t,
+        tenantT,
       );
 
       return {
@@ -195,7 +197,7 @@ export default function ListShareArticles() {
         share_option_list,
       };
     },
-    [shareOptions, t],
+    [shareOptions, tenantT],
   );
 
   const customEdit = useCallback(

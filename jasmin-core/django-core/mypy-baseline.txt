@@ -2,7 +2,7 @@
 # Managed by scripts/mypy_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/mypy_baseline.py freeze
-# 297 finding(s).
+# 296 finding(s).
 
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
@@ -28,7 +28,6 @@ apps/commissioning/models/members.py: Item "None" of "JasminUser | None" has no 
 apps/commissioning/models/members.py: Item "None" of "JasminUser | None" has no attribute "account_status"  [union-attr]
 apps/commissioning/models/members.py: Item "None" of "JasminUser | None" has no attribute "save"  [union-attr]
 apps/commissioning/models/members.py: Unsupported operand types for > ("datetime" and "None")  [operator]
-apps/commissioning/models/mixin.py: "ArchivableMixin" has no attribute "created_at"  [attr-defined]
 apps/commissioning/models/mixin.py: "FinalizedProtectedMixin" has no attribute "_meta"  [attr-defined]
 apps/commissioning/models/mixin.py: "FinalizedProtectedMixin" has no attribute "_state"  [attr-defined]
 apps/commissioning/models/mixin.py: "FinalizedProtectedMixin" has no attribute "is_finalized"  [attr-defined]

@@ -18,6 +18,7 @@ from apps.commissioning.services.station_contents import get_station_contents
 from apps.commissioning.tests.factories import (
     DeliveryStationDayFactory,
     MemberFactory,
+    ResellerFactory,
     ShareArticleFactory,
     ShareContentFactory,
     ShareDeliveryFactory,
@@ -81,6 +82,7 @@ def _contents(station_day):
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetStationContents:
     def test_one_entry_per_collected_variation_with_its_per_share_amounts(self, tenant):
         day = SharesDeliveryDayFactory(day_number=_DAY, default_packing_day=_DAY)
@@ -136,6 +138,65 @@ class TestGetStationContents:
         shares = _contents(station_day)["shares"]
 
         assert [share["items"][0]["note"] for share in shares] == ["", "the big ones"]
+
+    def test_each_share_names_its_own_seller_for_members(self, tenant):
+        day = SharesDeliveryDayFactory(day_number=_DAY, default_packing_day=_DAY)
+        station_day = DeliveryStationDayFactory(delivery_day=day)
+        station = station_day.delivery_station
+        fruit = ShareTypeFactory(share_option="HARVEST_SHARE")
+        small = ShareTypeVariationFactory(share_type=fruit, size="S", sort_order=1)
+        large = ShareTypeVariationFactory(share_type=fruit, size="L", sort_order=2)
+        cherries = ShareArticleFactory(name="Kirschen Zukauf")
+        small_share = _share(small, day)
+        large_share = _share(large, day)
+        _content(
+            small_share,
+            station,
+            cherries,
+            "0.5",
+            seller=ResellerFactory(
+                is_seller=True, name_for_member_pages="Obsthof Huber"
+            ),
+        )
+        _content(large_share, station, cherries, "1")
+        _collect(small_share, station_day, small)
+        _collect(large_share, station_day, large)
+
+        shares = _contents(station_day)["shares"]
+
+        assert [
+            share["items"][0]["seller_name_for_member_pages"] for share in shares
+        ] == [
+            "Obsthof Huber",
+            "",
+        ]
+
+    def test_each_article_carries_its_organic_status(self, tenant):
+        day = SharesDeliveryDayFactory(day_number=_DAY, default_packing_day=_DAY)
+        station_day = DeliveryStationDayFactory(delivery_day=day)
+        variation = ShareTypeVariationFactory(size="M", sort_order=1)
+        share = _share(variation, day)
+        _content(
+            share,
+            station_day.delivery_station,
+            ShareArticleFactory(name="Brot", organic_status="organic"),
+            "1",
+            unit="PCS",
+        )
+        _content(
+            share,
+            station_day.delivery_station,
+            ShareArticleFactory(name="Karotten", organic_status="conventional"),
+            "1",
+        )
+        _collect(share, station_day, variation)
+
+        [share_entry] = _contents(station_day)["shares"]
+
+        assert {
+            item["share_article_name"]: item["organic_status"]
+            for item in share_entry["items"]
+        } == {"Brot": "organic", "Karotten": "conventional"}
 
     def test_a_variation_nobody_collects_at_the_station_is_left_out(self, tenant):
         """Planned contents reach every station of the day; the notice still
@@ -240,6 +301,7 @@ class TestGetStationContents:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestStationContentsEndpoint:
     URL = reverse("packing_list-station-contents")
 

@@ -801,6 +801,8 @@ describe("DeliveryStationsDetails notices", () => {
         stationName: "Farm shop",
         dateLabel: TUESDAY_ON_THE_SHEET,
         marksKind: false,
+        // Without a control number the farm marks nothing organic.
+        organicControlNumber: "",
         cards: [VEGETABLES_S_CARD, FRUIT_CARD],
       },
     ]);

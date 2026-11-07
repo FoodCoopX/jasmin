@@ -115,6 +115,9 @@ export const stationSheetStyles = StyleSheet.create({
     bottom: 26,
     left: pdfTheme.spacing.page,
     right: pdfTheme.spacing.page,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
     paddingTop: 8,
     borderTopWidth: 0.5,
     borderTopColor: colors.border.default,
@@ -266,25 +269,39 @@ export function TickCircle() {
   return <View style={stationSheetStyles.tick} />;
 }
 
-/** Whom to tell when something is wrong; left out without a phone number or
- *  email address to give. */
+/** Whom to tell when something is wrong, without a phone number or email
+ *  address to give left out; and, on a sheet that runs over several pages,
+ *  its page out of the station's pages. */
 export function StationSheetFooter({
   question,
   tenant,
+  numbered = false,
   t,
 }: {
   question: string;
   tenant: TenantInfo;
+  numbered?: boolean;
   t: TFunction;
 }) {
   const contact = [tenant.phone, tenant.email].filter(Boolean).join(" · ");
-  if (!contact) return null;
+  if (!contact && !numbered) return null;
   return (
     <View style={stationSheetStyles.footer} fixed>
       <Text>
-        <Text style={stationSheetStyles.footerQuestion}>{question}</Text>
-        {` ${t("commissioning.station_contents.contact")} ${contact}`}
+        {contact ? (
+          <>
+            <Text style={stationSheetStyles.footerQuestion}>{question}</Text>
+            {` ${t("commissioning.station_contents.contact")} ${contact}`}
+          </>
+        ) : null}
       </Text>
+      {numbered && (
+        <Text
+          render={({ subPageNumber, subPageTotalPages }) =>
+            `${t("common.page")} ${subPageNumber} ${t("common.of")} ${subPageTotalPages}`
+          }
+        />
+      )}
     </View>
   );
 }

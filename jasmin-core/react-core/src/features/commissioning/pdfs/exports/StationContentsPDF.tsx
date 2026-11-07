@@ -1,6 +1,10 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { TFunction } from "i18next";
 
+import {
+  organicStatusLabel,
+  type OrganicStatus,
+} from "@hooks/configuration/useOrganicGate";
 import type {
   StationContentsCard,
   StationContentsPage,
@@ -101,7 +105,41 @@ const styles = StyleSheet.create({
     fontWeight: 400,
     color: colors.text.tertiary,
   },
+  organicTag: {
+    fontSize: 7.5,
+    fontWeight: 700,
+  },
+  organicNote: {
+    marginTop: 10,
+    fontSize: 8.5,
+    color: colors.text.secondary,
+  },
 });
+
+const organicTagColor = (status: Exclude<OrganicStatus, "conventional">) =>
+  status === "organic" ? colors.organic.organic : colors.organic.inConversion;
+
+/** The EU 2018/848 disclosure for the organic marks on the page; nothing
+ *  where the page carries none. */
+function OrganicNote({ page, t }: { page: StationContentsPage; t: TFunction }) {
+  const statuses = new Set(
+    page.cards.flatMap((card) => card.lines.map((line) => line.organicStatus)),
+  );
+  const lines = [
+    statuses.has("organic") &&
+      `${organicStatusLabel(t, "organic")}: ${t("commissioning.organic.organic_footer")}, ${page.organicControlNumber}`,
+    statuses.has("in_conversion") &&
+      `${organicStatusLabel(t, "in_conversion")}: ${t("commissioning.organic.in_conversion_footer")}, ${page.organicControlNumber}`,
+  ].filter((line): line is string => Boolean(line));
+  if (lines.length === 0) return null;
+  return (
+    <View style={styles.organicNote} wrap={false}>
+      {lines.map((line) => (
+        <Text key={line}>{line}</Text>
+      ))}
+    </View>
+  );
+}
 
 function ShareCard({
   card,
@@ -155,6 +193,19 @@ function ShareCard({
                   <Text
                     style={styles.articleSize}
                   >{` · ${line.sizeLabel}`}</Text>
+                )}
+                {line.sellerName && (
+                  <Text
+                    style={styles.articleSize}
+                  >{` (${line.sellerName})`}</Text>
+                )}
+                {line.organicStatus && (
+                  <Text
+                    style={[
+                      styles.organicTag,
+                      { color: organicTagColor(line.organicStatus) },
+                    ]}
+                  >{`  ${organicStatusLabel(t, line.organicStatus)}`}</Text>
                 )}
               </Text>
               {line.note ? <Text style={styles.note}>{line.note}</Text> : null}
@@ -225,6 +276,7 @@ export default function StationContentsPDF({
               />
             ))}
           </View>
+          <OrganicNote page={page} t={t} />
           <StationSheetFooter
             question={t("commissioning.station_contents.missing")}
             tenant={tenant}

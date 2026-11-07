@@ -34,6 +34,7 @@ import {
   useTableRowSelection,
   useUnitOptions,
   useYearWeekState,
+  useTenantLanguageT,
 } from "@hooks/index";
 import {
   commissioningBulkFinalizeShareContentCreate,
@@ -128,6 +129,7 @@ export default function PlanningShareContentBase({
     useState<TableRecord | null>(null);
 
   const { t } = useTranslation();
+  const tenantT = useTenantLanguageT();
   const {
     defaultPlanningGranularity,
     numberPackingStations: number_packing_stations,
@@ -567,7 +569,7 @@ export default function PlanningShareContentBase({
           article.id === transformedData.share_article,
       );
 
-      if (hasPurchasedSuffix((shareArticle?.name as string) ?? "", t)) {
+      if (hasPurchasedSuffix((shareArticle?.name as string) ?? "", tenantT)) {
         if (!transformedData.seller_name && !transformedData.seller) {
           throw new Error(t("commissioning.seller_required_for_purchase"));
         }
@@ -634,6 +636,7 @@ export default function PlanningShareContentBase({
       selectedYear,
       selectedWeek,
       t,
+      tenantT,
       vegetables_and_fruits,
     ],
   );
@@ -845,7 +848,7 @@ export default function PlanningShareContentBase({
           (article?.name as string) ??
             (record.share_article_name as string) ??
             "",
-          t,
+          tenantT,
         );
       if (!isPurchased) return total;
 
@@ -874,7 +877,7 @@ export default function PlanningShareContentBase({
     shareTypeVariations,
     shareTypeVariationAmountsSummary,
     planningMode,
-    t,
+    tenantT,
   ]);
 
   const { deliveryDayColumns } = useDeliveryDayColumns({

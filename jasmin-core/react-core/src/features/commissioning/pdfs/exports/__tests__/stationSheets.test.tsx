@@ -58,6 +58,7 @@ const noticePage = (marksKind: boolean): StationContentsPage => ({
   stationName: "Farm shop",
   dateLabel: "Tuesday, 06.10.2026 · KW 41",
   marksKind,
+  organicControlNumber: "",
   cards: [
     {
       key: "var-veg-s",
@@ -73,6 +74,8 @@ const noticePage = (marksKind: boolean): StationContentsPage => ({
           amount: "500",
           unit: "g",
           note: "",
+          sellerName: "",
+          organicStatus: null,
         },
         {
           key: "leek",
@@ -81,6 +84,8 @@ const noticePage = (marksKind: boolean): StationContentsPage => ({
           amount: "2",
           unit: "pcs",
           note: "The thin ones",
+          sellerName: "",
+          organicStatus: null,
         },
       ],
     },
@@ -98,6 +103,8 @@ const noticePage = (marksKind: boolean): StationContentsPage => ({
           amount: "1,5",
           unit: "kg",
           note: "",
+          sellerName: "",
+          organicStatus: null,
         },
       ],
     },
@@ -196,6 +203,69 @@ describe("StationContentsPDF", () => {
     expect(textOf(container)).not.toContain(
       "commissioning.station_contents.take_yourself",
     );
+  });
+
+  it("tags organic articles and names the control number below the cards", () => {
+    const certified = {
+      ...noticePage(false),
+      organicControlNumber: "DE-ÖKO-123",
+      cards: noticePage(false).cards.map((card) => ({
+        ...card,
+        lines: card.lines.map((line) =>
+          line.name === "Leek"
+            ? { ...line, organicStatus: "organic" as const }
+            : line,
+        ),
+      })),
+    };
+    const { container } = render(
+      <StationContentsPDF pages={[certified]} tenant={TENANT} t={t} />,
+    );
+
+    expect(textOf(cardOf(container, "Vegetables"))).toContain(
+      "Leek · large  commissioning.organic.organic",
+    );
+    expect(
+      screen.getByText(
+        "commissioning.organic.organic: commissioning.organic.organic_footer, DE-ÖKO-123",
+      ),
+    ).toBeInTheDocument();
+    expect(textOf(container)).not.toContain(
+      "commissioning.organic.in_conversion_footer",
+    );
+  });
+
+  it("names the seller of a bought-in article in brackets", () => {
+    const withSeller = {
+      ...noticePage(false),
+      cards: noticePage(false).cards.map((card) => ({
+        ...card,
+        lines: card.lines.map((line) =>
+          line.name === "Apples"
+            ? { ...line, sellerName: "Obsthof Huber" }
+            : line,
+        ),
+      })),
+    };
+    const { container } = render(
+      <StationContentsPDF pages={[withSeller]} tenant={TENANT} t={t} />,
+    );
+
+    expect(textOf(cardOf(container, "Fruit"))).toContain(
+      "Apples (Obsthof Huber)",
+    );
+  });
+
+  it("names no control number on a page without organic articles", () => {
+    const { container } = render(
+      <StationContentsPDF
+        pages={[{ ...noticePage(false), organicControlNumber: "DE-ÖKO-123" }]}
+        tenant={TENANT}
+        t={t}
+      />,
+    );
+
+    expect(textOf(container)).not.toContain("DE-ÖKO-123");
   });
 
   it("asks members to report what is missing, but only with a way to reach the farm", () => {
@@ -307,6 +377,28 @@ describe("DeliveryStationDetailsPDF", () => {
       // The boxes of each combination at the station.
       ["commissioning.pickup_sheet.total", "2", "1", "1"],
     ]);
+  });
+
+  it("numbers a station's pages", () => {
+    renderPickupList();
+    expect(screen.getByText("common.page 1 common.of 2")).toBeInTheDocument();
+  });
+
+  it("numbers the pages even where the farm gives no contact", () => {
+    const { container } = render(
+      <DeliveryStationDetailsPDF
+        pages={[pickupPage]}
+        packingMode="BOXES"
+        tints={{ "st-veg": 0 }}
+        tenant={{ ...TENANT, email: "", phone: "" }}
+        t={t}
+      />,
+    );
+
+    expect(textOf(container)).toContain("common.page 1 common.of 2");
+    expect(textOf(container)).not.toContain(
+      "commissioning.pickup_sheet.missing",
+    );
   });
 
   it("labels each column with its size and add-ons under the share type's tint", () => {

@@ -11,6 +11,7 @@ import {
   useShareTypeVariationSizeOptions,
   useTenant,
   useUnitOptions,
+  useTenantLanguageT,
 } from "@hooks/index";
 import { removePurchasedSuffix } from "@shared/utils";
 
@@ -56,6 +57,7 @@ const CurrentWeekDeliveryCard = ({
   currentYear,
 }: CurrentWeekDeliveryCardProps) => {
   const { t } = useTranslation();
+  const tenantT = useTenantLanguageT();
   const { getUnitLabel } = useUnitOptions();
   const { getSetting } = useTenant();
   const usesJokers = getSetting("uses_jokers", true);
@@ -166,7 +168,7 @@ const CurrentWeekDeliveryCard = ({
           }}
         />
         <Text className="current-week-article-name">
-          {removePurchasedSuffix(item.name, t)}
+          {removePurchasedSuffix(item.name, tenantT)}
           {showSellerName && item.sellerName && (
             <Text type="secondary" className="text-12 font-normal">
               {" "}

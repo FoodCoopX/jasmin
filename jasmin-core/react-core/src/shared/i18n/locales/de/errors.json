@@ -194,6 +194,7 @@
   },
   "share_content": {
     "invalid": "Eintrag ungültig — bitte die Daten prüfen.",
+    "already_planned": "Dieser Artikel ist für diesen Anteil schon geplant — bitte die Seite neu laden und den vorhandenen Eintrag ändern.",
     "not_found": "Eintrag nicht gefunden.",
     "invalid_composite_id": "Ungültige Kennung für den Anteilsinhalt.",
     "invalid_pk": "Ungültige Kennung für den Anteilsinhalt.",

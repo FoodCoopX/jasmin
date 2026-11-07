@@ -441,6 +441,7 @@ function StationPage({
       <StationSheetFooter
         question={t("commissioning.pickup_sheet.missing")}
         tenant={tenant}
+        numbered
         t={t}
       />
     </Page>

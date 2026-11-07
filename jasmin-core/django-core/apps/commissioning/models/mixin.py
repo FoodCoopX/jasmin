@@ -23,8 +23,8 @@ if TYPE_CHECKING:
     from apps.accounts.models import JasminUser
 
 from .managers import (
-    ActiveOnlyManager,
     CurrentActiveManager,
+    DeliveryWeekActiveOnlyManager,
 )
 
 
@@ -555,27 +555,23 @@ class LinePricingMixin:
 
 
 class ArchivableMixin(models.Model):
-    """Mixin to add archive functionality to models with CreatedMixin"""
+    """Archives a record once its delivery week lies further back than the
+    cutoff: ``active`` leaves it out of the lists of current weeks."""
+
+    # The relation carrying the ``year`` / ``delivery_week``, "" for the model.
+    archive_week_of = ""
 
     objects = models.Manager()
-    active = ActiveOnlyManager(archive_months=2)
+    active = DeliveryWeekActiveOnlyManager(archive_months=2)
 
     class Meta:
         abstract = True
         # Reverse relations and refresh_from_db should always use the
-        # unfiltered manager — never the date-filtered ``active``.
+        # unfiltered manager — never the archive-filtered ``active``.
         base_manager_name = "objects"
         indexes = [
             models.Index(fields=["created_at"]),
         ]
-
-    @classmethod
-    def get_archive_cutoff_date(cls, months_back: int = 2) -> datetime.datetime:
-        return timezone.now() - timedelta(days=30 * months_back)
-
-    def is_archived(self, months_back: int = 2) -> bool:
-        cutoff_date = self.get_archive_cutoff_date(months_back)
-        return self.created_at < cutoff_date
 
 
 class CreatedMixin(models.Model):

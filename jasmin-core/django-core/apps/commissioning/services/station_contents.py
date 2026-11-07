@@ -9,9 +9,9 @@ demand, not from its contents.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
-from ..models import SharesDeliveryDay, VirtualVariationComponent
+from ..models import ShareArticle, SharesDeliveryDay, VirtualVariationComponent
 from ..utils.packing_queries import packing_share_contents
 from .packing_list_service import PackingListService
 from .share_demand_service import ShareDemandService
@@ -44,12 +44,17 @@ def get_station_contents(
         day_number=day_number,
         delivery_station=delivery_station,
     )
-    notes = _notes_by_variation(
+    notes_and_sellers = _note_and_seller_by_variation(
         year=year,
         delivery_week=delivery_week,
         day_number=day_number,
         delivery_station=delivery_station,
         is_past=is_past,
+    )
+    organic_status_by_article = dict(
+        ShareArticle.objects.filter(
+            id__in={row["share_article_id"] for row in matrix["rows"]}
+        ).values_list("id", "organic_status")
     )
 
     shares: list[dict[str, Any]] = []
@@ -58,15 +63,14 @@ def get_station_contents(
         if variation_id not in collected:
             continue
         items = [
-            {
-                "id": row["id"],
-                "share_article_id": row["share_article_id"],
-                "share_article_name": row["share_article_name"],
-                "amount": row[column["key"]],
-                "unit": row["unit"] or "",
-                "size": row["size"] or "",
-                "note": notes.get((variation_id, row["id"]), ""),
-            }
+            _station_contents_item(
+                row,
+                row[column["key"]],
+                notes_and_sellers.get(
+                    (variation_id, row["id"]), _NoteAndSeller("", "")
+                ),
+                organic_status_by_article[row["share_article_id"]],
+            )
             for row in matrix["rows"]
             if row.get(column["key"])
         ]
@@ -83,6 +87,32 @@ def get_station_contents(
             }
         )
     return {"shares": shares}
+
+
+class _NoteAndSeller(NamedTuple):
+    note: str
+    seller_name_for_member_pages: str
+
+
+def _station_contents_item(
+    row: dict[str, Any],
+    amount: Any,
+    note_and_seller: _NoteAndSeller,
+    organic_status: str,
+) -> dict[str, Any]:
+    """One article of a share: the member-amounts row with the share's own
+    amount, note and seller."""
+    return {
+        "id": row["id"],
+        "share_article_id": row["share_article_id"],
+        "share_article_name": row["share_article_name"],
+        "amount": amount,
+        "unit": row["unit"] or "",
+        "size": row["size"] or "",
+        "note": note_and_seller.note,
+        "seller_name_for_member_pages": note_and_seller.seller_name_for_member_pages,
+        "organic_status": organic_status,
+    }
 
 
 def _collected_variation_ids(
@@ -118,17 +148,18 @@ def _collected_variation_ids(
     return collected
 
 
-def _notes_by_variation(
+def _note_and_seller_by_variation(
     *,
     year: int,
     delivery_week: int,
     day_number: int,
     delivery_station: str,
     is_past: bool,
-) -> dict[tuple[str, str], str]:
-    """Each share's own note on an article, keyed by its variation and the
-    member-amounts row id (article, unit and size). The member-amounts matrix
-    keeps one note per row, whichever variation's it read first."""
+) -> dict[tuple[str, str], _NoteAndSeller]:
+    """Each share's own note on an article and the name its seller shows
+    members, keyed by its variation and the member-amounts row id (article,
+    unit and size). The member-amounts matrix keeps one note per row,
+    whichever variation's it read first, and no seller."""
     contents = packing_share_contents(
         year,
         delivery_week,
@@ -136,10 +167,17 @@ def _notes_by_variation(
         is_past=is_past,
         delivery_station=delivery_station,
     ).values_list(
-        "share__share_type_variation_id", "share_article_id", "unit", "size", "note"
+        "share__share_type_variation_id",
+        "share_article_id",
+        "unit",
+        "size",
+        "note",
+        "seller__name_for_member_pages",
     )
     return {
-        (variation_id, f"{article_id}_{unit}_{size}"): note
-        for variation_id, article_id, unit, size, note in contents
-        if note
+        (variation_id, f"{article_id}_{unit}_{size}"): _NoteAndSeller(
+            note or "", seller or ""
+        )
+        for variation_id, article_id, unit, size, note, seller in contents
+        if note or seller
     }

@@ -25,7 +25,7 @@ delivery_week: number;
  */
 include_next_week?: boolean;
 /**
- * When true, includes archived/historical data. When false (default), only recent data is returned.
+ * When true, includes archived/historical data. When false (default), delivery weeks more than about two months back are left out.
  */
 is_past?: boolean;
 /**

@@ -2,6 +2,7 @@ import type {
   PackingModeEnum,
   StationContentsShare,
 } from "@shared/api/generated/models";
+import type { OrganicStatus } from "@hooks/configuration/useOrganicGate";
 import { formatMemberAmount } from "@shared/utils";
 import { getShareSizeLabelOrEmpty, getSizeLabelOrEmpty } from "./sizeLabel";
 
@@ -13,6 +14,11 @@ export interface StationContentsLine {
   amount: string;
   unit: string;
   note: string;
+  /** The name the seller shows members, where the farm shows sellers. */
+  sellerName: string;
+  /** Organic or in conversion where the farm is certified to say so; see
+   *  ``useOrganicGate``. */
+  organicStatus: Exclude<OrganicStatus, "conventional"> | null;
 }
 
 export interface StationContentsCard {
@@ -34,12 +40,20 @@ export interface StationContentsPage {
   dateLabel: string;
   /** Whether the cards say boxed or loose; see ``marksPackingKind``. */
   marksKind: boolean;
+  /** The farm's organic control number, "" where it isn't certified. */
+  organicControlNumber: string;
   cards: StationContentsCard[];
 }
 
 interface CardLabels {
   packingMode: PackingModeEnum;
   tints: Record<string, number>;
+  /** Whether the farm is certified to mark articles organic. */
+  marksOrganic: boolean;
+  /** Whether members see who sold a bought-in article. */
+  showsSellers: boolean;
+  /** The article's name as members read it. */
+  articleName: (name: string) => string;
   shareSizeLabel: (size: string) => string;
   articleSizeLabel: (size: string) => string;
   unitLabel: (unit: string) => string;
@@ -79,11 +93,18 @@ export function buildStationContentsCards(
       );
       return {
         key: item.id,
-        name: item.share_article_name,
+        name: labels.articleName(item.share_article_name),
         sizeLabel: getSizeLabelOrEmpty(item.size, labels.articleSizeLabel),
         amount,
         unit: unit ? labels.unitLabel(unit) : "",
         note: item.note,
+        sellerName: labels.showsSellers
+          ? item.seller_name_for_member_pages
+          : "",
+        organicStatus:
+          labels.marksOrganic && item.organic_status !== "conventional"
+            ? item.organic_status
+            : null,
       };
     }),
   }));
