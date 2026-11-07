@@ -141,6 +141,7 @@ const HONEY_SMALL: PackingBoxesMatrixAddOn = {
   share_type_id: "st-honey",
   share_type_short_name: "Honey",
   share_type_sort_index: 1,
+  is_packed_bulk: false,
 };
 
 /** A kind of box: a vegetable share of one size (or none) and the add-ons packed in. */
@@ -160,6 +161,7 @@ const box = (
     base_share_type_short_name: base ? "Veg" : "",
     // Boxes without a base share come after every share type.
     base_share_type_sort_index: base ? 0 : 99,
+    base_is_packed_bulk: false,
     add_ons: addOns,
     count,
   };
@@ -450,6 +452,7 @@ describe("AmountShareTypeVariations counts", () => {
         base_share_type_name: shortName,
         base_share_type_short_name: shortName,
         base_share_type_sort_index: sortIndex,
+        base_is_packed_bulk: false,
       }) satisfies PackingBoxesMatrixColumn;
     const vegetablesS = shareSize("veg", "Veg", "S", 1, 0);
     const vegetablesM = shareSize("veg", "Veg", "M", 2, 0);

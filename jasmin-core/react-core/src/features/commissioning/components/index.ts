@@ -8,3 +8,4 @@ export { default as NoVariationColumnsBanner } from './NoVariationColumnsBanner'
 export { default as BoxCombinationLabel } from './BoxCombinationLabel';
 export { default as FinalizedNotice } from './FinalizedNotice';
 export { default as InvoiceSendStatus } from './InvoiceSendStatus';
+export { default as StationContentsDownloads } from './StationContentsDownloads';

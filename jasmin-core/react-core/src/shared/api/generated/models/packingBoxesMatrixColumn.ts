@@ -22,6 +22,8 @@ export interface PackingBoxesMatrixColumn {
   base_share_type_name: string;
   base_share_type_short_name: string;
   base_share_type_sort_index: number;
+  /** The base variation's own setting, which decides only in MIXED packing mode; false for a combination without a base. */
+  base_is_packed_bulk: boolean;
   add_ons: PackingBoxesMatrixAddOn[];
   count: number;
 }

@@ -1553,6 +1553,7 @@ class TestGetMemberAmountsMatrix:
         for col in matrix["columns"]:
             assert col["add_ons"] == []
             assert col["count"] == 0
+            assert col["base_is_packed_bulk"] is False
         # Base share type group sorts before the additional one.
         assert (
             columns[f"variation_{base_var.pk}"]["base_share_type_sort_index"]

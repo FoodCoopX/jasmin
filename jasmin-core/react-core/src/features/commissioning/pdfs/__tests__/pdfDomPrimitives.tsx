@@ -33,6 +33,7 @@ interface PrimitiveProps {
   src?: string;
   orientation?: string;
   size?: string;
+  d?: string;
 }
 
 const styleAttr = (style: StyleInput) => JSON.stringify(flattenStyle(style));
@@ -74,6 +75,10 @@ export function pdfDomPrimitives() {
     Image: ({ src }: PrimitiveProps) => (
       <img data-pdf="image" alt="" src={src} />
     ),
+    Svg: ({ children }: PrimitiveProps) => (
+      <svg data-pdf="svg">{children}</svg>
+    ),
+    Path: ({ d }: PrimitiveProps) => <path data-pdf="path" d={d} />,
     PDFViewer: ({ children }: PrimitiveProps) => (
       <div data-pdf="viewer">{children}</div>
     ),

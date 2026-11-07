@@ -14492,6 +14492,92 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Error response.
+  /api/commissioning/packing_list/station_contents/:
+    get:
+      operationId: commissioning_packing_list_station_contents_retrieve
+      description: The shares collected at a delivery station on a week + delivery
+        day, each with what one share holds — the notice members read at the station.
+        One entry per physical share type variation somebody collects there (a virtual
+        one counts as its physical components), boxed and loose alike; the amounts
+        are ShareContent.amount, not multiplied by demand.
+      parameters:
+      - in: query
+        name: day_number
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 6
+        description: Day of the week (0=Monday, 6=Sunday)
+        required: true
+        examples:
+          Monday:
+            value: 0
+          Wednesday:
+            value: 2
+          Sunday:
+            value: 6
+      - in: query
+        name: delivery_station
+        schema:
+          type: string
+        description: Delivery station ID (Jasmin ID format)
+        required: true
+      - in: query
+        name: delivery_week
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 53
+        description: ISO week number (1-53). Week 53 is accepted only for a year that
+          has one; sent with a 52-week year it is refused.
+        required: true
+        examples:
+          Week1:
+            value: 1
+            summary: Week 1
+          Week26:
+            value: 26
+            summary: Week 26
+          Week52:
+            value: 52
+            summary: Week 52
+      - in: query
+        name: is_past
+        schema:
+          type: boolean
+          default: false
+        description: When true, includes archived/historical data. When false (default),
+          only recent data is returned.
+      - in: query
+        name: year
+        schema:
+          type: integer
+          minimum: 1900
+          maximum: 2100
+        description: Year (YYYY format)
+        required: true
+        examples:
+          '2024':
+            value: 2024
+          '2025':
+            value: 2025
+      tags:
+      - commissioning
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StationContents'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
   /api/commissioning/packing_list_bulk/:
     get:
       operationId: commissioning_packing_list_bulk_list
@@ -37343,7 +37429,12 @@ components:
           type: string
         share_type_sort_index:
           type: integer
+        is_packed_bulk:
+          type: boolean
+          description: The variation's own setting, which decides only in MIXED packing
+            mode.
       required:
+      - is_packed_bulk
       - share_type_id
       - share_type_short_name
       - share_type_sort_index
@@ -37374,6 +37465,10 @@ components:
           type: string
         base_share_type_sort_index:
           type: integer
+        base_is_packed_bulk:
+          type: boolean
+          description: The base variation's own setting, which decides only in MIXED
+            packing mode; false for a combination without a base.
         add_ons:
           type: array
           items:
@@ -37382,6 +37477,7 @@ components:
           type: integer
       required:
       - add_ons
+      - base_is_packed_bulk
       - base_share_type_id
       - base_share_type_name
       - base_share_type_short_name
@@ -46737,6 +46833,70 @@ components:
           type: string
           format: date-time
           readOnly: true
+    StationContents:
+      type: object
+      properties:
+        shares:
+          type: array
+          items:
+            $ref: '#/components/schemas/StationContentsShare'
+      required:
+      - shares
+    StationContentsItem:
+      type: object
+      description: One article of a share, at the amount one share holds.
+      properties:
+        id:
+          type: string
+        share_article_id:
+          type: string
+        share_article_name:
+          type: string
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,3})?$
+        unit:
+          type: string
+        size:
+          type: string
+        note:
+          type: string
+      required:
+      - amount
+      - id
+      - note
+      - share_article_id
+      - share_article_name
+      - size
+      - unit
+    StationContentsShare:
+      type: object
+      description: One physical share type variation collected at the station.
+      properties:
+        variation_id:
+          type: string
+        size:
+          type: string
+        share_type_id:
+          type: string
+        share_type_name:
+          type: string
+        is_packed_bulk:
+          type: boolean
+          description: 'The variation''s own setting, which decides only in MIXED
+            packing mode: in BULK mode every share is loose, in BOXES mode none is.'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StationContentsItem'
+      required:
+      - is_packed_bulk
+      - items
+      - share_type_id
+      - share_type_name
+      - size
+      - variation_id
     StationMemberMatrix:
       type: object
       description: |-

@@ -16,4 +16,6 @@ export interface PackingBoxesMatrixAddOn {
   share_type_id: string;
   share_type_short_name: string;
   share_type_sort_index: number;
+  /** The variation's own setting, which decides only in MIXED packing mode. */
+  is_packed_bulk: boolean;
 }

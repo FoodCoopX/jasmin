@@ -1,11 +1,12 @@
 import type { TFunction } from "i18next";
+import type { PackingModeEnum } from "@shared/api/generated/models";
 import type { StationPageData, TenantInfo } from "./DeliveryStationDetailsPDF";
 import ListPDFGenerator from "./ListPDFGenerator";
 
 interface DeliveryStationDetailsPDFGeneratorProps {
   pages: StationPageData[] | null;
-  week: number;
-  dayName: string;
+  packingMode: PackingModeEnum;
+  tints: Record<string, number>;
   tenant: TenantInfo;
   filename: string;
   buttonText: string;
@@ -14,8 +15,8 @@ interface DeliveryStationDetailsPDFGeneratorProps {
 
 export default function DeliveryStationDetailsPDFGenerator({
   pages,
-  week,
-  dayName,
+  packingMode,
+  tints,
   tenant,
   filename,
   buttonText,
@@ -30,8 +31,8 @@ export default function DeliveryStationDetailsPDFGenerator({
       documentLoader={() => import("./DeliveryStationDetailsPDF")}
       documentProps={{
         pages: pages ?? [],
-        week,
-        dayName,
+        packingMode,
+        tints,
         tenant,
         t,
       }}

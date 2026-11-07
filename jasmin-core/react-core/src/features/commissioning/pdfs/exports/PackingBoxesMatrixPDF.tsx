@@ -14,12 +14,7 @@ import {
   pickComboOrientation,
 } from "./boxComboPdf";
 import { listStyles } from "./listPdfBase";
-import {
-  ListPDFFooter,
-  ListPDFHeader,
-  TickBox,
-  type TenantInfo,
-} from "./ListPDFSharedComponents";
+import { ListPDFFooter, ListPDFHeader, TickBox } from "./ListPDFSharedComponents";
 
 // Fixed pt column widths; the NOTE column flexes to absorb slack, and the
 // combination columns take a dynamic pt width (see comboColumnWidth).
@@ -55,13 +50,9 @@ export interface PackingBoxesMatrixPDFProps {
   dayName: string;
   /** Hide the size column when the tenant's ``show_size_column`` is off. */
   showSize?: boolean;
-  /** Optional brand strip (logo + tenant name) above the title. */
-  tenant?: TenantInfo;
-  /** Header pill/category label. Defaults to the packing-boxes label; the
-   *  member "Was ihr nehmen könnt" variant passes its own. */
-  pillKey?: string;
   /** Render the trailing per-combination count row. On for the packing boxes
-   *  matrix (box count); off for the member per-share list (no box count). */
+   *  matrix (box count); off for the per-share matrix of a farm that uploads
+   *  its weekly share amounts (no box count). */
   showCountRow?: boolean;
   /** A cell's text, as the page shows it — an amount in the tenant's number
    *  format. Defaults to a plain box count. */
@@ -69,20 +60,13 @@ export interface PackingBoxesMatrixPDFProps {
   t: TFunction;
 }
 
-/**
- * The matrix as a single ``<Page>`` (no ``<Document>`` wrapper) so it can be
- * embedded into another document — e.g. appended after each station's pickup
- * page in the delivery-station-details PDF. Computes its own orientation from
- * its column count, so it can sit next to differently-oriented pages.
- */
-export const PackingBoxesMatrixPage = ({
+/** The matrix as one page, oriented by its column count. */
+const PackingBoxesMatrixPage = ({
   columns,
   data,
   week,
   dayName,
   showSize = true,
-  tenant,
-  pillKey = "commissioning.packing_list_boxes",
   showCountRow = true,
   cellText = (value) => formatComboCount(value),
   t,
@@ -106,7 +90,7 @@ export const PackingBoxesMatrixPage = ({
   });
   return (
     <Page size="A4" orientation={orientation} style={listStyles.page}>
-      <ListPDFHeader tenant={tenant} pill={t(pillKey)}>
+      <ListPDFHeader pill={t("commissioning.packing_list_boxes")}>
           <Text style={listStyles.title}>
             {t("commissioning.KW")} {week} · {dayName}
           </Text>
@@ -274,7 +258,7 @@ export const PackingBoxesMatrixPage = ({
           ))}
 
           {/* Box-count row (per combination in the current scope) — last row.
-              Hidden on the member per-share list, which has no box count. */}
+              Hidden on the per-share matrix, which has no box count. */}
           {showCountRow && (
           <View
             style={[listStyles.tableRow, localStyles.countRow]}

@@ -17,7 +17,8 @@ Output shape (consumed by ``PackingListBoxes.tsx``)::
     {
       "columns": [ { key, base_variation_id, base_size, base_sort_order,
                      base_share_type_id, base_share_type_name,
-                     base_share_type_sort_index, add_ons: [...], count } ],
+                     base_share_type_sort_index, base_is_packed_bulk,
+                     add_ons: [...], count } ],
       "rows":    [ { id, share_article_id, share_article_name, unit, size,
                      note, "<combo_key>": <per-box quantity>, ... } ],
     }
@@ -783,6 +784,7 @@ class PackingListBoxesMatrixService:
                         "base_share_type_short_name": "",
                         # Orphan "no base" group sorts after every real base.
                         "base_share_type_sort_index": len(base_rank),
+                        "base_is_packed_bulk": False,
                         "add_ons": add_ons,
                         "count": count,
                     }
@@ -802,6 +804,7 @@ class PackingListBoxesMatrixService:
                         base_share_type.short_name or base_share_type.name or ""
                     ),
                     "base_share_type_sort_index": base_rank[base_share_type.id],
+                    "base_is_packed_bulk": base_variation.is_packed_bulk,
                     "add_ons": add_ons,
                     "count": count,
                 }
@@ -867,6 +870,7 @@ class PackingListBoxesMatrixService:
             "share_type_id": share_type.id,
             "share_type_short_name": share_type.short_name or share_type.name or "",
             "share_type_sort_index": addon_rank[share_type.id],
+            "is_packed_bulk": variation.is_packed_bulk,
         }
 
     @staticmethod

@@ -44,6 +44,7 @@ const addOn = (shortName: string, size: string, rank: number): PackingBoxesMatri
   share_type_id: `st-${shortName}`,
   share_type_short_name: shortName,
   share_type_sort_index: rank,
+  is_packed_bulk: false,
 });
 
 type BaseShareType = { id: string; shortName: string; rank: number };
@@ -67,6 +68,7 @@ function combination(
     base_share_type_name: base.shortName,
     base_share_type_short_name: base.shortName,
     base_share_type_sort_index: base.rank,
+    base_is_packed_bulk: false,
     add_ons: addOns,
     count: 1,
   };
@@ -82,6 +84,7 @@ const orphan = (key: string, addOns: PackingBoxesMatrixAddOn[], baseCount: numbe
   base_share_type_name: "",
   base_share_type_short_name: "",
   base_share_type_sort_index: baseCount,
+  base_is_packed_bulk: false,
   add_ons: addOns,
   count: 1,
 });

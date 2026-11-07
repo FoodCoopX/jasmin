@@ -48,6 +48,12 @@ export const pdfTheme = {
 
     // Brand
     brand: "#1d603e",
+    brandSurface: "#eef4f0",
+
+    // The share-type bands of the sheets printed for a delivery station (the
+    // members' notice and the pickup list); which share type gets which is
+    // up to ``useStationSheetLabels``.
+    shareTints: ["#e7f0ea", "#f6eddc", "#e3ecf4", "#eeeaf3"],
 
     // Status / accent
     accent: {

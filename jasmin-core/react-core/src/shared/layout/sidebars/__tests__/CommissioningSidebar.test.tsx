@@ -199,7 +199,7 @@ describe("CommissioningSidebar", () => {
     expect(linkedRoutes().has(shareImport)).toBe(false);
   });
 
-  it("drops the delivery-station pages where a host keeps its pickup locations", () => {
+  it("keeps only the members' notices where a host keeps its pickup locations", () => {
     capabilities.delivery_stations = false;
 
     const routes = linkedRoutes();
@@ -207,7 +207,15 @@ describe("CommissioningSidebar", () => {
     for (const route of deliveryStationPages) {
       expect(routes.has(route), route).toBe(false);
     }
+    expect(routes.has("/commissioning/station-notices")).toBe(true);
     expect(routes.has("/commissioning/list-storages")).toBe(true);
+  });
+
+  it("offers the members' notices on the pickup lists, not on a page of their own", () => {
+    const routes = linkedRoutes();
+
+    expect(routes.has("/commissioning/delivery-stations-details")).toBe(true);
+    expect(routes.has("/commissioning/station-notices")).toBe(false);
   });
 
   it("links the bulk packing list in bulk packing", () => {

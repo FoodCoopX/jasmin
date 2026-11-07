@@ -43,6 +43,7 @@ export const HONEY_SMALL: PackingBoxesMatrixAddOn = {
   share_type_id: "st-honey",
   share_type_short_name: "Honey",
   share_type_sort_index: 1,
+  is_packed_bulk: false,
 };
 
 /** A box with a base share of one size (or none) and the add-ons packed into it. */
@@ -63,6 +64,7 @@ export const box = (
   base_share_type_short_name: base?.shareType ?? "",
   // Vegetables first; honey, and boxes without a base share, after them.
   base_share_type_sort_index: !base || base.shareType === "Honey" ? 1 : 0,
+  base_is_packed_bulk: false,
   add_ons: addOns,
   count,
 });

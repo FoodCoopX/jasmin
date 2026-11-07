@@ -21,6 +21,7 @@ const column = (
   base_share_type_name: "Vegetables",
   base_share_type_short_name: "Veg",
   base_share_type_sort_index: 1,
+  base_is_packed_bulk: false,
   add_ons: addOns,
   count: 3,
 });
@@ -44,6 +45,7 @@ describe("filterBulkComboColumns", () => {
       share_type_id: "st-2",
       share_type_short_name: "Fruit",
       share_type_sort_index: 2,
+      is_packed_bulk: false,
     };
     const kept = filterBulkComboColumns([column("box+bulk", "var-box", [addOn])], bulk);
     expect(kept).toHaveLength(1);

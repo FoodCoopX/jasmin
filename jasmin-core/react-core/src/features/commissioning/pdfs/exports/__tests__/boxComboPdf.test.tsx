@@ -61,6 +61,7 @@ const column = (
   base_share_type_name: "Vegetables",
   base_share_type_short_name: "VEG",
   base_share_type_sort_index: 0,
+  base_is_packed_bulk: false,
   add_ons: [],
   count: 1,
   ...overrides,

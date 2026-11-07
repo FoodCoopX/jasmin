@@ -120,6 +120,7 @@ import type {
   CommissioningPackingListBulkListParams,
   CommissioningPackingListListParams,
   CommissioningPackingListMemberAmountsRetrieveParams,
+  CommissioningPackingListStationContentsRetrieveParams,
   CommissioningPaymentCyclesListParams,
   CommissioningPlotsListParams,
   CommissioningPurchaseCostByWeekListParams,
@@ -346,6 +347,7 @@ import type {
   ShareWeightsByWeek,
   ShareWeightsSummary,
   SharesDeliveryDay,
+  StationContents,
   StationMemberMatrix,
   StockComparison,
   Storage,
@@ -18404,6 +18406,96 @@ export function useCommissioningPackingListMemberAmountsRetrieve<TData = Awaited
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getCommissioningPackingListMemberAmountsRetrieveQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * The shares collected at a delivery station on a week + delivery day, each with what one share holds — the notice members read at the station. One entry per physical share type variation somebody collects there (a virtual one counts as its physical components), boxed and loose alike; the amounts are ShareContent.amount, not multiplied by demand.
+ */
+export const commissioningPackingListStationContentsRetrieve = (
+    params: CommissioningPackingListStationContentsRetrieveParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<StationContents>(
+      {url: `/api/commissioning/packing_list/station_contents/`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getCommissioningPackingListStationContentsRetrieveQueryKey = (params?: CommissioningPackingListStationContentsRetrieveParams,) => {
+    return [
+    `/api/commissioning/packing_list/station_contents/`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getCommissioningPackingListStationContentsRetrieveQueryOptions = <TData = Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError = ErrorResponse>(params: CommissioningPackingListStationContentsRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCommissioningPackingListStationContentsRetrieveQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>> = ({ signal }) => commissioningPackingListStationContentsRetrieve(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CommissioningPackingListStationContentsRetrieveQueryResult = NonNullable<Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>>
+export type CommissioningPackingListStationContentsRetrieveQueryError = ErrorResponse
+
+
+export function useCommissioningPackingListStationContentsRetrieve<TData = Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError = ErrorResponse>(
+ params: CommissioningPackingListStationContentsRetrieveParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCommissioningPackingListStationContentsRetrieve<TData = Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError = ErrorResponse>(
+ params: CommissioningPackingListStationContentsRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCommissioningPackingListStationContentsRetrieve<TData = Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError = ErrorResponse>(
+ params: CommissioningPackingListStationContentsRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useCommissioningPackingListStationContentsRetrieve<TData = Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError = ErrorResponse>(
+ params: CommissioningPackingListStationContentsRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof commissioningPackingListStationContentsRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCommissioningPackingListStationContentsRetrieveQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

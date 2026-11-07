@@ -2,7 +2,7 @@
  * PackingListBulk: how much of each article one delivery station needs on one
  * delivery day, summed over every share type. Rendered through the real week,
  * day and station selectors, EditableTable, column hooks, phone card and PDF
- * download buttons. The generated commissioning client is the mocking
+ * download button. The generated commissioning client is the mocking
  * boundary: its hooks are real TanStack queries around spies that answer from
  * an in-memory farm. The PDF library, the PDF templates and the browser
  * download are stubbed, so no real PDF is rendered.
@@ -19,7 +19,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   DeliveryStation,
-  PackingBoxesMatrix,
   PackingListBulkRow,
   Share,
   SharesDeliveryDay,
@@ -75,7 +74,6 @@ const api = vi.hoisted(() => ({
   stations: vi.fn(),
   shareArticles: vi.fn(),
   bulkList: vi.fn(),
-  memberAmounts: vi.fn(),
 }));
 
 vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
@@ -115,30 +113,18 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
     ),
     getCommissioningPackingListBulkListQueryKey: (params?: unknown) =>
       queryKey("packing_list_bulk", params),
-    useCommissioningPackingListMemberAmountsRetrieve: queryHook(
-      "packing_list/member_amounts",
-      api.memberAmounts,
-    ),
   };
 });
 
-// The page only needs the two download buttons; the barrel would also load
-// every other PDF template of the app.
+// The page only needs its download button; the barrel would also load every
+// other PDF template of the app.
 vi.mock("@features/commissioning/pdfs", async () => ({
   PackingListBulkPDFGenerator: (
     await import("@features/commissioning/pdfs/exports/PackingListBulkPDFGenerator")
   ).default,
-  PackingBoxesMatrixPDFGenerator: (
-    await import("@features/commissioning/pdfs/exports/PackingBoxesMatrixPDFGenerator")
-  ).default,
 }));
 vi.mock("@features/commissioning/pdfs/exports/PackingListBulkPDF", () => ({
   default: function PackingListBulkPDF() {
-    return null;
-  },
-}));
-vi.mock("@features/commissioning/pdfs/exports/PackingBoxesMatrixPDF", () => ({
-  default: function PackingBoxesMatrixPDF() {
     return null;
   },
 }));
@@ -228,37 +214,6 @@ const POTATOES = bulkRow(MARKET, "Potatoes", 25);
 const BEETROOT = bulkRow(MARKET, "Beetroot", 6);
 const PUMPKINS = bulkRow(SCHOOL, "Pumpkins", 8, { unit: "PCS" });
 
-/** "What you may take": one column per share size, the amount per share. */
-const MEMBER_AMOUNTS: PackingBoxesMatrix = {
-  columns: [
-    {
-      key: "var-small",
-      base_variation_id: "var-small",
-      base_size: "S",
-      base_sort_order: 1,
-      base_share_type_id: "st-vegetables",
-      base_share_type_name: "Vegetables",
-      base_share_type_short_name: "Veg",
-      base_share_type_sort_index: 1,
-      add_ons: [],
-      count: 0,
-    },
-  ],
-  // The amount per share sits under the column key, which the generated row
-  // type leaves out.
-  rows: [
-    {
-      id: "row-carrots",
-      share_article_id: "sa-Carrots",
-      share_article_name: "Carrots",
-      unit: "KG",
-      size: "M",
-      note: "",
-      "var-small": 0.5,
-    } as PackingBoxesMatrix["rows"][number],
-  ],
-};
-
 type ListParams = { day_number: number; delivery_station?: string };
 
 /** What the in-memory farm holds; the request spies answer from it. */
@@ -267,7 +222,6 @@ let farm: {
   stationsByDeliveryDay: Record<string, DeliveryStation[]>;
   shares: Share[];
   bulkRows: Record<string, PackingListBulkRow[]>;
-  memberAmounts: Record<string, PackingBoxesMatrix>;
 };
 
 /** The delivery day and station a packing list belongs to. */
@@ -293,7 +247,6 @@ const DAY = "common.delivery_day";
 const STATION = "placeholder.delivery_station_selector";
 const WEEK = "common.week";
 const DOWNLOAD_LIST = /download\.packing_list_bulk$/;
-const DOWNLOAD_MEMBER_SHEET = /download\.packing_list_bulk_member$/;
 
 /** The label a selector shows for its current value. */
 function selectedIn(name: string): string {
@@ -367,7 +320,6 @@ function pending<T>() {
 }
 
 const lastListRequest = () => api.bulkList.mock.lastCall?.[0];
-const lastMemberSheetRequest = () => api.memberAmounts.mock.lastCall?.[0];
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -389,7 +341,6 @@ beforeEach(() => {
       [dayAndStation(FRIDAY, SCHOOL.id)]: [PUMPKINS],
       [dayAndStation(FRIDAY, MARKET.id)]: [BEETROOT],
     },
-    memberAmounts: { [dayAndStation(TUESDAY, FARM_SHOP.id)]: MEMBER_AMOUNTS },
   };
   api.deliveryDays.mockReset().mockImplementation(async () => [...farm.deliveryDays]);
   api.stations
@@ -409,15 +360,6 @@ beforeEach(() => {
       ...(farm.bulkRows[dayAndStation(params.day_number, params.delivery_station)] ??
         []),
     ]);
-  api.memberAmounts
-    .mockReset()
-    .mockImplementation(
-      async (params: ListParams) =>
-        farm.memberAmounts[dayAndStation(params.day_number, params.delivery_station)] ?? {
-          columns: [],
-          rows: [],
-        },
-    );
 });
 
 afterEach(() => {
@@ -442,7 +384,6 @@ describe("PackingListBulk loading", () => {
       is_past: false,
       delivery_station: FARM_SHOP.id,
     });
-    expect(lastMemberSheetRequest()).toEqual(lastListRequest());
     expect(screen.getByText("explainers.packing_list_bulk")).toBeInTheDocument();
   });
 
@@ -455,7 +396,6 @@ describe("PackingListBulk loading", () => {
     expect(screen.getByText("commissioning.please_select_delivery_station")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(api.bulkList).not.toHaveBeenCalled();
-    expect(api.memberAmounts).not.toHaveBeenCalled();
 
     stations.answer([FARM_SHOP, MARKET]);
 
@@ -526,7 +466,6 @@ describe("PackingListBulk packing rows", () => {
       delivery_station: FARM_SHOP.id,
       is_packed_bulk: true,
     });
-    expect(lastMemberSheetRequest()).toMatchObject({ is_packed_bulk: true });
   });
 
   it("counts every share size when the farm packs everything in bulk", async () => {
@@ -535,7 +474,6 @@ describe("PackingListBulk packing rows", () => {
     await screen.findByText("Carrots");
 
     expect(lastListRequest()).not.toHaveProperty("is_packed_bulk");
-    expect(lastMemberSheetRequest()).not.toHaveProperty("is_packed_bulk");
   });
 });
 
@@ -658,7 +596,6 @@ describe("PackingListBulk choosing the week, day and station", () => {
     await userEvent.click(arrow(WEEK, "common.previous"));
     await waitFor(() => expect(lastListRequest()).toMatchObject({ delivery_week: 39 }));
     expect(lastListRequest()).toMatchObject({ is_past: true });
-    expect(lastMemberSheetRequest()).toMatchObject({ delivery_week: 39, is_past: true });
   });
 });
 
@@ -762,62 +699,24 @@ describe("PackingListBulk downloads", () => {
     ]);
   });
 
-  it("prints the members' sheet with the amount per share size under the farm's name and logo", async () => {
-    renderPage();
-    await screen.findByText("Carrots");
-    const download = screen.getByRole("button", { name: DOWNLOAD_MEMBER_SHEET });
-    await waitFor(() => expect(download).toBeEnabled());
-
-    await userEvent.click(download);
-
-    await waitFor(() =>
-      expect(printed.files).toEqual([
-        `commissioning.packing_list_bulk_member_${weekAndDay}.pdf`,
-      ]),
-    );
-    const [{ template, props }] = printed.documents;
-    expect(template).toBe("PackingBoxesMatrixPDF");
-    expect(props).toMatchObject({
-      columns: MEMBER_AMOUNTS.columns,
-      week: 41,
-      dayName: "COMMON.WEEKDAY_TUESDAY",
-      pillKey: "commissioning.packing_list_bulk_member",
-      showCountRow: false,
-      tenant: {
-        name: "Green Acres",
-        logoUrl: "https://example.test/logo.png",
-        email: "office@example.test",
-        phone: "+49 30 1234567",
-      },
-    });
-    expect(props.data).toEqual([
-      expect.objectContaining({
-        share_article_name: "Carrots",
-        unit_label: "commissioning.units.kg",
-        "var-small": 0.5,
-      }),
-    ]);
-    // Each share size's amount prints at its unit's precision in the farm's
-    // number format, as the box list prints its cells; no amount stays blank.
-    const cellText = props.cellText as (value: unknown, item: Record<string, unknown>) => string;
-    const [carrots] = props.data as Record<string, unknown>[];
-    expect(cellText(carrots["var-small"], carrots)).toBe("0,50");
-    expect(cellText(3, { ...carrots, unit: "PCS" })).toBe("3,0");
-    expect(cellText(0, carrots)).toBe("");
-    expect(cellText(null, carrots)).toBe("");
-  });
-
-  it("says there is nothing to pack and keeps both downloads disabled", async () => {
+  it("says there is nothing to pack and keeps the download disabled", async () => {
     farm.bulkRows = {};
-    farm.memberAmounts = {};
     renderPage();
 
-    await waitFor(() => expect(api.memberAmounts).toHaveBeenCalled());
+    await waitFor(() => expect(api.bulkList).toHaveBeenCalled());
     await waitFor(() => expect(tableIsBusy()).toBe(false));
     expect(screen.getByText("table.no_data")).toBeInTheDocument();
     expect(bodyRows()).toHaveLength(0);
     expect(screen.getByRole("button", { name: DOWNLOAD_LIST })).toBeDisabled();
-    expect(screen.getByRole("button", { name: DOWNLOAD_MEMBER_SHEET })).toBeDisabled();
+  });
+
+  it("offers the packing list as its only download", async () => {
+    renderPage();
+    await screen.findByText("Carrots");
+
+    expect(screen.getAllByRole("button", { name: /download\./ })).toEqual([
+      screen.getByRole("button", { name: DOWNLOAD_LIST }),
+    ]);
   });
 });
 
@@ -829,7 +728,6 @@ describe("PackingListBulk when the list cannot be loaded", () => {
     await screen.findByText("Carrots");
     const marketList = pending<PackingListBulkRow[]>();
     api.bulkList.mockImplementation(() => marketList.promise);
-    api.memberAmounts.mockRejectedValue(new Error("Network Error"));
 
     await choose(STATION, "Market");
 
@@ -843,7 +741,6 @@ describe("PackingListBulk when the list cannot be loaded", () => {
     await waitFor(() => expect(tableIsBusy()).toBe(false));
     expect(bodyRows()).toHaveLength(0);
     expect(screen.getByRole("button", { name: DOWNLOAD_LIST })).toBeDisabled();
-    expect(screen.getByRole("button", { name: DOWNLOAD_MEMBER_SHEET })).toBeDisabled();
 
     api.bulkList.mockImplementation(async () => [CARROTS]);
     await choose(STATION, "Farm shop");
@@ -931,7 +828,6 @@ describe("PackingListBulk on a phone", () => {
     await screen.findByText("Carrots");
 
     expect(screen.queryByRole("button", { name: DOWNLOAD_LIST })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: DOWNLOAD_MEMBER_SHEET })).not.toBeInTheDocument();
     expect(screen.queryByText("commissioning.packing_day")).not.toBeInTheDocument();
     expect(screen.queryByText("explainers.packing_list_bulk")).not.toBeInTheDocument();
   });

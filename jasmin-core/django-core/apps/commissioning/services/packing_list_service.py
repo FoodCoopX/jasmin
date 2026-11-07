@@ -602,6 +602,7 @@ class PackingListService:
                     share_type.short_name or share_type.name or ""
                 ),
                 "base_share_type_sort_index": share_type_rank[share_type.id],
+                "base_is_packed_bulk": variation.is_packed_bulk,
                 "add_ons": [],
                 "count": 0,
             }

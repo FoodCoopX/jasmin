@@ -23,6 +23,7 @@ export {
   amountCellText,
   decimalsForUnit,
   formatAmountForUnit,
+  formatMemberAmount,
   renderNumber,
 } from './amountFormat';
 export { getShareOptionLabel } from './shareOptionLabel';

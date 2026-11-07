@@ -9,9 +9,10 @@ import DirectionsBikeIcon from "@mui/icons-material/DirectionsBike";
 /**
  * The commissioning sidebar's delivery-station links: the section with the
  * tour and pickup lists (and the station-fee billing), and the station and
- * tour lists for the data section. Both are empty where the host keeps its
- * pickup locations itself, as it then handles the stations, the tours and the
- * pickup lists on its side.
+ * tour lists for the data section. Where the host keeps its pickup locations
+ * itself, it handles the stations, the tours and the pickup lists on its side:
+ * the section then holds only the members' notices, which the pickup-list page
+ * offers otherwise, and the data section none.
  */
 export function useDeliveryStationNavItems() {
   const { t } = useTranslation();
@@ -32,11 +33,7 @@ export function useDeliveryStationNavItems() {
       Number(station.fee_per_year_net) > 0,
   );
 
-  if (!offersDeliveryStations) {
-    return { deliveryStationSection: [], deliveryStationListItems: [] };
-  }
-
-  const deliveryStationSection: RoleGatedItem[] = [
+  const section = (children: RoleGatedItem[]): RoleGatedItem[] => [
     {
       key: "commissioning-delivery-stations",
 
@@ -47,47 +44,67 @@ export function useDeliveryStationNavItems() {
           {t("commissioning.delivery_stations")}
         </div>
       ),
-      children: [
-        {
-          key: "commissioning-delivery-stations-overview",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/delivery-stations-overview">
-              {t("commissioning.tour_lists")}
-            </Link>
-          ),
-        },
-        {
-          key: "commissioning-delivery-stations-details",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/delivery-stations-details">
-              {t("commissioning.pickup_lists")}
-            </Link>
-          ),
-        },
-
-        // Only when at least one station actually charges a fee — most solawis
-        // don't, so hide the billing entirely for them.
-        ...(has_station_fees
-          ? [
-              {
-                key: "commissioning-delivery-station-fees",
-
-                requireRole: "isOffice" as const,
-                label: (
-                  <Link to="/commissioning/delivery-station-fees">
-                    {t("commissioning.station_fees")}
-                  </Link>
-                ),
-              },
-            ]
-          : []),
-      ],
+      children,
     },
   ];
+
+  if (!offersDeliveryStations) {
+    return {
+      deliveryStationSection: section([
+        {
+          key: "commissioning-station-notices",
+
+          requireRole: "isStaff",
+          label: (
+            <Link to="/commissioning/station-notices">
+              {t("commissioning.station_contents.page_title")}
+            </Link>
+          ),
+        },
+      ]),
+      deliveryStationListItems: [],
+    };
+  }
+
+  const deliveryStationSection = section([
+    {
+      key: "commissioning-delivery-stations-overview",
+
+      requireRole: "isStaff",
+      label: (
+        <Link to="/commissioning/delivery-stations-overview">
+          {t("commissioning.tour_lists")}
+        </Link>
+      ),
+    },
+    {
+      key: "commissioning-delivery-stations-details",
+
+      requireRole: "isStaff",
+      label: (
+        <Link to="/commissioning/delivery-stations-details">
+          {t("commissioning.pickup_lists")}
+        </Link>
+      ),
+    },
+
+    // Only when at least one station actually charges a fee — most solawis
+    // don't, so hide the billing entirely for them.
+    ...(has_station_fees
+      ? [
+          {
+            key: "commissioning-delivery-station-fees",
+
+            requireRole: "isOffice" as const,
+            label: (
+              <Link to="/commissioning/delivery-station-fees">
+                {t("commissioning.station_fees")}
+              </Link>
+            ),
+          },
+        ]
+      : []),
+  ]);
   const deliveryStationListItems: RoleGatedItem[] = [
     {
       key: "commissioning-list-delivery-stations",
