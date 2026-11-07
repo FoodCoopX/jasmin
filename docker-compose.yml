@@ -115,7 +115,7 @@ x-logging: &default-logging
 # (separate ``glitchtip`` DB) and redis (db index 2), a GlitchTip event spike,
 # a runaway Huey job, or a heavy WeasyPrint render could OOM the host and take
 # down the single-instance postgres (a SPOF for the whole platform). The caps
-# bound the blast radius: the observability stack (glitchtip-web/worker,
+# bound the blast radius: the observability stack (the glitchtip services,
 # uptime-kuma) is capped well below postgres/backend so it can't starve the DB,
 # and postgres carries a memory reservation. Values target an ~8 GB / 4-core
 # host — TUNE THEM to the actual host (sum of mem_limit should leave headroom
@@ -506,12 +506,13 @@ services:
   # and set ``VITE_SENTRY_DSN`` to the public URL. Until then,
   # frontend errors stay in the browser console.
   glitchtip-web:
-    # Pinned to a specific published patch (not the floating ``v4`` major tag)
-    # for reproducible observability deploys — same rationale as the certbot
-    # pin below. A floating major can silently pull a release with breaking
+    # Pinned to a specific published patch (not a floating major tag) for
+    # reproducible observability deploys — same rationale as the certbot pin
+    # below. A floating major can silently pull a release with breaking
     # migrations against the SHARED prod postgres (glitchtip DB on the same
-    # instance). Bump deliberately via the docker Dependabot entry.
-    image: glitchtip/glitchtip:v4.1.0
+    # instance). Bump deliberately via the docker Dependabot entry; the three
+    # glitchtip services run the same image.
+    image: glitchtip/glitchtip:6.2.6
     restart: unless-stopped
     logging: *default-logging
     # Non-critical observability — capped (incl. CPU) so an event spike can
@@ -526,8 +527,29 @@ services:
       EMAIL_URL: ${GLITCHTIP_EMAIL_URL:-consolemail://}
       DEFAULT_FROM_EMAIL: ${SERVER_EMAIL:-noreply@jasmin.coop}
       GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:?GLITCHTIP_DOMAIN is required}
-      CELERY_WORKER_AUTOSCALE: "1,3"
       ENABLE_USER_REGISTRATION: "false"
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      glitchtip-migrate:
+        condition: service_completed_successfully
+    networks: [jasmin-net]
+
+  glitchtip-migrate:
+    # GlitchTip's web and worker roles don't migrate their database: this
+    # one-shot run does (migrations, cache table, event partitions) before
+    # either starts, then exits.
+    image: glitchtip/glitchtip:6.2.6
+    restart: "no"
+    logging: *default-logging
+    mem_limit: 768m
+    pids_limit: 256
+    cpus: 1.0
+    command: ./bin/run-migrate.sh
+    environment:
+      DATABASE_URL: postgres://${GLITCHTIP_DB_USER:-glitchtip}:${GLITCHTIP_DB_PASSWORD:?GLITCHTIP_DB_PASSWORD is required (create the dedicated glitchtip DB role — see comment above)}@postgres:5432/glitchtip
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
     depends_on:
       postgres: { condition: service_healthy }
@@ -535,33 +557,35 @@ services:
     networks: [jasmin-net]
 
   glitchtip-worker:
-    # Pinned to a specific published patch (not the floating ``v4`` major tag)
-    # for reproducible observability deploys — same rationale as the certbot
-    # pin below. A floating major can silently pull a release with breaking
+    # Pinned to a specific published patch (not a floating major tag) for
+    # reproducible observability deploys — same rationale as the certbot pin
+    # below. A floating major can silently pull a release with breaking
     # migrations against the SHARED prod postgres (glitchtip DB on the same
-    # instance). Bump deliberately via the docker Dependabot entry.
-    image: glitchtip/glitchtip:v4.1.0
+    # instance). Bump deliberately via the docker Dependabot entry; the three
+    # glitchtip services run the same image.
+    image: glitchtip/glitchtip:6.2.6
     restart: unless-stopped
     logging: *default-logging
-    # Non-critical observability — capped (incl. CPU); CELERY_WORKER_AUTOSCALE
-    # 1,3 below can otherwise burst and contend with the app on the shared DB.
+    # Non-critical observability — capped (incl. CPU) so a burst of events
+    # can't contend with the app on the shared DB.
     mem_limit: 768m
     pids_limit: 256
     cpus: 1.0
-    command: ./bin/run-celery-with-beat.sh
     environment:
+      # The image's start script runs the task worker, with its scheduler, in
+      # this role and the web server otherwise.
+      SERVER_ROLE: worker
       DATABASE_URL: postgres://${GLITCHTIP_DB_USER:-glitchtip}:${GLITCHTIP_DB_PASSWORD:?GLITCHTIP_DB_PASSWORD is required (create the dedicated glitchtip DB role — see comment above)}@postgres:5432/glitchtip
       SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
       GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:?GLITCHTIP_DOMAIN is required}
-      CELERY_WORKER_AUTOSCALE: "1,3"
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
       EMAIL_URL: ${GLITCHTIP_EMAIL_URL:-consolemail://}
       DEFAULT_FROM_EMAIL: ${SERVER_EMAIL:-noreply@jasmin.coop}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      glitchtip-web:
-        condition: service_started
+      glitchtip-migrate:
+        condition: service_completed_successfully
     networks: [jasmin-net]
 
   certbot:

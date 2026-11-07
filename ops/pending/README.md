@@ -174,8 +174,9 @@ GlitchTip is never started and `SENTRY_DSN` is unset.
   - Comments on `GLITCHTIP_EMAIL_URL` and on the shared Redis (below).
 - `scripts/deploy.sh` pulls and starts `uptime-kuma` with the core stack, and
   starts `glitchtip-web` / `glitchtip-worker` once the `glitchtip` database
-  exists (before that they would only crash-loop). Its closing hints mention
-  the Kuma tunnel.
+  exists (before that `glitchtip-migrate` can only fail). A failed GlitchTip
+  start logs a warning instead of ending the deploy, so the gateway restart and
+  the health checks still run. Its closing hints mention the Kuma tunnel.
 - `backups/backup.sh` pushes to `KUMA_PUSH_BACKUP_URL` after each nightly run
   (`now` / `scheduled`, not `predeploy` or the 10-minute ledger run):
   `status=up` once the dump is verified and every off-host push went through,
@@ -202,14 +203,14 @@ Not in the patch:
   a service with `image: willfarrell/autoheal:<pinned tag>`, the socket mounted
   read-only, `AUTOHEAL_CONTAINER_LABEL=autoheal`, and the label
   `autoheal: "true"` on `huey` only.
-- **A separate Redis for GlitchTip.** GlitchTip's Celery uses Redis DB 2 on the
-  same instance as huey and the cache. The DB index separates keys, not memory:
-  all share the 384 MB `noeviction` cap, so a Celery backlog that fills it makes
+- **A separate Redis for GlitchTip.** GlitchTip's task queue uses Redis DB 2 on
+  the same instance as huey and the cache. The DB index separates keys, not memory:
+  all share the 384 MB `noeviction` cap, so a task backlog that fills it makes
   Redis refuse huey's enqueues and the cache writes. Watch
   `docker compose exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli info memory'`
   for the first weeks. If GlitchTip's share grows, give it its own small
   `redis:7-alpine` service (its own `mem_limit` and `--maxmemory`, no volume
-  needed) and point both GlitchTip `REDIS_URL`s at it.
+  needed) and point all three GlitchTip `REDIS_URL`s at it.
 
 The Sentry scrubber (`core/sentry_scrub.py`) covers formatted messages, log
 params and exception values, and request bodies are not sent — both are in
@@ -285,9 +286,10 @@ the tree already, so enabling GlitchTip is safe from that side.
    `GLITCHTIP_EMAIL_URL=smtp+tls://<user>:<url-encoded password>@<host>:587`
    (without it GlitchTip sends no alert mail).
 3. Start it: `docker compose up -d glitchtip-web glitchtip-worker` (later
-   deploys start it on their own now that the database exists). Wait for
-   `docker compose logs glitchtip-web` to finish its migrations; check
-   `ss -ltn | grep 8004` shows `127.0.0.1:8004`.
+   deploys start it on their own now that the database exists). Compose first
+   runs `glitchtip-migrate`, which migrates the database and exits, and starts
+   the other two once it has succeeded; `docker compose logs glitchtip-migrate`
+   shows its run. Check `ss -ltn | grep 8004` shows `127.0.0.1:8004`.
 4. Create the superuser:
    `docker compose exec glitchtip-web ./manage.py createsuperuser`
    (registration is off).
