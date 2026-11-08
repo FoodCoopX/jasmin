@@ -21,6 +21,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.authz.permissions import IsAdmin, IsOffice, IsStaff, RolePermissionsMixin
+from apps.shared.packing_mode_hooks import check_packing_mode_switch
 from apps.shared.request_utils import auth_user, body, client_ip, request_tenant
 from core.serializers import ErrorResponseSerializer
 from core.throttling import TenantScopedRateThrottle
@@ -363,6 +364,7 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
             self._validate_numbering_prefixes(new_settings_data)
             self._validate_year_numbering_locks(current_settings, new_settings_data)
             self._validate_coop_shares_bounds(current_settings, new_settings_data)
+            self._validate_packing_mode_switch(current_settings, new_settings_data)
 
             # Close the current version and create the new one — still under
             # the same lock the validations above ran against.
@@ -482,6 +484,22 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
                         f"because {label} already exist.",
                         field=setting_field,
                     )
+
+    @staticmethod
+    def _validate_packing_mode_switch(
+        current_settings: TenantSettings | None, new_settings_data: dict[str, Any]
+    ) -> None:
+        """Hand a changed packing mode to the check commissioning registers:
+        a switch may not change how a running or upcoming share size is
+        packed."""
+        if "packing_mode" not in new_settings_data:
+            return
+        current_mode = (
+            current_settings.packing_mode
+            if current_settings is not None
+            else TenantSettings._meta.get_field("packing_mode").get_default()
+        )
+        check_packing_mode_switch(current_mode, new_settings_data["packing_mode"])
 
     @staticmethod
     def _validate_coop_shares_bounds(

@@ -11,6 +11,7 @@ import type { ComponentType } from "react";
 import { ReactNode } from "react";
 import { blockNonNumericKeys } from "@shared/utils/numberFormat";
 import NumberInput from "@shared/ui/NumberInput";
+import DisabledReasonTooltip from "@shared/ui/DisabledReasonTooltip";
 import ToolTipIcon from "@shared/ui/ToolTipIcon";
 import { RemittanceTemplateInput } from "./RemittanceTemplateInput";
 
@@ -36,6 +37,8 @@ interface SelectOption {
   /** Render the option greyed-out and unselectable (kept visible on purpose,
    *  e.g. a strategy that's temporarily withdrawn but should still be seen). */
   disabled?: boolean;
+  /** Why a disabled option can't be picked, on hover and to screen readers. */
+  disabledReason?: string;
 }
 
 export interface SettingsCategory {
@@ -269,7 +272,13 @@ export const SettingsRenderer = {
                   value={option.value}
                   disabled={option.disabled}
                 >
-                  {option.label}
+                  <DisabledReasonTooltip
+                    reason={option.disabled ? option.disabledReason : null}
+                  >
+                    {(reasonId) => (
+                      <span aria-describedby={reasonId}>{option.label}</span>
+                    )}
+                  </DisabledReasonTooltip>
                 </Option>
               ))}
             </Select>

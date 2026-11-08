@@ -32,6 +32,7 @@ import {
   gatedByPermission,
   periodsOverlap,
   sameCellValue,
+  withNewRowDefaults,
   wrapApiFunctions,
 } from "@shared/tables";
 import type {
@@ -52,6 +53,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Modal, Space, Spin } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import VirtualComponentModal from "./VirtualComponentModal";
 
@@ -64,7 +66,55 @@ interface ShareTypeVariationRecord extends TableRecord {
   used_crate_name?: string;
   can_be_deleted?: boolean;
   picture?: string | null;
+  is_packed_bulk?: boolean;
+  /** ``is_packed_bulk`` as the "mixed" mode's choice; see ``packingColumn``. */
+  packing?: Packing;
   [key: string]: unknown;
+}
+
+type Packing = "BOXED" | "LOOSE";
+
+const startBoxed = withNewRowDefaults<ShareTypeVariationRecord>({
+  packing: "BOXED",
+});
+
+/** The table's ``customEdit``: only "mixed" has a packing choice to start. */
+const newRowStart = (packingMode: string) =>
+  packingMode === "MIXED" ? startBoxed : null;
+
+/**
+ * In the "mixed" packing mode the office chooses for every size whether it is
+ * packed in a box or loose; a new one starts boxed (``startBoxed``), as the
+ * backend saves a size without a choice. The table holds the choice as
+ * ``packing``, which the save turns back into ``is_packed_bulk``; in "boxes"
+ * or "bulk" the backend sets it.
+ */
+function packingColumn(t: TFunction): EditableColumnConfig<ShareTypeVariationRecord> {
+  const label = (packing: unknown) =>
+    packing === "LOOSE"
+      ? t("commissioning.packing_loose")
+      : packing === "BOXED"
+        ? t("commissioning.packing_boxed")
+        : "";
+  return {
+    title: (
+      <div className="text-xs">
+        {t("commissioning.packing")}
+        <ToolTipIcon title={t("tooltip.is_packed_bulk")} />
+      </div>
+    ),
+    dataIndex: "packing",
+    key: "packing",
+    inputType: "select",
+    required: true,
+    options: [
+      { value: "BOXED", label: label("BOXED") },
+      { value: "LOOSE", label: label("LOOSE") },
+    ],
+    render: label,
+    width: "7em",
+    align: "center",
+  };
 }
 
 /**
@@ -292,7 +342,13 @@ export default function ShareTypeVariationModal({
   });
 
   const data = useMemo(
-    () => (rawData ?? []) as unknown as ShareTypeVariationRecord[],
+    () =>
+      ((rawData ?? []) as unknown as ShareTypeVariationRecord[]).map(
+        (row): ShareTypeVariationRecord => ({
+          ...row,
+          packing: row.is_packed_bulk ? "LOOSE" : "BOXED",
+        }),
+      ),
     [rawData],
   );
 
@@ -576,24 +632,7 @@ export default function ShareTypeVariationModal({
           },
         },
         ...trialColumns,
-        ...(packing_mode === "MIXED"
-          ? [
-              {
-                title: (
-                  <div className="text-xs">
-                    {t("commissioning.is_packed_bulk")}
-                    <ToolTipIcon title={t("tooltip.is_packed_bulk")} />
-                  </div>
-                ),
-                dataIndex: "is_packed_bulk",
-                key: "is_packed_bulk",
-                inputType: "checkbox",
-                required: false,
-                width: "6em",
-                align: "center" as const,
-              },
-            ]
-          : []),
+        ...(packing_mode === "MIXED" ? [packingColumn(t)] : []),
         // ---- On-off (per-delivery opt-in) columns ------------------
         // Hidden when the tenant hasn't enabled the feature OR this share type
         // has jokers (jokers and opt-in are mutually exclusive). Backend
@@ -664,9 +703,11 @@ export default function ShareTypeVariationModal({
 
   const customSave = useCallback(
     (transformedData: Record<string, unknown>, record: TableRecord) => {
+      const { packing, ...fields } = transformedData;
       const variation: Record<string, unknown> = {
-        ...transformedData,
+        ...fields,
         share_type,
+        ...(packing ? { is_packed_bulk: packing === "LOOSE" } : {}),
       };
       if (sortOrderTaken(data, variation, record)) {
         const message = t("validation.unique.sort_order");
@@ -725,6 +766,7 @@ export default function ShareTypeVariationModal({
               onDeleteSuccess={handleDeleteSuccess}
               permissions={permissions}
               customSave={customSave}
+              customEdit={newRowStart(packing_mode)}
               forceInlineMode={true}
             />
             <DateRangeStatusLegend />

@@ -115,3 +115,11 @@ class CommissioningConfig(AppConfig):
         # ``body`` and would just duplicate the diff line.
         auditlog.register(ConsentDocument, exclude_fields=["body_sha256"])
         auditlog.register(ConsentRecord)
+
+        # The tenant settings refuse a packing mode switch that would change
+        # how a running or upcoming share size is packed.
+        from apps.shared.packing_mode_hooks import set_packing_mode_switch_guard
+
+        from .services.packing_mode import refuse_packing_mode_switch
+
+        set_packing_mode_switch_guard(refuse_packing_mode_switch)

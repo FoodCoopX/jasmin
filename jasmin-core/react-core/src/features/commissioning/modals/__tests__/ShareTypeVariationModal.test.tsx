@@ -294,21 +294,23 @@ async function pickDate(label: string, isoDate: string) {
   await userEvent.click(cell);
 }
 
-async function pickSize(size: string) {
+async function pick(select: string, title: string) {
   await userEvent.click(
-    within(editingRow()).getByRole("combobox", { name: "commissioning.size" }),
+    within(editingRow()).getByRole("combobox", { name: select }),
   );
   const option = await waitFor(() => {
     const match = Array.from(
       document.querySelectorAll<HTMLElement>(
         ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option",
       ),
-    ).find((item) => item.getAttribute("title") === `commissioning.${size}`);
-    if (!match) throw new Error(`No size ${size} is offered`);
+    ).find((item) => item.getAttribute("title") === title);
+    if (!match) throw new Error(`No ${title} is offered`);
     return match;
   });
   await userEvent.click(option);
 }
+
+const pickSize = (size: string) => pick("commissioning.size", `commissioning.${size}`);
 
 async function typeInto(label: string, text: string) {
   const input = within(editingRow()).getByLabelText(label);
@@ -417,7 +419,7 @@ describe("ShareTypeVariationModal loading", () => {
         .map((header) => header.textContent ?? "");
 
     expect(headers().join("|")).not.toMatch(
-      /allowed_for_trial_subscription|is_packed_bulk|requires_optin/,
+      /allowed_for_trial_subscription|commissioning\.packing|requires_optin/,
     );
   });
 
@@ -435,7 +437,7 @@ describe("ShareTypeVariationModal loading", () => {
       .map((header) => header.textContent ?? "")
       .join("|");
     expect(headers).toMatch(/commissioning\.allowed_for_trial_subscription/);
-    expect(headers).toMatch(/commissioning\.is_packed_bulk/);
+    expect(headers).toMatch(/commissioning\.packing/);
     expect(headers).toMatch(/commissioning\.requires_optin/);
   });
 
@@ -525,6 +527,28 @@ describe("ShareTypeVariationModal sizes over time", () => {
         within(rowWithCapacity(100)).getByText("01.11.2026"),
       ).toBeInTheDocument(),
     );
+  });
+
+  it.each([
+    ["starts a new size in mixed packing mode as boxed", null, false],
+    ["saves a new size in mixed packing mode as loose when chosen", "commissioning.packing_loose", true],
+  ])("%s", async (_, choice, loose) => {
+    tenantSettings.values = { packing_mode: "MIXED" };
+    renderModal();
+    await loaded();
+
+    await startNewVariation();
+    await pickSize("L");
+    await pickDate(VALID_FROM, "2026-10-12");
+    await typeInto(SORT_ORDER, "3");
+    if (choice) await pick("commissioning.packing", choice);
+    await save();
+
+    await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
+    expect(api.create.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ size: "L", is_packed_bulk: loose }),
+    );
+    expect(api.create.mock.calls[0][0]).not.toHaveProperty("packing");
   });
 
   it("brings back a size that has ended, with the sort order it had", async () => {

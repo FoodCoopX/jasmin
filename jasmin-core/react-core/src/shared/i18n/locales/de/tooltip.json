@@ -75,7 +75,7 @@
   "explainer_csv_validate": "Probelauf: prüft jede Zeile (inkl. Verweise wie Mitgliedsnummer/Variante), ohne etwas zu speichern.",
   "harvesting_crate_forecast": "Prognose der zu erntenden Kisten",
   "hash_consent_documents": "Hash der eingelesenen Zustimmungstexte — Änderungen lassen alte Zustimmungen ungültig werden.",
-  "is_packed_bulk": "Wenn aktiv, wird der Artikel lose (nicht in Kisten verpackt) ausgegeben; Mitglieder stellen sich den Anteil in der Verteilstation selbst zusammen.",
+  "is_packed_bulk": "Kiste: der Anteil kommt vorgepackt in die Verteilstation. Lose: Mitglieder stellen sich ihren Anteil dort selbst zusammen.",
   "must_be_subscribed_to": "Setzt voraus, dass eine andere Variante abonniert ist.",
   "needs_complex_planning": "An: wöchentlich wechselnde Planung wie bei Ernteanteilen. Aus: einfache, gleichbleibende Planung – einmal festlegen, gilt über alle Wochen.",
   "price_sum_articles": "Summe der Artikelpreise (zur Plausibilitätsprüfung).",

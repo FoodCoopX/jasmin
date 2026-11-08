@@ -12,7 +12,8 @@ import { todayApiDate } from "@shared/utils/apiDate";
  *
  * The weight statistics follow the boxes, as only boxes are weighed: box
  * packing, or ``MIXED`` while a current or upcoming physical variation is
- * packed in boxes.
+ * packed in boxes. The tour lists show each tour's boxes, so bulk packing
+ * leaves them out too.
  */
 export function usePackingListVisibility() {
   const { getSetting } = useTenant();
@@ -37,6 +38,7 @@ export function usePackingListVisibility() {
       packingMode === "BULK" ||
       (packingMode === "MIXED" && packsSomeVariationInBulk),
     showBoxesPackingList: packingMode === "BOXES" || packingMode === "MIXED",
+    showTourLists: packingMode !== "BULK",
     showWeightStatistics:
       packingMode === "BOXES" ||
       (packingMode === "MIXED" && packsSomeVariationInBoxes),

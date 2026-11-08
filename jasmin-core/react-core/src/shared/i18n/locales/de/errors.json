@@ -269,6 +269,9 @@
   "orderable_item": {
     "reference_invalid": "Eine Position muss genau eine Sache enthalten: entweder ein Angebot oder einen Artikel — nicht beides und nicht nichts."
   },
+  "packing_mode": {
+    "switch_changes_packing": "Der Pack-Modus kann nicht gewechselt werden, solange diese laufenden oder künftigen Größen anders gepackt werden: {{sizes}}. In „gemischt“ wird jede Größe so gepackt, wie bei ihr eingetragen."
+  },
   "packing_list": {
     "amounts_diverge_across_stations": "Die Packmengen unterscheiden sich je nach Verteilstation. Bitte eine Verteilstation (oder Tour) auswählen, um die Packliste anzuzeigen."
   },

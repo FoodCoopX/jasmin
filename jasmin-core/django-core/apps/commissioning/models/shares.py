@@ -239,11 +239,11 @@ class ShareTypeVariation(JasminModel, TimeBoundMixin):
         blank=True,
         related_name="+",
     )
-    # Per-variation override used in MIXED packing mode. Only consulted
-    # when ``TenantSettings.packing_mode == "MIXED"``: variations with
+    # Per-variation override used in MIXED packing mode: variations with
     # ``is_packed_bulk=True`` go onto the bulk packing list and ones with
-    # ``False`` go onto the boxes packing list. Ignored in pure BULK or
-    # BOXES modes (everything goes onto the single matching list).
+    # ``False`` onto the boxes packing list. Ignored in pure BULK or BOXES
+    # modes, where a size saved takes the flag that matches the mode
+    # (``services/packing_mode.py``).
     is_packed_bulk = models.BooleanField(default=False)
 
     # ---- On-off (per-delivery opt-in) semantics --------------------

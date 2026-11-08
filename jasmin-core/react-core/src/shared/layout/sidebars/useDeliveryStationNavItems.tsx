@@ -6,6 +6,8 @@ import { Link } from "react-router-dom";
 
 import DirectionsBikeIcon from "@mui/icons-material/DirectionsBike";
 
+import { usePackingListVisibility } from "./usePackingListVisibility";
+
 /**
  * The commissioning sidebar's delivery-station links: the section with the
  * tour and pickup lists (and the station-fee billing), and the station and
@@ -22,6 +24,7 @@ export function useDeliveryStationNavItems() {
   const offersDeliveryStations = useCapability("delivery_stations");
   const { getSetting } = useTenant();
   const importsShareAmounts = Boolean(getSetting("uploads_weekly_share_amount"));
+  const { showTourLists } = usePackingListVisibility();
 
   // The station-fee billing is only relevant for solawis that actually charge
   // pickup-station fees. Fetch stations only for office users (the only ones who
@@ -70,17 +73,22 @@ export function useDeliveryStationNavItems() {
     };
   }
 
-  const deliveryStationSection = section([
-    {
-      key: "commissioning-delivery-stations-overview",
+  const tourLists: RoleGatedItem[] = showTourLists
+    ? [
+        {
+          key: "commissioning-delivery-stations-overview",
 
-      requireRole: "isStaff",
-      label: (
-        <Link to="/commissioning/delivery-stations-overview">
-          {t("commissioning.tour_lists")}
-        </Link>
-      ),
-    },
+          requireRole: "isStaff",
+          label: (
+            <Link to="/commissioning/delivery-stations-overview">
+              {t("commissioning.tour_lists")}
+            </Link>
+          ),
+        },
+      ]
+    : [];
+  const deliveryStationSection = section([
+    ...tourLists,
     {
       key: "commissioning-delivery-stations-details",
 

@@ -233,6 +233,14 @@ describe("CommissioningSidebar", () => {
     expect(linkedRoutes().has(bulkPackingList)).toBe(true);
   });
 
+  it("drops the tour lists where every share is packed loose", () => {
+    settings.packing_mode = "BULK";
+    expect(linkedRoutes().has("/commissioning/delivery-stations-overview")).toBe(false);
+
+    settings.packing_mode = "MIXED";
+    expect(linkedRoutes().has("/commissioning/delivery-stations-overview")).toBe(true);
+  });
+
   it("links the bulk packing list in mixed packing while a variation is packed in bulk", () => {
     settings.packing_mode = "MIXED";
     physical.variations = [packedInBoxes, packedInBulk];

@@ -22,6 +22,7 @@ from ..models import (
     ShareTypeVariationGrossPrice,
     Subscription,
 )
+from ..services.packing_mode import apply_packing_mode
 from ..services.shares_day_change_service import SHARE_DAY_FIELDS
 from ..utils.capacity_window import build_capacity_by_week, parse_capacity_window
 from ..utils.dynamic_keys import AMOUNT_KEY_PREFIX, DAY_VARIATION_RE
@@ -308,7 +309,7 @@ class ShareTypeVariationSerializer(
                     share_type_from=share_type.valid_from,
                     share_type_until=share_type.valid_until,
                 )
-        return attrs
+        return apply_packing_mode(attrs, creating=self.instance is None)
 
 
 class ShareContentNestedSerializer(serializers.ModelSerializer):

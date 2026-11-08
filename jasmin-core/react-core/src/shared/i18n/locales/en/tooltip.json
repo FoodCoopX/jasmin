@@ -73,7 +73,7 @@
   "explainer_csv_validate": "Dry run: validates every row (incl. references like member number/variation) without saving anything.",
   "harvesting_crate_forecast": "Forecast of crates to be harvested",
   "hash_consent_documents": "Hash of the imported consent texts — changes invalidate old consents.",
-  "is_packed_bulk": "If active, the article is dispensed loose (not pre-packed).",
+  "is_packed_bulk": "Box: the share reaches the delivery station pre-packed. Loose: members put their share together there themselves.",
   "must_be_subscribed_to": "Requires that another variant is subscribed.",
   "needs_complex_planning": "On: weekly-changing planning like harvest shares. Off: simple, constant planning — set once, applies across all weeks.",
   "price_sum_articles": "Sum of the article prices (for plausibility check).",

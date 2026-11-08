@@ -152,6 +152,7 @@
     "packing_mode_boxes": "Crates are pre-packed / ready-made crates are delivered to the delivery stations",
     "packing_mode_bulk": "Members pack their own crates at the delivery stations",
     "packing_mode_mixed": "Mixed (selectable per share type)",
+    "packing_mode_locked": "Not possible while running or upcoming sizes are packed otherwise: {{sizes}}. Under \"mixed\", each size is packed as entered for it.",
     "number_packing_stations": "Number of packing stations",
     "show_size_column": "Show vegetable sizes column",
     "show_washing": "Show washing",

@@ -125,11 +125,8 @@ const grids = vi.hoisted(() => ({
   realCrates: false,
 }));
 
-vi.mock("@shared/tables", async () => {
-  const { gatedByPermission } = await import("@shared/tables/tablePermissions");
-  const { wrapApiFunctions } = await import(
-    "@shared/tables/BasicEditableTable/wrapApiFunctions"
-  );
+vi.mock("@shared/tables", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/tables")>();
   const { default: RealEditableTable } = await import(
     "@shared/tables/BasicEditableTable"
   );
@@ -140,8 +137,7 @@ vi.mock("@shared/tables", async () => {
       column.children ? leafColumns(column.children) : [column],
     );
   return {
-    gatedByPermission,
-    wrapApiFunctions,
+    ...actual,
     EditableTable: (props: EditableTableProps) => {
       const name: GridName = props.columns.some(
         (column) => column.key === "crate_type_name",

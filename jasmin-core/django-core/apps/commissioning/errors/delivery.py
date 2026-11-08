@@ -319,6 +319,23 @@ class ShareTypeVariationCapacityBelowOccupancy(BadRequestError):
 # --------------------------------------------------------------------------- #
 
 
+class PackingModeSwitchChangesPacking(BadRequestError):
+    """The packing mode can't switch to ``new_mode`` while running or upcoming
+    share sizes would change how they are packed: to "boxes" while some are
+    packed loose, to "bulk" while some are boxed. A switch to "mixed" is
+    always possible; there each size is packed as its own flag says."""
+
+    code = "packing_mode.switch_changes_packing"
+
+    def __init__(self, *, new_mode: str, sizes: str) -> None:
+        super().__init__(
+            f"The packing mode can't switch to {new_mode} while these share "
+            f"sizes are packed otherwise: {sizes}.",
+            field="packing_mode",
+            details={"new_mode": new_mode, "sizes": sizes},
+        )
+
+
 class PackingAmountsDivergeAcrossStations(BadRequestError):
     """An all-stations packing list (no ``delivery_station`` scope) can't be
     rendered because two delivery stations carry DIFFERENT per-share amounts for

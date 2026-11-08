@@ -153,6 +153,7 @@
     "packing_mode_boxes": "Kisten werden vorgepackt / es werden fertige Kisten an die Verteilstationen geliefert",
     "packing_mode_bulk": "Mitglieder packen ihre Kisten an Verteilstationen selbst",
     "packing_mode_mixed": "gemischt (pro Anteilsart wählbar)",
+    "packing_mode_locked": "Nicht möglich, solange laufende oder künftige Größen anders gepackt werden: {{sizes}}. In „gemischt“ wird jede Größe so gepackt, wie bei ihr eingetragen.",
     "number_packing_stations": "Anzahl Packstationen",
     "show_size_column": "Gemüse-Größen Spalte anzeigen",
     "show_washing": "Waschen anzeigen",
