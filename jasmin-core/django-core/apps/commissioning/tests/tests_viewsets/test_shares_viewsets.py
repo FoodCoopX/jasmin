@@ -1880,6 +1880,45 @@ class TestVirtualComponentsViewSet:
         )
         assert component.quantity == Decimal("1.00")
 
+    @time_machine.travel(datetime.datetime(2027, 1, 1, 12, 0), tick=False)
+    def test_recomputes_the_weeks_not_yet_read_only(self, api_client, tenant):
+        """1 January 2027 lies in ISO week 53 of 2026, so week 52 is the
+        earliest one still written to; week 51's ledger is closed."""
+        virtual = ShareTypeVariationFactory(variation_type="virtual")
+        physical = ShareTypeVariationFactory(variation_type="physical")
+        day = SharesDeliveryDayFactory()
+        shares = {
+            (year, week): ShareFactory(
+                year=year,
+                delivery_week=week,
+                delivery_day=day,
+                share_type_variation=physical,
+            )
+            for year, week in ((2026, 51), (2026, 52), (2026, 53), (2027, 2))
+        }
+
+        with mock.patch(
+            "apps.commissioning.services.recompute.recompute_shares"
+        ) as recompute_shares:
+            resp = api_client.post(
+                self.URL,
+                {
+                    "virtual_variation": str(virtual.id),
+                    "components": [
+                        {"physical_variation": str(physical.id), "quantity": 2}
+                    ],
+                },
+                format="json",
+            )
+
+        assert resp.status_code == status.HTTP_201_CREATED
+        [recomputed], _ = recompute_shares.call_args
+        assert set(recomputed) == {
+            shares[(2026, 52)].id,
+            shares[(2026, 53)].id,
+            shares[(2027, 2)].id,
+        }
+
     def test_the_column_default_is_a_decimal(self):
         """The round-trip above cannot tell the defaults apart — Postgres
         normalises a float and a Decimal to the same stored value. An unsaved

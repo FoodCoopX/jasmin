@@ -128,6 +128,8 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
   // — only ``price_1`` is ever picked, no quantity-based escalation.
   const finalTiers = useOfferTiers();
 
+  // The order's delivery week prices its articles and crates alike.
+  const priceDate = activeAtDateForWeek(params.year, params.delivery_week);
   const { washingCleaningColumns } = useWashingCleaningColumns();
   const shownWorkDays = useWashingCleaningVisibility();
   const { shareArticleColumn, handleUnitChange, handleAmountChange } =
@@ -141,7 +143,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
         // offers (useOffersData). The office can still overwrite each price;
         // the entered value is what gets snapshotted on save (the backend
         // stores it verbatim and never recomputes).
-        price_date: activeAtDateForWeek(params.year, params.delivery_week),
+        price_date: priceDate,
       },
       autofillContext: "reseller",
       finalTiers,
@@ -168,7 +170,7 @@ export function useOrderColumns({ params, dataCrates }: UseOrderColumnsParams) {
     },
   });
   const { cratesColumns: columnsCrates, crates: crateOptions } =
-    useCratesColumns();
+    useCratesColumns({ priceDate });
   const { noteColumn } = useNoteColumn();
 
   // Offer-based order line: the per-unit price is the SELECTED offer's tier

@@ -5074,6 +5074,13 @@ paths:
         schema:
           type: boolean
         description: Filter by active status
+      - in: query
+        name: price_date
+        schema:
+          type: string
+          format: date
+        description: The date the price and VAT rate apply on, e.g. a document's delivery
+          day; today when omitted.
       tags:
       - commissioning
       security:

@@ -6,7 +6,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from django.utils import timezone
+from isoweek import Week
 
 from ..models import Offer, OrderContent
 from ..utils.tax_rate_utils import resolve_article_tax_rate
@@ -156,7 +156,10 @@ def serialize_unused_offer(offer: Offer) -> dict[str, Any]:
         "price_2": offer.price_2,
         "price_3": offer.price_3,
         "rabatt": None,
-        "tax_rate": resolve_article_tax_rate(offer, timezone.localdate()),
+        # The rate of the offer's own week, the one its prices were set for.
+        "tax_rate": resolve_article_tax_rate(
+            offer, Week(offer.year, offer.delivery_week).monday()
+        ),
         "washing": offer.washing,
         "cleaning": offer.cleaning,
         "comes_from_long_term_storage": offer.comes_from_long_term_storage,

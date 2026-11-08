@@ -542,29 +542,36 @@ class CrateViewSet(
     @extend_schema(
         parameters=[
             get_price_info_parameter(),
+            catalogue_param(
+                "price_date",
+                description=(
+                    "The date the price and VAT rate apply on, e.g. a "
+                    "document's delivery day; today when omitted."
+                ),
+                required=False,
+            ),
             get_is_active_parameter(),
         ],
     )
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         return super().list(request, *args, **kwargs)
 
-    def get_current_price_annotations(self) -> dict[str, Subquery]:
-        today = timezone.localdate()
-        current_pricing = CrateNetPrice.objects.filter(
-            active_on_date_q(today),
+    def get_price_annotations(self, price_date: datetime.date) -> dict[str, Subquery]:
+        pricing_at_date = CrateNetPrice.objects.filter(
+            active_on_date_q(price_date),
             crate=OuterRef("pk"),
         ).order_by("-valid_from")
 
         return {
-            "price": Subquery(current_pricing.values("price")[:1]),
-            "tax_rate": Subquery(current_pricing.values("tax_rate")[:1]),
+            "price": Subquery(pricing_at_date.values("price")[:1]),
+            "tax_rate": Subquery(pricing_at_date.values("tax_rate")[:1]),
         }
 
     def get_queryset(self) -> QuerySet[Crate]:
         queryset = Crate.objects.all()
 
         params = validate_query_params(
-            self.request, optional=["get_price_info", "is_active"]
+            self.request, optional=["get_price_info", "price_date", "is_active"]
         )
         get_price_info = params["get_price_info"]
         is_active = params["is_active"]
@@ -572,7 +579,11 @@ class CrateViewSet(
         # Truthiness, not ``is not None``: ``?get_price_info=false`` must
         # leave the price annotation off.
         if get_price_info:
-            queryset = queryset.annotate(**self.get_current_price_annotations())
+            queryset = queryset.annotate(
+                **self.get_price_annotations(
+                    params["price_date"] or timezone.localdate()
+                )
+            )
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active)
 

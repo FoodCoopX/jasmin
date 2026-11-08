@@ -143,7 +143,13 @@ export default function InvoiceModal({
   // Invoices include both regular and extra share articles.
   const { shareArticleColumn, handleUnitChange, handleAmountChange } =
     useShareArticleColumn({
-      filters: { get_price_info: true, include_extra: true },
+      // The prices of the invoice's date: an invoice may bill several
+      // weeks' deliveries.
+      filters: {
+        get_price_info: true,
+        include_extra: true,
+        price_date: invoiceData?.invoice_date ?? undefined,
+      },
       autofillContext: "reseller",
       finalTiers,
     });
@@ -269,6 +275,7 @@ export default function InvoiceModal({
       apiFunctions: apiFunctionsCrates,
       refetchDocument: invalidateInvoice,
       repeatedTypeMessage: t("validation.unique.invoice_modal_crate"),
+      priceDate: invoiceData?.invoice_date,
     });
 
   const columns = useMemo<EditableColumnConfig<InvoiceContentRecord>[]>(

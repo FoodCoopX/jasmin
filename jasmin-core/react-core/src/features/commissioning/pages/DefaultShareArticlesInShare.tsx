@@ -96,9 +96,16 @@ export default function DefaultShareArticlesInShare() {
   } = useShareTypeVariationColumns({
     // Only PHYSICAL variations get content planning here — virtual variations
     // resolve into their physical components and carry no content of their own.
-    filters: { active_at_date: today, physical: true } as Record<string, unknown>,
+    // The upcoming ones too, so their amounts are in before their first week
+    // is forecast and planned.
+    filters: {
+      active_at_date: today,
+      include_future: true,
+      physical: true,
+    } as Record<string, unknown>,
     inputType: "positive_decimal2",
     width: "5em",
+    showValidity: true,
   });
 
   // --- Default-share rows -------------------------------------------------

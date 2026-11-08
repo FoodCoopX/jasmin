@@ -25,13 +25,20 @@ const crateColumns = vi.hoisted(() => [
   { key: "rabatt", dataIndex: "rabatt" },
 ]);
 
+// What the crate columns were last asked for.
+const cratesRequest = vi.hoisted(() => ({ options: undefined as unknown }));
+
 vi.mock("@features/commissioning/hooks", () => ({
-  useCratesColumns: ({ showNote = true }: { showNote?: boolean } = {}) => ({
-    cratesColumns: showNote
-      ? [...crateColumns, { key: "note", dataIndex: "note" }]
-      : crateColumns,
-    crates: [],
-  }),
+  useCratesColumns: (options: { showNote?: boolean } = {}) => {
+    cratesRequest.options = options;
+    const { showNote = true } = options;
+    return {
+      cratesColumns: showNote
+        ? [...crateColumns, { key: "note", dataIndex: "note" }]
+        : crateColumns,
+      crates: [],
+    };
+  },
   useOfferOptions: () => ({ offers: [] }),
   useOfferTiers: () => [1],
   useShareArticleColumn: () => ({
@@ -90,6 +97,20 @@ describe("useOrderColumns still-available cell", () => {
 
   it("counts a missing amount as nothing left", () => {
     expect(availableCell(null)).toHaveClass("amount-none-left");
+  });
+});
+
+describe("useOrderColumns crate prices", () => {
+  it("prices a picked crate at the order's week, as its articles", () => {
+    renderHook(() =>
+      useOrderColumns({
+        params: { year: 2026, delivery_week: 40, day_number: 2, reseller: "r1" },
+        dataCrates: [],
+      }),
+    );
+
+    // The Saturday of ISO week 40 of 2026.
+    expect(cratesRequest.options).toEqual({ priceDate: "2026-10-03" });
   });
 });
 

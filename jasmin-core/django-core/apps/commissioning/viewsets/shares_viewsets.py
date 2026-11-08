@@ -119,6 +119,7 @@ from ..utils.composite_id_utils import parse_slot_id
 from ..utils.iso_week_utils import week_day_to_date
 from ..utils.lookup import get_or_404
 from ..utils.query_params import validate_query_params
+from ..utils.read_only_week import first_writable_week
 from ..utils.sort_order import size_order_annotation
 from ..utils.weight import mean_weight, quantize_weight
 from .base_viewsets import BaseArchivableViewSet, CanBeDeletedDestroyMixin
@@ -2234,20 +2235,19 @@ class VirtualComponentsViewSet(RolePermissionsMixin, viewsets.ViewSet):
 
     @staticmethod
     def _recompute_for_physical_variations(physical_variation_ids: set) -> None:
-        """Rebuild theoreticals/SHARECONTENT movements for every current-or-
-        future Share of the given physical variations, after a virtual
+        """Rebuild theoreticals/SHARECONTENT movements of the given physical
+        variations' Shares in the weeks not yet read-only, after a virtual
         variation's component config changed how virtual demand fans into them.
-        Scoped to ``year >= current`` so historical seasons aren't re-walked."""
+        A read-only week's stock ledger is closed, so it keeps its figures."""
         if not physical_variation_ids:
             return
-        from django.utils import timezone
-
         from ..services.recompute import recompute_shares
 
+        first_week = first_writable_week()
         share_ids = list(
             Share.objects.filter(
+                iso_week_bound((first_week.year, first_week.week), "gte"),
                 share_type_variation_id__in=physical_variation_ids,
-                year__gte=timezone.localdate().year,
             ).values_list("id", flat=True)
         )
         recompute_shares(share_ids)

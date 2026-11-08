@@ -68,6 +68,7 @@ const api = vi.hoisted(() => ({
   cratesCreate: vi.fn(),
   cratesPartialUpdate: vi.fn(),
   cratesDestroy: vi.fn(),
+  lists: vi.fn(),
 }));
 
 const CRATE_TYPES = [
@@ -101,13 +102,13 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   commissioningCrateContentsDeliveryNoteDestroy: (...args: unknown[]) =>
     api.cratesDestroy(...args),
   // Option sources of the real crate / share-article column hooks.
-  useCommissioningCratesList: () => ({
+  useCommissioningCratesList: (params: unknown) => (api.lists("crates", params), {
     data: CRATE_TYPES,
     isLoading: false,
     error: null,
     refetch: vi.fn(),
   }),
-  useCommissioningShareArticlesList: () => ({
+  useCommissioningShareArticlesList: (params: unknown) => (api.lists("articles", params), {
     data: SHARE_ARTICLES,
     isLoading: false,
     error: null,
@@ -404,6 +405,14 @@ describe("DeliveryNoteModal header", () => {
       within(dialog).getByText(/commissioning\.corresponding_order/)
         .parentElement,
     ).toHaveTextContent("BE-2026-005 (25.09.2026)");
+  });
+
+  it("prices new lines at the date the order was delivered", () => {
+    renderModal();
+
+    const pricedAt = expect.objectContaining({ price_date: "2026-09-25" });
+    expect(api.lists).toHaveBeenCalledWith("crates", pricedAt);
+    expect(api.lists).toHaveBeenCalledWith("articles", pricedAt);
   });
 
   it("still names the order without printing a bogus date when the order has no date", () => {

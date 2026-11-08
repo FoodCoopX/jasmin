@@ -41,6 +41,8 @@ interface DocumentCrateTableOptions {
   /** Why a new line of a crate type the document lists is refused. */
   repeatedTypeMessage: string;
   withoutPrice?: boolean;
+  /** The date a new line's crate price and VAT rate are those of. */
+  priceDate?: string | null;
 }
 
 /**
@@ -66,9 +68,11 @@ export function useDocumentCrateTable({
   refetchDocument,
   repeatedTypeMessage,
   withoutPrice,
+  priceDate,
 }: DocumentCrateTableOptions) {
   const { cratesColumns, crates: crateOptions } = useCratesColumns({
     without_price: withoutPrice,
+    priceDate,
   });
   const lines = useMemo<(CrateItemSummary & TableRecord)[]>(
     () => (crateItems ?? []).map((item) => ({ ...item, key: item.id })),

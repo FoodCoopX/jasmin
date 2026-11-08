@@ -59,7 +59,7 @@ export default function DeliveryNoteModal({
   const { format } = useNumberFormat();
   const { formatDate, formatDateWithFallback } = useDateFormat();
   // Fallback tax rate for new lines when the picked ShareArticle
-  // doesn't carry an annotated current rate. Matches the InvoiceModal.
+  // doesn't carry an annotated rate. Matches the InvoiceModal.
   const { articles: defaultTaxRateArticles } = useDefaultTaxRates();
 
   // ``isFetching`` (not ``isLoading``): drives the EditableTable grid spinner.
@@ -83,23 +83,24 @@ export default function DeliveryNoteModal({
 
   // Delivery notes include both regular and extra share articles.
   // ``get_price_info=true`` makes the backend annotate each
-  // ShareArticle option with its currently-valid ``tax_rate`` (and
-  // every other DecimalField on ``ShareArticleNetPrice``) so the
-  // share-article-change handler can pick the right tax rate
+  // ShareArticle option with its ``tax_rate`` at the order's delivery
+  // date (and every other DecimalField on ``ShareArticleNetPrice``) so
+  // the share-article-change handler can pick the right tax rate
   // without a second round-trip. ``shareArticles`` exposed below
   // carries those annotations.
   const {
     shareArticleColumn,
     shareArticles,
   } = useShareArticleColumn({
-    filters: { include_extra: true, get_price_info: true } as Record<
-      string,
-      unknown
-    >,
+    filters: {
+      include_extra: true,
+      get_price_info: true,
+      price_date: deliveryNoteData?.order_date ?? undefined,
+    } as Record<string, unknown>,
     onFieldChange: (...args: unknown[]) => {
       // Auto-fill ``tax_rate`` on share-article pick. Use the
-      // article's own current tax_rate (annotated by the backend
-      // via ``get_price_info=true``) when present, fall back to
+      // article's own tax_rate at the order's date (annotated by the
+      // backend via ``get_price_info=true``) when present, fall back to
       // the tenant default. The ``OrderableItem`` model requires
       // tax_rate non-null at save time — without this the office
       // would have to remember to set it for every new line.
@@ -242,6 +243,7 @@ export default function DeliveryNoteModal({
     refetchDocument: invalidateDeliveryNote,
     repeatedTypeMessage: t("validation.unique.delivery_note_modal_crate"),
     withoutPrice: true,
+    priceDate: deliveryNoteData?.order_date,
   });
 
   return (

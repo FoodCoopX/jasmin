@@ -9,7 +9,10 @@ import type {
 } from "@shared/tables/BasicEditableTable/types";
 import type { ShareTypeVariationOption } from "../useShareTypeVariations";
 import { useShareTypeVariations } from "../useShareTypeVariations";
+import { useTranslation } from "react-i18next";
+import { useDateFormat } from "@hooks/index";
 import { useNumberFormat } from "@hooks/useNumberFormat";
+import { todayApiDate } from "@shared/utils/apiDate";
 import { useShareTypeVariationSizeOptions } from "@hooks/useShareTypeVariationSizeOptions";
 import { variationColumnKey } from "./columnKeys";
 
@@ -39,6 +42,12 @@ export interface UseShareTypeVariationColumnsConfig {
    * display column — e.g. `DeliveryStationsDetails` just renders counts.
    */
   inputType?: InputType;
+  /**
+   * Name, under each size, the date it starts on when that lies after today,
+   * else the date it ends on when it has one — for pages that list the sizes
+   * coming up next to the running ones.
+   */
+  showValidity?: boolean;
 }
 
 export interface UseShareTypeVariationColumnsResult {
@@ -61,7 +70,15 @@ export interface UseShareTypeVariationColumnsResult {
 export const useShareTypeVariationColumns = (
   config: UseShareTypeVariationColumnsConfig = {},
 ): UseShareTypeVariationColumnsResult => {
-  const { filters, renderCell, width = "5em", inputType } = config;
+  const {
+    filters,
+    renderCell,
+    width = "5em",
+    inputType,
+    showValidity,
+  } = config;
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
 
   const { shareTypeVariations: variations, loading } = useShareTypeVariations(
     filters ?? {},
@@ -87,12 +104,14 @@ export const useShareTypeVariationColumns = (
     // Honour the per-variation ``sort_order`` the office sets (S/M/L as 1/2/3
     // renders S, M, L) — NOT an alphabetical size sort (which would give
     // L, M, S). Falls back to size only to break ties when sort_order is unset
-    // (all default 0). Mirrors ``useAllShareTypeVariations``.
+    // (all default 0). Mirrors ``useAllShareTypeVariations``. A size and the
+    // one taking over from it go in the order they run.
     out.forEach((g) =>
       g.variations.sort(
         (a, b) =>
           (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
-          a.size.localeCompare(b.size),
+          a.size.localeCompare(b.size) ||
+          a.valid_from.localeCompare(b.valid_from),
       ),
     );
     out.sort((a, b) => a.share_type_name.localeCompare(b.share_type_name));
@@ -114,26 +133,46 @@ export const useShareTypeVariationColumns = (
       return trimFormatter.format(n);
     };
 
+    const today = todayApiDate();
+    const validityLabel = (variation: ShareTypeVariationOption) => {
+      if (!showValidity) return "";
+      if (variation.valid_from > today) {
+        return `${t("commissioning.valid_from")} ${formatDate(variation.valid_from)}`;
+      }
+      return variation.valid_until
+        ? `${t("commissioning.valid_until")} ${formatDate(variation.valid_until)}`
+        : "";
+    };
+
     return shareTypeGroups.map((group): EditableColumnConfig<TableRecord> => {
       const children: EditableColumnConfig<TableRecord>[] =
-        group.variations.map((variation, childIdx) => ({
-          title: (
-            <span className="text-label-sm">
-              {getShareTypeVariationSizeLabel(variation.size)}
-            </span>
-          ),
-          dataIndex: variationColumnKey(variation.id!),
-          key: variationColumnKey(variation.id!),
-          align: "center",
-          width,
-          ...(inputType ? { inputType, required: false } : {}),
-          className:
-            childIdx === 0 ? "column-group-start" : "column-variation-start",
-          render: renderCell
-            ? (value, record) =>
-                renderCell(value, record as TableRecord, variation)
-            : defaultRender,
-        }));
+        group.variations.map((variation, childIdx) => {
+          const validity = validityLabel(variation);
+          return {
+            title: (
+              <span className="text-label-sm">
+                {getShareTypeVariationSizeLabel(variation.size)}
+                {/* The space keeps the size and its dates apart in the
+                  input labels, which are built from the title's text. */}
+                {validity && " "}
+                {validity && (
+                  <span className="text-xs d-block">{validity}</span>
+                )}
+              </span>
+            ),
+            dataIndex: variationColumnKey(variation.id!),
+            key: variationColumnKey(variation.id!),
+            align: "center",
+            width,
+            ...(inputType ? { inputType, required: false } : {}),
+            className:
+              childIdx === 0 ? "column-group-start" : "column-variation-start",
+            render: renderCell
+              ? (value, record) =>
+                  renderCell(value, record as TableRecord, variation)
+              : defaultRender,
+          };
+        });
 
       // Always render the parent-share-type → child-variation group, even when
       // a share type has a single variation, so the header layout is consistent
@@ -154,6 +193,9 @@ export const useShareTypeVariationColumns = (
     inputType,
     locale,
     getShareTypeVariationSizeLabel,
+    showValidity,
+    t,
+    formatDate,
   ]);
 
   return { variationColumns, variations, shareTypeGroups, loading };
