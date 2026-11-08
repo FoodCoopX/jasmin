@@ -30,6 +30,7 @@ from ..schemas import (
 from ..serializers.shares_serializer import (
     ShareTypeVariationsTotalsResponseSerializer,
 )
+from ..services.delivery_tours import tour_numbers_by_week
 from ..utils import (
     batch_get_physical_variation_totals_for_week,
     get_physical_share_type_variation_totals,
@@ -37,6 +38,16 @@ from ..utils import (
 )
 from ..utils.iso_week_utils import saturday_of_iso_week
 from ..utils.query_params import validate_query_params
+
+
+def _tour_key(item: dict) -> tuple[str, str, int, int]:
+    """A content row's station, delivery day and week, which name its tour."""
+    return (
+        item["delivery_station_id"],
+        item["share__delivery_day_id"],
+        item["share__year"],
+        item["share__delivery_week"],
+    )
 
 
 class ShareContentGranularityView(APIViewRolePermissionsMixin, APIView):
@@ -129,40 +140,16 @@ class ShareContentGranularityView(APIViewRolePermissionsMixin, APIView):
             "share_article_id",
             "share__share_type_variation_id",
             "share__delivery_day_id",
+            "share__year",
+            "share__delivery_week",
             "amount",
             "delivery_station_id",
             "unit",
             "size",
         )
 
-    @staticmethod
-    def _build_tour_number_map(
-        content_rows: list[dict],
-    ) -> dict[tuple[str, str], int | None]:
-        """Prefetch all tour numbers in one query instead of N+1."""
-        pairs = {
-            (item["delivery_station_id"], item["share__delivery_day_id"])
-            for item in content_rows
-        }
-        if not pairs:
-            return {}
-
-        from django.db.models import Q
-
-        q = Q()
-        for station_id, day_id in pairs:
-            q |= Q(delivery_station_id=station_id, delivery_day_id=day_id)
-
-        return {
-            (
-                delivery_station_day.delivery_station_id,
-                delivery_station_day.delivery_day_id,
-            ): delivery_station_day.tour_number
-            for delivery_station_day in DeliveryStationDay.objects.filter(q)
-        }
-
     def _check_granularity(self, content_rows: list[dict]) -> tuple[bool, bool]:
-        tour_map = self._build_tour_number_map(content_rows)
+        tour_map = tour_numbers_by_week(_tour_key(item) for item in content_rows)
 
         day_grouped = self._group_by_day(content_rows)
         tour_grouped = self._group_by_tour(content_rows, tour_map)
@@ -193,19 +180,16 @@ class ShareContentGranularityView(APIViewRolePermissionsMixin, APIView):
     @staticmethod
     def _group_by_tour(
         content_rows: list[dict],
-        tour_map: dict[tuple[str, str], int | None],
+        tour_map: dict[tuple[str, str, int, int], int | None],
     ) -> dict[tuple, list[dict]]:
         grouped: dict[tuple, list[dict]] = defaultdict(list)
 
         for item in content_rows:
-            station_id = item["delivery_station_id"]
-            day_id = item["share__delivery_day_id"]
-            tour_number = tour_map.get((station_id, day_id))
             key = (
                 item["share_article_id"],
                 item["share__share_type_variation_id"],
-                day_id,
-                tour_number,
+                item["share__delivery_day_id"],
+                tour_map.get(_tour_key(item)),
             )
             grouped[key].append(item)
 

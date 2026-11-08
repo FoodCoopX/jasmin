@@ -242,6 +242,7 @@
   "available_pu": "Available PU",
   "ordered_pu": "Ordered PU",
   "tour_planning": "Tour planning",
+  "tour_plan_applies_from": "Changes apply from week {{week}}; this week keeps its tours.",
   "tour_label": "Tour {{number}}",
   "tour_save_failed": "The tour plan could not be saved. Please try again.",
   "harvest_save_failed": "The harvest amount could not be saved. Please try again.",

@@ -378,7 +378,8 @@
     "in_use": "This pickup day cannot be deleted while deliveries still reference it. Move or end those deliveries first.",
     "unknown": "No delivery station \"{{delivery_station}}\" is served on delivery day {{delivery_day}} on {{date}}.",
     "ambiguous": "{{matches}} delivery stations named \"{{delivery_station}}\" are served on delivery day {{delivery_day}} on {{date}} — give them distinct short names.",
-    "tour_number_below_one": "Tours start at 1. Assign the station day to a tour in the tour planning."
+    "tour_number_below_one": "Tours start at 1. Assign the station day to a tour in the tour planning.",
+    "missing_for_tour": "Delivery station \"{{delivery_station}}\" is not served on delivery day {{delivery_day}} from {{valid_from}}. Create a station day in the station's dialog first."
   },
   "inventory_entry": {
     "not_found": "Inventory entry not found."
@@ -529,7 +530,8 @@
   },
   "default_share_content": {
     "invalid_composite_id": "Invalid default share content id.",
-    "no_amounts": "No share type variation amounts were provided."
+    "no_amounts": "No share type variation amounts were provided.",
+    "no_running_week": "None of the sizes with an amount runs in the planned weeks. Choose weeks in which one runs."
   },
   "documentation": {
     "invalid_model": "Invalid documentation model.",

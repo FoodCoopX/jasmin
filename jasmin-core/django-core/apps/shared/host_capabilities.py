@@ -79,6 +79,9 @@ def host_capabilities() -> dict[str, bool]:
     * ``manual_share_import`` — the office's own upload of the weekly share
       amounts; Tapir imports them on every visit, and a manual import there
       would compete with it.
+    * ``about`` — jasmin's footer, its credit line and the "about" dialog
+      presenting jasmin's features; inside a host's page jasmin is a part of
+      the host and doesn't present itself.
     * ``delivery_stations`` — jasmin's delivery-station pages: the station list,
       the delivery tours, the tour and pickup lists and the station fees, the
       "also a delivery station" flag of resellers and sellers, and adding,
@@ -96,6 +99,7 @@ def host_capabilities() -> dict[str, bool]:
         "web_app": standalone,
         "manual_share_import": standalone,
         "delivery_stations": standalone,
+        "about": standalone,
     }
 
 

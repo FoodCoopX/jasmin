@@ -55,9 +55,17 @@ export default function DeliveryTours() {
   const { isOffice } = useRoles();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  // The plan applies from next week on: weeks up to this one keep their tours.
+  // Only the stations served on the day by then can take a stop.
+  const planStart = useMemo(() => dayjs().isoWeekday(8), []);
   const deliveryStationsFilters = useMemo(() => {
-    return selectedDay !== null ? { delivery_day: selectedDay } : {};
-  }, [selectedDay]);
+    return selectedDay !== null
+      ? {
+          delivery_day: selectedDay,
+          active_at_date_or_future: toApiDate(planStart)!,
+        }
+      : {};
+  }, [selectedDay, planStart]);
   const { deliveryStations, loading: stationsLoading } = useDeliveryStations(
     deliveryStationsFilters,
   );
@@ -339,6 +347,11 @@ export default function DeliveryTours() {
     <DndGrid onPlace={handlePlace} onRemove={handleRemove}>
       <div className="delivery-tours-page">
         <h1>{t("commissioning.delivery_tours")}</h1>
+        <p className="text-secondary">
+          {t("commissioning.tour_plan_applies_from", {
+            week: planStart.isoWeek(),
+          })}
+        </p>
 
         <SharesDeliveryDaySelector
           selectedSharesDeliveryDay={selectedDay}

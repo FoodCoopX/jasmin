@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
 from typing import Any
 
 from django.db import transaction
@@ -73,7 +72,12 @@ from ..services import (
 from ..services.delivery_exceptions import (
     resync_delivery_exception,
 )
+from ..services.delivery_tours import tour_plan, update_tours
 from ..services.onboarding_policy import onboarding_mode_enabled
+from ..services.station_day_succession import (
+    inherited_tour_placement,
+    migrate_succession_children,
+)
 from ..utils import get_contact_annotations
 from ..utils.iso_week_utils import previous_monday, weeks_in_range
 from ..utils.lookup import get_or_404
@@ -166,6 +170,12 @@ class DeliveryStationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         parameters=[
             get_is_active_parameter(),
             get_delivery_day_parameter(required=False),
+            get_active_at_date_or_future_parameter(
+                description=(
+                    "Only stations with a station-day running on this date or "
+                    "starting later; with delivery_day, one on that day."
+                ),
+            ),
             get_member_parameter(required=False),
         ],
     )
@@ -194,10 +204,17 @@ class DeliveryStationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         ).all()
 
         params = validate_query_params(
-            self.request, optional=["is_active", "delivery_day", "member"]
+            self.request,
+            optional=[
+                "is_active",
+                "delivery_day",
+                "active_at_date_or_future",
+                "member",
+            ],
         )
         is_active = params["is_active"]
         delivery_day = params["delivery_day"]
+        running_from = params["active_at_date_or_future"]
         member = params["member"]
         # A non-staff member may only scope to their OWN stations — reject a
         # crafted ?member=<other id> so the member↔station association can't be
@@ -215,12 +232,17 @@ class DeliveryStationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active)
 
-        if delivery_day is not None:
-            # A superseded station day and its successor share the delivery
-            # day, so the join yields the station once per row.
+        if delivery_day is not None or running_from is not None:
+            station_days = (
+                DeliveryStationDay.objects.all()
+                if running_from is None
+                else DeliveryStationDay.current.active_at_date_or_future(running_from)
+            )
+            if delivery_day is not None:
+                station_days = station_days.filter(delivery_day=delivery_day)
             queryset = queryset.filter(
-                deliverystationday__delivery_day=delivery_day
-            ).distinct()
+                id__in=station_days.values("delivery_station_id")
+            )
 
         # Scope to the stations the member is subscribed to.
         if member is not None:
@@ -285,48 +307,17 @@ class DeliveryToursViewSet(RolePermissionsMixin, viewsets.ViewSet):
             get_delivery_day_parameter(required=True),
         ],
         responses=DeliveryTourResponseSerializer(many=True),
-        description="Get delivery tours grouped by tour number for a delivery day.",
+        description=(
+            "Get the delivery tours of a delivery day from next week on, grouped "
+            "by tour number."
+        ),
     )
     def list(self, request: Request) -> Response:
         params = validate_query_params(request, required=["delivery_day"])
-        delivery_day = params["delivery_day"]
-
-        delivery_station_days = (
-            DeliveryStationDay.objects.filter(
-                delivery_day__id=delivery_day,
-                stop_order__isnull=False,
-            )
-            .select_related(
-                "delivery_station", "delivery_day", "delivery_station__contact"
-            )
-            .order_by("tour_number", "stop_order")
-        )
-
-        tours_data: dict[int, dict[str, Any]] = {}
-        for delivery_station_day in delivery_station_days:
-            tour_num = delivery_station_day.tour_number
-            if tour_num not in tours_data:
-                tours_data[tour_num] = {"tour_number": tour_num, "positions": []}
-
-            tours_data[tour_num]["positions"].append(
-                {
-                    "position": delivery_station_day.stop_order,
-                    "delivery_station_id": str(
-                        delivery_station_day.delivery_station.id
-                    ),
-                    "delivery_station_name": (
-                        delivery_station_day.delivery_station.contact.name
-                        if delivery_station_day.delivery_station.contact
-                        else f"Station {delivery_station_day.delivery_station.id}"
-                    ),
-                    "delivery_station_day_id": str(delivery_station_day.id),
-                }
-            )
-
         # Serialize through the declared serializer so the response is enforced
         # against the documented schema rather than shipping raw dicts.
         serializer = DeliveryTourResponseSerializer(
-            list(tours_data.values()), many=True
+            tour_plan(params["delivery_day"]), many=True
         )
         return Response(serializer.data)
 
@@ -337,9 +328,13 @@ class DeliveryToursViewSet(RolePermissionsMixin, viewsets.ViewSet):
                 name="UpdateToursResponse",
                 fields={"message": drf_serializers.CharField()},
             ),
+            400: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
-        description="Bulk-update tour assignments for delivery stations on a given day.",
+        description=(
+            "Replace a delivery day's tour plan from next week on. Weeks up to "
+            "this one keep their tours."
+        ),
     )
     @action(detail=False, methods=["post"])
     def update_tours(self, request: Request) -> Response:
@@ -356,80 +351,7 @@ class DeliveryToursViewSet(RolePermissionsMixin, viewsets.ViewSet):
             "Delivery day",
             error_cls=DeliveryDayNotFound,
         )
-
-        # The start a newly assigned station-day opens on. Clamped up to the
-        # delivery day's own start so a tour built on a future-dated day does
-        # not mint a station-day active on weeks that day does not run — the
-        # window rule perform_create/perform_update enforce, which this path
-        # bypasses by writing the model directly. Both operands are Mondays, as
-        # valid_from must be.
-        assignment_valid_from = max(
-            previous_monday(timezone.localdate()), shares_delivery_day.valid_from
-        )
-
-        with transaction.atomic():
-            # Only the CURRENTLY-OPEN station-day per (station, day) carries the
-            # live tour assignment. DeliveryStationDay is TimeBoundMixin: closed
-            # historical rows (valid_until set) legitimately coexist with the one
-            # open row, so scope every write here to valid_until IS NULL. Without
-            # it the reset below would rewrite tour_number/stop_order on closed
-            # history rows, and the update_or_create further down would match
-            # multiple rows on its implicit get() and raise MultipleObjectsReturned.
-            all_delivery_station_days = DeliveryStationDay.objects.filter(
-                delivery_day=shares_delivery_day, valid_until__isnull=True
-            ).select_for_update()
-
-            station_ids_in_tours: set[str] = set()
-            for tour in tours:
-                for position in tour["positions"]:
-                    station_ids_in_tours.add(position["delivery_station_id"])
-
-            all_delivery_station_days.exclude(
-                delivery_station_id__in=station_ids_in_tours
-            ).update(tour_number=1, stop_order=None)
-
-            created_station_days: list[DeliveryStationDay] = []
-            for tour in tours:
-                tour_number: int = tour["tour_number"]
-                for position in tour["positions"]:
-                    # Scope the implicit get() to the open row (see comment
-                    # above): a versioned (station, day) has >1 row and an
-                    # unscoped update_or_create would raise MultipleObjectsReturned.
-                    # The valid_until filter narrows the lookup only; a genuinely
-                    # new station-day still creates an open row (valid_until NULL).
-
-                    placement = {
-                        "tour_number": tour_number,
-                        "stop_order": position["position"],
-                    }
-                    station_day, created = DeliveryStationDay.objects.filter(
-                        valid_until__isnull=True
-                    ).update_or_create(
-                        delivery_station_id=position["delivery_station_id"],
-                        delivery_day=shares_delivery_day,
-                        # An existing row only moves to its new tour and stop.
-                        # Its start stays: moved later, it would leave the
-                        # deliveries before it outside its window and stop
-                        # covering the subscriptions it serves; an earlier
-                        # start set in the station's modal (onboarding mode)
-                        # would be lost on the next tour edit.
-                        defaults=placement,
-                        # A new row needs a start — TimeBoundMixin.valid_from is
-                        # NOT NULL, and full_clean() requires a Monday — and
-                        # opens this week (clamped, see above).
-                        create_defaults={
-                            **placement,
-                            "valid_from": assignment_valid_from,
-                        },
-                    )
-                    if created:
-                        created_station_days.append(station_day)
-
-            # A station newly added to a tour starts delivering — fan the
-            # existing long-term plan (honey, etc.) out to it so its shares
-            # are theoretically delivered there too. Future weeks only.
-            for station_day in created_station_days:
-                DefaultShareContentService.materialize_for_new_station_day(station_day)
+        update_tours(shares_delivery_day, tours)
 
         return Response(
             {"message": "Tours updated successfully"},
@@ -493,7 +415,18 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
                 delivery_day_valid_from=delivery_day.valid_from,
             )
 
-        station_day = serializer.save()
+        # A successor of the station's row on the day keeps its tour stop
+        # unless the request places it itself.
+        placement = (
+            {}
+            if {"tour_number", "stop_order"} & serializer.validated_data.keys()
+            else inherited_tour_placement(
+                serializer.validated_data["delivery_station"].id,
+                delivery_day.id,
+                valid_from,
+            )
+        )
+        station_day = serializer.save(**placement)
         DefaultShareContentService.materialize_for_new_station_day(station_day)
 
         # Creating a station-day for an EXISTING (station, day) pair runs
@@ -503,100 +436,7 @@ class DeliveryStationDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # strictly delivery_station_day_id-keyed, so a stranded row would count
         # under the closed id while the new DSD shows the slot free (over-book).
         # Migrate post-boundary children onto the per-week-active successor.
-        self._migrate_succession_children(station_day, valid_from)
-
-    @staticmethod
-    def _migrate_succession_children(
-        station_day: DeliveryStationDay, valid_from: date
-    ) -> None:
-        today = timezone.localdate()
-        predecessor = (
-            DeliveryStationDay.objects.filter(
-                delivery_station_id=station_day.delivery_station_id,
-                delivery_day_id=station_day.delivery_day_id,
-                valid_until=valid_from - timedelta(days=1),
-            )
-            .exclude(pk=station_day.pk)
-            .order_by("-valid_until")
-            .first()
-        )
-        if predecessor is None:
-            return
-
-        # The successor chain for this (station, day) covering weeks >= boundary
-        # — resolve each child to the DSD active at ITS OWN week (the new day may
-        # be a chain: the just-created row + later-dated rows).
-        successors = list(
-            DeliveryStationDay.objects.filter(
-                delivery_station_id=station_day.delivery_station_id,
-                delivery_day_id=station_day.delivery_day_id,
-            ).filter(Q(valid_until__isnull=True) | Q(valid_until__gte=valid_from))
-            # Deterministic tie-break — latest valid_from wins — matching the
-            # materialisation path (_find_active_delivery_station_day). Without
-            # it, a race-produced brief overlap could re-point migrated children
-            # to a DIFFERENT DSD than the one deliveries materialise onto
-            # (split per-DSD counts).
-            .order_by("-valid_from")
-        )
-
-        def _resolve(monday):
-            for delivery_station_day in successors:
-                if delivery_station_day.valid_from <= monday and (
-                    delivery_station_day.valid_until is None
-                    or delivery_station_day.valid_until >= monday
-                ):
-                    return delivery_station_day
-            return None
-
-        affected_share_ids: set[str] = set()
-
-        # Future ShareDeliveries stranded past the predecessor's new end.
-        deliveries_to_update = []
-        for share_delivery in ShareDelivery.objects.filter(
-            delivery_station_day=predecessor
-        ).select_related("share"):
-            monday = Week(
-                share_delivery.share.year, share_delivery.share.delivery_week
-            ).monday()
-            if monday < valid_from or monday <= today:
-                continue  # still within the predecessor's window / not future
-            resolved = _resolve(monday)
-            if (
-                resolved is not None
-                and resolved.id != share_delivery.delivery_station_day_id
-            ):
-                share_delivery.delivery_station_day = resolved
-                deliveries_to_update.append(share_delivery)
-                affected_share_ids.add(share_delivery.share_id)
-        if deliveries_to_update:
-            ShareDelivery.objects.bulk_update(
-                deliveries_to_update, fields=["delivery_station_day"]
-            )
-
-        # Future CapacityReservations likewise.
-        reservations_to_update = []
-        for reservation in CapacityReservation.objects.filter(
-            delivery_station_day=predecessor
-        ):
-            monday = Week(reservation.year, reservation.week).monday()
-            if monday < valid_from:
-                continue
-            resolved = _resolve(monday)
-            if (
-                resolved is not None
-                and resolved.id != reservation.delivery_station_day_id
-            ):
-                reservation.delivery_station_day = resolved
-                reservations_to_update.append(reservation)
-        if reservations_to_update:
-            CapacityReservation.objects.bulk_update(
-                reservations_to_update, fields=["delivery_station_day"]
-            )
-
-        if affected_share_ids:
-            from ..services.recompute import recompute_shares
-
-            recompute_shares(affected_share_ids)
+        migrate_succession_children(station_day, valid_from)
 
     def perform_update(self, serializer: DeliveryStationDaySerializer) -> None:
         # Mirror the SharesDeliveryDay guard for station-days: a standalone

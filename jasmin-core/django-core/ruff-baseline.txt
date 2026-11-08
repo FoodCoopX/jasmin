@@ -2,7 +2,7 @@
 # Managed by scripts/ruff_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/ruff_baseline.py freeze
-# 179 finding(s).
+# 177 finding(s).
 
 apps/accounts/backends.py: N806 Variable `UserModel` in function should be lowercase
 apps/accounts/models.py: N806 Variable `CHUNK_SIZE` in function should be lowercase
@@ -44,7 +44,6 @@ apps/commissioning/services/crate_summary.py: PLR0913 Too many arguments in func
 apps/commissioning/services/data_import.py: C901 `import_rows_from_csv` is too complex (11 > 10)
 apps/commissioning/services/default_share_content_service.py: C901 `delete_default_share_content_bulk` is too complex (11 > 10)
 apps/commissioning/services/default_share_content_service.py: C901 `materialize_for_new_station_day` is too complex (14 > 10)
-apps/commissioning/services/default_share_content_service.py: PLR0913 Too many arguments in function definition (8 > 5)
 apps/commissioning/services/documentation_service.py: PLR0913 Too many arguments in function definition (6 > 5)
 apps/commissioning/services/documentation_summary_service.py: C901 `get_summary` is too complex (11 > 10)
 apps/commissioning/services/documentation_summary_service.py: PLR0913 Too many arguments in function definition (15 > 5)
@@ -151,7 +150,6 @@ apps/commissioning/views/reseller_views.py: C901 `post` is too complex (12 > 10)
 apps/commissioning/views/stock_views.py: C901 `patch` is too complex (14 > 10)
 apps/commissioning/views/stock_views.py: PLR0915 Too many statements (54 > 50)
 apps/commissioning/viewsets/basics_viewsets.py: C901 `get_queryset` is too complex (11 > 10)
-apps/commissioning/viewsets/delivery_viewsets.py: C901 `_migrate_succession_children` is too complex (14 > 10)
 apps/commissioning/viewsets/shares_viewsets.py: C901 `export_csv` is too complex (14 > 10)
 apps/commissioning/viewsets/shares_viewsets.py: C901 `perform_update` is too complex (11 > 10)
 apps/cultivation/models/base.py: N806 Variable `CHUNK_SIZE` in function should be lowercase

@@ -81,7 +81,7 @@
   "dashboard_abos": "",
   "debits_abos": "",
   "dashboard_commissioning": "",
-  "delivery_tours": "",
+  "delivery_tours": "The tour plan applies from next week on. This week and past weeks keep their tours, so printed and packed lists stay right. Only delivery stations served on this delivery day from next week appear here; a station day is created in the delivery station's dialog.",
   "list_markets": "",
   "overview_resellers": "",
   "planning_share_content_page": "",

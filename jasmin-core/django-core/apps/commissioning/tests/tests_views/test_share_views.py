@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import datetime
+
 import pytest
+import time_machine
 from django.urls import reverse
 from rest_framework import status
 
 from apps.commissioning.tests.factories import (
     DeliveryStationDayFactory,
+    DeliveryStationFactory,
     ShareArticleFactory,
     ShareContentFactory,
     ShareFactory,
@@ -48,6 +52,53 @@ class TestShareContentGranularityView:
 
         resp = api_client.get(URL_GRANULARITY, {"year": 2026, "delivery_week": 15})
         assert resp.status_code == status.HTTP_200_OK
+
+    @time_machine.travel(datetime.datetime(2026, 11, 4, 12, 0), tick=False)
+    def test_reads_each_station_on_its_tour_of_that_week(self, api_client, tenant):
+        day = SharesDeliveryDayFactory(day_number=1)
+        moving = DeliveryStationFactory()
+        # The later row first, so a lookup that ignores the week ends on the
+        # earlier one.
+        DeliveryStationDayFactory(
+            delivery_station=moving,
+            delivery_day=day,
+            tour_number=2,
+            valid_from=datetime.date(2026, 12, 28),
+            valid_until=datetime.date(2027, 6, 27),
+        )
+        DeliveryStationDayFactory(
+            delivery_station=moving,
+            delivery_day=day,
+            tour_number=1,
+            valid_until=datetime.date(2026, 12, 27),
+        )
+        tour_two = DeliveryStationDayFactory(delivery_day=day, tour_number=2)
+        tour_one = DeliveryStationDayFactory(delivery_day=day, tour_number=1)
+        share = ShareFactory(
+            year=2027,
+            delivery_week=1,
+            share_type_variation=ShareTypeVariationFactory(),
+            delivery_day=day,
+        )
+        article = ShareArticleFactory()
+        for station, amount in (
+            (moving, 5),
+            (tour_two.delivery_station, 5),
+            (tour_one.delivery_station, 7),
+        ):
+            ShareContentFactory(
+                share=share,
+                share_article=article,
+                delivery_station=station,
+                amount=amount,
+                unit="KG",
+                size="M",
+            )
+
+        resp = api_client.get(URL_GRANULARITY, {"year": 2027, "delivery_week": 1})
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.data["tours_ok"] is True
 
     def test_day_number_scopes_to_one_delivery_day(self, api_client, tenant):
         # day_number scopes the consistency check to a single delivery day: a day

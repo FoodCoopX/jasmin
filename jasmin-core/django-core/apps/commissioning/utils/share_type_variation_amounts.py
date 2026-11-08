@@ -57,7 +57,7 @@ def _to_id(obj: Any) -> str | None:
     return obj.id if hasattr(obj, "id") else obj
 
 
-def _build_virtual_map(
+def virtual_components_of(
     physical_variation_ids: Iterable[Any],
 ) -> dict[object, list[tuple[object, Decimal]]]:
     """``virtual_variation_id -> [(physical_variation_id, quantity)]`` for the
@@ -84,7 +84,7 @@ def fold_virtual_ids_to_physical(variation_ids: Iterable[Any]) -> set:
     """Replace each VIRTUAL variation id with its physical component ids, leaving
     physical ids untouched.
 
-    The FORWARD sibling of :func:`_build_virtual_map`: given a demand-driven set of
+    The FORWARD sibling of :func:`virtual_components_of`: given a demand-driven set of
     variation ids (which may contain virtual variations), return the physical
     component id set they actually pack as — the physical column set for the
     delivery-stations overview. No-op (returns the input set) when none are
@@ -201,7 +201,7 @@ def get_physical_share_type_variation_totals(
     # ONE VirtualVariationComponent query + ONE demand-aggregation query for
     # ALL variations at once, then aggregate per physical variation in Python.
     # The day/tour/station filters are pushed into the single aggregation query.
-    virtual_map = _build_virtual_map(physical_ids)
+    virtual_map = virtual_components_of(physical_ids)
     all_variation_ids = physical_ids | set(virtual_map.keys())
 
     rows = _aggregated_rows(
@@ -294,7 +294,7 @@ def get_variation_quantities_by_station_day(
     if not variation_ids:
         return {}
     physical_ids = set(variation_ids)
-    virtual_map = _build_virtual_map(physical_ids)
+    virtual_map = virtual_components_of(physical_ids)
     rows = _demand_service().aggregated_rows(
         year=year,
         delivery_week=delivery_week,
@@ -338,7 +338,7 @@ def batch_get_physical_variation_totals_for_weeks(
         return {}
 
     # 1. Pre-fetch all virtual components for these physical variations (1 query)
-    virtual_map = _build_virtual_map(physical_variation_ids)
+    virtual_map = virtual_components_of(physical_variation_ids)
 
     all_variation_ids = physical_variation_ids | set(virtual_map.keys())
 

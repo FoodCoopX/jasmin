@@ -7740,6 +7740,13 @@ paths:
       operationId: commissioning_delivery_stations_list
       parameters:
       - in: query
+        name: active_at_date_or_future
+        schema:
+          type: string
+          format: date
+        description: Only stations with a station-day running on this date or starting
+          later; with delivery_day, one on that day.
+      - in: query
         name: delivery_day
         schema:
           type: string
@@ -8309,7 +8316,8 @@ paths:
   /api/commissioning/delivery_tours/:
     get:
       operationId: commissioning_delivery_tours_list
-      description: Get delivery tours grouped by tour number for a delivery day.
+      description: Get the delivery tours of a delivery day from next week on, grouped
+        by tour number.
       parameters:
       - in: query
         name: delivery_day
@@ -8339,7 +8347,8 @@ paths:
   /api/commissioning/delivery_tours/update_tours/:
     post:
       operationId: commissioning_delivery_tours_update_tours_create
-      description: Bulk-update tour assignments for delivery stations on a given day.
+      description: Replace a delivery day's tour plan from next week on. Weeks up
+        to this one keep their tours.
       tags:
       - commissioning
       requestBody:
@@ -8363,6 +8372,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/UpdateToursResponse'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
         '404':
           content:
             application/json:
@@ -8370,12 +8385,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Error response.
-        '400':
           content:
             application/json:
               schema:
@@ -34798,6 +34807,9 @@ components:
           type: boolean
           readOnly: true
         delivery_stations:
+          type: boolean
+          readOnly: true
+        about:
           type: boolean
           readOnly: true
     InventoryEntry:

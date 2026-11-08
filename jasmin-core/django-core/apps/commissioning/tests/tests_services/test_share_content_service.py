@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -801,6 +801,58 @@ class TestGetShareContentAsFrontendData:
         tour_keys = [key for key in row if key.startswith(f"{base_key}_tour_")]
         assert tour_keys == [f"{base_key}_tour_{tour_number}"]
         assert row[f"{base_key}_tour_{tour_number}"] == "5"
+
+    @time_machine.travel(datetime(2026, 11, 4, 12, 0), tick=False)
+    @patch(
+        "apps.commissioning.services.share_content_frontend.StockService.get_theoretical_current_stock",
+        return_value={},
+    )
+    def test_carries_each_week_under_the_tour_the_station_has_that_week(
+        self, _mock_stock, tenant
+    ):
+        variation = ShareTypeVariationFactory()
+        delivery_day = SharesDeliveryDayFactory(day_number=2)
+        station = DeliveryStationFactory()
+        DeliveryStationDayFactory(
+            delivery_station=station, delivery_day=delivery_day, tour_number=3
+        )
+        DeliveryStationDayFactory(
+            delivery_station=station,
+            delivery_day=delivery_day,
+            tour_number=1,
+            valid_from=date(2026, 12, 28),
+        )
+        article = ShareArticleFactory()
+        contents = [
+            ShareContentFactory(
+                share=ShareFactory(
+                    year=year,
+                    delivery_week=week,
+                    delivery_day=delivery_day,
+                    share_type_variation=variation,
+                ),
+                share_article=article,
+                delivery_station=station,
+                amount=Decimal("5"),
+                unit="KG",
+                size="M",
+            )
+            for year, week in ((2026, 52), (2027, 1))
+        ]
+
+        rows = ShareContentService().get_share_content_as_frontend_data(contents)
+
+        base_key = f"day_{delivery_day.pk}_variation_{variation.pk}"
+        tours_by_week = {
+            row["delivery_week"]: [
+                key for key in row if key.startswith(f"{base_key}_tour_")
+            ]
+            for row in rows
+        }
+        assert tours_by_week == {
+            52: [f"{base_key}_tour_3"],
+            1: [f"{base_key}_tour_1"],
+        }
 
 
 # ---------------------------------------------------------------------------

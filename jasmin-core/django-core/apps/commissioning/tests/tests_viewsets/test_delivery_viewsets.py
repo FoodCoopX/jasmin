@@ -23,7 +23,6 @@ from apps.commissioning.tests.factories import (
     ShareTypeVariationFactory,
     SubscriptionFactory,
 )
-from apps.commissioning.utils.iso_week_utils import previous_monday
 from apps.shared.tenants.models import TenantSettings
 
 
@@ -204,7 +203,8 @@ class TestDeliveryStationDayViewSet:
         missing = {row["id"]: row["tour_assignment_missing"] for row in resp.data}
         assert missing == {str(on_tour.id): False, str(off_tour.id): True}
 
-    def test_a_station_day_taken_off_its_tour_reads_as_missing(
+    @time_machine.travel(datetime.datetime(2026, 11, 4, 12, 0), tick=False)
+    def test_a_station_day_taken_off_its_tour_reads_as_missing_from_next_week(
         self, api_client, tenant
     ):
         day = SharesDeliveryDayFactory(day_number=2)
@@ -235,7 +235,16 @@ class TestDeliveryStationDayViewSet:
 
         resp = api_client.get(self.URL, {"delivery_day": str(day.id)})
         missing = {row["id"]: row["tour_assignment_missing"] for row in resp.data}
-        assert missing == {str(kept.id): False, str(dropped.id): True}
+        successor = DeliveryStationDay.objects.get(
+            delivery_station=dropped.delivery_station,
+            delivery_day=day,
+            valid_from=datetime.date(2026, 11, 9),
+        )
+        assert missing == {
+            str(kept.id): False,
+            str(dropped.id): False,
+            str(successor.id): True,
+        }
 
     def test_filter_by_member_returns_only_assigned_station_days(
         self, api_client, tenant
@@ -788,191 +797,6 @@ class TestDeliveryToursViewSet:
         DeliveryStationDayFactory(delivery_day=dd, tour_number=1, stop_order=1)
         resp = api_client.get(self.URL, {"delivery_day": str(dd.id)})
         assert resp.status_code == status.HTTP_200_OK
-
-    def test_update_tours_targets_open_row_when_station_day_is_versioned(
-        self, api_client, tenant
-    ):
-        # A (station, day) pair with history: the current open station-day plus
-        # an earlier closed one. update_tours must resolve to only the OPEN row —
-        # an update_or_create unscoped by valid_until would match BOTH rows on its
-        # implicit get() and 500 with MultipleObjectsReturned.
-        station = DeliveryStationFactory()
-        day = SharesDeliveryDayFactory(day_number=3)
-        # First day opens 2026-01-05 (factory default). Creating a second at a
-        # later Monday auto-closes this predecessor at 2026-05-31 via
-        # TimeBoundMixin succession, leaving two rows for the pair.
-        closed = DeliveryStationDayFactory(delivery_station=station, delivery_day=day)
-        current = DeliveryStationDayFactory(
-            delivery_station=station,
-            delivery_day=day,
-            valid_from=datetime.date(2026, 6, 1),
-        )
-        closed.refresh_from_db()
-        assert closed.valid_until is not None  # predecessor was closed
-        assert current.valid_until is None  # successor is the open row
-
-        resp = api_client.post(
-            reverse("delivery_tours-update-tours"),
-            {
-                "delivery_day": str(day.id),
-                "tours": [
-                    {
-                        "tour_number": 2,
-                        "positions": [
-                            {"position": 1, "delivery_station_id": str(station.id)}
-                        ],
-                    }
-                ],
-            },
-            format="json",
-        )
-
-        assert resp.status_code == status.HTTP_200_OK
-        current.refresh_from_db()
-        closed.refresh_from_db()
-        # The open row carries the new assignment; the closed history row is
-        # left exactly as it was.
-        assert current.tour_number == 2
-        assert current.stop_order == 1
-        assert closed.tour_number == 1
-        assert closed.stop_order is None
-
-
-@pytest.mark.django_db
-class TestUpdateToursCreatesStationDay:
-    """The CREATE branch of ``update_tours``' ``update_or_create``.
-
-    ``DeliveryStationDay`` has no ``is_active`` field (its sibling
-    ``DeliveryStation`` does), so ``defaults`` must not carry one. Django
-    setattrs unknown defaults on the UPDATE branch, so only this CREATE branch
-    exposes it: it passes them to the constructor and raises
-    ``TypeError: got unexpected keyword arguments``.
-
-    Activeness for this model IS ``valid_until IS NULL``, which the queryset
-    filter already expresses.
-    """
-
-    def test_assigning_a_station_with_no_station_day_creates_one(
-        self, api_client, tenant
-    ):
-        station = DeliveryStationFactory()
-        day = SharesDeliveryDayFactory(day_number=4)
-        # Deliberately NO DeliveryStationDay for this pair -> the create branch.
-        assert not DeliveryStationDay.objects.filter(
-            delivery_station=station, delivery_day=day
-        ).exists()
-
-        resp = api_client.post(
-            reverse("delivery_tours-update-tours"),
-            {
-                "delivery_day": str(day.id),
-                "tours": [
-                    {
-                        "tour_number": 3,
-                        "positions": [
-                            {"position": 1, "delivery_station_id": str(station.id)}
-                        ],
-                    }
-                ],
-            },
-            format="json",
-        )
-
-        assert resp.status_code == status.HTTP_200_OK
-        created = DeliveryStationDay.objects.get(
-            delivery_station=station, delivery_day=day
-        )
-        assert created.tour_number == 3
-        assert created.stop_order == 1
-        # Open row = the active one; there is no is_active column to set.
-        assert created.valid_until is None
-        # valid_from is NOT NULL with no model default, so the create branch has
-        # to supply it — and the project invariant is that it is always a Monday.
-        assert created.valid_from is not None
-        assert created.valid_from.weekday() == 0, "valid_from must be a Monday"
-        # Effective from the current week. This day started long ago, so the
-        # clamp to its own start doesn't bite.
-        assert created.valid_from == previous_monday(timezone.localdate())
-
-    def test_assignment_on_a_future_dated_day_opens_at_that_days_start(
-        self, api_client, tenant
-    ):
-        """A station-day may not open before its delivery day, so the created
-        row starts at the day's own start rather than this week's Monday."""
-        with time_machine.travel(datetime.datetime(2026, 2, 2, 12, 0), tick=False):
-            station = DeliveryStationFactory()
-            day = SharesDeliveryDayFactory(
-                day_number=5, valid_from=datetime.date(2026, 10, 5)
-            )
-
-            resp = api_client.post(
-                reverse("delivery_tours-update-tours"),
-                {
-                    "delivery_day": str(day.id),
-                    "tours": [
-                        {
-                            "tour_number": 1,
-                            "positions": [
-                                {"position": 1, "delivery_station_id": str(station.id)}
-                            ],
-                        }
-                    ],
-                },
-                format="json",
-            )
-
-            assert resp.status_code == status.HTTP_200_OK
-            created = DeliveryStationDay.objects.get(
-                delivery_station=station, delivery_day=day
-            )
-            assert created.valid_from == datetime.date(2026, 10, 5)
-
-
-@pytest.mark.django_db
-class TestUpdateToursKeepsStationDayStart:
-    """The UPDATE branch of ``update_tours`` moves an existing station day to
-    its new tour and stop and leaves its start alone — a start moved back in
-    the station's modal (onboarding mode) survives the next tour edit, and
-    the deliveries before this week stay inside the row's window."""
-
-    def test_an_existing_station_day_keeps_its_start(self, api_client, tenant):
-        station = DeliveryStationFactory()
-        day = SharesDeliveryDayFactory(day_number=4)
-        station_day = DeliveryStationDayFactory(
-            delivery_station=station,
-            delivery_day=day,
-            valid_from=datetime.date(2026, 1, 5),
-            tour_number=1,
-            stop_order=1,
-        )
-
-        resp = api_client.post(
-            reverse("delivery_tours-update-tours"),
-            {
-                "delivery_day": str(day.id),
-                "tours": [
-                    {
-                        "tour_number": 2,
-                        "positions": [
-                            {"position": 3, "delivery_station_id": str(station.id)}
-                        ],
-                    }
-                ],
-            },
-            format="json",
-        )
-
-        assert resp.status_code == status.HTTP_200_OK
-        station_day.refresh_from_db()
-        assert station_day.tour_number == 2
-        assert station_day.stop_order == 3
-        assert station_day.valid_from == datetime.date(2026, 1, 5)
-        assert (
-            DeliveryStationDay.objects.filter(
-                delivery_station=station, delivery_day=day
-            ).count()
-            == 1
-        )
 
 
 # ---------------------------------------------------------------------------

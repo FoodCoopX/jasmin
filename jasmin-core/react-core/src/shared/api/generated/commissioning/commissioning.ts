@@ -9941,7 +9941,7 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Get delivery tours grouped by tour number for a delivery day.
+ * Get the delivery tours of a delivery day from next week on, grouped by tour number.
  */
 export const commissioningDeliveryToursList = (
     params: CommissioningDeliveryToursListParams,
@@ -10031,7 +10031,7 @@ export function useCommissioningDeliveryToursList<TData = Awaited<ReturnType<typ
 
 
 /**
- * Bulk-update tour assignments for delivery stations on a given day.
+ * Replace a delivery day's tour plan from next week on. Weeks up to this one keep their tours.
  */
 export const commissioningDeliveryToursUpdateToursCreate = (
     deliveryToursUpdate: DeliveryToursUpdate,

@@ -247,6 +247,7 @@
   "available_pu": "verfügbare VPE",
   "ordered_pu": "bestellte VPE",
   "tour_planning": "Tourenplanung",
+  "tour_plan_applies_from": "Änderungen gelten ab KW {{week}}; diese Woche behält ihre Touren.",
   "tour_label": "Tour {{number}}",
   "tour_save_failed": "Die Tourenplanung konnte nicht gespeichert werden. Bitte versuche es erneut.",
   "harvest_save_failed": "Die Erntemenge konnte nicht gespeichert werden. Bitte versuche es erneut.",

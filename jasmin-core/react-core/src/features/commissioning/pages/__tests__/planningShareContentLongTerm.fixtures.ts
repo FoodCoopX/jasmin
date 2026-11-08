@@ -22,9 +22,10 @@ export const HARVEST_SHARE_TYPE = shareType(HARVEST, { needs_complex_planning: t
 export const HONEY_SHARE_TYPE = shareType(HONEY, { needs_complex_planning: false, is_additional_share_type: true });
 
 // The two physical share sizes, their average weights and active subscribers.
+// They run from the first week of ISO year 2026 on, so all the planned year.
 export const VARIATIONS: ShareTypeVariation[] = [
-  { id: "var-small", size: "S", average_weight: "2.00", share_type: "st-HARVEST_SHARE", valid_from: "2026-01-05" },
-  { id: "var-large", size: "L", average_weight: "4.00", share_type: "st-HARVEST_SHARE", valid_from: "2026-01-05" },
+  { id: "var-small", size: "S", average_weight: "2.00", share_type: "st-HARVEST_SHARE", valid_from: "2025-12-29" },
+  { id: "var-large", size: "L", average_weight: "4.00", share_type: "st-HARVEST_SHARE", valid_from: "2025-12-29" },
 ];
 export const SUBSCRIBERS: Record<string, number> = { "var-small": 20, "var-large": 10 };
 
@@ -100,3 +101,27 @@ export const CARROTS_2025 = planRow({
   year: 2025, share_article: "art-carrot", range_1: 18, range_2: 30,
   "amount_var-small": "2.000", "amount_var-large": "4.000",
 });
+
+/** A slot as the backend saves it: an update keeps the year, article, unit and
+ *  size its id names. */
+export function savedSlot(id: string | null, payload: Record<string, unknown>): PlanRow {
+  const [year, shareArticle, unit, size] = id
+    ? id.split("_")
+    : [payload.year, payload.share_article, payload.unit, payload.size].map(String);
+  const amounts = Object.fromEntries(
+    Object.entries(payload)
+      .filter(([key]) => key.startsWith("amount_"))
+      .map(([key, value]) => [key, Number(value).toFixed(3)]),
+  );
+  return planRow({
+    ...amounts,
+    year: Number(year), share_article: shareArticle, unit, size,
+    share_option: String(payload.share_option),
+    range_1: Number(payload.range_1), range_2: Number(payload.range_2),
+    only_odd_weeks: Boolean(payload.only_odd_weeks),
+    only_even_weeks: Boolean(payload.only_even_weeks),
+    only_every_three_weeks: Boolean(payload.only_every_three_weeks),
+    note: (payload.note as string | null) || null,
+    seller: (payload.seller as string | null) ?? null,
+  });
+}

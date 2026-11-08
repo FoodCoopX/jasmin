@@ -453,9 +453,8 @@ class DeliveryTourPositionSerializer(serializers.Serializer):
     delivery_station_id = serializers.CharField()
 
     def validate_delivery_station_id(self, value):
-        # Guard the WRITE path: update_tours feeds this id straight into
-        # DeliveryStationDay.update_or_create, which doesn't full_clean — so a
-        # bogus id would otherwise surface as a generic 409, not a field 400.
+        # update_tours names an unknown station in its refusal, which it
+        # reads by this id; a bogus id is answered here as a field 400.
         from ..errors import DeliveryStationNotFound
 
         if not DeliveryStation.objects.filter(id=value).exists():

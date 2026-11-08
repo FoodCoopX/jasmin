@@ -81,7 +81,7 @@
   "dashboard_abos": "",
   "debits_abos": "",
   "dashboard_commissioning": "",
-  "delivery_tours": "",
+  "delivery_tours": "Die Tourenplanung gilt ab der nächsten Woche. Diese und vergangene Wochen behalten ihre Touren, damit gedruckte und gepackte Listen stimmen. Hier stehen nur Verteilstationen, die an diesem Liefertag ab nächster Woche beliefert werden; ein Stationstag wird im Dialog der Verteilstation angelegt.",
   "list_markets": "",
   "overview_resellers": "",
   "planning_share_content_page": "",

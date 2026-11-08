@@ -41,6 +41,7 @@ from .delivery import (
     ShareTypeVariationCapacityBelowOccupancy,
     ShareTypeVariationOverCapacity,
     TourNumberBelowOne,
+    TourStationWithoutStationDay,
     WaitingListDisabled,
     WaitingListOfferEntryClosed,
     WaitingListOfferExpired,
@@ -137,6 +138,7 @@ from .orders import (
 )
 from .shares import (
     DataImportInvalid,
+    DefaultShareContentNoRunningWeek,
     DeliveryDayNumberUnknown,
     DeliveryStationDayAmbiguous,
     DeliveryStationDayUnknown,
@@ -272,6 +274,7 @@ __all__ = [
     "DeliveryStationOverCapacity",
     "ShareTypeVariationOverCapacity",
     "TourNumberBelowOne",
+    "TourStationWithoutStationDay",
     "WaitingListDisabled",
     "WaitingListOfferNotAvailable",
     "WaitingListOfferInvalid",
@@ -323,6 +326,7 @@ __all__ = [
     "ShareTypeVariationNotFound",
     "ShareTypeVariationGrossPriceInUse",
     "VirtualComponentNotPhysical",
+    "DefaultShareContentNoRunningWeek",
     "ShareContentAlreadyPlanned",
     "ShareContentError",
     "ShareContentNotFound",

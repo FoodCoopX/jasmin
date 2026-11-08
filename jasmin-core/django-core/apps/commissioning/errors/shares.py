@@ -59,6 +59,14 @@ class ShareContentAlreadyPlanned(ConflictError):
     code = "share_content.already_planned"
 
 
+class DefaultShareContentNoRunningWeek(BadRequestError):
+    """A long-term plan gives amounts only to sizes that run in none of its
+    weeks. A size gets plan rows only for the weeks it runs, so nothing would
+    be saved."""
+
+    code = "default_share_content.no_running_week"
+
+
 class ShareContentNotFound(NotFoundError):
     """No ShareContent rows exist for the requested
     (year, week, share_article, unit, size) planning slot."""

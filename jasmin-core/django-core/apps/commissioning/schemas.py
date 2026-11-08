@@ -185,10 +185,14 @@ def get_is_active_parameter(**overrides):
 def get_active_at_date_or_future_parameter(**overrides):
     """Get is_active_at_date_or_future boolean parameter for filtering by active status at a date or in the future."""
     required = overrides.pop("required", False)
+    description = overrides.pop(
+        "description",
+        "Filter for records active at a specific date or starting in the future",
+    )
 
     return catalogue_param(
         "active_at_date_or_future",
-        description="Filter for records active at a specific date or starting in the future",
+        description=description,
         required=required,
         **overrides,
     )

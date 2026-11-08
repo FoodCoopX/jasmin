@@ -18,4 +18,5 @@ export interface HostCapabilities {
   readonly web_app?: boolean;
   readonly manual_share_import?: boolean;
   readonly delivery_stations?: boolean;
+  readonly about?: boolean;
 }

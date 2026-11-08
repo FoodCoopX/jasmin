@@ -113,6 +113,7 @@ from ..services import (
     ShareDeliveryService,
     SharesDayChangeService,
 )
+from ..services.planning_subscriber_counts import subscriber_counts_for_planning
 from ..services.share_delivery_service import JokerScope
 from ..utils.composite_id_utils import parse_slot_id
 from ..utils.iso_week_utils import week_day_to_date
@@ -1111,7 +1112,7 @@ class ShareDeliveryViewSet(
             # Hoist the per-delivery DeliveryStationDay lookup out of the loop:
             # every future delivery resolves within ONE (station, target-day)
             # succession chain. Fetch it once and resolve each delivery's week in
-            # Python — mirrors delivery_viewsets._migrate_succession_children.
+            # Python, as station_day_succession.repoint_succession_children does.
             station_day_chain = list(
                 DeliveryStationDay.objects.filter(
                     delivery_station=new_delivery_station_day.delivery_station,
@@ -1604,9 +1605,7 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="subscriber_counts")
     def subscriber_counts(self, request: Request) -> Response:
         params = validate_query_params(request, optional=["year", "share_option"])
-        counts = DefaultShareContentService.get_subscriber_counts_for_planning(
-            params["year"], params["share_option"]
-        )
+        counts = subscriber_counts_for_planning(params["share_option"])
         return Response(counts, status=status.HTTP_200_OK)
 
     @extend_schema(

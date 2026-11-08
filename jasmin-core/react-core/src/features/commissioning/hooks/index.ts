@@ -26,6 +26,7 @@ export { usePlanningAxes } from './usePlanningAxes';
 export type { PlanningAxes, UsePlanningAxesParams } from './usePlanningAxes';
 export { useShareOptions } from './useShareOptions';
 export { useShareTypeVariations } from './useShareTypeVariations';
+export { useYearShareTypeVariations } from './useYearShareTypeVariations';
 export { useStationContentsPages } from './useStationContentsPages';
 export type { StationContentsSlot } from './useStationContentsPages';
 export { useWeekStationSlots } from './useWeekStationSlots';
