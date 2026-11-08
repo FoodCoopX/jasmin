@@ -1,5 +1,10 @@
 import { lazy } from "react";
-import { RequireOfficeOrOwnMember, RequireRole } from "@shared/auth";
+import {
+  RequireCapability,
+  RequireMembersAndSubscriptions,
+  RequireOfficeOrOwnMember,
+  RequireRole,
+} from "@shared/auth";
 import type { AppRoute } from "../types";
 
 const DashboardMembers = lazy(
@@ -23,31 +28,37 @@ export const membersRoutes: AppRoute[] = [
   {
     path: "/members/dashboard",
     element: (
-      <RequireRole flag="isOffice">
-        <DashboardMembers />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <DashboardMembers />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
 
   {
     path: "/members/staff-detail",
     element: (
-      <RequireRole flag="isOffice">
-        <StaffDetail />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <StaffDetail />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
     path: "/members/members",
     element: (
-      <RequireRole flag="isOffice">
-        <Members />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <Members />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
-    // Also a member's own page, for one who holds staff roles too (their menu
-    // links it).
+    // Also a member's own page, for one who holds staff roles too: their menu
+    // links it in every mode, so the import-shares mode doesn't close it.
     path: "/members/members/:id",
     element: (
       <RequireOfficeOrOwnMember>
@@ -59,13 +70,17 @@ export const membersRoutes: AppRoute[] = [
   {
     path: "/members/loans",
     element: (
-      <RequireRole flag="isOffice">
-        <MemberLoans />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <MemberLoans />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
 
   {
+    // Every email the farm sends, the resellers' included, so the
+    // import-shares mode doesn't close it.
     path: "/members/email-log",
     element: (
       <RequireRole flag="isOffice">
@@ -74,11 +89,15 @@ export const membersRoutes: AppRoute[] = [
     ),
   },
   {
+    // Customers file deletion requests too, and the office's mail about one
+    // links here in every mode, so the import-shares mode doesn't close it.
     path: "/members/data-protection",
     element: (
-      <RequireRole flag="isAdmin">
-        <GdprDeletionRequests />
-      </RequireRole>
+      <RequireCapability name="gdpr">
+        <RequireRole flag="isAdmin">
+          <GdprDeletionRequests />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
 ];

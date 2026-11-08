@@ -1,5 +1,4 @@
 {
-  "import_shares_mode_banner": "Share demand for this organization comes from the weekly CSV import — subscriptions here don't drive planning demand or delivery-station capacity.",
   "import_shares_mode_banner_link": "Go to the CSV import",
   "back": "Back",
   "cancel": "Cancel",

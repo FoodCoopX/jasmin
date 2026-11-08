@@ -1,5 +1,9 @@
 import { lazy } from "react";
-import { RequireCapability, RequireRole } from "@shared/auth";
+import {
+  RequireCapability,
+  RequireMembersAndSubscriptions,
+  RequireRole,
+} from "@shared/auth";
 import type { AppRoute } from "../types";
 
 const DashboardConfiguration = lazy(
@@ -80,9 +84,11 @@ export const configurationRoutes: AppRoute[] = [
   {
     path: "/configuration/delivery-exceptions",
     element: (
-      <RequireRole flag="isAdmin">
-        <ConfigurationDeliveryExceptions />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isAdmin">
+          <ConfigurationDeliveryExceptions />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
@@ -104,9 +110,11 @@ export const configurationRoutes: AppRoute[] = [
   {
     path: "/configuration/members",
     element: (
-      <RequireRole flag="isAdmin">
-        <ConfigurationMembers />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isAdmin">
+          <ConfigurationMembers />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
@@ -128,9 +136,11 @@ export const configurationRoutes: AppRoute[] = [
   {
     path: "/configuration/subscriptions",
     element: (
-      <RequireRole flag="isAdmin">
-        <ConfigurationSubscriptions />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isAdmin">
+          <ConfigurationSubscriptions />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
@@ -176,36 +186,46 @@ export const configurationRoutes: AppRoute[] = [
   {
     path: "/configuration/email-templates/members",
     element: (
-      <RequireRole flag="isAdmin">
-        <ConfigurationEmailTemplates
-          categories={["members", "office"]}
-          titleKey="email_templates.page_title_members"
-        />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isAdmin">
+          <ConfigurationEmailTemplates
+            categories={["members", "office"]}
+            titleKey="email_templates.page_title_members"
+          />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
+    // The privacy policy every sign-in page links and the records of
+    // processing cover every login, so the import-shares mode doesn't close it.
     path: "/configuration/gdpr",
     element: (
-      <RequireRole flag="isAdmin">
-        <ConfigurationGDPR />
-      </RequireRole>
+      <RequireCapability name="gdpr">
+        <RequireRole flag="isAdmin">
+          <ConfigurationGDPR />
+        </RequireRole>
+      </RequireCapability>
     ),
   },
   {
     path: "/configuration/consents",
     element: (
-      <RequireRole flag="isAdmin">
-        <ConfigurationConsents />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isAdmin">
+          <ConfigurationConsents />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
     path: "/configuration/payments",
     element: (
-      <RequireRole flag="isAdmin">
-        <ConfigurationPayments />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isAdmin">
+          <ConfigurationPayments />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
