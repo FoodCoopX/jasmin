@@ -90,37 +90,39 @@ class DefaultShareContentService:
         future_weeks: list[tuple[int, datetime.date]],
     ) -> tuple[
         dict[datetime.date, list],
-        dict[Any, list],
+        dict[tuple[datetime.date, Any], list],
     ]:
         """Prefetch delivery days and station relationships for future weeks.
 
         Returns:
-            (delivery_days_by_date, delivery_station_days)
+            (delivery_days_by_date, delivery_station_days) — the stations keyed
+            by (the week's Monday, delivery day id).
         """
-        delivery_days_by_date: dict[datetime.date, list] = {}
-        for _week, date in future_weeks:
-            active_days = SharesDeliveryDay.current.active_at_date(date)
-            if active_days.exists():
-                delivery_days_by_date[date] = list(active_days)
+        # A farm has a handful of delivery days: one query, matched per week.
+        all_days = list(SharesDeliveryDay.objects.all())
+        delivery_days_by_date: dict[datetime.date, list] = {
+            date: days
+            for _week, date in future_weeks
+            if (days := [day for day in all_days if day.is_active_at(date)])
+        }
 
-        delivery_station_days: dict[Any, list] = defaultdict(list)
-        if delivery_days_by_date:
-            all_delivery_days = [
-                delivery_day
-                for delivery_day_list in delivery_days_by_date.values()
-                for delivery_day in delivery_day_list
-            ]
-            # ``current`` (not ``objects``) so only ACTIVE station-days are
-            # used — matches how the harvest planner resolves stations
-            # (``DeliveryStationDay.current.active_at_date``). ``objects`` would
-            # pull in closed/historical station-days and materialise
-            # ShareContent for stations that no longer deliver.
-            station_relations = DeliveryStationDay.current.filter(
-                delivery_day__in=all_delivery_days
-            ).select_related("delivery_station", "delivery_day")
-
-            for rel in station_relations:
-                delivery_station_days[rel.delivery_day].append(rel.delivery_station)
+        # Each day's stations per week: the station-days running that week, of
+        # stations still delivering.
+        day_ids_by_date = {
+            date: {day.id for day in days}
+            for date, days in delivery_days_by_date.items()
+        }
+        delivery_station_days: dict[tuple[datetime.date, Any], list] = defaultdict(list)
+        for station_day in DeliveryStationDay.objects.filter(
+            delivery_day_id__in=set().union(*day_ids_by_date.values()),
+            delivery_station__is_active=True,
+        ).select_related("delivery_station"):
+            for date, day_ids in day_ids_by_date.items():
+                if station_day.delivery_day_id in day_ids and station_day.is_active_at(
+                    date
+                ):
+                    key = (date, station_day.delivery_day_id)
+                    delivery_station_days[key].append(station_day.delivery_station)
 
         return delivery_days_by_date, dict(delivery_station_days)
 
@@ -412,7 +414,9 @@ class DefaultShareContentService:
                         shares_to_create.append(share)
                         existing_shares[share_key] = share
 
-                    for station in delivery_station_days.get(delivery_day, []):
+                    for station in delivery_station_days.get(
+                        (monday, delivery_day.id), []
+                    ):
                         share_content = ShareContent(
                             share=share,
                             share_article=share_article,

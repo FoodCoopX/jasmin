@@ -160,6 +160,35 @@ class TestDeliveryStationViewSet:
         assert resp.status_code == status.HTTP_200_OK
 
 
+@pytest.mark.django_db
+class TestStationsOfAWeek:
+    """A week page lists the stations a day served that week: one that closed
+    since, even deactivated, still shows; one that opens later does not."""
+
+    URL = reverse("delivery_station-list")
+
+    @time_machine.travel(datetime.datetime(2026, 11, 4, 12, 0), tick=False)
+    def test_lists_the_stations_served_in_the_week(self, api_client, tenant):
+        day = SharesDeliveryDayFactory(day_number=2)
+        closed = DeliveryStationDayFactory(
+            delivery_day=day,
+            valid_until=datetime.date(2026, 6, 28),
+            delivery_station=DeliveryStationFactory(is_active=False),
+        )
+        later = DeliveryStationDayFactory(
+            delivery_day=day, valid_from=datetime.date(2026, 12, 28)
+        )
+
+        resp = api_client.get(
+            self.URL, {"delivery_day": str(day.id), "active_at_date": "2026-05-16"}
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        listed = {row["id"] for row in resp.data}
+        assert str(closed.delivery_station_id) in listed
+        assert str(later.delivery_station_id) not in listed
+
+
 # ---------------------------------------------------------------------------
 # DeliveryStationDayViewSet
 # ---------------------------------------------------------------------------

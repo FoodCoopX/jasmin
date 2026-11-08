@@ -31,9 +31,10 @@ export default function SubscriptionStatsCards() {
     getSetting("allows_waiting_list_for_subscriptions", true),
   );
   const { data: subscriptions } = useCommissioningAbosList({});
+  // Every physical size, ended ones too — the catalogue the dashboard reads,
+  // so both give each size the same colour.
   const { data: variations } = useCommissioningShareTypeVariationsList({
     physical: true,
-    include_future: true,
   });
   const { variationLegendById, snapshot } = useSubscriptionVariationStats(
     subscriptions,

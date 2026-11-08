@@ -768,7 +768,7 @@ describe("PackingListBoxes when the amounts differ between stations", () => {
 
     expect(await screen.findByText("Beetroot")).toBeInTheDocument();
     expect(shownIn(selectNamed(STATION))).toBe("Market");
-    expect(api.stations).toHaveBeenLastCalledWith({ is_active: true, delivery_day: "day-fri" });
+    expect(api.stations).toHaveBeenLastCalledWith({ is_active: true, delivery_day: "day-fri", active_at_date: "2026-10-10" });
     // Friday has two tours; the station already narrows the list further.
     expect(tourPicker()).toBeNull();
     expect(lastBoxesRequest()).toEqual(requestFor(FRIDAY, { delivery_station: MARKET.id }));

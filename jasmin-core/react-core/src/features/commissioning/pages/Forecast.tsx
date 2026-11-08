@@ -12,7 +12,6 @@ import {
   variationColumnKey,
 } from "@features/commissioning/hooks";
 import {
-  useActiveShareOptions,
   useInvalidateAfterTableMutation,
   useIsMobile,
   useNoteColumn,
@@ -124,9 +123,6 @@ export default function Forecast() {
   const { getSetting } = useTenant();
   const isMobile = useIsMobile();
 
-  const { activeShareOptions } = useActiveShareOptions();
-  const fruit_and_veg_shares_are_separate =
-    activeShareOptions.fruit_and_veg_shares_are_separate ?? false;
   const has_markets = getSetting("has_markets", true);
   const sells_to_resellers = getSetting("sells_to_resellers", true);
 
@@ -145,9 +141,9 @@ export default function Forecast() {
       active_at_date: activeAtDateForWeek(selectedYear, selectedWeek),
       // Forecast is a HARVEST forecast — ALWAYS scope to harvest-share
       // variations. The fruit-share variations are fetched separately
-      // (``shareTypeVariationFiltersFruits``) only when the tenant runs fruit
-      // and veg as separate shares. Without ``share_option`` the query returns
-      // EVERY share option (egg / chicken / …).
+      // (``shareTypeVariationFiltersFruits``); the week has a fruit share of
+      // its own when both lists have sizes. Without ``share_option`` the query
+      // returns EVERY share option (egg / chicken / …).
       share_option: ShareTypeEnum.HARVEST_SHARE,
     };
   }, [selectedYear, selectedWeek]);
@@ -157,21 +153,24 @@ export default function Forecast() {
     loading: shareTypeVariationsLoading,
   } = useShareTypeVariations(shareTypeVariationFilters);
 
-  const shareTypeVariationFiltersFruits = useMemo(() => {
-    if (!fruit_and_veg_shares_are_separate) return null;
-
-    return {
+  const shareTypeVariationFiltersFruits = useMemo(
+    () => ({
       physical: true,
       active_at_date: activeAtDateForWeek(selectedYear, selectedWeek),
       share_option: ShareTypeEnum.HARVEST_SHARE_FRUIT,
-    };
-  }, [selectedYear, selectedWeek, fruit_and_veg_shares_are_separate]);
+    }),
+    [selectedYear, selectedWeek],
+  );
 
   const {
     shareTypeVariations: shareTypeVariationsFruits,
     shareTypeVariationsCount: shareTypeVariationsFruitsCount,
     loading: shareTypeVariationsFruitsLoading,
   } = useShareTypeVariations(shareTypeVariationFiltersFruits);
+  // Fruit is a share of its own in the weeks it has sizes of its own next to
+  // the harvest share's, so the selected week decides.
+  const fruit_and_veg_shares_are_separate =
+    shareTypeVariationsCount > 0 && shareTypeVariationsFruitsCount > 0;
 
   const { finalColumn } = useFinalColumn();
   const { noteColumn } = useNoteColumn();

@@ -253,6 +253,50 @@ class TestCreateDefaultShareContent:
         assert plan_weeks(new) == content_weeks(new) == [53]
 
     @time_machine.travel(datetime.datetime(2026, 11, 4, 12, 0), tick=False)
+    def test_plans_a_week_only_for_the_stations_served_that_week(self, tenant):
+        """A station that stopped, one that starts later and an inactive one get
+        contents only for the weeks they are served in."""
+        day = SharesDeliveryDayFactory(day_number=2)
+        running = DeliveryStationDayFactory(delivery_day=day)
+        ended = DeliveryStationDayFactory(
+            delivery_day=day, valid_until=datetime.date(2026, 5, 31)
+        )
+        starting = DeliveryStationDayFactory(
+            delivery_day=day, valid_from=datetime.date(2026, 11, 16)
+        )
+        inactive = DeliveryStationDayFactory(
+            delivery_day=day, delivery_station__is_active=False
+        )
+        article = ShareArticleFactory()
+        variation = ShareTypeVariationFactory()
+
+        DefaultShareContentService.create_default_share_content(
+            {
+                "year": 2026,
+                "share_article": str(article.pk),
+                "share_option": "HARVEST_SHARE",
+                "range_1": 46,
+                "range_2": 47,
+                "unit": "KG",
+                "size": "M",
+                f"amount_{variation.pk}": "2",
+            }
+        )
+
+        def planned_weeks(station_day):
+            return sorted(
+                ShareContent.objects.filter(
+                    share_article=article,
+                    delivery_station=station_day.delivery_station,
+                ).values_list("share__delivery_week", flat=True)
+            )
+
+        assert planned_weeks(running) == [46, 47]
+        assert planned_weeks(starting) == [47]
+        assert planned_weeks(ended) == []
+        assert planned_weeks(inactive) == []
+
+    @time_machine.travel(datetime.datetime(2026, 11, 4, 12, 0), tick=False)
     def test_refuses_amounts_only_for_sizes_running_in_none_of_the_weeks(self, tenant):
         variation = ShareTypeVariationFactory(valid_from=datetime.date(2027, 1, 4))
         data = {

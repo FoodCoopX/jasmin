@@ -30,6 +30,7 @@ import type {
 import {
   termCapacity,
 } from "@features/abos/utils/stationCapacity";
+import { lastDayInRange, type Validity } from "@shared/utils/validityRange";
 import { formatWeekKey, termWeekKeys } from "@shared/utils/weekRange";
 
 interface CapacityOverviewProps {
@@ -103,7 +104,7 @@ export function CapacityOverview({
   stationDays,
 }: CapacityOverviewProps) {
   const { t } = useTranslation();
-  const { dateFormat } = useDateFormat();
+  const { dateFormat, formatDateForAPI } = useDateFormat();
   const presets = useDateRangePresets();
 
   // Default: today through one year ahead — the typical subscription horizon.
@@ -133,15 +134,33 @@ export function CapacityOverview({
     [weekKeys, windowKeys],
   );
 
+  // Only the sizes and station-days that run at some point of the range.
+  const runsInRange = useMemo(() => {
+    const start = formatDateForAPI(range[0])!;
+    const end = formatDateForAPI(range[1])!;
+    return (entity: Validity) => lastDayInRange(entity, start, end) !== null;
+  }, [range, formatDateForAPI]);
+
   const variationRows = useMemo(
-    () => buildCapacityRows("variation", variations, weekKeys, rangeInWindow),
-    [variations, weekKeys, rangeInWindow],
+    () =>
+      buildCapacityRows(
+        "variation",
+        variations.filter(runsInRange),
+        weekKeys,
+        rangeInWindow,
+      ),
+    [variations, runsInRange, weekKeys, rangeInWindow],
   );
 
   const stationRows = useMemo(
     () =>
-      buildCapacityRows("station_day", stationDays, weekKeys, rangeInWindow),
-    [stationDays, weekKeys, rangeInWindow],
+      buildCapacityRows(
+        "station_day",
+        stationDays.filter(runsInRange),
+        weekKeys,
+        rangeInWindow,
+      ),
+    [stationDays, runsInRange, weekKeys, rangeInWindow],
   );
 
   const columns = useMemo<EditableColumnConfig<CapacityRow>[]>(

@@ -56,10 +56,14 @@ export default function StationNotices() {
     );
   }, [selectedDeliveryDay, shareDeliveryDays]);
 
+  // The stations the day served in the selected week.
+  const weekDate = activeAtDateForWeek(selectedYear, selectedWeek);
   const { deliveryStations } = useDeliveryStations(
-    selectedDeliveryDayId ? { delivery_day: selectedDeliveryDayId } : {},
+    selectedDeliveryDayId
+      ? { delivery_day: selectedDeliveryDayId, active_at_date: weekDate }
+      : {},
   );
-  const weekSlots = useWeekStationSlots(dayNumbers, shareDeliveryDays);
+  const weekSlots = useWeekStationSlots(dayNumbers, shareDeliveryDays, weekDate);
 
   return (
     <div>
@@ -88,6 +92,7 @@ export default function StationNotices() {
           selectedDeliveryStation={selectedDeliveryStation}
           setSelectedDeliveryStation={setSelectedDeliveryStation}
           delivery_day={selectedDeliveryDayId}
+          active_at_date={weekDate}
           preserveSelection
         />
       </div>

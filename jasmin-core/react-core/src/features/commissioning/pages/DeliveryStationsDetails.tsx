@@ -146,9 +146,12 @@ export default function DeliveryStationsDetails() {
     return deliveryDay?.id ?? null;
   }, [selectedDeliveryDay, shareDeliveryDays]);
 
-  // Fetch all delivery stations for the selected day (for bulk PDFs)
+  // The stations the day served in the selected week (for the bulk PDFs).
+  const weekDate = activeAtDateForWeek(selectedYear, selectedWeek);
   const { deliveryStations } = useDeliveryStations(
-    selectedDeliveryDayId ? { delivery_day: selectedDeliveryDayId } : {},
+    selectedDeliveryDayId
+      ? { delivery_day: selectedDeliveryDayId, active_at_date: weekDate }
+      : {},
   );
 
   // Bulk fetch: the combination matrix for every station on the selected day,
@@ -169,7 +172,7 @@ export default function DeliveryStationsDetails() {
         : [],
   });
 
-  const weekSlots = useWeekStationSlots(dayNumbers, shareDeliveryDays);
+  const weekSlots = useWeekStationSlots(dayNumbers, shareDeliveryDays, weekDate);
 
   // Bulk fetch: the combination matrix for every station on every day of the
   // week it serves.
@@ -329,6 +332,7 @@ export default function DeliveryStationsDetails() {
           selectedDeliveryStation={selectedDeliveryStation}
           setSelectedDeliveryStation={setSelectedDeliveryStation}
           delivery_day={selectedDeliveryDayId}
+          active_at_date={weekDate}
           preserveSelection
         />
       </div>

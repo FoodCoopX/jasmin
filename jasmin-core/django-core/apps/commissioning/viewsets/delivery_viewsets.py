@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Any
 
 from django.db import transaction
@@ -100,6 +101,18 @@ def _payload_sets_a_step_up_field(request: Request | None) -> bool:
     return any(str(data.get(field) or "").strip() for field in _STEP_UP_CONTACT_FIELDS)
 
 
+def _station_days_running(
+    on_date: date | None, from_date: date | None
+) -> QuerySet[DeliveryStationDay]:
+    """The station-days running on ``on_date``, or on ``from_date`` or later;
+    every one without either."""
+    if on_date is not None:
+        return DeliveryStationDay.current.active_at_date(on_date)
+    if from_date is not None:
+        return DeliveryStationDay.current.active_at_date_or_future(from_date)
+    return DeliveryStationDay.objects.all()
+
+
 def _subscribed_station_ids(member):
     """The stations a member collects from — the default station of every
     confirmed, uncancelled subscription still running today.
@@ -170,6 +183,12 @@ class DeliveryStationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         parameters=[
             get_is_active_parameter(),
             get_delivery_day_parameter(required=False),
+            get_active_at_date_parameter(
+                description=(
+                    "Only stations with a station-day running on this date; with "
+                    "delivery_day, one on that day."
+                )
+            ),
             get_active_at_date_or_future_parameter(
                 description=(
                     "Only stations with a station-day running on this date or "
@@ -208,12 +227,14 @@ class DeliveryStationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             optional=[
                 "is_active",
                 "delivery_day",
+                "active_at_date",
                 "active_at_date_or_future",
                 "member",
             ],
         )
         is_active = params["is_active"]
         delivery_day = params["delivery_day"]
+        running_on = params["active_at_date"]
         running_from = params["active_at_date_or_future"]
         member = params["member"]
         # A non-staff member may only scope to their OWN stations — reject a
@@ -232,12 +253,8 @@ class DeliveryStationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active)
 
-        if delivery_day is not None or running_from is not None:
-            station_days = (
-                DeliveryStationDay.objects.all()
-                if running_from is None
-                else DeliveryStationDay.current.active_at_date_or_future(running_from)
-            )
+        if delivery_day is not None or running_on or running_from:
+            station_days = _station_days_running(running_on, running_from)
             if delivery_day is not None:
                 station_days = station_days.filter(delivery_day=delivery_day)
             queryset = queryset.filter(

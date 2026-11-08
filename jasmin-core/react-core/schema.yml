@@ -7747,6 +7747,13 @@ paths:
       operationId: commissioning_delivery_stations_list
       parameters:
       - in: query
+        name: active_at_date
+        schema:
+          type: string
+          format: date
+        description: Only stations with a station-day running on this date; with delivery_day,
+          one on that day.
+      - in: query
         name: active_at_date_or_future
         schema:
           type: string

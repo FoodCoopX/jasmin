@@ -9,13 +9,15 @@ export interface WeekStationSlot {
 }
 
 /**
- * The week's delivery days, each paired with the stations IT serves — every
- * day has its own, so the week's pages pair a day only with its stations.
- * Empty until every day's stations have loaded.
+ * The week's delivery days, each paired with the stations IT serves that week
+ * (`activeAtDate`, a date in it) — every day has its own, so the week's pages
+ * pair a day only with its stations. Empty until every day's stations have
+ * loaded.
  */
 export function useWeekStationSlots(
   dayNumbers: number[],
   shareDeliveryDays: { id?: unknown; day_number?: unknown }[],
+  activeAtDate: string,
 ): WeekStationSlot[] {
   const weekDeliveryDays = useMemo(
     () =>
@@ -29,6 +31,7 @@ export function useWeekStationSlots(
   );
   const { stationsPerDay, loading } = useDeliveryStationsPerDay(
     weekDeliveryDays.map((day) => day.id),
+    activeAtDate,
   );
   return useMemo(
     () =>

@@ -210,8 +210,10 @@ export default function PackingListBulk() {
     [deliveryDayLabel, selectedYear, selectedWeek],
   );
 
+  // The stations the day served in the selected week.
+  const weekDate = activeAtDateForWeek(selectedYear, selectedWeek);
   const [selectedDeliveryStation, setSelectedDeliveryStation] =
-    useDeliveryStationOfDay(getDeliveryDayId);
+    useDeliveryStationOfDay(getDeliveryDayId, { activeAtDate: weekDate });
 
   const generateFilename = useCallback(
     (prefix: string) =>
@@ -418,6 +420,7 @@ export default function PackingListBulk() {
           selectedDeliveryStation={selectedDeliveryStation}
           setSelectedDeliveryStation={setSelectedDeliveryStation}
           delivery_day={getDeliveryDayId}
+          active_at_date={weekDate}
         />
       </div>
 

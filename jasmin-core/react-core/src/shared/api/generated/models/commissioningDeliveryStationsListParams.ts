@@ -8,6 +8,10 @@
 
 export type CommissioningDeliveryStationsListParams = {
 /**
+ * Only stations with a station-day running on this date; with delivery_day, one on that day.
+ */
+active_at_date?: string;
+/**
  * Only stations with a station-day running on this date or starting later; with delivery_day, one on that day.
  */
 active_at_date_or_future?: string;

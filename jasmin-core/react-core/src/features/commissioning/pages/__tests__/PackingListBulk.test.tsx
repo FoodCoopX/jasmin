@@ -376,7 +376,7 @@ describe("PackingListBulk loading", () => {
     expect(selectedIn(DAY)).toBe("commissioning.delivery_day Tuesday, 06.10.2026");
     expect(selectedIn(STATION)).toBe("Farm shop");
     expect(api.deliveryDays).toHaveBeenCalledWith({ active_at_date: "2026-10-10" });
-    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-tue" });
+    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-tue", active_at_date: "2026-10-10" });
     expect(lastListRequest()).toEqual({
       year: 2026,
       delivery_week: 41,
@@ -522,7 +522,7 @@ describe("PackingListBulk choosing the week, day and station", () => {
     expect(
       await screen.findByText("commissioning.please_select_delivery_station"),
     ).toBeInTheDocument();
-    expect(api.stations).toHaveBeenLastCalledWith({ is_active: true, delivery_day: "day-fri" });
+    expect(api.stations).toHaveBeenLastCalledWith({ is_active: true, delivery_day: "day-fri", active_at_date: "2026-10-10" });
     expect(selectedIn(STATION)).toBe("");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
@@ -548,7 +548,7 @@ describe("PackingListBulk choosing the week, day and station", () => {
 
     expect(await screen.findByText("Beetroot")).toBeInTheDocument();
     expect(selectedIn(STATION)).toBe("Market");
-    expect(api.stations).toHaveBeenLastCalledWith({ is_active: true, delivery_day: "day-fri" });
+    expect(api.stations).toHaveBeenLastCalledWith({ is_active: true, delivery_day: "day-fri", active_at_date: "2026-10-10" });
     expect(lastListRequest()).toMatchObject({ day_number: FRIDAY, delivery_station: MARKET.id });
   });
 

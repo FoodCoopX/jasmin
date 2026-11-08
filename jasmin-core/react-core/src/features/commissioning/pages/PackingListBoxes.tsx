@@ -135,6 +135,8 @@ function usePackingScope({
   const [selectedDeliveryStation, setSelectedDeliveryStation, isStationOfDay] =
     useDeliveryStationOfDay(needsStation ? (dayRecord?.id ?? null) : null, {
       selectFirst: false,
+      // The stations the day served in that week.
+      activeAtDate: activeAtDateForWeek(year, week),
     });
 
   return {
@@ -404,6 +406,7 @@ export default function PackingListBoxes() {
             selectedDeliveryStation={selectedDeliveryStation}
             setSelectedDeliveryStation={setSelectedDeliveryStation}
             delivery_day={getDeliveryDayId}
+            active_at_date={activeAtDateForWeek(selectedYear, selectedWeek)}
           />
         )}
       </MobileStack>

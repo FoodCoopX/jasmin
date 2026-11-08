@@ -1,4 +1,5 @@
-// Capacity overview: a range with no fetched week shows every row as
+// Capacity overview: it lists the sizes and station days running in the
+// chosen range, and a range with no fetched week shows every row as
 // "unknown". The window is the union of the variations' and the station days'
 // weeks, so station days arriving later can bring the range into the window
 // while the variations stay the same array — and the variation rows then have
@@ -26,7 +27,10 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("@hooks/index", () => ({
-  useDateFormat: () => ({ dateFormat: "DD.MM.YYYY" }),
+  useDateFormat: () => ({
+    dateFormat: "DD.MM.YYYY",
+    formatDateForAPI: (date: dayjs.Dayjs) => date.format("YYYY-MM-DD"),
+  }),
   useDateRangePresets: () => [],
 }));
 
@@ -60,7 +64,10 @@ vi.mock("@shared/tables", () => ({
 }));
 
 const variations = [
-  { value: "v1", label: "Vegetable box", capacity: 10, capacity_by_week: {} },
+  {
+    value: "v1", label: "Vegetable box", capacity: 10, capacity_by_week: {},
+    valid_from: "2020-01-06", valid_until: null,
+  },
 ] as unknown as ShareTypeVariationOption[];
 
 /** A station day whose capacity weeks cover the overview's default range
@@ -70,6 +77,8 @@ function stationDayCoveringTheRange(): DeliveryStationDayOption {
   return {
     value: "d1",
     label: "Market hall, Tuesday",
+    valid_from: "2020-01-06",
+    valid_until: null,
     capacity: 5,
     capacity_by_week: Object.fromEntries(
       weeks.map((week) => [week, { occupied: 0, free: 5 }]),
@@ -104,5 +113,39 @@ describe("CapacityOverview", () => {
     expect(
       within(variationRow).getByText("abos.capacity_status_ok"),
     ).toBeInTheDocument();
+  });
+
+  it("lists only the sizes and station days running in the range", async () => {
+    const isoDate = (date: dayjs.Dayjs) => date.format("YYYY-MM-DD");
+    render(
+      <CapacityOverview
+        variations={[
+          ...variations,
+          {
+            value: "v-ended", label: "Ended box", capacity: 10, capacity_by_week: {},
+            valid_from: "2020-01-06", valid_until: isoDate(dayjs().subtract(1, "month")),
+          },
+          {
+            value: "v-later", label: "Later box", capacity: 10, capacity_by_week: {},
+            valid_from: isoDate(dayjs().add(2, "year")), valid_until: null,
+          },
+        ] as unknown as ShareTypeVariationOption[]}
+        stationDays={[
+          stationDayCoveringTheRange(),
+          {
+            ...stationDayCoveringTheRange(),
+            value: "d-ended",
+            valid_until: isoDate(dayjs().subtract(1, "month")),
+          },
+        ]}
+      />,
+    );
+    await userEvent.click(screen.getByText(/abos\.capacities_overview/));
+
+    expect(screen.getByTestId("row-variation-v1")).toBeInTheDocument();
+    expect(screen.queryByTestId("row-station_day-d-ended")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("row-variation-v-ended")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("row-variation-v-later")).not.toBeInTheDocument();
+    expect(screen.getByTestId("row-station_day-d1")).toBeInTheDocument();
   });
 });

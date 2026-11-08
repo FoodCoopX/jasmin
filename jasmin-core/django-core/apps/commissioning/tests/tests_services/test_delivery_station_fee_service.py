@@ -15,6 +15,7 @@ from apps.commissioning.models import (
     ExternalShareDemand,
     ShareDelivery,
     ShareImportBatch,
+    SharesDeliveryDay,
 )
 from apps.commissioning.services.delivery_station_fee_service import (
     DeliveryStationFeeService,
@@ -79,6 +80,31 @@ def _station_with_deliveries(*, quantity=1, **fees):
     )
     SubscriptionService().materialize_confirmed_subscription(subscription)
     return station, subscription
+
+
+def _wednesday():
+    """The Wednesday delivery day, shared by every station of a test."""
+    return SharesDeliveryDay.objects.filter(
+        day_number=2
+    ).first() or SharesDeliveryDayFactory(
+        day_number=2, valid_from=datetime.date(2020, 1, 6)
+    )
+
+
+def _served(station, valid_from, valid_until=None, delivery_day=None):
+    """Give ``station`` a station-day from ``valid_from`` to ``valid_until``."""
+    DeliveryStationDayFactory(
+        delivery_station=station,
+        delivery_day=delivery_day or _wednesday(),
+        valid_from=valid_from,
+        valid_until=valid_until,
+    )
+    return station
+
+
+def _always_served(station):
+    """A station served since long before any range billed here."""
+    return _served(station, datetime.date(2020, 1, 6))
 
 
 @pytest.fixture(autouse=True)
@@ -176,7 +202,7 @@ class TestComputeFeesBilling:
         assert result["total_net"] == "8.00"
 
     def test_per_month_prorates_the_months_by_day(self, tenant):
-        station = DeliveryStationFactory(fee_per_month_net=Decimal("50.00"))
+        station = _monthly("50.00")
         # 2026-07-06 .. 2026-08-02: 26 of July's 31 days and 2 of August's 31.
         result = DeliveryStationFeeService.compute_fees(station, _FROM, _UNTIL)
         assert result["fee_type"] == "per_month"
@@ -186,7 +212,7 @@ class TestComputeFeesBilling:
         assert result["lines"] == []
 
     def test_per_year_prorates_the_year_by_day(self, tenant):
-        station = DeliveryStationFactory(fee_per_year_net=Decimal("300.00"))
+        station = _yearly("300.00")
         result = DeliveryStationFeeService.compute_fees(station, _FROM, _UNTIL)
         assert result["fee_type"] == "per_year"
         assert result["billed_quantity"] == Decimal("0.0767")  # 28/365
@@ -207,11 +233,11 @@ class TestComputeFeesBilling:
 
 
 def _monthly(rate: str):
-    return DeliveryStationFactory(fee_per_month_net=Decimal(rate))
+    return _always_served(DeliveryStationFactory(fee_per_month_net=Decimal(rate)))
 
 
 def _yearly(rate: str):
-    return DeliveryStationFactory(fee_per_year_net=Decimal(rate))
+    return _always_served(DeliveryStationFactory(fee_per_year_net=Decimal(rate)))
 
 
 def _week(year: int, week: int) -> tuple[datetime.date, datetime.date]:
@@ -236,7 +262,8 @@ def _weeks_covering(year: int) -> list[tuple[datetime.date, datetime.date]]:
 class TestComputeFeesProration:
     """A monthly fee bills each month a range touches by the share of that
     month's days the range covers, a yearly fee each calendar year by the
-    share of its days; the total is rounded to the cent once."""
+    share of its days; the total is rounded to the cent once. The stations
+    here are served throughout."""
 
     def test_week_41_bills_seven_days_of_october(self, tenant):
         start, end = _week(2026, 41)  # Mon 5 – Sun 11 October
@@ -351,6 +378,65 @@ class TestComputeFeesProration:
 
 
 @pytest.mark.django_db
+class TestComputeFeesServedDays:
+    """A monthly or yearly fee bills only the days the station is served."""
+
+    def test_a_station_opening_in_september_bills_from_then(self, tenant):
+        station = _served(
+            DeliveryStationFactory(fee_per_month_net=Decimal("30.00")),
+            datetime.date(2026, 9, 7),
+        )
+
+        result = DeliveryStationFeeService.compute_fees(
+            station, datetime.date(2026, 1, 1), datetime.date(2026, 12, 31)
+        )
+
+        # 24 of September's 30 days, then October to December.
+        assert result["billed_quantity"] == Decimal("3.8")
+        assert result["total_net"] == "114.00"
+
+    def test_a_station_that_stopped_bills_until_then(self, tenant):
+        station = _served(
+            DeliveryStationFactory(fee_per_year_net=Decimal("365.00")),
+            datetime.date(2026, 1, 5),
+            datetime.date(2026, 6, 28),
+        )
+
+        result = DeliveryStationFeeService.compute_fees(
+            station, datetime.date(2026, 1, 1), datetime.date(2026, 12, 31)
+        )
+
+        # 5 January to 28 June: 175 days.
+        assert result["total_net"] == "175.00"
+
+    def test_two_delivery_days_in_the_same_weeks_count_once(self, tenant):
+        station = _always_served(
+            DeliveryStationFactory(fee_per_month_net=Decimal("31.00"))
+        )
+        _served(
+            station,
+            datetime.date(2020, 1, 6),
+            delivery_day=SharesDeliveryDayFactory(
+                day_number=4, valid_from=datetime.date(2020, 1, 6)
+            ),
+        )
+        start, end = _week(2026, 41)
+
+        result = DeliveryStationFeeService.compute_fees(station, start, end)
+
+        assert result["total_net"] == "7.00"
+
+    def test_a_station_without_a_station_day_bills_nothing(self, tenant):
+        station = DeliveryStationFactory(fee_per_month_net=Decimal("31.00"))
+
+        result = DeliveryStationFeeService.compute_fees(
+            station, datetime.date(2026, 1, 1), datetime.date(2026, 12, 31)
+        )
+
+        assert result["total_net"] == "0.00"
+
+
+@pytest.mark.django_db
 class TestComputeFeesImportMode:
     """Import-safety lock: a fee station on the external-CSV import has ZERO
     ShareDelivery rows — the per-box fee must count boxes from
@@ -442,7 +528,7 @@ class TestBillingEndpoint:
         assert row["total_net"] == "10.00"
 
     def test_sends_the_prorated_quantity_as_a_string(self, api_client, tenant):
-        station = DeliveryStationFactory(fee_per_month_net=Decimal("31.00"))
+        station = _monthly("31.00")
 
         response = api_client.get(
             self.URL, {"start_date": "2026-10-05", "end_date": "2026-10-11"}

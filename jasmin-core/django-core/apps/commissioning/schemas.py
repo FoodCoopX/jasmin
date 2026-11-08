@@ -202,10 +202,13 @@ def get_active_at_date_or_future_parameter(**overrides):
 def get_active_at_date_parameter(**overrides):
     """Get active_at_date date parameter for time-bound filtering."""
     required = overrides.pop("required", False)
+    description = overrides.pop(
+        "description", "Filter for records active at the given date (YYYY-MM-DD)"
+    )
 
     return catalogue_param(
         "active_at_date",
-        description="Filter for records active at the given date (YYYY-MM-DD)",
+        description=description,
         required=required,
         **overrides,
     )

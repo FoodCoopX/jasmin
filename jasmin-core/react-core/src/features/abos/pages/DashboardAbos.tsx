@@ -13,7 +13,12 @@ import {
   buildMonthlyActiveByVariation,
   useSubscriptionVariationStats,
 } from "@features/abos/hooks/useSubscriptionVariationStats";
+import { useVariationReferencePrices } from "@features/abos/hooks/useVariationReferencePrices";
 import { buildMonthlyIncomeSeries } from "@features/abos/utils/incomeSeries";
+import {
+  buildSolidarityPriceRows,
+  type PriceRow,
+} from "@features/abos/utils/solidarityPriceRows";
 import {
   useCurrency,
   useDateFormat,
@@ -25,14 +30,6 @@ import {
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
-
-interface PriceRow {
-  id: string;
-  name: string;
-  reference: number;
-  avg: number | null;
-  count: number;
-}
 
 export default function DashboardAbos() {
   const { t } = useTranslation();
@@ -52,11 +49,12 @@ export default function DashboardAbos() {
 
   const { data: subscriptions, isLoading } = useCommissioningAbosList({});
   // Fetched for stable per-variation labels + colours (order taken from the
-  // catalogue, not from whichever subscriptions happen to exist).
+  // catalogue, not from whichever subscriptions happen to exist). Every
+  // physical size, ended ones too, so a past range draws the sizes it had.
   const { data: variations } = useCommissioningShareTypeVariationsList({
     physical: true,
-    include_future: true,
   });
+  const { referencePricesOn } = useVariationReferencePrices();
 
   const { variationLegendById } = useSubscriptionVariationStats(
     subscriptions,
@@ -123,29 +121,38 @@ export default function DashboardAbos() {
     return map;
   }, [subscriptions, range]);
 
-  const priceRows = useMemo<PriceRow[]>(() => {
-    if (!allowsSolidarity) return [];
-    return (variations ?? []).map((v) => {
-      const prices = paidPricesByVariation.get(v.id ?? "") ?? [];
-      const avg = prices.length
-        ? prices.reduce((a, b) => a + b, 0) / prices.length
-        : null;
-      return {
-        id: v.id ?? "",
-        name: [v.share_type_name, getShareTypeVariationSizeLabel(v.size)]
-          .filter(Boolean)
-          .join(" · "),
-        reference: parseFloat(v.active_price_per_delivery ?? "0"),
-        avg,
-        count: prices.length,
-      };
-    });
-  }, [
-    allowsSolidarity,
-    variations,
-    paidPricesByVariation,
-    getShareTypeVariationSizeLabel,
-  ]);
+  const priceRows = useMemo<PriceRow[]>(
+    () =>
+      allowsSolidarity
+        ? buildSolidarityPriceRows(variations ?? [], {
+            range: range
+              ? [formatDateForAPI(range[0])!, formatDateForAPI(range[1])!]
+              : null,
+            paidPricesByVariation,
+            referencePriceOn: (variation, date) =>
+              referencePricesOn(
+                {
+                  value: variation.id ?? "",
+                  active_price_per_delivery: variation.active_price_per_delivery,
+                },
+                date,
+              ).regular,
+            nameOf: (variation) =>
+              [variation.share_type_name, getShareTypeVariationSizeLabel(variation.size)]
+                .filter(Boolean)
+                .join(" · "),
+          })
+        : [],
+    [
+      allowsSolidarity,
+      variations,
+      range,
+      formatDateForAPI,
+      referencePricesOn,
+      paidPricesByVariation,
+      getShareTypeVariationSizeLabel,
+    ],
+  );
 
   const priceColumns = useMemo(
     () => [

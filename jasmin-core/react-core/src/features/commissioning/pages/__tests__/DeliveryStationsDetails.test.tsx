@@ -419,7 +419,7 @@ describe("DeliveryStationsDetails loading", () => {
     expect(selectedIn(DAY)).toBe(TUESDAY_LABEL);
     expect(selectedIn(STATION)).toBe("Farm shop");
     expect(api.deliveryDays).toHaveBeenCalledWith({ active_at_date: "2026-10-10" });
-    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-tue" });
+    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-tue", active_at_date: "2026-10-10" });
     expect(api.pickups).toHaveBeenCalledWith({
       year: 2026,
       delivery_week: 41,
@@ -549,7 +549,7 @@ describe("DeliveryStationsDetails choosing the week, day and station", () => {
     expect(await screen.findByText("Emil Probe")).toBeInTheDocument();
     expect(selectedIn(STATION)).toBe("Market");
     expect(screen.queryByText("Cleo Muster")).not.toBeInTheDocument();
-    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-fri" });
+    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-fri", active_at_date: "2026-10-10" });
   });
 
   it("moves to the new day's first station when the station does not deliver that day", async () => {
