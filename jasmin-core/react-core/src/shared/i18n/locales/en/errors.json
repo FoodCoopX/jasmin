@@ -220,7 +220,8 @@
     "capacity_below_occupancy": "Capacity can't be set to {{capacity}} — {{peak}} share(s) are already booked for week {{week}}/{{year}}. Please choose at least {{peak}}.",
     "in_use": "This delivery station cannot be deleted while deliveries still reference its pickup days. Move or end those deliveries first.",
     "not_found": "Delivery station does not exist.",
-    "more_than_one_fee": "Only one fee applies: per box, per month or per year."
+    "more_than_one_fee": "Only one fee applies: per box, per month or per year.",
+    "name_required": "A delivery station needs an abbreviation or a company name."
   },
   "my_data": {
     "shared_station_identity_locked": "The name and address on this account belong to a delivery station and cannot be changed here — please contact the office. Email, phone and bank details remain editable."
@@ -577,6 +578,7 @@
     "details": "Details:"
   },
   "cultivation": {
+    "plot_name_required": "A plot needs a name.",
     "no_batches_to_place": "There are no finalized outdoor batches for this year, so there is nothing to plan.",
     "no_plots_available": "No outdoor plot has any beds configured. Add beds per plot first.",
     "batch_does_not_fit": "This batch needs more contiguous cells than any matching block offers. Either add more beds of that type, or clear the batch's bed type so it can go anywhere.",

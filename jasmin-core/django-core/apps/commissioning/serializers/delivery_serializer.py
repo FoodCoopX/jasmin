@@ -12,6 +12,7 @@ from ..errors import (
     DeliveryExceptionOverlap,
     DeliveryExceptionPeriodLocked,
     DeliveryStationMoreThanOneFee,
+    DeliveryStationNameRequired,
     PictureInvalid,
     TourNumberBelowOne,
 )
@@ -165,12 +166,18 @@ class DeliveryStationSerializer(
         list_serializer_class = DeliveryStationListSerializer
 
     FEE_FIELDS = ("fee_per_box_net", "fee_per_month_net", "fee_per_year_net")
+    NAME_FIELDS = ("short_name", "company_name")
 
     def validate(self, attrs):
+        attrs = super().validate(attrs)
+        self._validate_fees(attrs)
+        self._validate_name(attrs)
+        return attrs
+
+    def _validate_fees(self, attrs):
         """A station is paid one way only. A partial update is judged together
         with the fees the station stores, so adding a second fee is refused
         while switching from one to another in the same write is not."""
-        attrs = super().validate(attrs)
         fees = [
             attrs.get(field, getattr(self.instance, field, 0))
             for field in self.FEE_FIELDS
@@ -179,7 +186,29 @@ class DeliveryStationSerializer(
             raise DeliveryStationMoreThanOneFee(
                 "Only one fee applies: per box, per month or per year."
             )
-        return attrs
+
+    def _validate_name(self, attrs):
+        """A station needs a short name or a company name, the two its lists and
+        selectors show it by. An update is judged together with the stored
+        values, and one that sends neither field passes, so a station stored
+        without a name stays editable."""
+        if self.instance is not None and not any(
+            field in attrs for field in self.NAME_FIELDS
+        ):
+            return
+        contact = getattr(self.instance, "contact", None)
+        stored = {
+            "short_name": getattr(self.instance, "short_name", None),
+            "company_name": getattr(contact, "company_name", None),
+        }
+        if not any(
+            str(attrs.get(field, stored[field]) or "").strip()
+            for field in self.NAME_FIELDS
+        ):
+            raise DeliveryStationNameRequired(
+                "A delivery station needs a short name or a company name.",
+                details={"any_of": list(self.NAME_FIELDS)},
+            )
 
     def validate_picture(self, value):
         """Only a decodable PNG/JPEG/WEBP/GIF is stored, re-encoded under a

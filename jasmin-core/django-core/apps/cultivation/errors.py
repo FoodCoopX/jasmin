@@ -9,6 +9,13 @@ hand-built ``Response`` objects. Callers pass the human message:
 from core.errors import BadRequestError, ConflictError, NotFoundError
 
 
+class PlotNameRequired(BadRequestError):
+    """A plot would be stored without a name, which the plot list, the planner
+    grid and every plot picker show it by."""
+
+    code = "cultivation.plot_name_required"
+
+
 class NoBatchesToPlace(BadRequestError):
     """The year has no finalized batches, so there is nothing to solve."""
 

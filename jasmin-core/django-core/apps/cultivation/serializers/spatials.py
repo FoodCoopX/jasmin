@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from ..constants import CELLS_PER_BED
+from ..errors import PlotNameRequired
 from ..models import BedType, Plot, PlotContent
 from ..optimizer.loading import plot_segments
 
@@ -35,6 +36,15 @@ class PlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plot
         fields = "__all__"
+
+    def validate(self, attrs: dict) -> dict:
+        """A plot needs a name. An update that leaves ``name`` out keeps the
+        stored one."""
+        if (self.instance is None or "name" in attrs) and not str(
+            attrs.get("name") or ""
+        ).strip():
+            raise PlotNameRequired("A plot needs a name.", field="name")
+        return attrs
 
     def _beds(self, obj: Plot) -> int:
         return sum(content.amount for content in obj.contents.all())

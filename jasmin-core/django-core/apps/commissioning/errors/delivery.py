@@ -297,6 +297,14 @@ class DeliveryStationMoreThanOneFee(BadRequestError):
     code = "delivery_station.more_than_one_fee"
 
 
+class DeliveryStationNameRequired(BadRequestError):
+    """A station would have neither a short name nor a company name. Every
+    station list and selector shows it by one of the two, so without either it
+    is a blank row nobody can pick out."""
+
+    code = "delivery_station.name_required"
+
+
 class ShareTypeVariationCapacityBelowOccupancy(BadRequestError):
     """The production-cap twin of ``DeliveryStationCapacityBelowOccupancy``: a
     variation's farm-wide ``capacity`` may not drop below the busiest

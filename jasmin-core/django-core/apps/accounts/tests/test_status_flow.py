@@ -5,7 +5,8 @@ Covers:
 - Login is blocked for non-active statuses with the right error message
 - Self-registration creates pending_approval + Member, blocks login
 - Member.confirm() flips a pending_approval user to active
-- Invitation accept activates user AND auto-confirms the linked Member
+- Invitation accept activates user AND auto-confirms the linked Member, which
+  stays pending while its coop shares are out of range
 - Member ↔ "member" role signals (post_save / pre_delete)
 - pre_delete on Member auto-deactivates a user left with no roles
 - Configuration → Users surface refuses the "member" role
@@ -16,10 +17,12 @@ Covers:
 
 from __future__ import annotations
 
+import datetime
 from unittest.mock import patch
 
 import pytest
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -40,11 +43,13 @@ from apps.accounts.services.user_admin_service import (
 )
 from apps.authz.roles import Role
 from apps.commissioning.models import Member
+from apps.commissioning.models.choices import InvitationStatus
 from apps.commissioning.tests.factories import JasminUserFactory, MemberFactory
 from apps.shared.invitations import (
     accept_invitation,
     create_user_with_invitation,
 )
+from apps.shared.tenants.models import TenantSettings
 
 # --------------------------------------------------------------------------- #
 # Model-level invariants                                                       #
@@ -602,6 +607,35 @@ class TestInvitationAccept:
         assert member.member_number is not None
         user.refresh_from_db()
         assert user.account_status == "active"
+
+    def test_accept_leaves_a_member_below_the_coop_share_minimum_pending(self, tenant):
+        """The invitee can't add coop shares, so the login goes active and the
+        member waits for the office."""
+        TenantSettings.objects.create(
+            tenant=tenant,
+            valid_from=timezone.now() - datetime.timedelta(seconds=1),
+            min_number_coop_shares=3,
+            max_number_coop_shares=10,
+        )
+        admin = JasminUserFactory(roles=[Role.OFFICE])
+        member = MemberFactory(email="short@example.com", user=None, is_trial=False)
+        with patch("apps.shared.invitations._send_invitation_email"):
+            user, invitation = create_user_with_invitation(
+                email="short@example.com",
+                first_name="S",
+                last_name="Hort",
+                roles=[Role.MEMBER],
+                user_language="en",
+                member=member,
+                created_by=admin,
+            )
+        accept_invitation(token=str(invitation.token), password="N3wPass!Long123")
+        member.refresh_from_db()
+        user.refresh_from_db()
+        invitation.refresh_from_db()
+        assert user.account_status == "active"
+        assert invitation.status == InvitationStatus.ACCEPTED
+        assert member.admin_confirmed is False
 
     def test_accept_schedules_welcome_email(self, tenant):
         """Accepting the invitation must schedule an

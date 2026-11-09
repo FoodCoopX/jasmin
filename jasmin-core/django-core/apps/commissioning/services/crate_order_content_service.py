@@ -238,7 +238,9 @@ class CrateOrderContentService:
             )
             written_pks = [row.pk for row in line if row.order_id]
         if update_fields and written_pks:
-            CrateOrderContent.objects.filter(pk__in=written_pks).update(**update_fields)
+            CrateContentService.write_rows(
+                CrateOrderContent.objects.filter(pk__in=written_pks), update_fields
+            )
         if new_total < current_total:
             CrateOrderContentService._take_off_line(line, row_pk, new_total)
         elif new_total > current_total:

@@ -21,6 +21,9 @@ class CommissioningConfig(AppConfig):
             ContactEntity,
             CoopShare,
             CoopShareTransfer,
+            CrateContentInvoiceReseller,
+            CrateDeliveryNoteContent,
+            CrateOrderContent,
             DeliveryNoteContent,
             DeliveryNoteReseller,
             InvoiceReseller,
@@ -103,10 +106,13 @@ class CommissioningConfig(AppConfig):
         # noise on every mutation.
         auditlog.register(InvoiceReseller, exclude_fields=["document_hash"])
         auditlog.register(InvoiceResellerContent)
+        auditlog.register(CrateContentInvoiceReseller)
         auditlog.register(DeliveryNoteReseller)
         auditlog.register(DeliveryNoteContent)
+        auditlog.register(CrateDeliveryNoteContent)
         auditlog.register(Order)
         auditlog.register(OrderContent)
+        auditlog.register(CrateOrderContent)
 
         # Consent versioning: ConsentRecord is the audit-relevant table.
         # ConsentDocument is append-only by convention; register it too

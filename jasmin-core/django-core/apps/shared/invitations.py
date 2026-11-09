@@ -391,13 +391,26 @@ def accept_invitation(*, token: str, password: str) -> JasminUser:
     # the confirming admin for audit. An invitation the office sent after
     # rejecting the member is how it re-admits them, so accepting one lifts
     # the rejection rather than leaving the member confirmed and rejected.
+    # A non-trial member whose coop shares don't fit the tenant's window yet
+    # stays pending, as ``link_to_user`` leaves it: the invitee can't add
+    # shares, so the login goes active and the office confirms the member
+    # once its shares are in.
     if member is not None and member.user_id == user.pk and not member.admin_confirmed:
         if (
             member.admin_rejected_at is not None
             and invitation.created_at <= member.admin_rejected_at
         ):
             raise ValidationError({"token": "This invitation is no longer valid."})
-        member.confirm(admin_user=invitation.created_by, save=True)
+        from apps.commissioning.errors import MemberCoopSharesOutOfRange
+
+        try:
+            with transaction.atomic():
+                member.confirm(admin_user=invitation.created_by, save=True)
+        except MemberCoopSharesOutOfRange:
+            logger.info(
+                "invitation.accepted_member_pending member=%s reason=coop_shares",
+                member.pk,
+            )
 
     # Mark *all other* outstanding invitations for this user as cancelled
     # so a stolen old token cannot be replayed even before its TTL expires.

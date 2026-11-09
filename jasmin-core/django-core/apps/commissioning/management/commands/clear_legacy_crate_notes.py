@@ -32,6 +32,7 @@ from apps.commissioning.models import (
     CrateDeliveryNoteContent,
     CrateOrderContent,
 )
+from apps.commissioning.services.crate_content_service import CrateContentService
 from apps.shared.tenants.models import Tenant
 
 LEGACY_NOTE_PATTERN = r"^[+-][1-9][0-9]*$"
@@ -107,7 +108,9 @@ class Command(BaseCommand):
                 legacy = model.objects.filter(note__regex=LEGACY_NOTE_PATTERN)
                 skipped = legacy.filter(finalized).count()
                 draft = legacy.exclude(finalized)
-                cleared = draft.count() if dry_run else draft.update(note=None)
+                cleared = draft.count()
+                if not dry_run:
+                    CrateContentService.write_rows(draft, {"note": None})
                 self.stdout.write(
                     f"  {model.__name__}: {verb} {cleared}, "
                     f"skipped {skipped} finalized"

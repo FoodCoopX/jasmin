@@ -25,6 +25,19 @@ from core.db_locks import acquire_advisory_xact_lock
 
 class CrateContentService:
     @staticmethod
+    def write_rows(rows: QuerySet, fields: dict[str, Any]) -> None:
+        """Set ``fields`` on every row of ``rows``, one ``save()`` per row, so
+        the audit log records each change: a ``QuerySet.update()`` would
+        write past it. ``crate_type`` comes along for the entry's
+        ``object_repr``."""
+        if not fields:
+            return
+        for row in rows.select_related("crate_type").select_for_update(of=("self",)):
+            for field, value in fields.items():
+                setattr(row, field, value)
+            row.save(update_fields=list(fields))
+
+    @staticmethod
     @transaction.atomic
     def apply_total_amount_change(
         *,
@@ -45,8 +58,8 @@ class CrateContentService:
            both read the same ``current_total``, both compute the same
            delta, and both create offsetting adjustment rows — silently
            doubling the correction. No UNIQUE constraint catches that.
-        2. Bulk-update ``update_fields`` (the price, rabatt, tax rate and note
-           the caller sends) on every row in ``scope_qs``.
+        2. Write ``update_fields`` (the price, rabatt, tax rate and note the
+           caller sends) on every row in ``scope_qs`` (:meth:`write_rows`).
         3. Re-aggregate ``Sum('amount')`` and compute the delta.
         4. If delta is zero, return.
         5. Otherwise look up an existing row to adjust in ``adjustment_qs``
@@ -61,7 +74,7 @@ class CrateContentService:
         """
         acquire_advisory_xact_lock(lock_key)
 
-        scope_qs.update(**update_fields)
+        CrateContentService.write_rows(scope_qs, update_fields)
 
         current_total = scope_qs.aggregate(total=Sum("amount"))["total"] or 0
         difference = int(new_total_amount) - int(current_total)

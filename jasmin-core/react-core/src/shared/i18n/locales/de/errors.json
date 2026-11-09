@@ -220,7 +220,8 @@
     "capacity_below_occupancy": "Kapazität kann nicht auf {{capacity}} gesetzt werden — in KW {{week}}/{{year}} sind bereits {{peak}} Anteile gebucht. Bitte mindestens {{peak}} wählen.",
     "in_use": "Diese Verteilstation kann nicht gelöscht werden, weil noch Lieferungen auf ihre Abholtage verweisen. Bitte zuerst die Lieferungen verschieben oder beenden.",
     "not_found": "Verteilstation nicht gefunden.",
-    "more_than_one_fee": "Nur eine Gebühr ist möglich: pro Kiste, pro Monat oder pro Jahr."
+    "more_than_one_fee": "Nur eine Gebühr ist möglich: pro Kiste, pro Monat oder pro Jahr.",
+    "name_required": "Eine Verteilstation braucht ein Kürzel oder einen Firmennamen."
   },
   "my_data": {
     "shared_station_identity_locked": "Name und Adresse dieses Kontos gehören zu einer Verteilstation und können hier nicht geändert werden — bitte ans Büro wenden. E-Mail, Telefon und Bankverbindung bleiben änderbar."
@@ -577,6 +578,7 @@
     "details": "Details:"
   },
   "cultivation": {
+    "plot_name_required": "Eine Fläche braucht einen Namen.",
     "no_batches_to_place": "Für dieses Jahr sind keine finalisierten Freiland-Sätze hinterlegt — es gibt nichts zu planen.",
     "no_plots_available": "Für keine Freiland-Fläche sind Beete hinterlegt. Bitte zuerst Beete je Fläche eintragen.",
     "batch_does_not_fit": "Dieser Satz braucht mehr zusammenhängende Zellen, als eine passende Fläche bietet. Entweder mehr Beete dieses Typs anlegen oder den Beet-Typ des Satzes leeren.",
