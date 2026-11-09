@@ -8,10 +8,10 @@
 import type { ShareImportBatchStatusEnum } from './shareImportBatchStatusEnum';
 
 export interface ShareImportBatch {
-  readonly id?: string;
+  readonly id: string;
   /** @nullable */
-  readonly original_filename?: string | null;
-  readonly file_checksum?: string;
+  readonly original_filename: string | null;
+  readonly file_checksum: string;
   /**
    * @minimum 0
    * @maximum 32767
@@ -22,16 +22,16 @@ export interface ShareImportBatch {
    * @maximum 53
    */
   delivery_week: number;
-  readonly status?: ShareImportBatchStatusEnum;
-  readonly row_count?: number;
-  readonly error_count?: number;
-  readonly validation_report?: unknown;
-  readonly diff_report?: unknown;
-  readonly created_at?: string;
+  readonly status: ShareImportBatchStatusEnum;
+  readonly row_count: number;
+  readonly error_count: number;
+  readonly validation_report: unknown;
+  readonly diff_report: unknown;
+  readonly created_at: string;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   /** @nullable */
-  readonly applied_at?: string | null;
+  readonly applied_at: string | null;
   /** @nullable */
-  readonly applied_by?: string | null;
+  readonly applied_by: string | null;
 }

@@ -16,8 +16,9 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningResellersListParams,
-  PatchedReseller,
+  PatchedResellerRequest,
   Reseller,
+  ResellerRequest,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
 import { ROLES } from "@shared/auth/roles";
@@ -63,9 +64,9 @@ const RESELLER_LIST_PARAMS: CommissioningResellersListParams = {
 const resellersResource: CrudResource<TableRecord> = {
   useList: useCommissioningResellersList,
   create: (payload) =>
-    commissioningResellersCreate(payload as unknown as Reseller),
+    commissioningResellersCreate(payload as unknown as ResellerRequest),
   update: (id, payload) =>
-    commissioningResellersPartialUpdate(id, payload as PatchedReseller),
+    commissioningResellersPartialUpdate(id, payload as PatchedResellerRequest),
   delete: (id) =>
     commissioningResellersDestroy(id, { delete_context: "resellers" }),
   getListQueryKey: getCommissioningResellersListQueryKey,

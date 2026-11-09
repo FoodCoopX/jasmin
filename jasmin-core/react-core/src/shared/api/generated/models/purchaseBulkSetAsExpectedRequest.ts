@@ -5,8 +5,8 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
-import type { PurchaseBulkSetAsExpectedItem } from './purchaseBulkSetAsExpectedItem';
+import type { PurchaseBulkSetAsExpectedItemRequest } from './purchaseBulkSetAsExpectedItemRequest';
 
 export interface PurchaseBulkSetAsExpectedRequest {
-  selectedData: PurchaseBulkSetAsExpectedItem[];
+  selectedData: PurchaseBulkSetAsExpectedItemRequest[];
 }

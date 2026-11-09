@@ -20,12 +20,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   DefaultShareArticleInShare,
-  DefaultShareArticleInShareBulkEntry,
+  DefaultShareArticleInShareBulkEntryRequest,
   DefaultShareArticleInShareBulkUpsertRequest,
   ShareTypeVariation,
   UnitEnum,
 } from "@shared/api/generated/models";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
+import { makeShareTypeVariation } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 // One ``t`` for every call, as the real hook keeps it stable across renders.
@@ -116,10 +117,10 @@ function variation(
   sortOrder: number,
   fields: Partial<ShareTypeVariation> = {},
 ): Variation {
-  return {
+  return makeShareTypeVariation({
     id, share_type: shareType, share_type_name: SHARE_TYPE_NAMES[shareType], size, sort_order: sortOrder,
     variation_type: "physical", valid_from: "2026-01-05", valid_until: null, ...fields,
-  };
+  });
 }
 
 const VEGETABLES_S = variation("variation-vegetables-s", "share-type-vegetables", "S", 1);
@@ -182,11 +183,12 @@ function stored(articleId: string, variationId: string, quantity: string): Defau
   storedCount += 1;
   const owner = ARTICLES.find((each) => each.id === articleId);
   const shareTypeVariation = VARIATIONS.find((each) => each.id === variationId);
+  if (!owner || !shareTypeVariation) throw new Error(`No article ${articleId} or size ${variationId}`);
   return {
-    id: `default-${storedCount}`, share_article: articleId, share_article_name: owner?.name,
-    share_type_variation: variationId, share_type_variation_size: shareTypeVariation?.size,
-    share_type_id: shareTypeVariation?.share_type, quantity: Number(quantity).toFixed(3),
-    unit: owner?.default_movement_unit ?? null,
+    id: `default-${storedCount}`, share_article: articleId, share_article_name: owner.name,
+    share_type_variation: variationId, share_type_variation_size: shareTypeVariation.size,
+    share_type_id: shareTypeVariation.share_type, quantity: Number(quantity).toFixed(3),
+    unit: owner.default_movement_unit,
   };
 }
 
@@ -376,7 +378,7 @@ const upsert = (articleId: string, amounts: [Variation, string | null][]) => ({
 function lastUpsert() {
   const payload = api.bulkUpsert.mock.lastCall?.[0] as DefaultShareArticleInShareBulkUpsertRequest | undefined;
   if (!payload) throw new Error("Nothing was saved");
-  const entries: DefaultShareArticleInShareBulkEntry[] = [...payload.entries].sort((a, b) =>
+  const entries: DefaultShareArticleInShareBulkEntryRequest[] = [...payload.entries].sort((a, b) =>
     a.share_type_variation.localeCompare(b.share_type_variation),
   );
   return { ...payload, entries };

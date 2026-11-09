@@ -18,11 +18,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  DocumentationSummaryRow,
-  ShareArticle,
-  Storage,
-} from "@shared/api/generated/models";
+import type { DocumentationSummaryRow, ShareArticle, Storage } from "@shared/api/generated/models";
+import { makeShareArticle, makeStorage } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 const NOW = vi.hoisted(() => {
@@ -136,16 +133,16 @@ import DocumentationHarvest from "../DocumentationHarvest";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-const COLD_STORE: Storage = { id: "st-cold", name: "Cold store", is_short_term_harvest_storage: true };
-const ROOT_CELLAR: Storage = { id: "st-cellar", name: "Root cellar", is_long_term_harvest_storage: true };
-const FARM_SHOP: Storage = { id: "st-shop", name: "Farm shop" };
+const COLD_STORE: Storage = makeStorage({ id: "st-cold", name: "Cold store", is_short_term_harvest_storage: true });
+const ROOT_CELLAR: Storage = makeStorage({ id: "st-cellar", name: "Root cellar", is_long_term_harvest_storage: true });
+const FARM_SHOP: Storage = makeStorage({ id: "st-shop", name: "Farm shop" });
 const STORAGES = [COLD_STORE, ROOT_CELLAR, FARM_SHOP];
 
 const article = (
   name: string,
   unit: ShareArticle["default_movement_unit"],
   fields: Partial<ShareArticle> = {},
-): ShareArticle => ({ id: `sa-${name.toLowerCase()}`, name, default_movement_unit: unit, ...fields });
+): ShareArticle => makeShareArticle({ id: `sa-${name.toLowerCase()}`, name, default_movement_unit: unit, ...fields });
 
 const CARROTS = article("Carrots", "KG");
 const LETTUCE = article("Lettuce", "PCS");

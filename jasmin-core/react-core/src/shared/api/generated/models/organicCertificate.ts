@@ -13,7 +13,7 @@ the optional ``valid_until`` (Sunday) are enforced by TimeBoundMixin, and
 successive certificates chain (one OPEN certificate per reseller).
  */
 export interface OrganicCertificate {
-  readonly id?: string;
+  readonly id: string;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;

@@ -271,7 +271,7 @@ export default function SepaSetupModal({
           is_active: true,
           ...paperFields,
           ...referenceField,
-        } as BillingProfile,
+        },
       });
     }
   };

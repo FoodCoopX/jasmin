@@ -6,6 +6,7 @@ import type {
   DeliveryStationDay,
   SharesDeliveryDay,
 } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay } from "@/test/modelFixtures";
 
 export const NOW = new Date(2026, 9, 6, 12, 0);
 
@@ -21,7 +22,7 @@ export const deliveryDay = (
   id: string,
   day_number: SharesDeliveryDay["day_number"],
   valid_from: string,
-): SharesDeliveryDay => ({ id, day_number, valid_from, valid_until: null });
+): SharesDeliveryDay => makeSharesDeliveryDay({ id, day_number, valid_from, valid_until: null });
 
 // The farm delivers on Tuesdays and Thursdays and adds Saturdays in November.
 export const DELIVERY_DAYS = [
@@ -33,9 +34,16 @@ export const DELIVERY_DAYS = [
 export function stationDay(
   overrides: Partial<DeliveryStationDay> & { id: string },
 ): DeliveryStationDay {
+  const deliveryDayId = overrides.delivery_day ?? "sdd-tue";
   return {
     delivery_station: STATION.id,
-    delivery_day: "sdd-tue",
+    delivery_station_short_name: STATION.short_name ?? "",
+    delivery_station_name: STATION.contact?.name ?? null,
+    coords_lat: null,
+    coords_lon: null,
+    tour_assignment_missing: false,
+    delivery_day: deliveryDayId,
+    delivery_day_number: String(DELIVERY_DAYS.find((day) => day.id === deliveryDayId)?.day_number),
     valid_from: "2025-12-29",
     valid_until: null,
     capacity: 20,

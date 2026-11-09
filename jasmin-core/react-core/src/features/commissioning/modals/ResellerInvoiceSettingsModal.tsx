@@ -16,13 +16,16 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { commissioningResellersPartialUpdate } from "@shared/api/generated/commissioning/commissioning";
-import type { PatchedReseller, Reseller } from "@shared/api/generated/models";
+import type {
+  PatchedResellerRequest,
+  Reseller,
+} from "@shared/api/generated/models";
 
 const { Title, Paragraph } = Typography;
 
 /** The form's values: the discount field's NumberInput yields a number. */
 type InvoiceSettingsValues = Omit<
-  PatchedReseller,
+  PatchedResellerRequest,
   "early_payment_discount_percent"
 > & { early_payment_discount_percent?: number | string | null };
 
@@ -102,7 +105,7 @@ export const ResellerInvoiceSettingsModal: FC<
         // sending so the server-side ``DecimalField`` parser doesn't lose
         // trailing zeros.
         const { early_payment_discount_percent: discount, ...rest } = values;
-        const payload: PatchedReseller = {
+        const payload: PatchedResellerRequest = {
           ...rest,
           early_payment_discount_percent:
             typeof discount === "number" ? String(discount) : discount,

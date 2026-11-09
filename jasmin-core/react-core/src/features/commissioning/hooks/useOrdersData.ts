@@ -25,8 +25,8 @@ import type {
   CommissioningCrateContentsListParams,
   CrateOrderContentCreateRequest,
   CrateOrderSummary,
-  OrderContent,
   OrderContentListItem,
+  OrderContentRequest,
 } from "@shared/api/generated/models";
 // Direct import from the helper-only files keeps @react-pdf/renderer
 // out of useOrdersData's eager bundle. The historic *PDFGenerator.tsx
@@ -310,7 +310,7 @@ export function useOrdersData() {
 
   const apiFunctions = useMemo<ApiFunctions>(
     () =>
-      wrapApiFunctions<OrderContent & TableRecord>({
+      wrapApiFunctions<OrderContentRequest & TableRecord>({
       create: async (payload) => {
         const res = await commissioningOrderContentsCreate(payload);
         invalidateDaysWithOrders();

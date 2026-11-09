@@ -8,10 +8,10 @@
 import type { PlantingModeEnum } from './plantingModeEnum';
 
 export interface CultivationBatch {
-  readonly id?: string;
-  readonly vegetable_name?: string;
+  readonly id: string;
+  readonly vegetable_name: string;
   /** @nullable */
-  readonly used_bed_type_name?: string | null;
+  readonly used_bed_type_name: string | null;
   /**
    * @minimum 0
    * @maximum 32767

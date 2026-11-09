@@ -50,7 +50,7 @@ via a dedicated endpoint (e.g. an explicit "SEPA mandate context"
 response) rather than widening this serializer.
  */
 export interface TenantNonStaffRead {
-  readonly id?: string;
+  readonly id: string;
   /** @maxLength 63 */
   schema_name: string;
   /** @maxLength 200 */
@@ -61,7 +61,7 @@ export interface TenantNonStaffRead {
   logo?: string | null;
   /** @nullable */
   bio_logo?: string | null;
-  readonly app_icon_version?: string;
+  readonly app_icon_version: string;
   is_active?: boolean;
   /** @maxLength 8 */
   tenant_language?: string;
@@ -138,7 +138,7 @@ export interface TenantNonStaffRead {
   auditing_association?: string;
   professional_association?: string;
   legal_notice_extra_html?: string;
-  readonly settings?: TenantNonStaffReadSettings;
-  readonly current_settings?: TenantNonStaffReadCurrentSettings;
-  readonly capabilities?: HostCapabilities;
+  readonly settings: TenantNonStaffReadSettings;
+  readonly current_settings: TenantNonStaffReadCurrentSettings;
+  readonly capabilities: HostCapabilities;
 }

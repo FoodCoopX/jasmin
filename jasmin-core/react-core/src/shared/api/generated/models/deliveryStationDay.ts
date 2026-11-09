@@ -13,23 +13,23 @@ import type { DeliveryStationDayCapacityByWeek } from './deliveryStationDayCapac
 Supports dynamic variation fields for tour overview.
  */
 export interface DeliveryStationDay {
-  readonly id?: string;
+  readonly id: string;
   readonly delivery_station_short_name?: string;
   readonly delivery_day_number?: string;
   /** @nullable */
-  readonly delivery_station_name?: string | null;
+  readonly delivery_station_name: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,2}(?:\.\d{0,10})?$
    */
-  readonly coords_lat?: string | null;
+  readonly coords_lat: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,2}(?:\.\d{0,10})?$
    */
-  readonly coords_lon?: string | null;
+  readonly coords_lon: string | null;
   /** @nullable */
-  readonly capacity_by_week?: DeliveryStationDayCapacityByWeek;
+  readonly capacity_by_week: DeliveryStationDayCapacityByWeek;
   readonly tour_assignment_missing?: boolean;
   /** @minimum 1 */
   tour_number?: number;
@@ -73,5 +73,5 @@ export interface DeliveryStationDay {
   capacity?: number;
   delivery_station: string;
   delivery_day: string;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }

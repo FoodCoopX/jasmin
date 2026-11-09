@@ -9,6 +9,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import type { InvoiceReseller } from "@shared/api/generated/models";
+import { makeInvoiceReseller } from "@/test/modelFixtures";
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: unknown) =>
@@ -70,16 +73,16 @@ vi.mock("@shared/utils", async (importOriginal) => ({
 import InvoiceSendStatus from "../InvoiceSendStatus";
 
 const INVOICE_ID = "invoice-7";
-const FINALIZED_WITH_PDF = {
+const FINALIZED_WITH_PDF = makeInvoiceReseller({
   id: INVOICE_ID,
   is_finalized: true,
   file: "/media/invoices/rechnung.pdf",
   has_been_sent_to_reseller_at: null,
   has_been_sent_to_accounting_at: null,
   cancelled_by_invoice: null,
-};
+});
 
-function renderStatus(invoice: object, canSend = true) {
+function renderStatus(invoice: InvoiceReseller, canSend = true) {
   const client = new QueryClient();
   const invalidate = vi.spyOn(client, "invalidateQueries");
   render(

@@ -17,7 +17,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   MyCustomerDataRead,
-  PatchedMyCustomerDataUpdate,
+  PatchedMyCustomerDataUpdateRequest,
 } from "@shared/api/generated/models";
 import { notify } from "@shared/utils";
 import StoredOrEditField from "./StoredOrEditField";
@@ -90,7 +90,7 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
     ]),
   );
 
-  const onFinish = (values: PatchedMyCustomerDataUpdate) => {
+  const onFinish = (values: PatchedMyCustomerDataUpdateRequest) => {
     const payload = { ...values };
     if (!editingIban) delete payload.iban;
     mutate({ data: payload });

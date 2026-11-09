@@ -7,7 +7,7 @@
  */
 
 export interface Season {
-  readonly id?: string;
+  readonly id: string;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;

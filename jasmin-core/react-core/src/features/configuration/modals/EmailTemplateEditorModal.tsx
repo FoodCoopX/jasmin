@@ -21,8 +21,8 @@ import "react-quill-new/dist/quill.snow.css";
 import "@shared/quill/SanitizingClipboard";
 
 import type {
-  PatchedEmailTemplateUpdate,
-  TestSend,
+  PatchedEmailTemplateUpdateRequest,
+  TestSendRequest,
 } from "@shared/api/generated/models";
 import {
   getNotificationsEmailTemplatesListQueryKey,
@@ -148,7 +148,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
     }
   }, [detail, labelByName]);
 
-  const buildPayload = (): PatchedEmailTemplateUpdate => ({
+  const buildPayload = (): PatchedEmailTemplateUpdateRequest => ({
     subject: chipsToPlainText(subjectHtml),
     body_html: chipsToPlaceholders(bodyHtml),
     body_text: detail?.body_text ?? "",
@@ -360,7 +360,7 @@ export default function EmailTemplateEditorModal({ slug, onClose }: Props) {
                   icon={<SendOutlined />}
                   onClick={() => {
                     if (!slug) return;
-                    const body: TestSend = testRecipient
+                    const body: TestSendRequest = testRecipient
                       ? { recipient: testRecipient }
                       : {};
                     testMutation.mutate({ slug, data: body });

@@ -28,6 +28,11 @@ import type {
 } from "@shared/api/generated/models";
 import i18n from "@shared/i18n";
 import {
+  makeDeliveryStation,
+  makeSharesDeliveryDay,
+  makeShareTypeVariation,
+} from "@/test/modelFixtures";
+import {
   flushMicrotasks,
   profileRenders,
   type ProfileRendersHandle,
@@ -118,24 +123,24 @@ import ExternalCodeMappingsModal from "../ExternalCodeMappingsModal";
 
 // The small vegetable box ran until the end of 2025, when a new one took over.
 const VARIATIONS: ShareTypeVariation[] = [
-  { id: "var-veg-s", share_type: "st-veg", share_type_name: "Vegetables", size: "S", valid_from: "2025-01-06", valid_until: "2025-12-28" },
-  { id: "var-veg-s-2026", share_type: "st-veg", share_type_name: "Vegetables", size: "S", valid_from: "2025-12-29", valid_until: null },
-  { id: "var-veg-l", share_type: "st-veg", share_type_name: "Vegetables", size: "L", valid_from: "2025-01-06" },
-  { id: "var-bread", share_type: "st-bread", share_type_name: "Bread", size: "ONE_SIZE", valid_from: "2025-01-06" },
+  makeShareTypeVariation({ id: "var-veg-s", share_type: "st-veg", share_type_name: "Vegetables", size: "S", valid_from: "2025-01-06", valid_until: "2025-12-28" }),
+  makeShareTypeVariation({ id: "var-veg-s-2026", share_type: "st-veg", share_type_name: "Vegetables", size: "S", valid_from: "2025-12-29", valid_until: null }),
+  makeShareTypeVariation({ id: "var-veg-l", share_type: "st-veg", share_type_name: "Vegetables", size: "L", valid_from: "2025-01-06" }),
+  makeShareTypeVariation({ id: "var-bread", share_type: "st-bread", share_type_name: "Bread", size: "ONE_SIZE", valid_from: "2025-01-06" }),
 ];
 
 const STATIONS: DeliveryStation[] = [
-  { id: "station-mill", short_name: "Mill", city: "Vienna" },
-  { id: "station-farm", short_name: "Farm", city: "" },
+  makeDeliveryStation({ id: "station-mill", short_name: "Mill", city: "Vienna" }),
+  makeDeliveryStation({ id: "station-farm", short_name: "Farm", city: "" }),
   // Set up, but neither named nor placed yet.
-  { id: "station-new", short_name: null, city: "" },
+  makeDeliveryStation({ id: "station-new", short_name: null, city: "" }),
 ];
 
 // Tuesday's delivery day ran until the end of 2025, when a new one took over.
 const DELIVERY_DAYS: SharesDeliveryDay[] = [
-  { id: "sdd-tue-2025", day_number: 1, valid_from: "2025-01-06", valid_until: "2025-12-28" },
-  { id: "sdd-tue", day_number: 1, valid_from: "2025-12-29", valid_until: null },
-  { id: "sdd-thu", day_number: 3, valid_from: "2025-01-06", valid_until: null },
+  makeSharesDeliveryDay({ id: "sdd-tue-2025", day_number: 1, valid_from: "2025-01-06", valid_until: "2025-12-28" }),
+  makeSharesDeliveryDay({ id: "sdd-tue", day_number: 1, valid_from: "2025-12-29", valid_until: null }),
+  makeSharesDeliveryDay({ id: "sdd-thu", day_number: 3, valid_from: "2025-01-06", valid_until: null }),
 ];
 
 // The internal objects as the modal labels them, dated in the default format.

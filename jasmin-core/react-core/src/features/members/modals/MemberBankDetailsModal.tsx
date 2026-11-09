@@ -6,7 +6,7 @@ import {
   getCommissioningMembersListQueryKey,
   useCommissioningMembersPartialUpdate,
 } from "@shared/api/generated/commissioning/commissioning";
-import type { PatchedMember } from "@shared/api/generated/models";
+import type { PatchedMemberRequest } from "@shared/api/generated/models";
 import StoredOrEditField from "@shared/layout/MyDataTab/StoredOrEditField";
 import { ModalCancelSaveFooter } from "@shared/modals/shared";
 import { notify } from "@shared/utils";
@@ -87,7 +87,7 @@ export default function MemberBankDetailsModal({
   const handleSave = async () => {
     setSubmitError(null);
     if (!memberId) return;
-    let values: Pick<PatchedMember, "iban" | "account_owner">;
+    let values: Pick<PatchedMemberRequest, "iban" | "account_owner">;
     try {
       values = await form.validateFields();
     } catch {
@@ -96,7 +96,7 @@ export default function MemberBankDetailsModal({
     // Only send a field the office actually opened for editing — mirrors the
     // self-service strip-empty pattern so "save" can't blank a value the
     // office can't currently see.
-    const payload: PatchedMember = {};
+    const payload: PatchedMemberRequest = {};
     if (editingIban) payload.iban = values.iban ?? "";
     if (editingAccountOwner) payload.account_owner = values.account_owner ?? "";
     if (Object.keys(payload).length === 0) {

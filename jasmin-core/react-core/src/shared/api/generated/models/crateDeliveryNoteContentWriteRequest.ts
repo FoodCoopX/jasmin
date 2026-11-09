@@ -14,7 +14,9 @@ date. On update, an omitted ``price_per_unit`` / ``rabatt`` / ``tax_rate``
 / ``note`` keeps the stored value.
  */
 export interface CrateDeliveryNoteContentWriteRequest {
+  /** @minLength 1 */
   delivery_note_id: string;
+  /** @minLength 1 */
   crate_type: string;
   amount: number;
   /**

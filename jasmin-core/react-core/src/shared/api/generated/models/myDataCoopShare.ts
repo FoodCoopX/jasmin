@@ -13,17 +13,17 @@ fields the user actually needs to see in their own data tab
 record changes are office-managed (cf. CoopShareViewSet).
  */
 export interface MyDataCoopShare {
-  readonly id?: string;
+  readonly id: string;
   /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */
-  readonly amount_of_coop_shares?: string;
-  readonly value_one_coop_share?: number;
+  readonly amount_of_coop_shares: string;
+  readonly value_one_coop_share: number;
   /** @nullable */
-  readonly due_date?: string | null;
+  readonly due_date: string | null;
   /** @nullable */
-  readonly paid_at?: string | null;
-  readonly admin_confirmed?: boolean;
+  readonly paid_at: string | null;
+  readonly admin_confirmed: boolean;
   /** @nullable */
-  readonly admin_confirmed_at?: string | null;
+  readonly admin_confirmed_at: string | null;
   /** @nullable */
-  readonly cancelled_at?: string | null;
+  readonly cancelled_at: string | null;
 }

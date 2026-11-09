@@ -13,6 +13,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SharesDeliveryDay } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay } from "@/test/modelFixtures";
 import { flushMicrotasks } from "@/test/profileRenders";
 
 // A `t` that shows the tour number, so the tours tell apart.
@@ -56,8 +57,9 @@ import TourSelector from "../TourSelector";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-// ``usedTours``: the tours the day's stations sit on, as the list sends them.
-const deliveryDay = (id: string, usedTours: number[] | undefined): SharesDeliveryDay => ({
+// ``usedTours``: the tours the day's stations sit on, as the list sends them;
+// null for a day none of whose stations sits on a tour.
+const deliveryDay = (id: string, usedTours: number[] | null): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: 1,
   valid_from: "2026-01-05",
@@ -68,7 +70,7 @@ const deliveryDay = (id: string, usedTours: number[] | undefined): SharesDeliver
 const TUESDAY_THREE_TOURS = deliveryDay("day-tue", [1, 2, 3]);
 const FRIDAY_TWO_TOURS = deliveryDay("day-fri", [2, 1]);
 const THURSDAY_LATER_TOURS = deliveryDay("day-thu", [3, 2]);
-const SATURDAY_NO_TOURS = deliveryDay("day-sat", undefined);
+const SATURDAY_NO_TOURS = deliveryDay("day-sat", null);
 const SUNDAY_EMPTY_TOURS = deliveryDay("day-sun", []);
 
 const TOUR = "commissioning.tour_number";

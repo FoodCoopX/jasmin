@@ -14,7 +14,7 @@ to keep commissioning's one-way isolation; the background-job infra
 itself remains a documented extraction blocker.
  */
 export interface BackgroundJobEnqueueResponse {
-  readonly job_id?: string;
-  readonly kind?: string;
-  readonly status?: string;
+  readonly job_id: string;
+  readonly kind: string;
+  readonly status: string;
 }

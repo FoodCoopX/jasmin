@@ -12,13 +12,14 @@ import type {
   TourOverview,
   DeliveryStationsToursOverviewResponse,
 } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay, makeShareTypeVariation } from "@/test/modelFixtures";
 
 // Backend day numbers: 0 = Monday … 6 = Sunday.
 export const TUESDAY = 1;
 export const WEDNESDAY = 2;
 export const FRIDAY = 4;
 
-export const deliveryDay = (id: string, dayNumber: number, tours = 2): SharesDeliveryDay => ({
+export const deliveryDay = (id: string, dayNumber: number, tours = 2): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
@@ -31,7 +32,7 @@ export const shareSize = (
   shareType: "veg" | "honey" | "bread",
   size: ShareTypeVariation["size"],
   packedInBulk = false,
-): ShareTypeVariation => ({
+): ShareTypeVariation => makeShareTypeVariation({
   id: `var-${shareType}-${size}`,
   share_type: `st-${shareType}`,
   size,

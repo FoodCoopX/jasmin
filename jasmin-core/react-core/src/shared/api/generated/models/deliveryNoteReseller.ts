@@ -16,52 +16,53 @@ DeliveryNote). Injected via ``get_fields()`` for the same metaclass reason
 as ``LinePricingFieldsMixin``.
  */
 export interface DeliveryNoteReseller {
-  readonly id?: string;
-  readonly line_items?: readonly DeliveryNoteResellerContent[];
-  readonly crate_items?: readonly CrateItemSummary[];
+  readonly id: string;
+  readonly line_items: readonly DeliveryNoteResellerContent[];
+  readonly crate_items: readonly CrateItemSummary[];
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly sum_netto?: string;
+  readonly sum_netto: string;
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly sum_brutto?: string;
+  readonly sum_brutto: string;
   /** @nullable */
-  readonly reseller_name?: string | null;
-  readonly reseller_address?: string;
-  readonly reseller_zip?: string;
-  readonly reseller_city?: string;
+  readonly reseller_name: string | null;
+  readonly reseller_address: string;
+  readonly reseller_zip: string;
+  readonly reseller_city: string;
   /** @nullable */
-  readonly reseller_country?: string | null;
-  readonly delivery_note_number?: string;
-  readonly delivery_note_date?: string;
-  readonly order_number?: string;
+  readonly reseller_country: string | null;
+  readonly delivery_note_number: string;
+  /** @nullable */
+  readonly delivery_note_date: string | null;
+  readonly order_number: string;
   /**
    * Order date via the shared ISO-week resolver (year/week/day_number).
    * @nullable
    */
-  readonly order_date?: string | null;
-  readonly order_prefix?: string;
-  readonly created_at?: string;
-  readonly is_finalized?: boolean;
+  readonly order_date: string | null;
+  readonly order_prefix: string;
+  readonly created_at: string;
+  readonly is_finalized: boolean;
   /** @nullable */
-  readonly finalized_at?: string | null;
-  readonly prefix?: string;
+  readonly finalized_at: string | null;
+  readonly prefix: string;
   /** @nullable */
-  readonly number?: number | null;
+  readonly number: number | null;
   /** @nullable */
-  readonly date?: string | null;
+  readonly date: string | null;
   /** @nullable */
-  readonly file?: string | null;
+  readonly file: string | null;
   /** @nullable */
-  readonly has_been_sent_to_reseller_at?: string | null;
+  readonly has_been_sent_to_reseller_at: string | null;
   is_cancelled?: boolean;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   /** @nullable */
-  readonly finalized_by?: string | null;
-  readonly order?: string;
-  readonly tax_breakdown?: readonly DeliveryNoteResellerTaxBreakdownItem[];
+  readonly finalized_by: string | null;
+  readonly order: string;
+  readonly tax_breakdown: readonly DeliveryNoteResellerTaxBreakdownItem[];
   /**
    * Return a human-readable name for ``created_by``.
    * @nullable
    */
-  readonly created_by_name?: string | null;
+  readonly created_by_name: string | null;
 }

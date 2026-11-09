@@ -23,6 +23,7 @@ import type { ComponentType } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ShareArticle, UnitEnum } from "@shared/api/generated/models";
+import { makeShareArticle } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 const NOW = vi.hoisted(() => {
@@ -143,7 +144,8 @@ type Size = "S" | "M" | "L";
 
 const article = (
   id: string, name: string, unit: UnitEnum, flags: Partial<ShareArticle> = {},
-): ShareArticle => ({ id, name, default_movement_unit: unit, is_active: true, is_purchased: false, ...flags });
+): ShareArticle =>
+  makeShareArticle({ id, name, default_movement_unit: unit, is_active: true, is_purchased: false, ...flags });
 const CARROTS = article("art-carrots", "Carrots", "KG");
 const LETTUCE = article("art-lettuce", "Lettuce", "PCS");
 const BEETROOT = article("art-beetroot", "Beetroot", "KG");

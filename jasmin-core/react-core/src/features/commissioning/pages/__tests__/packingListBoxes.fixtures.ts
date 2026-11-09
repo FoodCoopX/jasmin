@@ -10,6 +10,7 @@ import type {
   PackingBoxesMatrixColumn,
   SharesDeliveryDay,
 } from "@shared/api/generated/models";
+import { makeDeliveryStation, makeSharesDeliveryDay } from "@/test/modelFixtures";
 
 // Backend day numbers: 0 = Monday … 6 = Sunday.
 export const MONDAY = 0;
@@ -18,7 +19,7 @@ export const THURSDAY = 3;
 export const FRIDAY = 4;
 
 // ``tours``: how many tours the day's stations sit on (1 … tours).
-export const deliveryDay = (id: string, dayNumber: number, tours = 1): SharesDeliveryDay => ({
+export const deliveryDay = (id: string, dayNumber: number, tours = 1): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
@@ -26,7 +27,7 @@ export const deliveryDay = (id: string, dayNumber: number, tours = 1): SharesDel
   used_tours: Array.from({ length: tours }, (_, index) => index + 1),
 });
 
-export const station = (id: string, shortName: string): DeliveryStation => ({
+export const station = (id: string, shortName: string): DeliveryStation => makeDeliveryStation({
   id,
   short_name: shortName,
   is_active: true,

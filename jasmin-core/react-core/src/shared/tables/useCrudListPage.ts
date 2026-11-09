@@ -25,21 +25,31 @@ interface ListQueryResult {
  * mutation fns, and the list query key (for invalidation). This is the ONE
  * genuinely per-resource bit that can't be derived — bundle the Orval symbols
  * here (ideally as a module-level const so its identity is stable).
+ *
+ * `TPayload` is what a save sends: the generated request type where it differs
+ * from the row, as it does for a picture, which is read as a URL but uploaded
+ * as a file.
  */
-export interface CrudResource<TRow extends TableRecord> {
+export interface CrudResource<
+  TRow extends TableRecord,
+  TPayload extends TableRecord = TRow,
+> {
   // `any[]` (not `unknown[]`) so the heterogeneous Orval hook/query-key
   // signatures (each with its own typed `*ListParams`) stay assignable — a
   // rest of `unknown` would fail param contravariance against them.
   useList: (...args: any[]) => ListQueryResult;
-  create: (payload: TRow) => Promise<unknown>;
-  update: (id: string, payload: TRow) => Promise<unknown>;
+  create: (payload: TPayload) => Promise<unknown>;
+  update: (id: string, payload: TPayload) => Promise<unknown>;
   delete: (id: string, extra?: Record<string, unknown>) => Promise<unknown>;
   getListQueryKey: (...args: any[]) => readonly unknown[];
 }
 
-export interface UseCrudListPageOptions<TRow extends TableRecord> {
+export interface UseCrudListPageOptions<
+  TRow extends TableRecord,
+  TPayload extends TableRecord = TRow,
+> {
   /** The generated list hook + CRUD fns + query key. */
-  resource: CrudResource<TRow>;
+  resource: CrudResource<TRow, TPayload>;
   /** Table permissions (caller picks the helper — `permissionsWithDeletable`,
    *  `gatedByPermissionOnlyEdit`, …; the choice legitimately varies per page). */
   permissions: TablePermissions<TRow>;
@@ -92,14 +102,17 @@ const NEW_ROW_DEFAULTS: Record<string, unknown> = { is_active: true };
  * See {@link CrudListPage} for the thin component wrapper (pure-skeleton pages);
  * complex pages call this hook directly and render their own JSX.
  */
-export function useCrudListPage<TRow extends TableRecord>({
+export function useCrudListPage<
+  TRow extends TableRecord,
+  TPayload extends TableRecord = TRow,
+>({
   resource,
   permissions,
   withHideInactive = true,
   activeField = "is_active",
   newRowDefaults = NEW_ROW_DEFAULTS,
   listParams,
-}: UseCrudListPageOptions<TRow>): CrudListPageApi<TRow> {
+}: UseCrudListPageOptions<TRow, TPayload>): CrudListPageApi<TRow> {
   const queryClient = useQueryClient();
   const [hideInactive, setHideInactive] = useState(true);
 
@@ -130,7 +143,7 @@ export function useCrudListPage<TRow extends TableRecord>({
 
   const apiFunctions = useMemo<ApiFunctions>(
     () =>
-      wrapApiFunctions<TRow>({
+      wrapApiFunctions<TPayload>({
         create: (payload) => resource.create(payload),
         update: (id, payload) => resource.update(id, payload),
         delete: (id, extra) => resource.delete(id, extra),

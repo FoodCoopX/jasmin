@@ -15,7 +15,10 @@ export interface PatchedHarvestSharePlanningUpdateRequest {
   delivery_week?: number;
   /** @nullable */
   note?: string | null;
-  /** @nullable */
+  /**
+   * @minLength 1
+   * @nullable
+   */
   seller?: string | null;
   cleaning?: boolean;
   washing?: boolean;

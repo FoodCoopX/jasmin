@@ -38,6 +38,7 @@ import {
   HONEY,
   HONEY_SHARE_TYPE,
   KOHLRABI,
+  offeredFor,
   planRow,
   type PlanRow,
   savedSlot,
@@ -324,7 +325,7 @@ beforeEach(() => {
       : [{ id: "var-jar", size: "ONE_SIZE", share_type: "st-HONEY_SHARE", valid_from: "2025-12-29" }],
   );
   api.shareArticles.mockReset().mockImplementation(async ({ share_option }: Filter) =>
-    ARTICLES.filter((item) => !share_option || item.share_option_list?.includes(share_option)),
+    ARTICLES.filter((item) => offeredFor(item, share_option)),
   );
   api.sellers.mockReset().mockResolvedValue(SELLERS);
   api.planList.mockReset().mockImplementation(async ({ year, share_option }: Filter) =>
@@ -624,9 +625,7 @@ describe("PlanningShareContentLongTermBase new row", () => {
     await loaded();
     const fennel = article("art-fennel", "Fennel", "KG");
     api.shareArticles.mockImplementation(async ({ share_option }: { share_option?: string }) =>
-      [...ARTICLES, fennel].filter(
-        (item) => !share_option || item.share_option_list?.includes(share_option),
-      ),
+      [...ARTICLES, fennel].filter((item) => offeredFor(item, share_option)),
     );
 
     await userEvent.click(button(ADD_ARTICLE));

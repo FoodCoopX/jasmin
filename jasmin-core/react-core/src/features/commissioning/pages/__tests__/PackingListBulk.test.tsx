@@ -23,6 +23,7 @@ import type {
   Share,
   SharesDeliveryDay,
 } from "@shared/api/generated/models";
+import { makeDeliveryStation, makeShare, makeSharesDeliveryDay } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 const NOW = vi.hoisted(() => {
@@ -162,14 +163,14 @@ const THURSDAY = 3;
 const FRIDAY = 4;
 const SATURDAY = 5;
 
-const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => ({
+const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
   valid_until: null,
 });
 
-const station = (id: string, shortName: string): DeliveryStation => ({
+const station = (id: string, shortName: string): DeliveryStation => makeDeliveryStation({
   id,
   short_name: shortName,
   is_active: true,
@@ -180,7 +181,7 @@ const MARKET = station("st-market", "Market");
 const SCHOOL = station("st-school", "School");
 
 /** A share of the frozen week, delivered on one weekday and packed on another. */
-const share = (id: string, deliveryDayNumber: number, packingDay: number): Share => ({
+const share = (id: string, deliveryDayNumber: number, packingDay: number): Share => makeShare({
   id,
   year: 2026,
   delivery_week: 41,

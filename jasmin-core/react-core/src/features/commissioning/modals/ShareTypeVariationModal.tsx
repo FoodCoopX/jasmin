@@ -22,7 +22,7 @@ import {
   useCommissioningShareTypeVariationsList,
 } from "@shared/api/generated/commissioning/commissioning";
 import type { CommissioningShareTypeVariationsListParams } from "@shared/api/generated/models/commissioningShareTypeVariationsListParams";
-import type { ShareTypeVariation } from "@shared/api/generated/models/shareTypeVariation";
+import type { ShareTypeVariationRequest } from "@shared/api/generated/models/shareTypeVariationRequest";
 import { useRoles } from "@shared/auth";
 import ModalCloseFooter from "@shared/modals/ModalCloseFooter";
 import RichTextEditorModal from "@shared/modals/RichTextEditorModal";
@@ -720,7 +720,7 @@ export default function ShareTypeVariationModal({
 
   const apiFunctions = useMemo<ApiFunctions>(
     () =>
-      wrapApiFunctions<ShareTypeVariation & TableRecord>({
+      wrapApiFunctions<ShareTypeVariationRequest & TableRecord>({
         create: (data) => commissioningShareTypeVariationsCreate(data),
         update: (id, data) =>
           commissioningShareTypeVariationsPartialUpdate(id, data),

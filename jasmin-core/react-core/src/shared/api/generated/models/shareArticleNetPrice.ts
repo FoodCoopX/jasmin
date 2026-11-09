@@ -16,7 +16,7 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface ShareArticleNetPrice {
-  readonly id?: string;
+  readonly id: string;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;
@@ -83,6 +83,6 @@ export interface ShareArticleNetPrice {
    */
   net_price_for_orders_bunch_3?: string | null;
   share_article: string;
-  readonly can_be_deleted?: boolean;
-  readonly share_article_name?: string;
+  readonly can_be_deleted: boolean;
+  readonly share_article_name: string;
 }

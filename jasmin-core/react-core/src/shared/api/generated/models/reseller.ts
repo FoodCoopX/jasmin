@@ -20,20 +20,21 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface Reseller {
-  readonly id?: string;
+  readonly id: string;
   readonly has_orders?: boolean;
-  readonly has_active_organic_certificate?: boolean;
+  readonly has_active_organic_certificate: boolean;
   is_also_delivery_station?: boolean;
-  readonly linked_delivery_station?: string;
+  /** @nullable */
+  readonly linked_delivery_station: string | null;
   /** True iff unlinking would not orphan a DS that's still in use.
 
 Used by the frontend to disable the ``is_also_delivery_station``
 checkbox when the link cannot safely be undone. */
-  readonly linked_delivery_station_can_be_deleted?: boolean;
+  readonly linked_delivery_station_can_be_deleted: boolean;
   /** @nullable */
-  readonly linked_user_info?: ResellerLinkedUserInfo;
-  readonly iban_masked?: string;
-  readonly iban_stored?: boolean;
+  readonly linked_user_info: ResellerLinkedUserInfo;
+  readonly iban_masked: string;
+  readonly iban_stored: boolean;
   /**
    * @maxLength 200
    * @nullable
@@ -123,12 +124,13 @@ checkbox when the link cannot safely be undone. */
    * @nullable
    */
   note?: string | null;
-  readonly contact?: string;
+  /** @nullable */
+  readonly contact: string | null;
   /** @nullable */
   linked_user?: string | null;
   /** @nullable */
   offer_group?: string | null;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
   /**
    * @maxLength 200
    * @nullable

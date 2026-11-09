@@ -9,15 +9,16 @@ import type {
   ShareArticle,
   Storage,
 } from "@shared/api/generated/models";
+import { makeReseller, makeShareArticle, makeStorage } from "@/test/modelFixtures";
 
 /** A summary row: the API row plus its ``storage_<id>`` flags. */
 export type Row = DocumentationSummaryRow & Record<string, unknown>;
 export type Payload = Record<string, unknown>;
 
-export const COLD_STORE: Storage = { id: "storage-cold", name: "Cold store", is_active: true };
-export const PACKING_SHED: Storage = { id: "storage-shed", name: "Packing shed", is_active: true };
+export const COLD_STORE: Storage = makeStorage({ id: "storage-cold", name: "Cold store", is_active: true });
+export const PACKING_SHED: Storage = makeStorage({ id: "storage-shed", name: "Packing shed", is_active: true });
 
-const article = (name: string, unit: ShareArticle["default_movement_unit"]): ShareArticle => ({
+const article = (name: string, unit: ShareArticle["default_movement_unit"]): ShareArticle => makeShareArticle({
   id: `article-${name.toLowerCase()}`, name, default_movement_unit: unit,
   is_active: true, is_purchased: true,
 });
@@ -29,7 +30,7 @@ export const BEETROOT = article("Beetroot", "KG");
 export const LEEKS = { ...article("Leeks", "PCS"), default_pieces_per_pu_purchase: "12.000" };
 export const KALE = article("Kale", "BUNCH");
 
-const seller = (id: string, companyName: string, controlNumber: string | null): Reseller => ({
+const seller = (id: string, companyName: string, controlNumber: string | null): Reseller => makeReseller({
   id, company_name: companyName, organic_control_number: controlNumber,
   is_seller: true, is_active_seller: true,
   address: "Field Lane 1", zip_code: "12345", city: "Greenville",

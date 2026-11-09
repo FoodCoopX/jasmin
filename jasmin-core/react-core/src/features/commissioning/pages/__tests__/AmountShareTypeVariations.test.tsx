@@ -26,6 +26,7 @@ import type {
   WeeklyComboMatrixResponse,
   WeeklyComboMatrixRow,
 } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 const NOW = vi.hoisted(() => {
@@ -116,7 +117,7 @@ const SCHOOL: Stop = { id: "ds-school", name: "School", tour: 1 };
 const LIBRARY: Stop = { id: "ds-library", name: "Library", tour: 2 };
 
 /** A delivery day running all year, with the stations it serves. */
-const deliveryDay = (dayNumber: number, tours: number, stops: Stop[]): SharesDeliveryDay => ({
+const deliveryDay = (dayNumber: number, tours: number, stops: Stop[]): SharesDeliveryDay => makeSharesDeliveryDay({
   id: `day-${dayNumber}`,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",

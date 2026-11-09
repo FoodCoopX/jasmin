@@ -19,31 +19,37 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface ShareTypeVariation {
-  readonly id?: string;
-  /** @pattern ^-?\d{0,6}(?:\.\d{0,2})?$ */
-  readonly active_price_per_delivery?: string;
-  /** @pattern ^-?\d{0,6}(?:\.\d{0,2})?$ */
-  readonly active_price_sum_articles?: string;
+  readonly id: string;
   /**
    * @nullable
    * @pattern ^-?\d{0,6}(?:\.\d{0,2})?$
    */
-  readonly active_solidarity_min_price_per_delivery?: string | null;
+  readonly active_price_per_delivery: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,6}(?:\.\d{0,2})?$
    */
-  readonly active_price_per_delivery_if_trial?: string | null;
+  readonly active_price_sum_articles: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,6}(?:\.\d{0,2})?$
    */
-  readonly active_solidarity_min_price_per_delivery_if_trial?: string | null;
+  readonly active_solidarity_min_price_per_delivery: string | null;
+  /**
+   * @nullable
+   * @pattern ^-?\d{0,6}(?:\.\d{0,2})?$
+   */
+  readonly active_price_per_delivery_if_trial: string | null;
+  /**
+   * @nullable
+   * @pattern ^-?\d{0,6}(?:\.\d{0,2})?$
+   */
+  readonly active_solidarity_min_price_per_delivery_if_trial: string | null;
   /** @nullable */
-  readonly capacity_by_week?: ShareTypeVariationCapacityByWeek;
+  readonly capacity_by_week: ShareTypeVariationCapacityByWeek;
   /** @nullable */
-  readonly subscriptions_valid_until_max?: string | null;
-  readonly has_open_ended_subscription?: boolean;
+  readonly subscriptions_valid_until_max: string | null;
+  readonly has_open_ended_subscription: boolean;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;
@@ -80,7 +86,7 @@ export interface ShareTypeVariation {
   share_type: string;
   /** @nullable */
   used_crate?: string | null;
-  readonly physical_components?: readonly string[];
-  readonly can_be_deleted?: boolean;
-  readonly share_type_name?: string;
+  readonly physical_components: readonly string[];
+  readonly can_be_deleted: boolean;
+  readonly share_type_name: string;
 }

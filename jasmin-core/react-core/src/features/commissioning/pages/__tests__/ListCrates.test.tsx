@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Crate } from "@shared/api/generated/models";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
+import { makeCrate } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 // One ``t`` for every call, as the real hook keeps it stable across renders.
@@ -120,8 +121,8 @@ type Row = Record<string, unknown>;
 const NOW = new Date(2026, 9, 7, 12, 0);
 
 /** A crate as the list endpoint carries it. */
-const crate = (fields: Partial<Crate> & { id: string; name: string }): Crate => ({
-  is_active: true, number: null, short_name: null, note: null, can_be_deleted: true, ...fields,
+const crate = (fields: Partial<Crate> & { id: string; name: string }): Crate => makeCrate({
+  is_active: true, number: null, short_name: null, note: null, ...fields,
 });
 
 // Already on offers and deliveries, so the backend protects it.

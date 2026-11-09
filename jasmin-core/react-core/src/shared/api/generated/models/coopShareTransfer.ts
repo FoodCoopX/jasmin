@@ -12,15 +12,15 @@ serializer context by the transfer action) is true when the transfer left the
 giving member without shares and cancelled the membership.
  */
 export interface CoopShareTransfer {
-  readonly id?: string;
-  readonly from_member?: string;
-  readonly to_member?: string;
-  readonly amount_of_coop_shares?: number;
-  readonly transfer_date?: string;
+  readonly id: string;
+  readonly from_member: string;
+  readonly to_member: string;
+  readonly amount_of_coop_shares: number;
+  readonly transfer_date: string;
   /** @nullable */
-  readonly note?: string | null;
-  readonly created_at?: string;
+  readonly note: string | null;
+  readonly created_at: string;
   /** @nullable */
-  readonly created_by?: string | null;
-  readonly from_member_cancelled?: boolean;
+  readonly created_by: string | null;
+  readonly from_member_cancelled: boolean;
 }

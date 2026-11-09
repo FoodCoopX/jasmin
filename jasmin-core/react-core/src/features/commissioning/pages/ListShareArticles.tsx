@@ -11,8 +11,8 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningShareArticlesListParams,
-  PatchedShareArticle,
-  ShareArticle,
+  PatchedShareArticleRequest,
+  ShareArticleRequest,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
 import {
@@ -64,11 +64,11 @@ const SHARE_ARTICLE_LIST_PARAMS: CommissioningShareArticlesListParams = {
 const shareArticlesResource: CrudResource<TableRecord> = {
   useList: useCommissioningShareArticlesList,
   create: (payload) =>
-    commissioningShareArticlesCreate(payload as unknown as ShareArticle),
+    commissioningShareArticlesCreate(payload as unknown as ShareArticleRequest),
   update: (id, payload) =>
     commissioningShareArticlesPartialUpdate(
       id,
-      payload as PatchedShareArticle,
+      payload as PatchedShareArticleRequest,
     ),
   delete: commissioningShareArticlesDestroy,
   getListQueryKey: getCommissioningShareArticlesListQueryKey,

@@ -15,7 +15,10 @@ import {
   getCommissioningDeliveryStationsListQueryKey,
   useCommissioningDeliveryStationsList,
 } from "@shared/api/generated/commissioning/commissioning";
-import type { DeliveryStation } from "@shared/api/generated/models";
+import type {
+  DeliveryStation,
+  DeliveryStationRequest,
+} from "@shared/api/generated/models";
 import {
   DeliveryStationDetailModal,
   DeliveryStationFeeModal,
@@ -51,8 +54,12 @@ interface ShareDeliveryDay {
 }
 
 type DeliveryStationRow = DeliveryStation & TableRecord;
+type DeliveryStationPayload = DeliveryStationRequest & TableRecord;
 
-const deliveryStationsResource: CrudResource<DeliveryStationRow> = {
+const deliveryStationsResource: CrudResource<
+  DeliveryStationRow,
+  DeliveryStationPayload
+> = {
   useList: useCommissioningDeliveryStationsList,
   create: commissioningDeliveryStationsCreate,
   update: commissioningDeliveryStationsPartialUpdate,
@@ -90,7 +97,7 @@ export default function ListDeliveryStations() {
     unknown
   > | null>(null);
 
-  const list = useCrudListPage<DeliveryStationRow>({
+  const list = useCrudListPage<DeliveryStationRow, DeliveryStationPayload>({
     resource: deliveryStationsResource,
     permissions,
   });

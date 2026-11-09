@@ -20,26 +20,26 @@ those marks. Injected via ``get_fields()`` for the same metaclass reason as
 ``LinePricingFieldsMixin``.
  */
 export interface InvoiceResellerContent {
-  readonly id?: string;
+  readonly id: string;
   /**
    * @nullable
    * @pattern ^-?\d{0,7}(?:\.\d{0,3})?$
    */
-  readonly source_amount?: string | null;
+  readonly source_amount: string | null;
   /** @nullable */
-  readonly source_unit?: string | null;
+  readonly source_unit: string | null;
   /** @nullable */
-  readonly source_size?: string | null;
+  readonly source_size: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,3}(?:\.\d{0,2})?$
    */
-  readonly source_price_per_unit?: string | null;
+  readonly source_price_per_unit: string | null;
   /** @nullable */
-  readonly source_rabatt?: number | null;
-  readonly is_finalized?: boolean;
+  readonly source_rabatt: number | null;
+  readonly is_finalized: boolean;
   /** @nullable */
-  readonly finalized_at?: string | null;
+  readonly finalized_at: string | null;
   /**
    * @maxLength 200
    * @nullable
@@ -73,34 +73,34 @@ export interface InvoiceResellerContent {
   /** @pattern ^-?\d{0,7}(?:\.\d{0,3})?$ */
   amount: string;
   /** @nullable */
-  readonly finalized_by?: string | null;
+  readonly finalized_by: string | null;
   /** @nullable */
   offer?: string | null;
   /** @nullable */
   share_article?: string | null;
   invoice: string;
   /** @nullable */
-  readonly order_content?: string | null;
-  readonly delivery_note_contents?: readonly string[];
+  readonly order_content: string | null;
+  readonly delivery_note_contents: readonly string[];
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly line_netto?: string;
+  readonly line_netto: string;
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly line_brutto?: string;
+  readonly line_brutto: string;
   /**
    * Get share article name from direct relation or through offer.
    * @nullable
    */
-  readonly share_article_name?: string | null;
+  readonly share_article_name: string | null;
   /** @nullable */
-  readonly organic_status?: string | null;
-  readonly amount_differs?: boolean;
-  readonly original_amount?: string;
-  readonly price_per_unit_differs?: boolean;
-  readonly original_price_per_unit?: string;
-  readonly rabatt_differs?: boolean;
-  readonly original_rabatt?: string;
-  readonly unit_differs?: boolean;
-  readonly original_unit?: string;
-  readonly size_differs?: boolean;
-  readonly original_size?: string;
+  readonly organic_status: string | null;
+  readonly amount_differs: boolean;
+  readonly original_amount: string;
+  readonly price_per_unit_differs: boolean;
+  readonly original_price_per_unit: string;
+  readonly rabatt_differs: boolean;
+  readonly original_rabatt: string;
+  readonly unit_differs: boolean;
+  readonly original_unit: string;
+  readonly size_differs: boolean;
+  readonly original_size: string;
 }

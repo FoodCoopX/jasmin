@@ -14,6 +14,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SharesDeliveryDay } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay } from "@/test/modelFixtures";
 import { flushMicrotasks } from "@/test/profileRenders";
 
 // The canonical mock with one `t` for every render, as react-i18next keeps it.
@@ -56,7 +57,7 @@ import SharesDeliveryDaySelector from "../SharesDeliveryDaySelector";
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
 // Backend day numbers: 0 = Monday … 6 = Sunday.
-const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => ({
+const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",

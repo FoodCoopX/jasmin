@@ -7,7 +7,7 @@
  */
 
 export interface HistoricalPlanting {
-  readonly id?: string;
+  readonly id: string;
   /**
    * @minimum 0
    * @maximum 32767

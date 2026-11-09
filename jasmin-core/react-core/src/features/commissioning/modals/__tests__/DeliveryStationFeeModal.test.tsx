@@ -19,6 +19,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DeliveryStation } from "@shared/api/generated/models";
+import { makeDeliveryStation } from "@/test/modelFixtures";
 import { flushMicrotasks } from "@/test/profileRenders";
 
 // One ``t`` for every call, as the real hook keeps it stable across renders.
@@ -68,11 +69,11 @@ type Row = Record<string, unknown>;
 
 /** A station as the list endpoint carries it, fees as decimal strings. */
 function station(overrides: Partial<DeliveryStation> & { id: string }): DeliveryStation {
-  return {
+  return makeDeliveryStation({
     is_active: true, short_name: null, number: null, address: "", zip_code: "", city: "",
     fee_per_box_net: "0.00", fee_per_month_net: "0.00", fee_per_year_net: "0.00", fees_billing_period: null,
     ...overrides,
-  };
+  });
 }
 
 // Paid per box, settled monthly.

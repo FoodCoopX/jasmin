@@ -24,8 +24,8 @@ import type {
   CommissioningSharesDeliveryDaysListParams,
   DeliveryStation,
   DeliveryTourResponse,
-  DeliveryToursUpdate,
-  DeliveryTourUpdate,
+  DeliveryToursUpdateRequest,
+  DeliveryTourUpdateRequest,
   SharesDeliveryDay,
 } from "@shared/api/generated/models";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
@@ -98,7 +98,7 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
     }) =>
       useMutation({
         mutationKey: ["commissioningDeliveryToursUpdateToursCreate"],
-        mutationFn: async ({ data }: { data: DeliveryToursUpdate }) => api.saveTours(data),
+        mutationFn: async ({ data }: { data: DeliveryToursUpdateRequest }) => api.saveTours(data),
         onError: options?.mutation?.onError,
         meta: options?.mutation?.meta,
       }),
@@ -142,7 +142,7 @@ const stationsOf = (day: Day) => ({
 let farm: {
   days: Day[];
   stations: Record<string, Station[]>;
-  plans: Record<string, DeliveryTourUpdate[]>;
+  plans: Record<string, DeliveryTourUpdateRequest[]>;
 };
 
 const activeOn = (day: Day, date: string) =>
@@ -190,7 +190,7 @@ const listedPlan = ({ delivery_day }: CommissioningDeliveryToursListParams): Del
     }));
 
 /** Replaces the day's whole plan, as the backend does. */
-function savePlan({ delivery_day, tours }: DeliveryToursUpdate) {
+function savePlan({ delivery_day, tours }: DeliveryToursUpdateRequest) {
   farm.plans = { ...farm.plans, [delivery_day]: tours.map((tour) => ({ ...tour })) };
   return { message: "Tours updated." };
 }
@@ -245,7 +245,7 @@ const answer = (respond: (() => void) | undefined) =>
     await flushMicrotasks();
   });
 
-const lastSave = () => api.saveTours.mock.lastCall?.[0] as DeliveryToursUpdate | undefined;
+const lastSave = () => api.saveTours.mock.lastCall?.[0] as DeliveryToursUpdateRequest | undefined;
 
 /** The plan of the one save the page sent. */
 async function savedPlan() {
@@ -633,7 +633,7 @@ describe("DeliveryTours placing stations", () => {
   it("shows that the plan is being saved, then that it is saved", async () => {
     let finish: (() => void) | undefined;
     api.saveTours.mockImplementation(
-      (body: DeliveryToursUpdate) =>
+      (body: DeliveryToursUpdateRequest) =>
         new Promise((resolve) => (finish = () => resolve(savePlan(body)))),
     );
     const { user } = renderPage();

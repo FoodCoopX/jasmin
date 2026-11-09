@@ -11,11 +11,11 @@ import type { DefaultPlanningGranularityEnum } from './defaultPlanningGranularit
 import type { BillingStrategyEnum } from './billingStrategyEnum';
 
 export interface TenantSettings {
-  readonly id?: string;
+  readonly id: string;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;
-  readonly created_at?: string;
+  readonly created_at: string;
   has_coop_shares?: boolean;
   /**
    * @minimum -2147483648

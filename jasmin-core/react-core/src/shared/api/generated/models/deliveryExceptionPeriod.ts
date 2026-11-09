@@ -12,9 +12,9 @@ which a ShareTypeVariation is not delivered. Bounds must align to whole
 weeks and must not overlap another pause for the same variation.
  */
 export interface DeliveryExceptionPeriod {
-  readonly id?: string;
+  readonly id: string;
   share_type_variation: string;
-  readonly share_type_variation_string?: string;
+  readonly share_type_variation_string: string;
   valid_from: string;
   valid_until: string;
   /**
@@ -22,5 +22,5 @@ export interface DeliveryExceptionPeriod {
    * @nullable
    */
   note?: string | null;
-  readonly is_locked?: boolean;
+  readonly is_locked: boolean;
 }

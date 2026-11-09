@@ -26,49 +26,25 @@ import type {
 
 import type {
   AbsenceCategory,
+  AbsenceCategoryRequest,
   Employee,
+  EmployeeRequest,
   ErrorResponse,
-  PatchedAbsenceCategory,
-  PatchedEmployee,
-  PatchedWeeklyPlanCategory,
+  PatchedAbsenceCategoryRequest,
+  PatchedEmployeeRequest,
+  PatchedWeeklyPlanCategoryRequest,
   StaffAbsenceCategoriesListParams,
   StaffEmployeesListParams,
   StaffWeeklyPlanCategoriesListParams,
   StaffWeeklyPlanGridRetrieveParams,
   WeeklyPlanCategory,
-  WeeklyPlanCopy,
+  WeeklyPlanCategoryRequest,
+  WeeklyPlanCopyRequest,
   WeeklyPlanGrid,
-  WeeklyPlanReplace
+  WeeklyPlanReplaceRequest
 } from '.././models';
 
 import { axiosService } from '../../../services/api';
-
-// https://stackoverflow.com/questions/49579094/typescript-conditional-types-filter-out-readonly-properties-pick-only-requir/49579497#49579497
-type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
-T,
->() => T extends Y ? 1 : 2
-? A
-: B;
-
-type WritableKeys<T> = {
-[P in keyof T]-?: IfEquals<
-  { [Q in P]: T[P] },
-  { -readonly [Q in P]: T[P] },
-  P
->;
-}[keyof T];
-
-type UnionToIntersection<U> =
-  (U extends any ? (k: U)=>void : never) extends ((k: infer I)=>void) ? I : never;
-type DistributeReadOnlyOverUnions<T> = T extends any ? NonReadonly<T> : never;
-
-type Writable<T> = Pick<T, WritableKeys<T>>;
-type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
-  [P in keyof Writable<T>]: T[P] extends object
-    ? NonReadonly<NonNullable<T[P]>>
-    : T[P];
-} : DistributeReadOnlyOverUnions<T>;
-
 
 
 
@@ -161,7 +137,7 @@ export function useStaffAbsenceCategoriesList<TData = Awaited<ReturnType<typeof 
 
 
 export const staffAbsenceCategoriesCreate = (
-    absenceCategory: NonReadonly<AbsenceCategory>,
+    absenceCategoryRequest: AbsenceCategoryRequest,
  signal?: AbortSignal
 ) => {
       
@@ -169,7 +145,7 @@ export const staffAbsenceCategoriesCreate = (
       return axiosService<AbsenceCategory>(
       {url: `/api/staff/absence_categories/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: absenceCategory, signal
+      data: absenceCategoryRequest, signal
     },
       );
     }
@@ -177,8 +153,8 @@ export const staffAbsenceCategoriesCreate = (
 
 
 export const getStaffAbsenceCategoriesCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>, TError,{data: NonReadonly<AbsenceCategory>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>, TError,{data: NonReadonly<AbsenceCategory>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>, TError,{data: AbsenceCategoryRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>, TError,{data: AbsenceCategoryRequest}, TContext> => {
 
 const mutationKey = ['staffAbsenceCategoriesCreate'];
 const {mutation: mutationOptions} = options ?
@@ -190,7 +166,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>, {data: NonReadonly<AbsenceCategory>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>, {data: AbsenceCategoryRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  staffAbsenceCategoriesCreate(data,)
@@ -202,15 +178,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffAbsenceCategoriesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>>
-    export type StaffAbsenceCategoriesCreateMutationBody = NonReadonly<AbsenceCategory>
+    export type StaffAbsenceCategoriesCreateMutationBody = AbsenceCategoryRequest
     export type StaffAbsenceCategoriesCreateMutationError = ErrorResponse
 
     export const useStaffAbsenceCategoriesCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>, TError,{data: NonReadonly<AbsenceCategory>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>, TError,{data: AbsenceCategoryRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffAbsenceCategoriesCreate>>,
         TError,
-        {data: NonReadonly<AbsenceCategory>},
+        {data: AbsenceCategoryRequest},
         TContext
       > => {
 
@@ -306,14 +282,14 @@ export function useStaffAbsenceCategoriesRetrieve<TData = Awaited<ReturnType<typ
 
 export const staffAbsenceCategoriesUpdate = (
     id: string,
-    absenceCategory: NonReadonly<AbsenceCategory>,
+    absenceCategoryRequest: AbsenceCategoryRequest,
  ) => {
       
       
       return axiosService<AbsenceCategory>(
       {url: `/api/staff/absence_categories/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: absenceCategory
+      data: absenceCategoryRequest
     },
       );
     }
@@ -321,8 +297,8 @@ export const staffAbsenceCategoriesUpdate = (
 
 
 export const getStaffAbsenceCategoriesUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>, TError,{id: string;data: NonReadonly<AbsenceCategory>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>, TError,{id: string;data: NonReadonly<AbsenceCategory>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>, TError,{id: string;data: AbsenceCategoryRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>, TError,{id: string;data: AbsenceCategoryRequest}, TContext> => {
 
 const mutationKey = ['staffAbsenceCategoriesUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -334,7 +310,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>, {id: string;data: NonReadonly<AbsenceCategory>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>, {id: string;data: AbsenceCategoryRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  staffAbsenceCategoriesUpdate(id,data,)
@@ -346,15 +322,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffAbsenceCategoriesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>>
-    export type StaffAbsenceCategoriesUpdateMutationBody = NonReadonly<AbsenceCategory>
+    export type StaffAbsenceCategoriesUpdateMutationBody = AbsenceCategoryRequest
     export type StaffAbsenceCategoriesUpdateMutationError = ErrorResponse
 
     export const useStaffAbsenceCategoriesUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>, TError,{id: string;data: NonReadonly<AbsenceCategory>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>, TError,{id: string;data: AbsenceCategoryRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffAbsenceCategoriesUpdate>>,
         TError,
-        {id: string;data: NonReadonly<AbsenceCategory>},
+        {id: string;data: AbsenceCategoryRequest},
         TContext
       > => {
 
@@ -364,14 +340,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const staffAbsenceCategoriesPartialUpdate = (
     id: string,
-    patchedAbsenceCategory: NonReadonly<PatchedAbsenceCategory>,
+    patchedAbsenceCategoryRequest: PatchedAbsenceCategoryRequest,
  ) => {
       
       
       return axiosService<AbsenceCategory>(
       {url: `/api/staff/absence_categories/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedAbsenceCategory
+      data: patchedAbsenceCategoryRequest
     },
       );
     }
@@ -379,8 +355,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getStaffAbsenceCategoriesPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedAbsenceCategory>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedAbsenceCategory>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>, TError,{id: string;data: PatchedAbsenceCategoryRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>, TError,{id: string;data: PatchedAbsenceCategoryRequest}, TContext> => {
 
 const mutationKey = ['staffAbsenceCategoriesPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -392,7 +368,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>, {id: string;data: NonReadonly<PatchedAbsenceCategory>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>, {id: string;data: PatchedAbsenceCategoryRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  staffAbsenceCategoriesPartialUpdate(id,data,)
@@ -404,15 +380,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffAbsenceCategoriesPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>>
-    export type StaffAbsenceCategoriesPartialUpdateMutationBody = NonReadonly<PatchedAbsenceCategory>
+    export type StaffAbsenceCategoriesPartialUpdateMutationBody = PatchedAbsenceCategoryRequest
     export type StaffAbsenceCategoriesPartialUpdateMutationError = ErrorResponse
 
     export const useStaffAbsenceCategoriesPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedAbsenceCategory>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>, TError,{id: string;data: PatchedAbsenceCategoryRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffAbsenceCategoriesPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedAbsenceCategory>},
+        {id: string;data: PatchedAbsenceCategoryRequest},
         TContext
       > => {
 
@@ -563,7 +539,7 @@ export function useStaffEmployeesList<TData = Awaited<ReturnType<typeof staffEmp
 
 
 export const staffEmployeesCreate = (
-    employee: NonReadonly<Employee>,
+    employeeRequest: EmployeeRequest,
  signal?: AbortSignal
 ) => {
       
@@ -571,7 +547,7 @@ export const staffEmployeesCreate = (
       return axiosService<Employee>(
       {url: `/api/staff/employees/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: employee, signal
+      data: employeeRequest, signal
     },
       );
     }
@@ -579,8 +555,8 @@ export const staffEmployeesCreate = (
 
 
 export const getStaffEmployeesCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesCreate>>, TError,{data: NonReadonly<Employee>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesCreate>>, TError,{data: NonReadonly<Employee>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesCreate>>, TError,{data: EmployeeRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesCreate>>, TError,{data: EmployeeRequest}, TContext> => {
 
 const mutationKey = ['staffEmployeesCreate'];
 const {mutation: mutationOptions} = options ?
@@ -592,7 +568,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffEmployeesCreate>>, {data: NonReadonly<Employee>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffEmployeesCreate>>, {data: EmployeeRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  staffEmployeesCreate(data,)
@@ -604,15 +580,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffEmployeesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffEmployeesCreate>>>
-    export type StaffEmployeesCreateMutationBody = NonReadonly<Employee>
+    export type StaffEmployeesCreateMutationBody = EmployeeRequest
     export type StaffEmployeesCreateMutationError = ErrorResponse
 
     export const useStaffEmployeesCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesCreate>>, TError,{data: NonReadonly<Employee>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesCreate>>, TError,{data: EmployeeRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffEmployeesCreate>>,
         TError,
-        {data: NonReadonly<Employee>},
+        {data: EmployeeRequest},
         TContext
       > => {
 
@@ -708,14 +684,14 @@ export function useStaffEmployeesRetrieve<TData = Awaited<ReturnType<typeof staf
 
 export const staffEmployeesUpdate = (
     id: string,
-    employee: NonReadonly<Employee>,
+    employeeRequest: EmployeeRequest,
  ) => {
       
       
       return axiosService<Employee>(
       {url: `/api/staff/employees/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: employee
+      data: employeeRequest
     },
       );
     }
@@ -723,8 +699,8 @@ export const staffEmployeesUpdate = (
 
 
 export const getStaffEmployeesUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesUpdate>>, TError,{id: string;data: NonReadonly<Employee>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesUpdate>>, TError,{id: string;data: NonReadonly<Employee>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesUpdate>>, TError,{id: string;data: EmployeeRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesUpdate>>, TError,{id: string;data: EmployeeRequest}, TContext> => {
 
 const mutationKey = ['staffEmployeesUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -736,7 +712,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffEmployeesUpdate>>, {id: string;data: NonReadonly<Employee>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffEmployeesUpdate>>, {id: string;data: EmployeeRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  staffEmployeesUpdate(id,data,)
@@ -748,15 +724,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffEmployeesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof staffEmployeesUpdate>>>
-    export type StaffEmployeesUpdateMutationBody = NonReadonly<Employee>
+    export type StaffEmployeesUpdateMutationBody = EmployeeRequest
     export type StaffEmployeesUpdateMutationError = ErrorResponse
 
     export const useStaffEmployeesUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesUpdate>>, TError,{id: string;data: NonReadonly<Employee>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesUpdate>>, TError,{id: string;data: EmployeeRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffEmployeesUpdate>>,
         TError,
-        {id: string;data: NonReadonly<Employee>},
+        {id: string;data: EmployeeRequest},
         TContext
       > => {
 
@@ -766,14 +742,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const staffEmployeesPartialUpdate = (
     id: string,
-    patchedEmployee: NonReadonly<PatchedEmployee>,
+    patchedEmployeeRequest: PatchedEmployeeRequest,
  ) => {
       
       
       return axiosService<Employee>(
       {url: `/api/staff/employees/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedEmployee
+      data: patchedEmployeeRequest
     },
       );
     }
@@ -781,8 +757,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getStaffEmployeesPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedEmployee>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedEmployee>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>, TError,{id: string;data: PatchedEmployeeRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>, TError,{id: string;data: PatchedEmployeeRequest}, TContext> => {
 
 const mutationKey = ['staffEmployeesPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -794,7 +770,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>, {id: string;data: NonReadonly<PatchedEmployee>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>, {id: string;data: PatchedEmployeeRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  staffEmployeesPartialUpdate(id,data,)
@@ -806,15 +782,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffEmployeesPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>>
-    export type StaffEmployeesPartialUpdateMutationBody = NonReadonly<PatchedEmployee>
+    export type StaffEmployeesPartialUpdateMutationBody = PatchedEmployeeRequest
     export type StaffEmployeesPartialUpdateMutationError = ErrorResponse
 
     export const useStaffEmployeesPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedEmployee>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>, TError,{id: string;data: PatchedEmployeeRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffEmployeesPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedEmployee>},
+        {id: string;data: PatchedEmployeeRequest},
         TContext
       > => {
 
@@ -884,7 +860,7 @@ from sparse ``WeeklyPlan`` rows; the client fetches it, edits locally, and
 writes the whole week back (replace-all).
  */
 export const staffWeeklyPlanCreate = (
-    weeklyPlanReplace: WeeklyPlanReplace,
+    weeklyPlanReplaceRequest: WeeklyPlanReplaceRequest,
  signal?: AbortSignal
 ) => {
       
@@ -892,7 +868,7 @@ export const staffWeeklyPlanCreate = (
       return axiosService<WeeklyPlanGrid>(
       {url: `/api/staff/weekly_plan/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: weeklyPlanReplace, signal
+      data: weeklyPlanReplaceRequest, signal
     },
       );
     }
@@ -900,8 +876,8 @@ export const staffWeeklyPlanCreate = (
 
 
 export const getStaffWeeklyPlanCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>, TError,{data: WeeklyPlanReplace}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>, TError,{data: WeeklyPlanReplace}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>, TError,{data: WeeklyPlanReplaceRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>, TError,{data: WeeklyPlanReplaceRequest}, TContext> => {
 
 const mutationKey = ['staffWeeklyPlanCreate'];
 const {mutation: mutationOptions} = options ?
@@ -913,7 +889,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>, {data: WeeklyPlanReplace}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>, {data: WeeklyPlanReplaceRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  staffWeeklyPlanCreate(data,)
@@ -925,15 +901,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffWeeklyPlanCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>>
-    export type StaffWeeklyPlanCreateMutationBody = WeeklyPlanReplace
+    export type StaffWeeklyPlanCreateMutationBody = WeeklyPlanReplaceRequest
     export type StaffWeeklyPlanCreateMutationError = ErrorResponse
 
     export const useStaffWeeklyPlanCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>, TError,{data: WeeklyPlanReplace}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCreate>>, TError,{data: WeeklyPlanReplaceRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffWeeklyPlanCreate>>,
         TError,
-        {data: WeeklyPlanReplace},
+        {data: WeeklyPlanReplaceRequest},
         TContext
       > => {
 
@@ -948,7 +924,7 @@ from sparse ``WeeklyPlan`` rows; the client fetches it, edits locally, and
 writes the whole week back (replace-all).
  */
 export const staffWeeklyPlanCopyCreate = (
-    weeklyPlanCopy: WeeklyPlanCopy,
+    weeklyPlanCopyRequest: WeeklyPlanCopyRequest,
  signal?: AbortSignal
 ) => {
       
@@ -956,7 +932,7 @@ export const staffWeeklyPlanCopyCreate = (
       return axiosService<WeeklyPlanGrid>(
       {url: `/api/staff/weekly_plan/copy/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: weeklyPlanCopy, signal
+      data: weeklyPlanCopyRequest, signal
     },
       );
     }
@@ -964,8 +940,8 @@ export const staffWeeklyPlanCopyCreate = (
 
 
 export const getStaffWeeklyPlanCopyCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>, TError,{data: WeeklyPlanCopy}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>, TError,{data: WeeklyPlanCopy}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>, TError,{data: WeeklyPlanCopyRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>, TError,{data: WeeklyPlanCopyRequest}, TContext> => {
 
 const mutationKey = ['staffWeeklyPlanCopyCreate'];
 const {mutation: mutationOptions} = options ?
@@ -977,7 +953,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>, {data: WeeklyPlanCopy}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>, {data: WeeklyPlanCopyRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  staffWeeklyPlanCopyCreate(data,)
@@ -989,15 +965,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffWeeklyPlanCopyCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>>
-    export type StaffWeeklyPlanCopyCreateMutationBody = WeeklyPlanCopy
+    export type StaffWeeklyPlanCopyCreateMutationBody = WeeklyPlanCopyRequest
     export type StaffWeeklyPlanCopyCreateMutationError = ErrorResponse
 
     export const useStaffWeeklyPlanCopyCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>, TError,{data: WeeklyPlanCopy}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>, TError,{data: WeeklyPlanCopyRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffWeeklyPlanCopyCreate>>,
         TError,
-        {data: WeeklyPlanCopy},
+        {data: WeeklyPlanCopyRequest},
         TContext
       > => {
 
@@ -1186,7 +1162,7 @@ export function useStaffWeeklyPlanCategoriesList<TData = Awaited<ReturnType<type
 
 
 export const staffWeeklyPlanCategoriesCreate = (
-    weeklyPlanCategory: NonReadonly<WeeklyPlanCategory>,
+    weeklyPlanCategoryRequest: WeeklyPlanCategoryRequest,
  signal?: AbortSignal
 ) => {
       
@@ -1194,7 +1170,7 @@ export const staffWeeklyPlanCategoriesCreate = (
       return axiosService<WeeklyPlanCategory>(
       {url: `/api/staff/weekly_plan_categories/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: weeklyPlanCategory, signal
+      data: weeklyPlanCategoryRequest, signal
     },
       );
     }
@@ -1202,8 +1178,8 @@ export const staffWeeklyPlanCategoriesCreate = (
 
 
 export const getStaffWeeklyPlanCategoriesCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>, TError,{data: NonReadonly<WeeklyPlanCategory>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>, TError,{data: NonReadonly<WeeklyPlanCategory>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>, TError,{data: WeeklyPlanCategoryRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>, TError,{data: WeeklyPlanCategoryRequest}, TContext> => {
 
 const mutationKey = ['staffWeeklyPlanCategoriesCreate'];
 const {mutation: mutationOptions} = options ?
@@ -1215,7 +1191,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>, {data: NonReadonly<WeeklyPlanCategory>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>, {data: WeeklyPlanCategoryRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  staffWeeklyPlanCategoriesCreate(data,)
@@ -1227,15 +1203,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffWeeklyPlanCategoriesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>>
-    export type StaffWeeklyPlanCategoriesCreateMutationBody = NonReadonly<WeeklyPlanCategory>
+    export type StaffWeeklyPlanCategoriesCreateMutationBody = WeeklyPlanCategoryRequest
     export type StaffWeeklyPlanCategoriesCreateMutationError = ErrorResponse
 
     export const useStaffWeeklyPlanCategoriesCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>, TError,{data: NonReadonly<WeeklyPlanCategory>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>, TError,{data: WeeklyPlanCategoryRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffWeeklyPlanCategoriesCreate>>,
         TError,
-        {data: NonReadonly<WeeklyPlanCategory>},
+        {data: WeeklyPlanCategoryRequest},
         TContext
       > => {
 
@@ -1331,14 +1307,14 @@ export function useStaffWeeklyPlanCategoriesRetrieve<TData = Awaited<ReturnType<
 
 export const staffWeeklyPlanCategoriesUpdate = (
     id: string,
-    weeklyPlanCategory: NonReadonly<WeeklyPlanCategory>,
+    weeklyPlanCategoryRequest: WeeklyPlanCategoryRequest,
  ) => {
       
       
       return axiosService<WeeklyPlanCategory>(
       {url: `/api/staff/weekly_plan_categories/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: weeklyPlanCategory
+      data: weeklyPlanCategoryRequest
     },
       );
     }
@@ -1346,8 +1322,8 @@ export const staffWeeklyPlanCategoriesUpdate = (
 
 
 export const getStaffWeeklyPlanCategoriesUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>, TError,{id: string;data: NonReadonly<WeeklyPlanCategory>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>, TError,{id: string;data: NonReadonly<WeeklyPlanCategory>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>, TError,{id: string;data: WeeklyPlanCategoryRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>, TError,{id: string;data: WeeklyPlanCategoryRequest}, TContext> => {
 
 const mutationKey = ['staffWeeklyPlanCategoriesUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -1359,7 +1335,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>, {id: string;data: NonReadonly<WeeklyPlanCategory>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>, {id: string;data: WeeklyPlanCategoryRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  staffWeeklyPlanCategoriesUpdate(id,data,)
@@ -1371,15 +1347,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffWeeklyPlanCategoriesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>>
-    export type StaffWeeklyPlanCategoriesUpdateMutationBody = NonReadonly<WeeklyPlanCategory>
+    export type StaffWeeklyPlanCategoriesUpdateMutationBody = WeeklyPlanCategoryRequest
     export type StaffWeeklyPlanCategoriesUpdateMutationError = ErrorResponse
 
     export const useStaffWeeklyPlanCategoriesUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>, TError,{id: string;data: NonReadonly<WeeklyPlanCategory>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>, TError,{id: string;data: WeeklyPlanCategoryRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffWeeklyPlanCategoriesUpdate>>,
         TError,
-        {id: string;data: NonReadonly<WeeklyPlanCategory>},
+        {id: string;data: WeeklyPlanCategoryRequest},
         TContext
       > => {
 
@@ -1389,14 +1365,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const staffWeeklyPlanCategoriesPartialUpdate = (
     id: string,
-    patchedWeeklyPlanCategory: NonReadonly<PatchedWeeklyPlanCategory>,
+    patchedWeeklyPlanCategoryRequest: PatchedWeeklyPlanCategoryRequest,
  ) => {
       
       
       return axiosService<WeeklyPlanCategory>(
       {url: `/api/staff/weekly_plan_categories/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedWeeklyPlanCategory
+      data: patchedWeeklyPlanCategoryRequest
     },
       );
     }
@@ -1404,8 +1380,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getStaffWeeklyPlanCategoriesPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedWeeklyPlanCategory>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedWeeklyPlanCategory>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>, TError,{id: string;data: PatchedWeeklyPlanCategoryRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>, TError,{id: string;data: PatchedWeeklyPlanCategoryRequest}, TContext> => {
 
 const mutationKey = ['staffWeeklyPlanCategoriesPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -1417,7 +1393,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>, {id: string;data: NonReadonly<PatchedWeeklyPlanCategory>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>, {id: string;data: PatchedWeeklyPlanCategoryRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  staffWeeklyPlanCategoriesPartialUpdate(id,data,)
@@ -1429,15 +1405,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StaffWeeklyPlanCategoriesPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>>
-    export type StaffWeeklyPlanCategoriesPartialUpdateMutationBody = NonReadonly<PatchedWeeklyPlanCategory>
+    export type StaffWeeklyPlanCategoriesPartialUpdateMutationBody = PatchedWeeklyPlanCategoryRequest
     export type StaffWeeklyPlanCategoriesPartialUpdateMutationError = ErrorResponse
 
     export const useStaffWeeklyPlanCategoriesPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedWeeklyPlanCategory>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>, TError,{id: string;data: PatchedWeeklyPlanCategoryRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof staffWeeklyPlanCategoriesPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedWeeklyPlanCategory>},
+        {id: string;data: PatchedWeeklyPlanCategoryRequest},
         TContext
       > => {
 

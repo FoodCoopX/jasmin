@@ -15,5 +15,6 @@ export interface BulkSendOffersRequest {
    * @maximum 53
    */
   delivery_week: number;
+  /** @minLength 1 */
   offer_group: string;
 }

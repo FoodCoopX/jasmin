@@ -16,17 +16,17 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface Crate {
-  readonly id?: string;
+  readonly id: string;
   /**
    * @nullable
    * @pattern ^-?\d{0,3}(?:\.\d{0,2})?$
    */
-  readonly price?: string | null;
+  readonly price: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,3}(?:\.\d{0,2})?$
    */
-  readonly tax_rate?: string | null;
+  readonly tax_rate: string | null;
   is_active?: boolean;
   /** @maxLength 200 */
   name: string;
@@ -46,5 +46,5 @@ export interface Crate {
    * @nullable
    */
   note?: string | null;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }

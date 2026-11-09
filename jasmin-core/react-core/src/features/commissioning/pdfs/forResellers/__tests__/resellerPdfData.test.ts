@@ -6,7 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { DeliveryNoteReseller, InvoiceReseller } from "@shared/api/generated/models";
+import type { InvoiceReseller } from "@shared/api/generated/models";
+import { makeDeliveryNoteReseller, makeInvoiceReseller } from "@/test/modelFixtures";
 
 import {
   buildBankDetails,
@@ -41,11 +42,11 @@ describe("resolvePaymentTerms", () => {
   const getSetting = (key: string) => settings[key];
 
   it("prefers the reseller's own terms", () => {
-    const invoice: InvoiceReseller = {
+    const invoice = makeInvoiceReseller({
       reseller_payment_terms_in_days: 7,
       reseller_early_payment_discount_percent: "3.50",
       reseller_early_payment_discount_days: 5,
-    };
+    });
     expect(resolvePaymentTerms(invoice, getSetting)).toEqual({
       days: 7,
       earlyPaymentDiscountPercent: 3.5,
@@ -54,12 +55,12 @@ describe("resolvePaymentTerms", () => {
   });
 
   it("keeps a reseller discount of zero over the tenant setting", () => {
-    const invoice: InvoiceReseller = { reseller_early_payment_discount_percent: "0" };
+    const invoice = makeInvoiceReseller({ reseller_early_payment_discount_percent: "0" });
     expect(resolvePaymentTerms(invoice, getSetting).earlyPaymentDiscountPercent).toBe(0);
   });
 
   it("falls back to the tenant settings", () => {
-    expect(resolvePaymentTerms({}, getSetting)).toEqual({
+    expect(resolvePaymentTerms(makeInvoiceReseller(), getSetting)).toEqual({
       days: 30,
       earlyPaymentDiscountPercent: 2,
       earlyPaymentDiscountDays: 10,
@@ -84,7 +85,9 @@ describe("buildInvoicePdfData", () => {
 
   it("takes the totals from the backend's sums, cents-exact", () => {
     const data = buildInvoicePdfData(
-      { sum_netto: "10.30", sum_brutto: "11.05", tax_breakdown: breakdown, prefix: "RE", number: 4 },
+      makeInvoiceReseller({
+        sum_netto: "10.30", sum_brutto: "11.05", tax_breakdown: breakdown, prefix: "RE", number: 4,
+      }),
       bank,
     );
     expect(data.totals).toEqual({ netto: 10.3, tax: 0.75, brutto: 11.05 });
@@ -102,14 +105,18 @@ describe("buildInvoicePdfData", () => {
   });
 
   it("sums the tax breakdown when the backend sends no totals", () => {
-    const data = buildInvoicePdfData({ tax_breakdown: breakdown }, bank);
+    const { sum_netto: _netto, sum_brutto: _brutto, ...withoutTotals } = makeInvoiceReseller({
+      tax_breakdown: breakdown,
+    });
+    // Deliberately partial: the fallback for a payload without the sums.
+    const data = buildInvoicePdfData(withoutTotals as InvoiceReseller, bank);
     expect(data.totals.netto).toBeCloseTo(10.3, 10);
     expect(data.totals.brutto).toBeCloseTo(11.05, 10);
     expect(data.totals.tax).toBe(0.75);
   });
 
   it("prints zero totals for an invoice without lines", () => {
-    const data = buildInvoicePdfData({}, bank);
+    const data = buildInvoicePdfData(makeInvoiceReseller(), bank);
     expect(data.taxBreakdown).toEqual([]);
     expect(data.totals).toEqual({ netto: 0, tax: 0, brutto: 0 });
   });
@@ -117,13 +124,13 @@ describe("buildInvoicePdfData", () => {
 
 describe("buildDeliveryNotePdfData", () => {
   it("maps the delivery note without a VAT ID and with its hash", () => {
-    const note: DeliveryNoteReseller = {
+    const note = makeDeliveryNoteReseller({
       prefix: "LS",
       number: 9,
       date: "2026-10-05",
       reseller_name: "Corner Shop",
       is_finalized: true,
-    };
+    });
     const data = buildDeliveryNotePdfData(note);
     expect(data.deliveryNote).toMatchObject({
       prefix: "LS",

@@ -13,11 +13,11 @@ import type { VegetableSizeEnum } from './vegetableSizeEnum';
  * Mixin to automatically add related name fields.
  */
 export interface Forecast {
-  readonly id?: string;
-  readonly created_at?: string;
-  readonly is_finalized?: boolean;
+  readonly id: string;
+  readonly created_at: string;
+  readonly is_finalized: boolean;
   /** @nullable */
-  readonly finalized_at?: string | null;
+  readonly finalized_at: string | null;
   /**
    * @minimum 0
    * @maximum 32767
@@ -29,7 +29,7 @@ export interface Forecast {
    */
   delivery_week: number;
   /** @nullable */
-  readonly day_number?: ForecastDayNumber;
+  readonly day_number: ForecastDayNumber;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
@@ -56,15 +56,15 @@ export interface Forecast {
    */
   sort_order?: number | null;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   /** @nullable */
-  readonly finalized_by?: string | null;
+  readonly finalized_by: string | null;
   share_article: string;
   /** @nullable */
-  readonly storage?: string | null;
+  readonly storage: string | null;
   /** @nullable */
   plot?: string | null;
-  readonly can_be_deleted?: boolean;
-  readonly share_article_name?: string;
-  readonly plot_name?: string;
+  readonly can_be_deleted: boolean;
+  readonly share_article_name: string;
+  readonly plot_name: string;
 }

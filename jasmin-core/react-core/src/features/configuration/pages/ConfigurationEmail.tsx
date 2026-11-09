@@ -21,7 +21,10 @@ import {
 } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { TenantEmailConfig } from "@shared/api/generated/models";
+import type {
+  TenantEmailConfig,
+  TenantEmailConfigRequest,
+} from "@shared/api/generated/models";
 import {
   getTenantsEmailConfigListQueryKey,
   useTenantsEmailConfigList,
@@ -42,7 +45,12 @@ import TestEmailModal from "@features/configuration/modals/TestEmailModal";
 
 const { Text } = Typography;
 
-const EMPTY_CONFIG: TenantEmailConfig = {
+/** What the page edits: the settings it saves, plus what it shows about the
+ * stored ones — whether a password is stored and whether they are verified. */
+type EmailConfigForm = TenantEmailConfigRequest &
+  Pick<TenantEmailConfig, "has_smtp_password" | "is_verified">;
+
+const EMPTY_CONFIG: EmailConfigForm = {
   smtp_host: "",
   smtp_port: 587,
   smtp_username: "",
@@ -54,10 +62,12 @@ const EMPTY_CONFIG: TenantEmailConfig = {
   accounting_email: "",
   max_emails_per_hour: 1000,
   is_active: true,
+  has_smtp_password: false,
+  is_verified: false,
 };
 
 export default function ConfigurationEmail() {
-  const [config, setConfig] = useState<TenantEmailConfig>(EMPTY_CONFIG);
+  const [config, setConfig] = useState<EmailConfigForm>(EMPTY_CONFIG);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [credentialFields, setCredentialFields] = useState<{
     smtp_password?: string;
@@ -120,7 +130,7 @@ export default function ConfigurationEmail() {
   // the change dirty instead of flipping the indicator to "saved" over a
   // change that didn't persist.
   const handleSave = useCallback(async () => {
-    const payload: TenantEmailConfig = {
+    const payload: TenantEmailConfigRequest = {
       smtp_host: config.smtp_host,
       smtp_port: config.smtp_port,
       smtp_username: config.smtp_username,

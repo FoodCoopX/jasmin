@@ -22,7 +22,7 @@ import {
 import type {
   MyDataCoopShare,
   MyMemberDataRead,
-  PatchedMyMemberDataUpdate,
+  PatchedMyMemberDataUpdateRequest,
 } from "@shared/api/generated/models";
 import { useDateFormat } from "@hooks/index";
 import { notify } from "@shared/utils";
@@ -31,7 +31,7 @@ import StoredOrEditField from "./StoredOrEditField";
 const { Title, Paragraph } = Typography;
 
 /** The form's values: the birth-date picker holds a dayjs instance. */
-type MemberDataFormValues = Omit<PatchedMyMemberDataUpdate, "birth_date"> & {
+type MemberDataFormValues = Omit<PatchedMyMemberDataUpdateRequest, "birth_date"> & {
   birth_date?: dayjs.Dayjs | null;
 };
 
@@ -105,7 +105,7 @@ export default function MemberSection({ onSaved }: { onSaved: () => void }) {
     // Strip empty IBAN/account_owner unless the user explicitly opened
     // the edit — prevents "save" from clearing a previously-set value
     // the user can't currently see.
-    const payload: PatchedMyMemberDataUpdate = {
+    const payload: PatchedMyMemberDataUpdateRequest = {
       ...values,
       birth_date: formatDateForAPI(values.birth_date ?? null),
     };

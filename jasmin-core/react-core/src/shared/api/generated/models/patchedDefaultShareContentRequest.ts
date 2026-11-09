@@ -17,9 +17,13 @@ bases so ``super()`` reaches DRF.
  */
 export interface PatchedDefaultShareContentRequest {
   year?: number;
+  /** @minLength 1 */
   share_article?: string;
+  /** @minLength 1 */
   share_option?: string;
+  /** @minLength 1 */
   unit?: string;
+  /** @minLength 1 */
   size?: string;
   range_1?: number;
   range_2?: number;

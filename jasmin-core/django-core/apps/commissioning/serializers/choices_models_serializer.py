@@ -32,8 +32,9 @@ class _UsedToursField(serializers.ListField):
     """The distinct tour numbers of a delivery day's station days.
 
     Only present with ``need_info_on_tours``, which annotates the queryset;
-    without the annotation the key is left out of the row. With it, a day
-    without station days carries null.
+    without the annotation the key is left out of the row, and the schema
+    lists it as optional (``core.openapi.SOMETIMES_ABSENT_FIELDS``). With it, a
+    day without station days carries null.
     """
 
     def get_attribute(self, instance):

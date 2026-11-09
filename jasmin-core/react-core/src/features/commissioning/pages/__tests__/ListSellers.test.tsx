@@ -22,6 +22,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Reseller } from "@shared/api/generated/models";
 import { TenantContext } from "@shared/contexts/TenantContext";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
+import { makeReseller } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 // One `t` for every render, as react-i18next keeps it.
@@ -156,15 +157,14 @@ import ListSellers from "../ListSellers";
 
 /** A seller as the reseller list returns it. */
 function seller(overrides: Partial<Reseller> & { id: string }): Reseller {
-  return {
+  return makeReseller({
     is_seller: true, is_active_seller: true, is_reseller: false, is_active_reseller: false,
-    is_also_delivery_station: false, linked_delivery_station_can_be_deleted: true,
+    is_also_delivery_station: false,
     name_for_member_pages: null, company_name: null, first_name: null, last_name: null,
     address: "", zip_code: "", city: "", email: null, phone: null, phone_2: null,
-    organic_control_number: null, has_active_organic_certificate: false,
-    linked_user_info: null, can_be_deleted: true,
+    organic_control_number: null,
     ...overrides,
-  };
+  });
 }
 
 // Has sold to the farm, so the backend protects it; certified organic, with a

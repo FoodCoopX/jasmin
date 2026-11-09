@@ -25,6 +25,7 @@ import type {
   ShareTypeVariation,
 } from "@shared/api/generated/models";
 import i18n from "@shared/i18n";
+import { makeShareArticle, makeSharesDeliveryDay, makeShareTypeVariation } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 // The canonical mock, with one `t` for every render as react-i18next keeps it.
@@ -117,33 +118,33 @@ const station = (id: string, short_name: string) => ({
 // The farm delivers on Tuesdays and Thursdays; the Saturday delivery day has
 // no station this week.
 const DELIVERY_DAYS: SharesDeliveryDay[] = [
-  {
+  makeSharesDeliveryDay({
     id: "sdd-tue",
     day_number: 1,
     valid_from: "2025-01-06",
     delivery_stations: [station("station-mill", "Mill")],
-  },
-  {
+  }),
+  makeSharesDeliveryDay({
     id: "sdd-thu",
     day_number: 3,
     valid_from: "2025-01-06",
     delivery_stations: [station("station-farm", "Farm")],
-  },
-  { id: "sdd-sat", day_number: 5, valid_from: "2026-01-05", delivery_stations: [] },
+  }),
+  makeSharesDeliveryDay({ id: "sdd-sat", day_number: 5, valid_from: "2026-01-05", delivery_stations: [] }),
 ];
 const DAYS_WITH_STATIONS = ["sdd-tue", "sdd-thu"];
 
 // The two share sizes, listed large first; the office sorts small before large.
 const VARIATIONS: ShareTypeVariation[] = [
-  { id: "var-large", size: "L", sort_order: 3, share_type: "st-harvest", valid_from: "2026-01-05" },
-  { id: "var-small", size: "S", sort_order: 1, share_type: "st-harvest", valid_from: "2026-01-05" },
+  makeShareTypeVariation({ id: "var-large", size: "L", sort_order: 3, share_type: "st-harvest", valid_from: "2026-01-05" }),
+  makeShareTypeVariation({ id: "var-small", size: "S", sort_order: 1, share_type: "st-harvest", valid_from: "2026-01-05" }),
 ];
 
 const article = (
   id: string,
   name: string,
   unit: ShareArticle["default_movement_unit"],
-): ShareArticle => ({
+): ShareArticle => makeShareArticle({
   id,
   name,
   default_movement_unit: unit,

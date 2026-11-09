@@ -116,10 +116,10 @@ class ShareTypeVariationSerializer(
     NAME_FIELDS = ["share_type_name"]
 
     active_price_per_delivery = serializers.DecimalField(
-        max_digits=8, decimal_places=2, read_only=True
+        max_digits=8, decimal_places=2, read_only=True, allow_null=True
     )
     active_price_sum_articles = serializers.DecimalField(
-        max_digits=8, decimal_places=2, read_only=True
+        max_digits=8, decimal_places=2, read_only=True, allow_null=True
     )
     # Active solidarity floor (null when none set) — drives the editable price
     # field's min in the abos table + new-subscription modal.
@@ -408,7 +408,7 @@ class ShareDeliverySerializer(ReadOnlyOnUpdateMixin, serializers.ModelSerializer
         source="share.share_type_variation.requires_optin", read_only=True
     )
     is_opted_in = serializers.BooleanField(read_only=True)
-    optin_decided_at = serializers.DateTimeField(read_only=True)
+    optin_decided_at = serializers.DateTimeField(read_only=True, allow_null=True)
     optin_deadline = serializers.SerializerMethodField()
     optin_locked = serializers.SerializerMethodField()
 
@@ -580,7 +580,7 @@ class ShareSerializer(serializers.ModelSerializer):
     share_type_name = serializers.CharField(read_only=True)
     share_type_variation_size = serializers.CharField(read_only=True)
     share_type_variation_average_weight = serializers.DecimalField(
-        max_digits=5, decimal_places=3, read_only=True
+        max_digits=5, decimal_places=3, read_only=True, allow_null=True
     )
 
     class Meta:

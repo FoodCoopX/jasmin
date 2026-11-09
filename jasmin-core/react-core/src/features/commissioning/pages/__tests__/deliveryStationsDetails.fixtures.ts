@@ -12,19 +12,20 @@ import type {
   StationMemberMatrix,
   StationMemberMatrixRow,
 } from "@shared/api/generated/models";
+import { makeDeliveryStation, makeSharesDeliveryDay } from "@/test/modelFixtures";
 
 // Backend day numbers: 0 = Monday … 6 = Sunday.
 export const TUESDAY = 1;
 export const FRIDAY = 4;
 
-export const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => ({
+export const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
   valid_until: null,
 });
 
-export const station = (id: string, shortName: string): DeliveryStation => ({
+export const station = (id: string, shortName: string): DeliveryStation => makeDeliveryStation({
   id,
   short_name: shortName,
   is_active: true,

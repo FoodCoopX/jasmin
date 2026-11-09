@@ -16,7 +16,7 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface Storage {
-  readonly id?: string;
+  readonly id: string;
   is_active?: boolean;
   /** @maxLength 100 */
   name: string;
@@ -24,5 +24,5 @@ export interface Storage {
   description?: string | null;
   is_long_term_harvest_storage?: boolean;
   is_short_term_harvest_storage?: boolean;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }

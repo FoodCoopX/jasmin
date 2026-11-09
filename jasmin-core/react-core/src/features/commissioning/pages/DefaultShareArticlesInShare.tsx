@@ -11,7 +11,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   DefaultShareArticleInShare,
-  DefaultShareArticleInShareBulkEntry,
+  DefaultShareArticleInShareBulkEntryRequest,
   DefaultShareArticleInShareBulkUpsertRequest,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
@@ -192,7 +192,7 @@ export default function DefaultShareArticlesInShare() {
       update: async (id, data) => {
         // Only the cells that differ from what is stored: a cell the office
         // didn't touch must not overwrite, or clear, an amount on the server.
-        const entries: DefaultShareArticleInShareBulkEntry[] = [];
+        const entries: DefaultShareArticleInShareBulkEntryRequest[] = [];
         for (const v of variations) {
           if (!v.id || !(variationColumnKey(v.id) in data)) continue;
           const quantity = quantityOf(data[variationColumnKey(v.id)]);

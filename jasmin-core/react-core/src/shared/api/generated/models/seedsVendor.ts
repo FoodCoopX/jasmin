@@ -7,7 +7,7 @@
  */
 
 export interface SeedsVendor {
-  readonly id?: string;
+  readonly id: string;
   /** @maxLength 200 */
   name: string;
   /**

@@ -126,7 +126,6 @@ class DeliveryStationSerializer(
     """Serializer for DeliveryStation with dynamic contact and day fields."""
 
     can_be_deleted = serializers.SerializerMethodField()
-    tour_assignment_missing = serializers.BooleanField(read_only=True)
     # Tells the frontend whether the ``is_also_reseller`` / ``is_also_seller``
     # checkboxes can be unticked. False when the linked Reseller still has
     # dependants and would be orphaned by an unlink.

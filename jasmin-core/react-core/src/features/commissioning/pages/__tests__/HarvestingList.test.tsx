@@ -14,6 +14,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Crate, DocumentationSummaryRow, ShareArticle, UnitEnum } from "@shared/api/generated/models";
+import { makeCrate, makeShareArticle } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 const NOW = vi.hoisted(() => {
@@ -135,13 +136,12 @@ import HarvestingList from "../HarvestingList";
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
 const MONDAY = 0, TUESDAY = 1, WEDNESDAY = 2; // Backend day numbers: 0 = Monday … 6 = Sunday.
-const E1: Crate = { id: "crate-e1", name: "Euro crate 30", short_name: "E1" };
-const E2: Crate = { id: "crate-e2", name: "Euro crate 60", short_name: "E2" };
+const E1: Crate = makeCrate({ id: "crate-e1", name: "Euro crate 30", short_name: "E1" });
+const E2: Crate = makeCrate({ id: "crate-e2", name: "Euro crate 60", short_name: "E2" });
 const CRATES = [E1, E2];
 
-const article = (name: string, unit: UnitEnum, fields: Partial<ShareArticle> = {}): ShareArticle => ({
-  id: `art-${name.toLowerCase()}`, name, default_movement_unit: unit, is_active: true, is_purchased: false, ...fields,
-});
+const article = (name: string, unit: UnitEnum, fields: Partial<ShareArticle> = {}): ShareArticle =>
+  makeShareArticle({ id: `art-${name.toLowerCase()}`, name, default_movement_unit: unit, is_active: true, is_purchased: false, ...fields });
 const CARROTS = article("Carrots", "KG", { default_kg_per_pu_harvest: "10", default_crate_harvest: E2.id });
 const KOHLRABI = article("Kohlrabi", "PCS", { default_pieces_per_pu_harvest: "12", default_crate_harvest: E1.id });
 const LETTUCE = article("Lettuce", "PCS"), RADISHES = article("Radishes", "BUNCH"), BEETROOT = article("Beetroot", "KG");

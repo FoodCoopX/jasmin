@@ -13,12 +13,15 @@ import type { ShareCleaningDay } from './shareCleaningDay';
 import type { ShareGetCurrentStockDay } from './shareGetCurrentStockDay';
 
 export interface Share {
-  readonly id?: string;
-  readonly delivery_day_number?: number;
-  readonly share_type_name?: string;
-  readonly share_type_variation_size?: string;
-  /** @pattern ^-?\d{0,2}(?:\.\d{0,3})?$ */
-  readonly share_type_variation_average_weight?: string;
+  readonly id: string;
+  readonly delivery_day_number: number;
+  readonly share_type_name: string;
+  readonly share_type_variation_size: string;
+  /**
+   * @nullable
+   * @pattern ^-?\d{0,2}(?:\.\d{0,3})?$
+   */
+  readonly share_type_variation_average_weight: string | null;
   /**
    * @minimum 0
    * @maximum 32767
@@ -30,17 +33,17 @@ export interface Share {
    */
   delivery_week: number;
   /** @nullable */
-  readonly changed_day_number?: ShareChangedDayNumber;
+  readonly changed_day_number: ShareChangedDayNumber;
   /** @nullable */
-  readonly harvesting_day?: ShareHarvestingDay;
+  readonly harvesting_day: ShareHarvestingDay;
   /** @nullable */
-  readonly packing_day?: SharePackingDay;
+  readonly packing_day: SharePackingDay;
   /** @nullable */
-  readonly washing_day?: ShareWashingDay;
+  readonly washing_day: ShareWashingDay;
   /** @nullable */
-  readonly cleaning_day?: ShareCleaningDay;
+  readonly cleaning_day: ShareCleaningDay;
   /** @nullable */
-  readonly get_current_stock_day?: ShareGetCurrentStockDay;
+  readonly get_current_stock_day: ShareGetCurrentStockDay;
   /**
    * @nullable
    * @pattern ^-?\d{0,7}(?:\.\d{0,3})?$

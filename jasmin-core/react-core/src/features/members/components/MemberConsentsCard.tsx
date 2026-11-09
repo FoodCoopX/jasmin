@@ -14,7 +14,7 @@ import {
 import type {
   ConsentDocumentSummary,
   ConsentRecord,
-  ConsentRecordRevoke,
+  ConsentRecordRevokeRequest,
 } from "@shared/api/generated/models";
 import { downloadConsentPdf } from "@shared/consent/downloadConsentPdf";
 import { isSupersededConsent } from "@shared/consent/supersededConsent";
@@ -231,7 +231,7 @@ const MemberConsentsCard = ({
           if (revokeTarget?.id) {
             revokeMutation.mutate({
               id: revokeTarget.id,
-              data: { reason: revokeReason } satisfies ConsentRecordRevoke,
+              data: { reason: revokeReason } satisfies ConsentRecordRevokeRequest,
             });
           }
         }}

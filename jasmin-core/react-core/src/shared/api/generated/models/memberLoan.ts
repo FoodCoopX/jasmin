@@ -12,16 +12,16 @@
 next to the row when the table is filtered to "all members".
  */
 export interface MemberLoan {
-  readonly id?: string;
-  readonly member_string?: string;
-  readonly admin_confirmed?: boolean;
+  readonly id: string;
+  readonly member_string: string;
+  readonly admin_confirmed: boolean;
   /** @nullable */
-  readonly admin_confirmed_at?: string | null;
+  readonly admin_confirmed_at: string | null;
   /** @nullable */
-  readonly admin_rejected_at?: string | null;
+  readonly admin_rejected_at: string | null;
   /** @nullable */
-  readonly admin_rejection_reason?: string | null;
-  readonly created_at?: string;
+  readonly admin_rejection_reason: string | null;
+  readonly created_at: string;
   /**
    * @minimum -2147483648
    * @maximum 2147483647
@@ -37,8 +37,8 @@ export interface MemberLoan {
   /** @nullable */
   paid_back_date?: string | null;
   /** @nullable */
-  readonly admin_confirmed_by?: string | null;
+  readonly admin_confirmed_by: string | null;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   member: string;
 }

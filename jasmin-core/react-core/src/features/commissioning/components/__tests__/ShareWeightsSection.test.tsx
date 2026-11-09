@@ -21,6 +21,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Share, SharesDeliveryDay } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 const NOW = vi.hoisted(() => {
@@ -126,7 +127,7 @@ import ShareWeightsSection from "../ShareWeightsSection";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => ({
+const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
@@ -147,16 +148,13 @@ const FRUIT_L: ShareSize = { shareType: "Fruit", size: "L", target: null };
 type Weights = [string | null, string | null, string | null, string | null];
 const NO_WEIGHTS: Weights = [null, null, null, null];
 
-/** A share as the list returns it: the delivery and the weights taken of it. */
-type ShareRow = Share & { id: string };
-
 const share = (
   id: string,
   week: number,
   day: SharesDeliveryDay,
   of: ShareSize,
   weights: Weights = NO_WEIGHTS,
-): ShareRow => ({
+): Share => ({
   id,
   year: 2026,
   delivery_week: week,
@@ -165,7 +163,7 @@ const share = (
   share_type_variation: `var-${of.shareType.toLowerCase()}-${of.size}`,
   share_type_name: of.shareType,
   share_type_variation_size: of.size,
-  ...(of.target ? { share_type_variation_average_weight: of.target } : {}),
+  share_type_variation_average_weight: of.target,
   changed_day_number: null,
   harvesting_day: 0,
   washing_day: 0,
@@ -195,7 +193,7 @@ const FRUIT = "Fruit L";
 const FRIDAY_SMALL_WEIGHTS = ["2,500 kg", "2,380", "", "", "", "2,38 kg"];
 
 /** What the in-memory farm holds; the request spies answer from it. */
-let farm: { shares: ShareRow[] };
+let farm: { shares: Share[] };
 
 type Payload = Record<string, unknown>;
 type SharesParams = { year: number; delivery_week: number; delivery_day: string };
@@ -362,7 +360,7 @@ describe("ShareWeightsSection loading", () => {
   });
 
   it("shows a spinner over the table while the shares load", async () => {
-    const rows = pending<ShareRow[]>();
+    const rows = pending<Share[]>();
     api.shares.mockImplementation(() => rows.promise);
     renderSection();
 

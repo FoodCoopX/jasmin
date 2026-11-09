@@ -26,7 +26,7 @@ import {
   getCommissioningShareImportBatchesListQueryKey,
   useCommissioningShareImportBatchesList,
 } from "@shared/api/generated/commissioning/commissioning";
-import type { ShareImportUpload } from "@shared/api/generated/models";
+import type { ShareImportUploadRequest } from "@shared/api/generated/models";
 import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 
@@ -128,19 +128,19 @@ export default function ImportShares() {
       notify.error(t("import_shares.select_week"));
       return;
     }
-    if (fileList.length === 0) {
+    const file = fileList[0]?.originFileObj;
+    if (!file) {
       notify.error(t("import_shares.no_file"));
       return;
     }
     setBusy(true);
     try {
-      const data = await commissioningShareImportBatchesUploadCreate({
-        // The generated client appends each field to FormData; `file` is
-        // typed as `string` in the spec but FormData.append accepts a Blob.
-        file: fileList[0].originFileObj as unknown as string,
+      const upload: ShareImportUploadRequest = {
+        file,
         year: selectedYear,
         delivery_week: selectedWeek,
-      } as ShareImportUpload);
+      };
+      const data = await commissioningShareImportBatchesUploadCreate(upload);
       setActiveBatch(data as unknown as ShareImportBatch);
       setFileList([]);
       await fetchBatches();

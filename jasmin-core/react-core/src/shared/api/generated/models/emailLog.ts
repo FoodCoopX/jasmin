@@ -8,18 +8,18 @@
 import type { EmailLogStatusEnum } from './emailLogStatusEnum';
 
 export interface EmailLog {
-  readonly id?: number;
-  readonly recipient?: string;
-  readonly subject?: string;
-  readonly template?: string;
-  readonly purpose?: string;
-  readonly status?: EmailLogStatusEnum;
-  readonly error?: string;
-  readonly related_object_type?: string;
-  readonly related_object_id?: string;
-  readonly created_at?: string;
+  readonly id: number;
+  readonly recipient: string;
+  readonly subject: string;
+  readonly template: string;
+  readonly purpose: string;
+  readonly status: EmailLogStatusEnum;
+  readonly error: string;
+  readonly related_object_type: string;
+  readonly related_object_id: string;
+  readonly created_at: string;
   /** @nullable */
-  readonly sent_at?: string | null;
+  readonly sent_at: string | null;
   /** @nullable */
-  readonly delivered_at?: string | null;
+  readonly delivered_at: string | null;
 }

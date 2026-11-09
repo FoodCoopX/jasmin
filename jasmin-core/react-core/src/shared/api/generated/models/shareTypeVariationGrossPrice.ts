@@ -16,7 +16,7 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface ShareTypeVariationGrossPrice {
-  readonly id?: string;
+  readonly id: string;
   readonly share_type_variation_size?: string;
   valid_from: string;
   /** @nullable */
@@ -49,5 +49,5 @@ export interface ShareTypeVariationGrossPrice {
    */
   solidarity_min_price_per_delivery_if_trial?: string | null;
   share_type_variation: string;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }
