@@ -69,6 +69,7 @@ class AdminConfirmableMixin(models.Model):
         self.admin_confirmed_at = (
             confirmed_at if confirmed_at is not None else timezone.now()
         )
+        self.admin_rejected_at = None
         self.admin_rejection_reason = None
         if save:
             self.save()

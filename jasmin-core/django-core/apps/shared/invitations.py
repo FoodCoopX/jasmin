@@ -392,10 +392,11 @@ def accept_invitation(*, token: str, password: str) -> JasminUser:
     # rejecting the member is how it re-admits them, so accepting one lifts
     # the rejection rather than leaving the member confirmed and rejected.
     if member is not None and member.user_id == user.pk and not member.admin_confirmed:
-        if member.admin_rejected_at is not None:
-            if invitation.created_at <= member.admin_rejected_at:
-                raise ValidationError({"token": "This invitation is no longer valid."})
-            member.admin_rejected_at = None
+        if (
+            member.admin_rejected_at is not None
+            and invitation.created_at <= member.admin_rejected_at
+        ):
+            raise ValidationError({"token": "This invitation is no longer valid."})
         member.confirm(admin_user=invitation.created_by, save=True)
 
     # Mark *all other* outstanding invitations for this user as cancelled

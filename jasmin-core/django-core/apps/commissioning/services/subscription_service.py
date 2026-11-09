@@ -274,8 +274,7 @@ class SubscriptionService:
         """Confirm the member a freshly confirmed subscription admits.
 
         A confirmed member stays confirmed (a reject refuses one), so it needs
-        neither the lock nor the rejection check: a member re-admitted after a
-        rejection keeps its ``admin_rejected_at``. Any other member is re-read
+        neither the lock nor the rejection check. Any other member is re-read
         and locked after the subscription, the order a member reject takes them
         in. A rejected member is refused, not re-admitted through one of their
         subscriptions; the office re-admits by sending a new invitation. A

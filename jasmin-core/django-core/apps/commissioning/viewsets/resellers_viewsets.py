@@ -73,6 +73,7 @@ from ..scoping import (
     enforce_privileged,
     is_privileged,
     own_reseller_id,
+    scope_to_finalized,
     scope_to_reseller,
 )
 from ..serializers import (
@@ -1017,7 +1018,10 @@ class InvoiceResellerViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     serializer_class = InvoiceResellerSerializer
 
     def get_queryset(self):
-        return scope_to_reseller(super().get_queryset(), self.request, path="reseller")
+        queryset = scope_to_reseller(
+            super().get_queryset(), self.request, path="reseller"
+        )
+        return scope_to_finalized(queryset, self.request, path="is_finalized")
 
     @extend_schema(
         request={
@@ -1272,7 +1276,8 @@ class InvoiceResellerContentViewSet(RolePermissionsMixin, viewsets.ModelViewSet)
         invoice_id = params["invoice_id"]
         if invoice_id:
             queryset = queryset.filter(invoice_id=invoice_id)
-        return scope_to_reseller(queryset, self.request, path="invoice__reseller")
+        own = scope_to_reseller(queryset, self.request, path="invoice__reseller")
+        return scope_to_finalized(own, self.request, path="invoice__is_finalized")
 
 
 class DeliveryNoteResellerViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
@@ -1311,9 +1316,10 @@ class DeliveryNoteResellerViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     serializer_class = DeliveryNoteResellerSerializer
 
     def get_queryset(self):
-        return scope_to_reseller(
+        queryset = scope_to_reseller(
             super().get_queryset(), self.request, path="order__reseller"
         )
+        return scope_to_finalized(queryset, self.request, path="is_finalized")
 
     @extend_schema(
         request={
@@ -1438,9 +1444,10 @@ class DeliveryNoteResellerContentViewSet(RolePermissionsMixin, viewsets.ModelVie
         delivery_note_id = params["delivery_note_id"]
         if delivery_note_id:
             queryset = queryset.filter(delivery_note_id=delivery_note_id)
-        return scope_to_reseller(
+        own = scope_to_reseller(
             queryset, self.request, path="delivery_note__order__reseller"
         )
+        return scope_to_finalized(own, self.request, path="delivery_note__is_finalized")
 
 
 class CommissioningListResellersViewSet(RolePermissionsMixin, viewsets.ViewSet):

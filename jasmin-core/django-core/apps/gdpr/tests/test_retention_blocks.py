@@ -205,21 +205,6 @@ class TestCheckRetentionBlocks:
         reasons = GDPRService.check_retention_blocks(user)
         assert not any("active subscription" in r for r in reasons)
 
-    def test_subscription_confirmed_after_a_rejection_blocks(self, tenant):
-        """A confirm keeps an earlier ``admin_rejected_at``; the confirmed
-        subscription is a running contract all the same."""
-        user = JasminUserFactory()
-        member = MemberFactory(user=user)
-        SubscriptionFactory(
-            member=member,
-            admin_confirmed=True,
-            admin_rejected_at=timezone.now(),
-            valid_until=_sunday_offset(26),
-        )
-
-        reasons = GDPRService.check_retention_blocks(user)
-        assert any("active subscription" in r for r in reasons)
-
     def test_subscription_ended_by_a_cancellation_does_not_block(self, tenant):
         """A member exit force-ends the term at ``cancelled_effective_at`` and
         keeps the original ``valid_until``; the earlier date is the end."""

@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def _ongoing_subscriptions(today) -> Q:
     """Subscriptions that are still an ongoing contract: confirmed and running
     until a day still to come. A reject unconfirms, so a confirmed row is no
-    rejected application, even when it keeps an earlier ``admin_rejected_at``.
+    rejected application.
     A cancellation ends the term at ``cancelled_effective_at`` (a member exit
     force-ends it there too) while ``valid_until`` keeps the original end, so
     that date wins when set."""
