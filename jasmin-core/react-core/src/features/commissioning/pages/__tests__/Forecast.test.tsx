@@ -19,6 +19,10 @@ const pageState = vi.hoisted(() => ({
   variationsLoading: false,
   listEnabled: [] as unknown[],
   selectedRowKeys: [] as string[],
+  // The sizes the selected week has, per share option.
+  sizesByOption: {} as Record<string, { id: string; size: string }[]>,
+  // Whether the columns were last built with a separate fruit share.
+  fruitSeparate: undefined as boolean | undefined,
 }));
 
 const { t, notify, copyToNextWeek } = vi.hoisted(() => ({
@@ -87,10 +91,6 @@ vi.mock("@hooks/index", async () => {
     useNoteColumn: () => ({
       noteColumn: { title: "note", dataIndex: "note", key: "note" },
     }),
-    // activeShareOptions is read for ``fruit_and_veg_shares_are_separate`` —
-    // an empty object makes it ``?? false`` so the (heavier) fruit branch and
-    // its second variations query are skipped.
-    useActiveShareOptions: () => ({ activeShareOptions: {} }),
     useTableRowSelection: () => ({
       selectedRowKeys: pageState.selectedRowKeys,
       setSelectedRowKeys: vi.fn(),
@@ -112,6 +112,7 @@ vi.mock("@hooks/index", async () => {
 // Commissioning feature hooks. The variations, offer groups and plots report
 // ``loading``: while any of them loads, the forecast rows wait.
 vi.mock("@features/commissioning/hooks", () => ({
+  variationColumnKey: (id: string) => `variation_${id}`,
   useShareArticles: () => ({ shareArticles: [], refetch: vi.fn() }),
   usePlots: () => ({ plots: [], countPlots: 0, loading: false }),
   useOfferGroups: () => ({
@@ -119,11 +120,14 @@ vi.mock("@features/commissioning/hooks", () => ({
     offerGroupsCount: 0,
     loading: false,
   }),
-  useShareTypeVariations: () => ({
-    shareTypeVariations: [],
-    shareTypeVariationsCount: 0,
-    loading: pageState.variationsLoading,
-  }),
+  useShareTypeVariations: (params: { share_option?: string } | null) => {
+    const sizes = pageState.sizesByOption[params?.share_option ?? ""] ?? [];
+    return {
+      shareTypeVariations: sizes,
+      shareTypeVariationsCount: sizes.length,
+      loading: pageState.variationsLoading,
+    };
+  },
   useFinalColumn: () => ({
     finalColumn: { title: "final", dataIndex: "is_finalized", key: "final" },
   }),
@@ -141,7 +145,14 @@ vi.mock("@features/commissioning/hooks", () => ({
   }),
   // Column-builder hook for the page; the table is stubbed
   // below, so an empty column set is enough for the render/smoke tests.
-  useForecastColumns: () => [],
+  useForecastColumns: ({
+    fruit_and_veg_shares_are_separate,
+  }: {
+    fruit_and_veg_shares_are_separate: boolean;
+  }) => {
+    pageState.fruitSeparate = fruit_and_veg_shares_are_separate;
+    return [];
+  },
 }));
 
 vi.mock("@shared/auth", () => ({
@@ -212,6 +223,8 @@ function makeQueryClient() {
 
 beforeEach(() => {
   pageState.variationsLoading = false;
+  pageState.sizesByOption = {};
+  pageState.fruitSeparate = undefined;
   pageState.listEnabled = [];
   pageState.selectedRowKeys = [];
   t.mockClear();
@@ -272,6 +285,35 @@ describe("Forecast (smoke)", () => {
     await flushMicrotasks(50);
 
     expect(profiler.onRender.mock.calls.length).toBeLessThan(80);
+  });
+});
+
+describe("Forecast fruit share", () => {
+  function renderForecast() {
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <Forecast />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("plans fruit apart in a week that has fruit sizes of its own", async () => {
+    pageState.sizesByOption = {
+      HARVEST_SHARE: [{ id: "var-m", size: "M" }],
+      HARVEST_SHARE_FRUIT: [{ id: "var-fruit", size: "M" }],
+    };
+    renderForecast();
+
+    await screen.findByTestId("editable-table");
+    expect(pageState.fruitSeparate).toBe(true);
+  });
+
+  it("plans no fruit apart in a week without fruit sizes", async () => {
+    pageState.sizesByOption = { HARVEST_SHARE: [{ id: "var-m", size: "M" }] };
+    renderForecast();
+
+    await screen.findByTestId("editable-table");
+    expect(pageState.fruitSeparate).toBe(false);
   });
 });
 

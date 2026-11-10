@@ -18,13 +18,13 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface ShareType {
-  readonly id?: string;
+  readonly id: string;
   amount_of_jokers?: number;
   amount_of_donation_jokers?: number;
-  readonly share_type_variation_sizes_in_use?: string;
+  readonly share_type_variation_sizes_in_use: string;
   /** @nullable */
-  readonly variations_valid_until_max?: string | null;
-  readonly has_open_ended_variation?: boolean;
+  readonly variations_valid_until_max: string | null;
+  readonly has_open_ended_variation: boolean;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;
@@ -49,5 +49,5 @@ export interface ShareType {
   delivery_cycle?: ShareTypeDeliveryCycle;
   needs_complex_planning?: boolean;
   is_additional_share_type?: boolean;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }

@@ -7,6 +7,9 @@
  */
 
 export interface CreateStornoRequest {
-  /** Reason for the storno */
+  /**
+   * Reason for the storno
+   * @minLength 1
+   */
   reason: string;
 }

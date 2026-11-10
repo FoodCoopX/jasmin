@@ -13,12 +13,18 @@
 export interface HarvestSharePlanningCreateRequest {
   year: number;
   delivery_week: number;
+  /** @minLength 1 */
   share_article: string;
+  /** @minLength 1 */
   unit?: string;
+  /** @minLength 1 */
   size?: string;
   /** @nullable */
   note?: string | null;
-  /** @nullable */
+  /**
+   * @minLength 1
+   * @nullable
+   */
   seller?: string | null;
   cleaning?: boolean;
   washing?: boolean;

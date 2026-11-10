@@ -11,6 +11,7 @@
 email-ownership verification code (step "confirm email" of the wizard).
  */
 export interface RegisterSendCodeRequest {
+  /** @minLength 1 */
   email: string;
   /** @maxLength 255 */
   first_name?: string;

@@ -146,11 +146,10 @@ const WeekSelector = (props: WeekSelectorProps) => {
     <Space>
       <Select
         value={selectedYear}
-        style={{ width: "6em" }}
         size="small"
         onChange={handleYearChange}
         options={yearOptions}
-        className="week-selector-select"
+        className="week-selector-select week-selector-year"
         aria-label={t("common.year")}
       />
       <SteppedSelect

@@ -1,6 +1,7 @@
 import dayjs, { type ConfigType } from "dayjs";
 import { useCallback } from "react";
 import { toApiDate } from "@shared/utils/apiDate";
+import { MONTH_FORMAT, SHORT_MONTH_FORMAT } from "@shared/utils/monthFormats";
 import { useTenant } from "./useTenant";
 
 export const useDateFormat = () => {
@@ -23,7 +24,6 @@ export const useDateFormat = () => {
       .replace(/Y+/g, "")
       .replace(/^[\s./-]+/, "")
       .replace(/[\s/-]+$/, "") || dateFormat;
-
   const formatDate = useCallback(
     (value: ConfigType, customFormat: string | null = null) => {
       if (!value) return null;
@@ -64,6 +64,8 @@ export const useDateFormat = () => {
   return {
     dateFormat,
     mobileDateFormat,
+    monthFormat: MONTH_FORMAT,
+    shortMonthFormat: SHORT_MONTH_FORMAT,
     formatDate,
     formatDateWithFallback,
     formatDateForAPI,

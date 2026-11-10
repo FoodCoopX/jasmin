@@ -71,6 +71,28 @@ class TourNumberBelowOne(BadRequestError):
         )
 
 
+class TourStationWithoutStationDay(BadRequestError):
+    """The tour plan places a station that has no station-day on the delivery
+    day from the week the plan applies on. The tours page only arranges the
+    stations a day serves; a station-day is created in the station's dialog,
+    where its start, times and capacity are set."""
+
+    code = "delivery_station_day.missing_for_tour"
+
+    def __init__(self, *, delivery_station, delivery_day, valid_from) -> None:
+        super().__init__(
+            f"Delivery station '{delivery_station}' is not served on delivery day "
+            f"'{delivery_day}' from {valid_from}. Create a station day for it "
+            "in the station's dialog first.",
+            field="tours",
+            details={
+                "delivery_station": delivery_station,
+                "delivery_day": delivery_day,
+                "valid_from": str(valid_from),
+            },
+        )
+
+
 class DeliveryDayValidFromInPast(BadRequestError):
     """A delivery day or station-day was CREATED with a ``valid_from`` date
     before today.
@@ -275,6 +297,14 @@ class DeliveryStationMoreThanOneFee(BadRequestError):
     code = "delivery_station.more_than_one_fee"
 
 
+class DeliveryStationNameRequired(BadRequestError):
+    """A station would have neither a short name nor a company name. Every
+    station list and selector shows it by one of the two, so without either it
+    is a blank row nobody can pick out."""
+
+    code = "delivery_station.name_required"
+
+
 class ShareTypeVariationCapacityBelowOccupancy(BadRequestError):
     """The production-cap twin of ``DeliveryStationCapacityBelowOccupancy``: a
     variation's farm-wide ``capacity`` may not drop below the busiest
@@ -295,6 +325,23 @@ class ShareTypeVariationCapacityBelowOccupancy(BadRequestError):
 # --------------------------------------------------------------------------- #
 # Packing list                                                                 #
 # --------------------------------------------------------------------------- #
+
+
+class PackingModeSwitchChangesPacking(BadRequestError):
+    """The packing mode can't switch to ``new_mode`` while running or upcoming
+    share sizes would change how they are packed: to "boxes" while some are
+    packed loose, to "bulk" while some are boxed. A switch to "mixed" is
+    always possible; there each size is packed as its own flag says."""
+
+    code = "packing_mode.switch_changes_packing"
+
+    def __init__(self, *, new_mode: str, sizes: str) -> None:
+        super().__init__(
+            f"The packing mode can't switch to {new_mode} while these share "
+            f"sizes are packed otherwise: {sizes}.",
+            field="packing_mode",
+            details={"new_mode": new_mode, "sizes": sizes},
+        )
 
 
 class PackingAmountsDivergeAcrossStations(BadRequestError):

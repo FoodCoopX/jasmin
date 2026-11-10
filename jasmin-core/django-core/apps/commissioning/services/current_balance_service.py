@@ -40,7 +40,8 @@ def _lock_sort_key(key: EntityKey) -> tuple[str, str, str, str]:
     ``"…:{unit or ''}:…"`` string the lock itself is keyed on. Every lock-
     acquisition site MUST use this same ordering so two transactions touching an
     overlapping entity set take the shared locks in the same order (no AB/BA)."""
-    return tuple(part or "" for part in key)  # type: ignore[return-value]
+    share_article_id, unit, size, storage_id = key
+    return (share_article_id or "", unit or "", size or "", storage_id or "")
 
 
 def _normalize(

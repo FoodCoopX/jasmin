@@ -1,0 +1,12 @@
+/* A feature in the about dialog's list: the check mark sits by the first of
+   its two lines. Under .ant-list so the padding and alignment outrank AntD's
+   own list item. */
+.ant-list .ant-list-item.about-feature-item {
+  padding: 6px 0;
+  align-items: flex-start;
+}
+
+.about-feature-icon {
+  margin-top: 4px;
+  font-size: 16px;
+}

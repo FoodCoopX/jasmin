@@ -10,6 +10,7 @@ import type {
   PackingBoxesMatrixColumn,
   SharesDeliveryDay,
 } from "@shared/api/generated/models";
+import { makeDeliveryStation, makeSharesDeliveryDay } from "@/test/modelFixtures";
 
 // Backend day numbers: 0 = Monday … 6 = Sunday.
 export const MONDAY = 0;
@@ -17,15 +18,16 @@ export const TUESDAY = 1;
 export const THURSDAY = 3;
 export const FRIDAY = 4;
 
-export const deliveryDay = (id: string, dayNumber: number, tours = 1): SharesDeliveryDay => ({
+// ``tours``: how many tours the day's stations sit on (1 … tours).
+export const deliveryDay = (id: string, dayNumber: number, tours = 1): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
   valid_until: null,
-  number_of_tours: tours,
+  used_tours: Array.from({ length: tours }, (_, index) => index + 1),
 });
 
-export const station = (id: string, shortName: string): DeliveryStation => ({
+export const station = (id: string, shortName: string): DeliveryStation => makeDeliveryStation({
   id,
   short_name: shortName,
   is_active: true,
@@ -42,6 +44,7 @@ export const HONEY_SMALL: PackingBoxesMatrixAddOn = {
   share_type_id: "st-honey",
   share_type_short_name: "Honey",
   share_type_sort_index: 1,
+  is_packed_bulk: false,
 };
 
 /** A box with a base share of one size (or none) and the add-ons packed into it. */
@@ -62,6 +65,7 @@ export const box = (
   base_share_type_short_name: base?.shareType ?? "",
   // Vegetables first; honey, and boxes without a base share, after them.
   base_share_type_sort_index: !base || base.shareType === "Honey" ? 1 : 0,
+  base_is_packed_bulk: false,
   add_ons: addOns,
   count,
 });

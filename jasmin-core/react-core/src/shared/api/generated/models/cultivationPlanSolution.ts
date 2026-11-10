@@ -11,11 +11,11 @@ import type { SolutionMetrics } from './solutionMetrics';
  * A candidate plan header (no placements — fetch those via ``details``).
  */
 export interface CultivationPlanSolution {
-  readonly id?: string;
-  readonly year?: number;
-  readonly version?: number;
-  readonly chosen?: boolean;
-  readonly cells_per_bed?: number;
-  readonly placement_count?: number;
-  readonly metrics?: SolutionMetrics;
+  readonly id: string;
+  readonly year: number;
+  readonly version: number;
+  readonly chosen: boolean;
+  readonly cells_per_bed: number;
+  readonly placement_count: number;
+  readonly metrics: SolutionMetrics;
 }

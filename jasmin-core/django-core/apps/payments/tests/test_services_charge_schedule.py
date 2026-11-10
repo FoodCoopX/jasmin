@@ -420,13 +420,13 @@ class TestSmoothedStrategy:
         # Everything owed found a period, so nothing is reported as unbilled.
         assert not any("under-collection" in r.getMessage() for r in caplog.records)
 
-    def test_rest_owed_at_a_backdated_exit_is_logged_not_billed_after_it(
+    def test_rest_owed_at_a_force_end_is_logged_not_billed_after_it(
         self, tenant, tenant_settings, subscription, caplog
     ):
-        """A backdated member exit can come after every period up to it was
-        issued, while the boxes delivered before it are still partly unpaid.
-        No period after the exit may bill them, so those stay at 0 and the
-        amount owed is logged as an error, to be billed out-of-band."""
+        """A force-end can come after every period up to it was issued, while
+        the boxes delivered before it are still partly unpaid. No period after
+        the end may bill them, so those stay at 0 and the amount owed is logged
+        as an error, to be billed out-of-band."""
         tenant_settings.billing_strategy = TenantSettings.BILLING_STRATEGY_SMOOTHED
         tenant_settings.save()
         # 24 deliveries × 10€ = 240€, the last on 2026-06-17 (ISO week 25):
@@ -464,7 +464,7 @@ class TestSmoothedStrategy:
             subscription=subscription, status=ChargeStatus.ISSUED
         )
         assert sum(c.expected_amount for c in issued) == Decimal("120.00")
-        # The other 120€ is owed for boxes delivered before the exit.
+        # The other 120€ is owed for boxes delivered before the end.
         assert any(
             "under-collection" in message
             and str(subscription.pk) in message
@@ -876,7 +876,9 @@ class TestRegenerateProtectsBundledCharges:
 class TestForceEndedTerm:
     """The member exit's force-end stamps ``cancelled_effective_at`` and keeps
     ``valid_until``. The charges must stop at that end all the same, also one a
-    DRAFT run holds, and also when it has passed by the time they are planned."""
+    DRAFT run holds, and also when it has passed by the time they are planned.
+    The tests force-end at a given date; which date an exit picks is
+    ``_force_end_date``'s rule."""
 
     _bundle = TestRegenerateProtectsBundledCharges._bundle
 
@@ -889,12 +891,12 @@ class TestForceEndedTerm:
         with time_machine.travel(datetime.datetime(2026, 7, 6, 12, 0), tick=False):
             yield
 
-    def test_exact_charge_of_the_period_holding_the_exit_is_repriced(
+    def test_exact_charge_of_the_period_holding_the_end_is_repriced(
         self, tenant, tenant_settings, subscription
     ):
         """The period from 2026-06-05 holds four deliveries, 40€, and its charge
-        sits in a DRAFT run. The exit drops the three after it, so the charge
-        leaves the run and comes back at the one delivery left, 10€."""
+        sits in a DRAFT run. The force-end drops the three after it, so the
+        charge leaves the run and comes back at the one delivery left, 10€."""
         # Weekly deliveries to 2026-07-01 (ISO week 27), billed EXACT per month.
         _make_deliveries_for_subscription(
             subscription, [(2026, w) for w in range(2, 28)]
@@ -924,9 +926,9 @@ class TestForceEndedTerm:
     @pytest.mark.parametrize(
         ("strategy", "june_amount"),
         [
-            # The one delivery up to the exit, on 2026-06-10.
+            # The one delivery up to the end, on 2026-06-10.
             (TenantSettings.BILLING_STRATEGY_EXACT, Decimal("10.00")),
-            # The 23 deliveries up to the exit, 230€, over the six periods
+            # The 23 deliveries up to the end, 230€, over the six periods
             # starting by it; the one from 2026-06-05 is the last of them.
             (TenantSettings.BILLING_STRATEGY_SMOOTHED, Decimal("38.33")),
         ],
@@ -934,7 +936,7 @@ class TestForceEndedTerm:
     def test_repriced_charge_bundled_again_stays_in_its_run(
         self, tenant, tenant_settings, subscription, strategy, june_amount
     ):
-        """The charge of the period holding the exit ends on the exit, as the
+        """The charge of the period holding the force-end ends on it, as the
         last period of a cancelled term ends on its cut. Once a DRAFT run bundles
         it, later regenerates keep it there; taking it out again would let the
         run export without it and leave it unbilled."""
@@ -965,13 +967,13 @@ class TestForceEndedTerm:
         assert still_bundled.expected_amount == june_amount
         assert still_bundled.period_end == exit_date
 
-    def test_smoothed_charge_of_the_period_holding_the_exit_takes_the_rest_owed(
+    def test_smoothed_charge_of_the_period_holding_the_end_takes_the_rest_owed(
         self, tenant, tenant_settings, subscription
     ):
         """Under SMOOTHED the periods up to the one from 2026-05-05 are issued and
         the one from 2026-06-05 sits in a DRAFT run at its even share. After the
-        exit that charge leaves the run and bills what the boxes delivered up to
-        the exit still owe; no period after the exit bills anything."""
+        force-end that charge leaves the run and bills what the boxes delivered
+        up to the end still owe; no period after the end bills anything."""
         tenant_settings.billing_strategy = TenantSettings.BILLING_STRATEGY_SMOOTHED
         tenant_settings.save()
         # 51 deliveries × 10€ = 510€, Wednesdays from 2026-01-07 to 2026-12-23:
@@ -1007,11 +1009,11 @@ class TestForceEndedTerm:
         assert june_charge.expected_amount == Decimal("17.50")
         assert sum(c.expected_amount for c in charges_after_exit) == Decimal("230.00")
 
-    def test_exit_before_the_term_starts_leaves_nothing_to_collect(
+    def test_an_end_before_the_term_starts_leaves_nothing_to_collect(
         self, tenant, tenant_settings, subscription
     ):
-        """An exit before ``valid_from`` puts the effective end before the term
-        starts. Its charges are still re-planned, every one at 0 and out of its
+        """A force-end before ``valid_from`` puts the effective end before the
+        term starts. Its charges are still re-planned, every one at 0 and out of its
         DRAFT run, rather than skipped like an inverted term."""
         _make_deliveries_for_subscription(
             subscription, [(2026, w) for w in range(2, 14)]
@@ -1037,13 +1039,13 @@ class TestForceEndedTerm:
             subscription=subscription, expected_amount__gt=Decimal("0.00")
         ).exists()
 
-    def test_delivery_dated_after_the_exit_is_not_billed(
+    def test_delivery_dated_after_the_end_is_not_billed(
         self, tenant, tenant_settings, subscription
     ):
-        """Billing stops at the exit even while a delivery dated after it is
-        still stored; the force-end drops them, the planner doesn't count on it.
-        Under EXACT the period holding the exit bills only the delivery before
-        it, and the periods after it plan 0."""
+        """Billing stops at the force-end even while a delivery dated after it
+        is still stored; the force-end drops them, the planner doesn't count on
+        it. Under EXACT the period holding the end bills only the delivery
+        before it, and the periods after it plan 0."""
         # Weekly deliveries to 2026-06-10 (ISO week 24).
         _make_deliveries_for_subscription(
             subscription, [(2026, w) for w in range(2, 25)]

@@ -16,8 +16,9 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface OfferGroup {
-  readonly id?: string;
-  readonly reseller_names?: string;
+  readonly id: string;
+  /** @nullable */
+  readonly reseller_names?: string | null;
   /**
    * @minimum 0
    * @maximum 2147483647
@@ -45,6 +46,6 @@ export interface OfferGroup {
    * @nullable
    */
   rabatt_price_tier_3?: number | null;
-  readonly is_default?: boolean;
-  readonly can_be_deleted?: boolean;
+  readonly is_default: boolean;
+  readonly can_be_deleted: boolean;
 }

@@ -101,7 +101,8 @@ class CultivationPlanSolutionWithDetailsSerializer(CultivationPlanSolutionSerial
     carryover = serializers.SerializerMethodField()
 
     class Meta(CultivationPlanSolutionSerializer.Meta):
-        fields = CultivationPlanSolutionSerializer.Meta.fields + [
+        fields = [
+            *CultivationPlanSolutionSerializer.Meta.fields,
             "details",
             "carryover",
         ]

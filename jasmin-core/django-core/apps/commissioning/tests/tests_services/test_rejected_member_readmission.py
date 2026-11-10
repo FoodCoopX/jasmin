@@ -1,19 +1,21 @@
 """A rejected member stays rejected until the office re-invites them.
 
 A member, subscription or coop-share confirm refuses a rejected member, also when
-the caller still holds the row from before the reject; a member already
-re-admitted keeps getting subscriptions confirmed. The office re-admits a
-rejected member by sending a new invitation: accepting it confirms the member
-and lifts the rejection, while an invitation from before the rejection stays
-refused. Re-sending a login email repeats the invitation it replaces, so a
-public self-registration's re-sent email confirms nobody.
+the caller still holds the row from before the reject. The office re-admits a
+rejected member by sending a new invitation: accepting it confirms the member,
+and a confirm lifts the rejection, while an invitation from before the
+rejection stays refused. A migration clears the stamp of every confirmed row.
+Re-sending a login email repeats the invitation it replaces, so a public
+self-registration's re-sent email confirms nobody.
 """
 
 from __future__ import annotations
 
+import importlib
 from unittest import mock
 
 import pytest
+from django.apps import apps as django_apps
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.urls import reverse
@@ -38,6 +40,10 @@ from apps.shared.invitations import (
 )
 
 PASSWORD = "N3wPass!Long123"
+
+stamp_migration = importlib.import_module(
+    "apps.commissioning.migrations.0036_clear_rejection_stamps_of_confirmed_rows"
+)
 
 
 def _invited_applicant(office, *, names_member: bool):
@@ -113,18 +119,39 @@ class TestConfirmingARejectedMember:
         assert share.admin_confirmed is False
         assert member.admin_confirmed is False
 
-    def test_a_re_admitted_member_still_gets_subscriptions_confirmed(self, tenant):
-        """A confirm keeps an earlier ``admin_rejected_at``; the member it
-        re-admitted is a member like any other."""
+    def test_a_confirm_lifts_an_earlier_rejection(self, tenant):
         office = JasminUserFactory(roles=[Role.OFFICE])
-        member = MemberFactory(admin_confirmed=True, admin_rejected_at=timezone.now())
-        subscription = SubscriptionFactory(member=member)
+        member = MemberFactory(admin_confirmed=False)
+        member.reject(admin_user=office, reason="incomplete", save=True)
 
-        with transaction.atomic():
-            subscription.confirm(admin_user=office, save=True)
+        member.confirm(admin_user=office, save=True)
 
+        member.refresh_from_db()
+        assert member.admin_confirmed is True
+        assert member.admin_rejected_at is None
+        assert member.admin_rejection_reason is None
+
+    def test_the_migration_clears_the_stamp_of_confirmed_rows_only(self, tenant):
+        rejected_at = timezone.now()
+        re_admitted = MemberFactory(
+            admin_confirmed=True,
+            admin_rejected_at=rejected_at,
+            admin_rejection_reason="incomplete",
+        )
+        subscription = SubscriptionFactory(
+            member=re_admitted, admin_confirmed=True, admin_rejected_at=rejected_at
+        )
+        rejected = MemberFactory(admin_confirmed=False, admin_rejected_at=rejected_at)
+
+        stamp_migration.clear_rejection_stamps_of_confirmed_rows(django_apps, None)
+
+        re_admitted.refresh_from_db()
         subscription.refresh_from_db()
-        assert subscription.admin_confirmed is True
+        rejected.refresh_from_db()
+        assert re_admitted.admin_rejected_at is None
+        assert re_admitted.admin_rejection_reason is None
+        assert subscription.admin_rejected_at is None
+        assert rejected.admin_rejected_at == rejected_at
 
 
 @pytest.mark.django_db

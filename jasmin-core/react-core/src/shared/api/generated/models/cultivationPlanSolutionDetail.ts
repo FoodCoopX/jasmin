@@ -12,7 +12,7 @@ grid needs (crop name, week window, rotation family) so rendering a plan
 costs one request instead of a lookup per placement.
  */
 export interface CultivationPlanSolutionDetail {
-  readonly id?: string;
+  readonly id: string;
   solution: string;
   batch: string;
   plot: string;
@@ -26,10 +26,10 @@ export interface CultivationPlanSolutionDetail {
    * @maximum 32767
    */
   cell_count: number;
-  readonly end_cell?: number;
-  readonly vegetable_name?: string;
-  readonly planting_week?: number;
-  readonly end_week?: number;
+  readonly end_cell: number;
+  readonly vegetable_name: string;
+  readonly planting_week: number;
+  readonly end_week: number;
   /** @nullable */
-  readonly cultivation_break_family?: string | null;
+  readonly cultivation_break_family: string | null;
 }

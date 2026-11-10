@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 import time_machine
 
+from apps.commissioning.errors import DefaultShareContentNoRunningWeek
 from apps.commissioning.models import (
     DefaultShareContent,
     MovementShareArticle,
@@ -92,6 +93,34 @@ class TestDetectWeekPattern:
         ) = DefaultShareContentService._detect_week_pattern([2, 4, 6], 1, 6)
         assert not only_odd
         assert only_even
+
+    def test_reads_a_pattern_against_the_weeks_a_size_runs_in(self):
+        # Odd weeks 1–15, with no size running in weeks 7–10.
+        running = set(range(1, 7)) | set(range(11, 16))
+        (
+            only_odd,
+            only_even,
+            every_three,
+        ) = DefaultShareContentService._detect_week_pattern(
+            [1, 3, 5, 11, 13, 15], 1, 15, running
+        )
+        assert only_odd
+        assert not only_even
+        assert not every_three
+
+    def test_keeps_the_pattern_of_rows_in_weeks_no_size_runs_in(self):
+        # Odd weeks 1–15 stored for a size that runs only from week 7.
+        running = set(range(7, 16))
+        (
+            only_odd,
+            only_even,
+            every_three,
+        ) = DefaultShareContentService._detect_week_pattern(
+            [1, 3, 5, 7, 9, 11, 13, 15], 1, 15, running
+        )
+        assert only_odd
+        assert not only_even
+        assert not every_three
 
     def test_every_three_weeks(self):
         # range_1=1, range_2=7 → expected indices 0,3,6 → weeks 1,4,7
@@ -178,6 +207,115 @@ class TestCreateDefaultShareContent:
             == 3
         )
 
+    @time_machine.travel(datetime.datetime(2026, 11, 4, 12, 0), tick=False)
+    def test_plans_a_size_only_for_the_weeks_it_runs(self, tenant):
+        """A size replaced during the planned weeks gets plan rows, shares and
+        contents up to its last week, and its successor from its first."""
+        article = ShareArticleFactory()
+        old = ShareTypeVariationFactory(
+            size="M", valid_until=datetime.date(2026, 12, 27)
+        )
+        new = ShareTypeVariationFactory(
+            size="M",
+            share_type=old.share_type,
+            valid_from=datetime.date(2026, 12, 28),
+        )
+        DeliveryStationDayFactory(delivery_day=SharesDeliveryDayFactory(day_number=2))
+        data = {
+            "year": 2026,
+            "share_article": str(article.pk),
+            "share_option": "HARVEST_SHARE",
+            "range_1": 50,
+            "range_2": 53,
+            "unit": "KG",
+            "size": "M",
+            f"amount_{old.pk}": "2",
+            f"amount_{new.pk}": "3",
+        }
+
+        DefaultShareContentService.create_default_share_content(data)
+
+        def plan_weeks(variation):
+            return sorted(
+                DefaultShareContent.objects.filter(
+                    share_type_variation=variation
+                ).values_list("delivery_week", flat=True)
+            )
+
+        def content_weeks(variation):
+            return sorted(
+                ShareContent.objects.filter(
+                    share__share_type_variation=variation
+                ).values_list("share__delivery_week", flat=True)
+            )
+
+        assert plan_weeks(old) == content_weeks(old) == [50, 51, 52]
+        assert plan_weeks(new) == content_weeks(new) == [53]
+
+    @time_machine.travel(datetime.datetime(2026, 11, 4, 12, 0), tick=False)
+    def test_plans_a_week_only_for_the_stations_served_that_week(self, tenant):
+        """A station that stopped, one that starts later and an inactive one get
+        contents only for the weeks they are served in."""
+        day = SharesDeliveryDayFactory(day_number=2)
+        running = DeliveryStationDayFactory(delivery_day=day)
+        ended = DeliveryStationDayFactory(
+            delivery_day=day, valid_until=datetime.date(2026, 5, 31)
+        )
+        starting = DeliveryStationDayFactory(
+            delivery_day=day, valid_from=datetime.date(2026, 11, 16)
+        )
+        inactive = DeliveryStationDayFactory(
+            delivery_day=day, delivery_station__is_active=False
+        )
+        article = ShareArticleFactory()
+        variation = ShareTypeVariationFactory()
+
+        DefaultShareContentService.create_default_share_content(
+            {
+                "year": 2026,
+                "share_article": str(article.pk),
+                "share_option": "HARVEST_SHARE",
+                "range_1": 46,
+                "range_2": 47,
+                "unit": "KG",
+                "size": "M",
+                f"amount_{variation.pk}": "2",
+            }
+        )
+
+        def planned_weeks(station_day):
+            return sorted(
+                ShareContent.objects.filter(
+                    share_article=article,
+                    delivery_station=station_day.delivery_station,
+                ).values_list("share__delivery_week", flat=True)
+            )
+
+        assert planned_weeks(running) == [46, 47]
+        assert planned_weeks(starting) == [47]
+        assert planned_weeks(ended) == []
+        assert planned_weeks(inactive) == []
+
+    @time_machine.travel(datetime.datetime(2026, 11, 4, 12, 0), tick=False)
+    def test_refuses_amounts_only_for_sizes_running_in_none_of_the_weeks(self, tenant):
+        variation = ShareTypeVariationFactory(valid_from=datetime.date(2027, 1, 4))
+        data = {
+            "year": 2026,
+            "share_article": str(ShareArticleFactory().pk),
+            "share_option": "HARVEST_SHARE",
+            "range_1": 40,
+            "range_2": 42,
+            "unit": "KG",
+            "size": "M",
+            f"amount_{variation.pk}": "2",
+        }
+
+        with pytest.raises(DefaultShareContentNoRunningWeek):
+            DefaultShareContentService.create_default_share_content(data)
+        assert not DefaultShareContent.objects.filter(
+            share_type_variation=variation
+        ).exists()
+
     def test_raises_on_missing_amounts(self, tenant):
         article = ShareArticleFactory()
         data = {
@@ -225,8 +363,8 @@ class TestCreateDefaultShareContent:
 
         # The bulk-create path bypasses ``Share.save()``, so it must default
         # ALL day fields (including ``get_current_stock_day``) from the delivery
-        # day in memory — a NULL one would silently drop the share from that
-        # day-filtered list.
+        # day in memory — a NULL one would cost the share its theoretical
+        # amounts.
         assert share.harvesting_day == delivery_day.default_harvesting_day
         assert share.packing_day == delivery_day.default_packing_day
         assert share.washing_day == delivery_day.default_washing_day
@@ -454,89 +592,52 @@ class TestGetDefaultShareContentList:
 
 
 # ---------------------------------------------------------------------------
-# _calculate_needed_amount
+# needed_amount of the long-term list
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
-class TestCalculateNeededAmount:
-    """needed_amount = Σ (current_subscribers × amount × num_filtered_weeks).
+class TestNeededAmount:
+    """needed_amount = Σ over a slot's plan rows (one week of one size each) of
+    amount × the size's subscribers, counted once at today's date."""
 
-    The snapshot is a single date (``datetime.date.today()``) — subscriber
-    counts are assumed constant for the whole timespan.
-    """
+    @staticmethod
+    def _plan(variation, weeks, amount, article):
+        for week in weeks:
+            DefaultShareContentFactory(
+                year=2026,
+                delivery_week=week,
+                share_type_variation=variation,
+                share_article=article,
+                amount=Decimal(amount),
+            )
 
-    def test_returns_zero_for_empty_amounts(self, tenant):
-        result = DefaultShareContentService._calculate_needed_amount(
-            year=2026,
-            range_1=10,
-            range_2=12,
-            only_odd=False,
-            only_even=False,
-            only_every_three=False,
-            amounts_dict={},
-        )
-        assert result == "0"
+    @staticmethod
+    def _needed(article) -> Decimal:
+        [row] = [
+            row
+            for row in DefaultShareContentService.get_default_share_content_list(2026)
+            if row["share_article"] == article.id
+        ]
+        return Decimal(row["needed_amount"])
 
-    def test_returns_zero_when_no_weeks_pass_filter(self, tenant):
-        from apps.commissioning.tests.factories import SubscriptionFactory
-
+    @time_machine.travel(datetime.datetime(2026, 6, 1, 12, 0), tick=False)
+    def test_multiplies_subscribers_amount_and_planned_weeks(self, tenant):
         variation = ShareTypeVariationFactory()
-        SubscriptionFactory(share_type_variation=variation)
-        # range 10–10 with only_every_three=False, but only_odd on an even
-        # single-week range → 0 filtered weeks.
-        result = DefaultShareContentService._calculate_needed_amount(
-            year=2026,
-            range_1=10,
-            range_2=10,
-            only_odd=True,
-            only_even=False,
-            only_every_three=False,
-            amounts_dict={f"amount_{variation.pk}": "3"},
-        )
-        assert result == "0"
-
-    def test_multiplies_subscribers_amount_and_filtered_weeks(self, tenant):
-        import time_machine
-
-        from apps.commissioning.tests.factories import SubscriptionFactory
-
-        variation = ShareTypeVariationFactory()
-        # Share one DeliveryStationDay across the subscriptions —
-        # ``SharesDeliveryDayFactory`` uses a fixed ``day_number=2`` and
-        # ``SharesDeliveryDay`` is time-bound unique on day_number, so
-        # creating multiple via SubFactory triggers an overlap error.
         station_day = DeliveryStationDayFactory()
-
         for _ in range(3):
             SubscriptionFactory(
                 share_type_variation=variation,
                 default_delivery_station_day=station_day,
             )
+        article = ShareArticleFactory()
+        self._plan(variation, (10, 11, 12), "2", article)
 
-        # Pin "today" to a date after the factory's valid_from (2026-01-05)
-        # so the subscriptions are active in the snapshot.
-        with time_machine.travel(datetime.date(2026, 6, 1), tick=False):
-            result = DefaultShareContentService._calculate_needed_amount(
-                year=2026,
-                range_1=10,
-                range_2=12,  # weeks 10, 11, 12 → 3 weeks unfiltered
-                only_odd=False,
-                only_even=False,
-                only_every_three=False,
-                amounts_dict={f"amount_{variation.pk}": "2"},
-            )
+        # 3 subscribers × 2 KG × 3 weeks
+        assert self._needed(article) == Decimal("18.00")
 
-        # 3 subscribers × 2 KG × 3 weeks = 18
-        assert Decimal(result) == Decimal("18.00")
-
+    @time_machine.travel(datetime.datetime(2026, 6, 1, 12, 0), tick=False)
     def test_counts_next_future_cohort_when_none_active_today(self, tenant):
-        import time_machine
-
-        from apps.commissioning.tests.factories import SubscriptionFactory
-
         variation = ShareTypeVariationFactory()
         station_day = DeliveryStationDayFactory()
-        # Subscriptions that START in the future (after the pinned "today"), so
-        # they are NOT active at the snapshot.
         for _ in range(2):
             SubscriptionFactory(
                 share_type_variation=variation,
@@ -544,84 +645,28 @@ class TestCalculateNeededAmount:
                 valid_from=datetime.date(2026, 8, 3),
                 valid_until=datetime.date(2026, 12, 27),
             )
+        article = ShareArticleFactory()
+        self._plan(variation, (10, 11, 12), "2", article)
 
-        # "today" is before the cohort starts → 0 active now → forward-scan picks
-        # up the next future cohort (not 0).
-        with time_machine.travel(datetime.date(2026, 6, 1), tick=False):
-            result = DefaultShareContentService._calculate_needed_amount(
-                year=2026,
-                range_1=10,
-                range_2=12,  # 3 weeks
-                only_odd=False,
-                only_even=False,
-                only_every_three=False,
-                amounts_dict={f"amount_{variation.pk}": "2"},
-            )
+        # 2 subscribers starting later × 2 × 3 weeks
+        assert self._needed(article) == Decimal("12.00")
 
-        # 2 future subscribers × 2 × 3 weeks = 12
-        assert Decimal(result) == Decimal("12.00")
-
-    def test_week_filter_reduces_total(self, tenant):
-        import time_machine
-
-        from apps.commissioning.tests.factories import SubscriptionFactory
-
-        variation = ShareTypeVariationFactory()
-        SubscriptionFactory(share_type_variation=variation)
-
-        with time_machine.travel(datetime.date(2026, 6, 1), tick=False):
-            result = DefaultShareContentService._calculate_needed_amount(
-                year=2026,
-                range_1=10,
-                range_2=15,  # 10..15 → 6 weeks; only_even → 10, 12, 14 = 3
-                only_odd=False,
-                only_even=True,
-                only_every_three=False,
-                amounts_dict={f"amount_{variation.pk}": "4"},
-            )
-
-        # 1 subscriber × 4 × 3 filtered weeks = 12
-        assert Decimal(result) == Decimal("12.00")
-
-    def test_sums_across_variations(self, tenant):
-        import time_machine
-
-        from apps.commissioning.tests.factories import SubscriptionFactory
-
-        var_s = ShareTypeVariationFactory(size="S")
-        var_m = ShareTypeVariationFactory(size="M", share_type=var_s.share_type)
+    @time_machine.travel(datetime.datetime(2026, 6, 1, 12, 0), tick=False)
+    def test_counts_each_size_for_the_weeks_it_runs(self, tenant):
+        small = ShareTypeVariationFactory(size="S")
+        medium = ShareTypeVariationFactory(size="M", share_type=small.share_type)
         station_day = DeliveryStationDayFactory()
-        SubscriptionFactory(
-            share_type_variation=var_s,
-            default_delivery_station_day=station_day,
-        )
-        SubscriptionFactory(
-            share_type_variation=var_s,
-            default_delivery_station_day=station_day,
-        )
-        SubscriptionFactory(
-            share_type_variation=var_m,
-            default_delivery_station_day=station_day,
-        )
-
-        with time_machine.travel(datetime.date(2026, 6, 1), tick=False):
-            result = DefaultShareContentService._calculate_needed_amount(
-                year=2026,
-                range_1=10,
-                range_2=12,  # 3 weeks
-                only_odd=False,
-                only_even=False,
-                only_every_three=False,
-                amounts_dict={
-                    f"amount_{var_s.pk}": "1",
-                    f"amount_{var_m.pk}": "2",
-                },
+        for variation in (small, small, medium):
+            SubscriptionFactory(
+                share_type_variation=variation,
+                default_delivery_station_day=station_day,
             )
+        article = ShareArticleFactory()
+        self._plan(small, (10, 11, 12), "1", article)
+        self._plan(medium, (12,), "2", article)
 
-        # S: 2 subs × 1 × 3 = 6
-        # M: 1 sub × 2 × 3 = 6
-        # Total: 12
-        assert Decimal(result) == Decimal("12.00")
+        # S: 2 subscribers × 1 × 3 weeks; M: 1 subscriber × 2 × 1 week
+        assert self._needed(article) == Decimal("8.00")
 
 
 # ---------------------------------------------------------------------------
@@ -747,6 +792,21 @@ class TestMaterializeForNewStationDay:
             )
 
         assert created == 0
+
+    def test_skips_rows_of_a_size_not_running_that_week(self, tenant):
+        variation = ShareTypeVariationFactory(valid_until=datetime.date(2026, 8, 30))
+        DefaultShareContentFactory(
+            year=2026, delivery_week=self.FUTURE_WEEK, share_type_variation=variation
+        )
+        station_day = DeliveryStationDayFactory(delivery_day=SharesDeliveryDayFactory())
+
+        with time_machine.travel(self.NOW, tick=False):
+            created = DefaultShareContentService.materialize_for_new_station_day(
+                station_day
+            )
+
+        assert created == 0
+        assert not Share.objects.filter(share_type_variation=variation).exists()
 
     def test_is_idempotent(self, tenant):
         import time_machine

@@ -68,9 +68,9 @@ class CultivationPlanSolutionDetail(JasminModel):
             ),
         ]
 
+    def __str__(self) -> str:
+        return f"{self.batch_id} @ {self.plot_id} [{self.start_cell}:{self.end_cell}]"
+
     @property
     def end_cell(self) -> int:
         return self.start_cell + self.cell_count
-
-    def __str__(self) -> str:
-        return f"{self.batch_id} @ {self.plot_id} [{self.start_cell}:{self.end_cell}]"

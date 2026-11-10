@@ -7,6 +7,8 @@
  */
 
 export interface TwoFactorVerifyRequest {
+  /** @minLength 1 */
   challenge_token: string;
+  /** @minLength 1 */
   code: string;
 }

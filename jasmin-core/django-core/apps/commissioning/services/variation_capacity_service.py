@@ -35,6 +35,11 @@ from django.utils import timezone
 from ..errors import ShareTypeVariationOverCapacity
 from ..models import ShareTypeVariation, Subscription
 from ..utils.iso_week_utils import previous_monday, week_day_to_date
+from .delivery_exceptions import (
+    first_unpaused_monday,
+    pause_periods_for_variation,
+    paused_weeks_by_variation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,8 +138,6 @@ class VariationCapacityService:
         # Paused (Lieferpause) weeks deliver nothing, so they consume no
         # production capacity — exclude them (mirrors the delivery-based DSD
         # occupancy, which is naturally 0 on a paused week). Batched: ONE query.
-        from .delivery_exceptions import paused_weeks_by_variation
-
         paused = paused_weeks_by_variation(ids, [(b[0], b[1]) for b in bounds])
 
         subscription_terms = (
@@ -180,7 +183,9 @@ class VariationCapacityService:
         The peak of a set of intervals is always reached at some interval's
         START, so we evaluate only the term's own start week plus each
         overlapping sub's start week (clamped into the term) — no need to walk,
-        or even bound, an open-ended term week-by-week.
+        or even bound, an open-ended term week-by-week. A paused week delivers
+        nothing, so a start week that falls in a pause moves on to the first
+        week after it: every term covering a later week covers that one too.
         """
         others = list(
             cls._overlapping_qs(
@@ -190,9 +195,12 @@ class VariationCapacityService:
         if not others:
             return 0
 
-        candidate_mondays = {previous_monday(valid_from)}
-        for ofrom, _ountil, _oqty in others:
-            monday = previous_monday(ofrom if ofrom > valid_from else valid_from)
+        pauses = pause_periods_for_variation(variation_id)
+        candidate_mondays = set()
+        for start in [valid_from, *(ofrom for ofrom, _ountil, _oqty in others)]:
+            monday = first_unpaused_monday(
+                previous_monday(start if start > valid_from else valid_from), pauses
+            )
             if valid_until is not None and monday > valid_until:
                 continue
             candidate_mondays.add(monday)

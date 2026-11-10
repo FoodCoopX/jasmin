@@ -81,7 +81,7 @@ export default function ListOfferGroups() {
             <span>
               {(value as string) ?? ""}{" "}
               <Tooltip title={t("commissioning.offer_group_default_hint")}>
-                <LockOutlined className="text-muted" />
+                <LockOutlined className="color-text-tertiary" />
               </Tooltip>
             </span>
           ) : (

@@ -8,7 +8,7 @@ import {
   useCommissioningOrganicCertificatesList,
 } from "@shared/api/generated/commissioning/commissioning";
 import type { OrganicCertificate } from "@shared/api/generated/models";
-import type { EditableColumnConfig } from "@shared/tables/BasicEditableTable/types";
+import type { EditableColumnConfig, TableRecord } from "@shared/tables/BasicEditableTable/types";
 import { useTimeBoundColumns } from "@hooks/index";
 import PriceEditorModal from "./prices/PriceEditorModal";
 
@@ -36,7 +36,7 @@ export default function OrganicCertificatesModal({
     overlapGroup: ["reseller"],
   });
 
-  const columns = useMemo<EditableColumnConfig[]>(
+  const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
     () =>
       [
         validFromColumn,
@@ -69,7 +69,7 @@ export default function OrganicCertificatesModal({
               ""
             ),
         },
-      ] as EditableColumnConfig[],
+      ],
     [t, validFromColumn, validUntilColumn],
   );
 

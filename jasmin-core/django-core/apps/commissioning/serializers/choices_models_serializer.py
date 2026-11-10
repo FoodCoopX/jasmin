@@ -1,8 +1,16 @@
+from django.db.models import Max
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from ..errors import SharesDeliveryDayToursReducedWhileInUse
-from ..models import OrdersDeliveryDay, PaymentCycle, SharesDeliveryDay, Subscription
+from ..models import (
+    DeliveryStationDay,
+    OrdersDeliveryDay,
+    PaymentCycle,
+    SharesDeliveryDay,
+    Subscription,
+)
 from ..utils.deletion_utils import bulk_deletable_pks, can_delete_instance
 from .serializers_mixin import DeletableMixin
 
@@ -24,8 +32,9 @@ class _UsedToursField(serializers.ListField):
     """The distinct tour numbers of a delivery day's station days.
 
     Only present with ``need_info_on_tours``, which annotates the queryset;
-    without the annotation the key is left out of the row. With it, a day
-    without station days carries null.
+    without the annotation the key is left out of the row, and the schema
+    lists it as optional (``core.openapi.SOMETIMES_ABSENT_FIELDS``). With it, a
+    day without station days carries null.
     """
 
     def get_attribute(self, instance):
@@ -143,21 +152,28 @@ class SharesDeliveryDaySerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        # The number of tours on an IN-USE (non-deletable) delivery day may only
-        # be raised — lowering it would strand deliveries on the removed tours.
-        # Raising it (e.g. 3 -> 4) is always fine.
+        # The number of tours is the columns the tours page offers, so it may
+        # not be lowered below a tour the day's stations sit on today or later.
+        # An unchanged or raised count passes even when the stations sit on
+        # more tours: the table sends it back with every edit of the row. An
+        # empty count is read as one tour everywhere, so it counts as one here.
         if self.instance is not None and "number_of_tours" in attrs:
-            new_tours = attrs["number_of_tours"]
-            current_tours = self.instance.number_of_tours
-            if (
-                new_tours is not None
-                and current_tours is not None
-                and new_tours < current_tours
-                and not self.get_can_be_deleted(self.instance)
-            ):
-                raise SharesDeliveryDayToursReducedWhileInUse(
-                    current_tours=current_tours, new_tours=new_tours
+            new_tours = attrs["number_of_tours"] or 1
+            current_tours = self.instance.number_of_tours or 1
+            if new_tours < current_tours:
+                highest_tour = (
+                    DeliveryStationDay.current.active_at_date_or_future(
+                        timezone.localdate()
+                    )
+                    .filter(delivery_day=self.instance)
+                    .aggregate(highest=Max("tour_number"))["highest"]
                 )
+                if highest_tour is not None and new_tours < highest_tour:
+                    raise SharesDeliveryDayToursReducedWhileInUse(
+                        current_tours=current_tours,
+                        new_tours=new_tours,
+                        highest_tour=highest_tour,
+                    )
         return attrs
 
 

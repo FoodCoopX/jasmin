@@ -34,6 +34,7 @@ from django.db.models import DateField, F, Max, Q, Value
 from django.db.models.functions import Least
 from django.utils import timezone
 
+from apps.shared.audit_log import update_and_log
 from apps.shared.display_formats import DisplayFormats
 from core.tenant_db import connection
 
@@ -50,6 +51,25 @@ class MemberCancellation:
 
     subscriptions_ended: list[str]
     subscriptions_not_ended: list[str]
+
+
+def lock_open_subscriptions(member_id: str) -> None:
+    """Lock the member's subscriptions not cancelled yet, in pk order.
+
+    A member exit writes them after the member's row, while a reject locks the
+    open subscriptions before the member and a subscription confirm locks its
+    subscription before it writes the member. Whatever exits a member takes
+    these locks before the member's row, so two of them on one member wait for
+    each other instead of deadlocking.
+    """
+    from ..models import Subscription
+
+    list(
+        Subscription.objects.filter(member_id=member_id, cancelled_at__isnull=True)
+        .select_for_update()
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
 
 
 def latest_coop_share_transfer_date(member: Member) -> date | None:
@@ -113,6 +133,8 @@ def cancel_member_with_coop_shares(
     # cancellation of the same member waits for the first and is refused. Only
     # the row: GDPR erasure has written it before it gets here, so taking the
     # transfer's advisory lock now could deadlock with a transfer waiting for it.
+    # The subscriptions come first (see ``lock_open_subscriptions``).
+    lock_open_subscriptions(member.pk)
     locked = Member.objects.select_for_update().only("cancelled_at").get(pk=member.pk)
     if locked.cancelled_at is not None:
         raise MemberAlreadyCancelled("This membership is already cancelled.")
@@ -356,9 +378,8 @@ def _cancel_draft_subscriptions(
         )
     )
     if draft_subscriptions:
-        Subscription.objects.filter(
-            pk__in=[draft.pk for draft in draft_subscriptions]
-        ).update(
+        update_and_log(
+            draft_subscriptions,
             cancelled_at=now,
             # Clamp the effective date to each draft's own term end. The DB
             # CheckConstraint ``subscription_cancel_before_valid_until`` requires
@@ -417,7 +438,6 @@ def _force_end_subscription(subscription, *, effective, now, cancelled_by) -> No
     through ``subscription_term.effective_term_end``, so ``cancelled_effective_at``
     bounds them: a later pause edit restores nothing after it.
     """
-    from ..models import Subscription
     from .subscription_deliveries import truncate_future_deliveries
 
     # Stamp the cancellation columns with a targeted UPDATE, NOT
@@ -430,7 +450,8 @@ def _force_end_subscription(subscription, *, effective, now, cancelled_by) -> No
     # exit. The cancellation stamp itself needs no term re-validation, and
     # ``_force_end_date`` never picks a date past ``valid_until``, so the
     # cancel-before-valid_until constraint holds.
-    Subscription.objects.filter(pk=subscription.pk).update(
+    update_and_log(
+        [subscription],
         cancelled_at=now,
         cancelled_effective_at=effective,
         cancelled_by=cancelled_by,

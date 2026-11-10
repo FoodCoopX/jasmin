@@ -5,9 +5,10 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
-import type { VirtualVariationComponentItem } from './virtualVariationComponentItem';
+import type { VirtualVariationComponentItemRequest } from './virtualVariationComponentItemRequest';
 
 export interface VirtualVariationComponentsRequest {
+  /** @minLength 1 */
   virtual_variation: string;
-  components: VirtualVariationComponentItem[];
+  components: VirtualVariationComponentItemRequest[];
 }

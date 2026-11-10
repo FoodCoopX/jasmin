@@ -7,7 +7,7 @@
  */
 
 export interface PlotContent {
-  readonly id?: string;
+  readonly id: string;
   /**
    * @minimum 0
    * @maximum 2147483647

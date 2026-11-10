@@ -211,7 +211,7 @@ export default function DeliveryStationFees() {
         initialData={data}
         loading={isFetching}
         permissions={READ_ONLY_PERMISSION}
-        pagination={true}
+        pagination={false}
         showSearchBar={true}
         className="custom-jasmin-table delivery-station-fees__table"
       />

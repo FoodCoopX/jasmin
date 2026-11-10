@@ -25,8 +25,8 @@ import type {
   CommissioningCrateContentsListParams,
   CrateOrderContentCreateRequest,
   CrateOrderSummary,
-  OrderContent,
   OrderContentListItem,
+  OrderContentRequest,
 } from "@shared/api/generated/models";
 // Direct import from the helper-only files keeps @react-pdf/renderer
 // out of useOrdersData's eager bundle. The historic *PDFGenerator.tsx
@@ -289,8 +289,8 @@ export function useOrdersData() {
 
   // `data` mixes real OrderContent rows with placeholder rows for offers
   // that don't yet have an OrderContent. Each row carries an explicit
-  // `is_placeholder` flag (see `_serialize_unused_offer` in
-  // order_content_service.py). We need the freshest array inside the api
+  // `is_placeholder` flag (see `serialize_unused_offer` in
+  // order_content_rows.py). We need the freshest array inside the api
   // closures to look records up; a ref avoids re-creating apiFunctions on
   // every data change (which would invalidate EditableTable's initialData).
   const dataRef = useRef(data);
@@ -310,7 +310,7 @@ export function useOrdersData() {
 
   const apiFunctions = useMemo<ApiFunctions>(
     () =>
-      wrapApiFunctions<OrderContent & TableRecord>({
+      wrapApiFunctions<OrderContentRequest & TableRecord>({
       create: async (payload) => {
         const res = await commissioningOrderContentsCreate(payload);
         invalidateDaysWithOrders();

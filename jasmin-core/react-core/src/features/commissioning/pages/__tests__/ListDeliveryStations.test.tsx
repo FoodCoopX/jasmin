@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DeliveryStation, SharesDeliveryDay } from "@shared/api/generated/models";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
+import { makeDeliveryStation, makeSharesDeliveryDay } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 // One ``t`` for every call, as the real hook keeps it stable across renders.
@@ -165,7 +166,7 @@ const NOW = new Date(2026, 4, 13, 10, 0);
 const TODAY = "2026-05-13";
 
 // Backend day numbers: 0 = Monday … 6 = Sunday.
-const deliveryDay = (id: string, dayNumber: number, validFrom: string): SharesDeliveryDay => ({
+const deliveryDay = (id: string, dayNumber: number, validFrom: string): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: validFrom,
@@ -178,13 +179,12 @@ const SATURDAY = deliveryDay("day-sat", 5, "2026-06-01");
 
 /** A station as the list endpoint carries it. */
 function station(overrides: Partial<DeliveryStation> & { id: string }): DeliveryStation {
-  return {
-    can_be_deleted: true, tour_assignment_missing: false, linked_reseller_can_be_deleted: true,
+  return makeDeliveryStation({
     is_active: true, short_name: null, number: null, is_also_reseller: false, is_also_seller: false,
     linked_reseller: null, company_name: null, first_name: null, last_name: null,
     address: "", zip_code: "", city: "", email: null, phone: null,
     ...overrides,
-  };
+  });
 }
 
 // Has deliveries, so the backend protects it; also a reseller with orders.

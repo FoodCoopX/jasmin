@@ -113,6 +113,11 @@ updates:
       # migration with a visual check of every page.
       - dependency-name: "antd"
         update-types: ["version-update:semver-major"]
+      # quill is declared for the clipboard override's types; the editor runs
+      # the copy react-quill-new brings, at ~2.0. A newer minor or major would
+      # install a second copy beside it, so quill moves with react-quill-new.
+      - dependency-name: "quill"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # The Playwright end-to-end suite's own package (Playwright, TypeScript).
   - package-ecosystem: "npm"

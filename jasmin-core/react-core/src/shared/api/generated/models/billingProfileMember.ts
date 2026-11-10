@@ -18,16 +18,12 @@ back; the member's own mandate is written through ``MySepaMandateView``,
 never through this serializer.
  */
 export interface BillingProfileMember {
-  readonly id?: string;
+  readonly id: string;
   member: string;
-  readonly member_string?: string;
+  readonly member_string: string;
   payment_method?: PaymentMethodEnum;
-  /** @maxLength 34 */
-  iban?: string;
-  /** @maxLength 200 */
-  account_holder?: string;
-  readonly iban_masked?: string;
-  readonly account_holder_masked?: string;
+  readonly iban_masked: string;
+  readonly account_holder_masked: string;
   /**
    * @maxLength 35
    * @nullable
@@ -39,9 +35,9 @@ export interface BillingProfileMember {
    * Set when first SEPA debit is exported. Drives FRST→RCUR.
    * @nullable
    */
-  readonly sepa_mandate_first_use_at?: string | null;
+  readonly sepa_mandate_first_use_at: string | null;
   /** @nullable */
   sepa_mandate_paper_received_at?: string | null;
   is_active?: boolean;
-  readonly is_sepa_ready?: boolean;
+  readonly is_sepa_ready: boolean;
 }

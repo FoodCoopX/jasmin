@@ -187,7 +187,7 @@ class TestDocumentDateResolution:
         """When the order's ISO week resolves to today's date, that's what
         ends up on the delivery note."""
         _ensure_settings(connection.tenant)
-        today = timezone.now().date()
+        today = timezone.localdate()
         iso_year, iso_week, iso_day = today.isocalendar()
         order = _make_order_with_content(
             year=iso_year, delivery_week=iso_week, day_number=iso_day - 1

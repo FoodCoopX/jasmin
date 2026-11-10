@@ -111,7 +111,7 @@ export default function DecidedDeletionsTable() {
         key: "rejection_reason",
         render: (val: string | null) =>
           val ? (
-            <Typography.Text style={{ whiteSpace: "pre-wrap" }}>
+            <Typography.Text className="text-prewrap">
               {val}
             </Typography.Text>
           ) : (
@@ -124,7 +124,7 @@ export default function DecidedDeletionsTable() {
 
   return (
     <div>
-      <div className="flex-between" style={{ marginBottom: "0.5em" }}>
+      <div className="flex-between deletions-table-header">
         <h3>
           <Space>
             {t("gdpr.decided_deletions")}

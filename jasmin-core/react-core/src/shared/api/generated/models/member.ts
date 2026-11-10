@@ -19,55 +19,55 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface Member {
-  readonly id?: string;
+  readonly id: string;
   /** @nullable */
-  readonly linked_user_info?: MemberLinkedUserInfo;
-  readonly active_subscriptions_count?: number;
+  readonly linked_user_info: MemberLinkedUserInfo;
+  readonly active_subscriptions_count: number;
   /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */
-  readonly coop_shares_total?: string;
+  readonly coop_shares_total: string;
   /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
-  readonly coop_shares_value?: string;
-  readonly coop_shares_pending_count?: number;
+  readonly coop_shares_value: string;
+  readonly coop_shares_pending_count: number;
   /** @nullable */
-  readonly payback_due_date?: string | null;
-  readonly iban_masked?: string;
-  readonly account_owner_masked?: string;
-  readonly admin_confirmed?: boolean;
+  readonly payback_due_date: string | null;
+  readonly iban_masked: string;
+  readonly account_owner_masked: string;
+  readonly admin_confirmed: boolean;
   /** @nullable */
-  readonly admin_confirmed_at?: string | null;
+  readonly admin_confirmed_at: string | null;
   /** @nullable */
-  readonly admin_rejected_at?: string | null;
+  readonly admin_rejected_at: string | null;
   /** @nullable */
-  readonly admin_rejection_reason?: string | null;
-  readonly created_at?: string;
+  readonly admin_rejection_reason: string | null;
+  readonly created_at: string;
   /** @nullable */
-  readonly cancelled_at?: string | null;
+  readonly cancelled_at: string | null;
   /** @nullable */
-  readonly cancelled_effective_at?: string | null;
+  readonly cancelled_effective_at: string | null;
   on_waiting_list?: boolean;
-  readonly waiting_list_status?: WaitingListStatusEnum;
+  readonly waiting_list_status: WaitingListStatusEnum;
   /** @nullable */
-  readonly waiting_list_position?: number | null;
+  readonly waiting_list_position: number | null;
   /** @nullable */
-  readonly notification_sent_at?: string | null;
+  readonly notification_sent_at: string | null;
   /** @nullable */
-  readonly notification_expires_at?: string | null;
+  readonly notification_expires_at: string | null;
   /** @nullable */
-  readonly response_received_at?: string | null;
+  readonly response_received_at: string | null;
   /** @nullable */
-  readonly notification_token?: string | null;
+  readonly notification_token: string | null;
   is_active?: boolean;
   /** @nullable */
-  readonly entry_date?: string | null;
+  readonly entry_date: string | null;
   is_trial?: boolean;
   /** @nullable */
-  readonly trial_converted_at?: string | null;
+  readonly trial_converted_at: string | null;
   /** @nullable */
-  readonly cancellation_email_sent_at?: string | null;
+  readonly cancellation_email_sent_at: string | null;
   /** @nullable */
   birth_date?: string | null;
   /** @nullable */
-  readonly member_number?: number | null;
+  readonly member_number: number | null;
   /**
    * @maxLength 255
    * @nullable
@@ -113,24 +113,14 @@ export interface Member {
    * @maximum 32767
    */
   number_of_rates?: number;
-  /**
-   * @maxLength 255
-   * @nullable
-   */
-  account_owner?: string | null;
-  /**
-   * @maxLength 34
-   * @nullable
-   */
-  iban?: string | null;
   /** @nullable */
-  readonly sepa_consent?: string | null;
+  readonly sepa_consent: string | null;
   /** @nullable */
-  readonly withdrawal_consent?: string | null;
+  readonly withdrawal_consent: string | null;
   /** @nullable */
-  readonly privacy_consent?: string | null;
+  readonly privacy_consent: string | null;
   /** @nullable */
-  readonly consent_withdrawn_at?: string | null;
+  readonly consent_withdrawn_at: string | null;
   /** @nullable */
   membership_paper_received_at?: string | null;
   /** @nullable */
@@ -151,16 +141,16 @@ export interface Member {
   /** @nullable */
   note?: string | null;
   /** @nullable */
-  readonly admin_confirmed_by?: string | null;
+  readonly admin_confirmed_by: string | null;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   /** @nullable */
-  readonly cancelled_by?: string | null;
+  readonly cancelled_by: string | null;
   /** @nullable */
-  readonly user?: string | null;
-  readonly can_be_deleted?: boolean;
+  readonly user: string | null;
+  readonly can_be_deleted: boolean;
   /** @nullable */
-  readonly admin_confirmed_by_name?: string | null;
+  readonly admin_confirmed_by_name: string | null;
   /** @nullable */
-  readonly created_by_name?: string | null;
+  readonly created_by_name: string | null;
 }

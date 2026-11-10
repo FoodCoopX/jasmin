@@ -4,16 +4,12 @@ import { Navigate, Route, Routes } from "react-router-dom";
 // barrel: that barrel re-exports OrderInfoPanel, which reaches the pdfs
 // barrel and its static PDF templates, pulling @react-pdf into the app
 // shell chunk every authenticated user loads.
-import ImportSharesModeBanner from "@features/commissioning/components/ImportSharesModeBanner";
+import MissingWorkDaysBanner from "@features/commissioning/components/MissingWorkDaysBanner";
 import TenantDashboardPage from "@features/platform/pages/TenantDashboard";
 import UnauthorizedPage from "../UnauthorizedPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { routeGroups } from "./routeConfig";
 import { useRouteTitle } from "./useRouteTitle";
-
-// Route groups that show the "demand comes from the CSV import" banner when
-// the tenant runs in weekly-upload mode (the banner self-hides otherwise).
-const IMPORT_SHARES_BANNER_GROUPS = new Set(["/members", "/abos"]);
 
 interface AppRouterProps {
   defaultRedirect?: string;
@@ -68,9 +64,7 @@ export const AppRouter = ({ defaultRedirect = "/" }: AppRouterProps) => {
               path={`${groupPath}/*`}
               element={
                 <>
-                  {IMPORT_SHARES_BANNER_GROUPS.has(groupPath) && (
-                    <ImportSharesModeBanner />
-                  )}
+                  {groupPath === "/commissioning" && <MissingWorkDaysBanner />}
                   {/* Configuration pages get a primary-coloured border on
                       every card via this scoping wrapper (see
                       card-headers.css). */}

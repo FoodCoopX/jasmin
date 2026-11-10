@@ -302,7 +302,11 @@ def regenerate_recovery_codes(*, user: JasminUser, code: str) -> list[str]:
 
 class _ChallengeToken(Token):
     token_type = "two_factor_challenge"
-    lifetime = settings.TWO_FACTOR_CHALLENGE_LIFETIME
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        # Read per token, not at import, so a changed setting applies.
+        self.lifetime = settings.TWO_FACTOR_CHALLENGE_LIFETIME
+        super().__init__(*args, **kwargs)
 
 
 def issue_challenge_token(*, user: JasminUser, tenant_schema: str) -> str:
@@ -349,7 +353,11 @@ def consume_challenge_token(*, challenge: str, tenant_schema: str) -> JasminUser
 
 class _EnrolmentToken(Token):
     token_type = "two_factor_enrolment"
-    lifetime = settings.TWO_FACTOR_ENROLMENT_LIFETIME
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        # Read per token, not at import, so a changed setting applies.
+        self.lifetime = settings.TWO_FACTOR_ENROLMENT_LIFETIME
+        super().__init__(*args, **kwargs)
 
 
 def issue_enrolment_token(*, user: JasminUser, tenant_schema: str) -> str:

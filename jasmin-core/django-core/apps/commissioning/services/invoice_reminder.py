@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from typing import Any
 
 from django.db import DatabaseError
@@ -107,6 +108,78 @@ def _reminder_context(
         "invoices_text": _build_invoices_text(invoice_dicts, language),
         "tenant": {"bank_details": ctx["bank_details"]},
     }
+
+
+def _invoices_reminded_on(day, buckets: Iterable[dict[str, Any]]) -> set[str]:
+    """The ids of the invoices already reminded on ``day``. A reminder row
+    without an invoice records only its reseller and the day, so it counts for
+    every invoice of that reseller in ``buckets``."""
+    from apps.commissioning.models import ReminderSending
+
+    reminded: set[str] = set()
+    resellers_reminded: set[str] = set()
+    for reseller_id, invoice_id in ReminderSending.objects.filter(
+        sent_on=day
+    ).values_list("reseller_id", "invoice_id"):
+        if invoice_id is None:
+            resellers_reminded.add(reseller_id)
+        else:
+            reminded.add(invoice_id)
+    for bucket in buckets:
+        if bucket["reseller"].id in resellers_reminded:
+            reminded.update(invoice.id for _order, invoice in bucket["invoices"])
+    return reminded
+
+
+def _leave_out_reminded(
+    invoices_with_orders: list, reminded: set[str], results: list[dict[str, Any]]
+) -> list:
+    """The ``(order, invoice)`` pairs whose invoice isn't in ``reminded``. Each
+    other pair goes into ``results`` as a success that was already sent: it WAS
+    reminded, just not now, so a re-run shows it handled, not failed."""
+    due = []
+    for order, invoice in invoices_with_orders:
+        if invoice.id in reminded:
+            results.append(
+                {
+                    "order_id": str(order.id),
+                    "invoice_number": invoice.full_number,
+                    "success": True,
+                    "already_sent": True,
+                }
+            )
+        else:
+            due.append((order, invoice))
+    return due
+
+
+def _record_reminders(
+    reseller, invoices_with_orders: list, today, reminded: set[str]
+) -> None:
+    """Record each invoice reminded, so a retry/re-click today leaves it out,
+    and add it to ``reminded``. Guarded against a concurrent run racing on the
+    same (invoice, day). An invoice covering several delivery notes comes once
+    per order and is recorded once."""
+    from apps.commissioning.models import ReminderSending
+
+    for _order, invoice in invoices_with_orders:
+        if invoice.id in reminded:
+            continue
+
+        def _create(invoice=invoice):
+            ReminderSending.objects.create(
+                reseller=reseller, invoice=invoice, sent_on=today
+            )
+
+        def _on_race(invoice=invoice):
+            logger.warning(
+                "remindersending.race invoice=%s — concurrent reminder send, "
+                "dedup row already exists",
+                invoice.id,
+            )
+
+        create_send_record_idempotent(_create, on_race=_on_race)
+        reminded.add(invoice.id)
 
 
 def bulk_send_invoice_reminders(
@@ -238,18 +311,13 @@ def bulk_send_invoice_reminders(
             total=total_buckets,
         )
 
-    # Idempotency. Resellers already reminded TODAY (e.g. a retry after a
-    # 'failed' job, or a re-click) are skipped below so they aren't dunned twice.
-    # The set is the clean pre-check; the (reseller, sent_on) DB unique catches
-    # races / concurrent runs.
-    from apps.commissioning.models import ReminderSending
-
+    # Idempotency. Invoices already reminded TODAY (e.g. a retry after a
+    # 'failed' job, or a re-click) are left out below so they aren't dunned
+    # twice; another invoice of the same reseller is still reminded. The set is
+    # the clean pre-check; the (invoice, sent_on) DB unique catches races /
+    # concurrent runs.
     today = timezone.localdate()
-    already_reminded_today: set[str] = set(
-        ReminderSending.objects.filter(sent_on=today).values_list(
-            "reseller_id", flat=True
-        )
-    )
+    already_reminded_today = _invoices_reminded_on(today, by_reseller.values())
 
     # One EmailService for the whole run — its __init__ queries TenantEmailConfig
     # once, so building it per reseller bucket repeated that query N times.
@@ -257,21 +325,11 @@ def bulk_send_invoice_reminders(
 
     for bucket in by_reseller.values():
         reseller = bucket["reseller"]
-        invoices_with_orders = bucket["invoices"]
-
-        # Skip a reseller already reminded today — record as success (they WERE
-        # reminded, just not now) so a re-run shows them handled, not failed.
-        if reseller.id in already_reminded_today:
+        invoices_with_orders = _leave_out_reminded(
+            bucket["invoices"], already_reminded_today, results
+        )
+        if not invoices_with_orders:
             successful_buckets += 1
-            for order, invoice in invoices_with_orders:
-                results.append(
-                    {
-                        "order_id": str(order.id),
-                        "invoice_number": invoice.full_number,
-                        "success": True,
-                        "skipped": "already_reminded_today",
-                    }
-                )
             processed += 1
             _emit_progress()
             continue
@@ -296,27 +354,14 @@ def bulk_send_invoice_reminders(
         if success:
             successful_buckets += 1
 
-            # Record the send so a retry/re-click today skips this reseller.
-            # Guarded against a concurrent run racing on the same (reseller, day).
-            def _create_reminder_record(reseller=reseller):
-                ReminderSending.objects.create(reseller=reseller, sent_on=today)
-                already_reminded_today.add(reseller.id)
-
-            def _on_reminder_race(reseller=reseller):
-                logger.warning(
-                    "remindersending.race reseller=%s — concurrent reminder send, "
-                    "dedup row already exists",
-                    reseller.id,
-                )
-
-            create_send_record_idempotent(
-                _create_reminder_record, on_race=_on_reminder_race
+            _record_reminders(
+                reseller, invoices_with_orders, today, already_reminded_today
             )
             for order, invoice in invoices_with_orders:
                 results.append(
                     {
                         "order_id": str(order.id),
-                        "invoice_number": (invoice.full_number),
+                        "invoice_number": invoice.full_number,
                         "success": True,
                     }
                 )

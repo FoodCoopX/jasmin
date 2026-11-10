@@ -28,10 +28,8 @@ import {
 } from "@features/commissioning/hooks/useOrdersData";
 import { refuseRepeatedCrateType } from "@features/commissioning/hooks/useDocumentCrateTable";
 import { OrderDaySelectors } from "@features/commissioning/selectors/OrderDaySelectors";
-import {
-  missingOrderDays,
-  orderDayConfigs,
-} from "@features/commissioning/utils/orderDays";
+import { useOrderDayConfigs } from "@features/commissioning/hooks/useOrderDayConfigs";
+import { missingOrderDays } from "@features/commissioning/utils/orderDays";
 import { OrderInfoPanel } from "@features/commissioning/components/OrderInfoPanel";
 import "./Orders.css";
 
@@ -224,7 +222,7 @@ export default function Orders() {
     [setOrderDays],
   );
 
-  const dayConfigs = useMemo(() => orderDayConfigs(t), [t]);
+  const dayConfigs = useOrderDayConfigs();
 
   // Editing must follow the ORDER's finalized flag (what the backend actually
   // gates on — see FinalizedProtectedMixin), NOT the presence of a delivery

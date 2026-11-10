@@ -271,7 +271,7 @@ export default function CustomerOrderPage() {
 
   if (!resellerId) {
     return (
-      <div style={{ padding: "48px", textAlign: "center" }}>
+      <div className="customer-order-no-reseller">
         <h1>{t("customer.no_reseller_linked")}</h1>
         <Text type="secondary">{t("customer.contact_admin")}</Text>
       </div>
@@ -279,10 +279,10 @@ export default function CustomerOrderPage() {
   }
 
   return (
-    <div style={{ padding: "24px", maxWidth: "1200px", margin: "0 auto" }}>
+    <div className="customer-order-page">
       <CustomerOrderHeader reseller={reseller} logoUrl={logoUrl} />
 
-      <div style={{ marginBottom: "24px" }}>
+      <div className="mb-24">
         <WeekSelector
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
@@ -304,14 +304,7 @@ export default function CustomerOrderPage() {
       {/* Order-level summary OUTSIDE the offer card: always rendered (with a
           dash placeholder) so the layout doesn't shift once an order exists.
           The total spans both the offers and the other-articles table. */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
+      <div className="flex-center-y gap-16 mb-16">
         <Text type="secondary">
           {t("resellers.order_number")}:{" "}
           <Text strong>
@@ -325,7 +318,7 @@ export default function CustomerOrderPage() {
         {orderInfo?.isLocked && (
           <Tag color="blue">{t("customer.finalized")}</Tag>
         )}
-        <Text type="secondary" style={{ marginLeft: "auto" }}>
+        <Text type="secondary" className="customer-order-total">
           {t("customer.total")}:{" "}
           <Text strong>
             {totalOrderSum > 0 ? formatCurrency(totalOrderSum) : "—"}
@@ -340,33 +333,27 @@ export default function CustomerOrderPage() {
             title={
               <>
                 {t("customer.available_offers")}
-                <Text
-                  type="secondary"
-                  style={{ marginLeft: 12, fontWeight: "normal", fontSize: 14 }}
-                >
+                <Text type="secondary" className="customer-order-week">
                   {t("customer.week")} {selectedWeek} / {selectedYear}
                 </Text>
                 {orderingDeadline && (
                   <Tag
                     color={isOrderingClosed ? "red" : "green"}
-                    style={{ marginLeft: 8 }}
+                    className="ml-8"
                   >
                     {t("customer.order_deadline")}:{" "}
                     {formatDateTime(orderingDeadline, `dddd, ${dateFormat}`)}
                   </Tag>
                 )}
                 {isPastWeek && (
-                  <Tag color="default" style={{ marginLeft: 8 }}>
+                  <Tag color="default" className="ml-8">
                     {t("customer.finalized")}
                   </Tag>
                 )}
               </>
             }
           >
-            <Text
-              type="secondary"
-              style={{ marginLeft: 10, fontWeight: "normal", fontSize: 11 }}
-            >
+            <Text type="secondary" className="customer-order-net-prices">
               {t("customer.prices_are_netto")}
             </Text>
             <ReadOnlyReportTable
@@ -385,7 +372,7 @@ export default function CustomerOrderPage() {
           the table is invisible otherwise. Own columns: amount + unit, per-unit
           price, rabatt, line total. */}
       {otherArticleRows.length > 0 && (
-        <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+        <Row gutter={[24, 24]} className="mt-24">
           <Col xs={24}>
             <Card
               title={t("customer.other_articles")}

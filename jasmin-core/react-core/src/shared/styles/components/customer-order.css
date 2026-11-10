@@ -1,0 +1,31 @@
+/* The customer's order page (CustomerOrderPage). */
+.customer-order-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Shown instead of the page when the login has no reseller. */
+.customer-order-no-reseller {
+  padding: 48px;
+  text-align: center;
+}
+
+/* The order's total, pushed to the right end of the summary row. */
+.customer-order-total {
+  margin-left: auto;
+}
+
+/* The selected week beside the offers card's title. */
+.customer-order-week {
+  margin-left: 12px;
+  font-weight: normal;
+  font-size: 14px;
+}
+
+/* The note that prices are net, above the offers table. */
+.customer-order-net-prices {
+  margin-left: 10px;
+  font-weight: normal;
+  font-size: 11px;
+}

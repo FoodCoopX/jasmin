@@ -86,10 +86,7 @@ export default function MemberStatsCards({
     const coopValue = (count: number, worth: string) => (
       <>
         {format(count, 0)}
-        <span
-          className="summary-stats-card__subvalue"
-          style={{ display: "block" }}
-        >
+        <span className="summary-stats-card__subvalue d-block">
           {formatCurrency(Number(worth))}
         </span>
       </>
@@ -117,14 +114,7 @@ export default function MemberStatsCards({
   ]);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        marginBottom: 12,
-      }}
-    >
+    <div className="flex-col gap-8 mb-12">
       <SummaryStatsCard
         title={t("statistics.section_members")}
         stats={memberItems}

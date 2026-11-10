@@ -660,9 +660,9 @@ REGISTRY: dict[str, EmailTemplateSpec] = {
             "Wird an das Büro gesendet, wenn beim nächtlichen automatischen "
             "Verlängerungslauf ein oder mehrere Abos NICHT verlängert werden "
             "konnten (z. B. keine passende Anteils-Variante deckt die neue "
-            "Laufzeit ab, oder der Verteilstationstag reicht nicht hinein) — "
-            "damit das Büro die betroffenen Mitglieder prüfen und ggf. manuell "
-            "verlängern kann."
+            "Laufzeit ab, für sie ist kein Preis hinterlegt, oder der "
+            "Verteilstationstag reicht nicht hinein) — damit das Büro die "
+            "betroffenen Mitglieder prüfen und ggf. manuell verlängern kann."
         ),
         default_template="commissioning/emails/subscription_renewal_failures_office",
         default_subject=(

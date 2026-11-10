@@ -12,8 +12,10 @@ import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
  * The Invoice and DeliveryNote documents stay distinct — this only shares the
  * byte-for-byte identical new-line seed, not the documents themselves.
  */
-export function makeContentCustomEdit(defaultTaxRateArticles: number) {
-  return (record: TableRecord, form: FormInstance): TableRecord => {
+export function makeContentCustomEdit<T extends TableRecord = TableRecord>(
+  defaultTaxRateArticles: number,
+) {
+  return (record: T, form: FormInstance): T => {
     if (record.key === -1) {
       const defaultValues = {
         size: "M",
@@ -21,7 +23,7 @@ export function makeContentCustomEdit(defaultTaxRateArticles: number) {
         tax_rate: defaultTaxRateArticles,
       };
       form.setFieldsValue(defaultValues);
-      return { ...record, ...defaultValues } as TableRecord;
+      return { ...record, ...defaultValues };
     }
     return record;
   };

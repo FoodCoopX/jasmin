@@ -17,49 +17,49 @@ viewset queryset stays lean. Callers must keep the matching
 ``select_related`` chain (see ``_build_subscription_queryset``) to avoid N+1.
  */
 export interface Subscription {
-  readonly id?: string;
+  readonly id: string;
   /** Get human-readable display ID */
-  readonly display_id?: string;
-  readonly renewal_display_id?: string;
+  readonly display_id: string;
+  readonly renewal_display_id: string;
   member: string;
   share_type_variation: string;
-  readonly member_first_name?: string;
-  readonly member_last_name?: string;
-  readonly member_string?: string;
-  readonly email?: string;
+  readonly member_first_name: string;
+  readonly member_last_name: string;
+  readonly member_string: string;
+  readonly email: string;
   /** @nullable */
-  readonly pickup_name?: string | null;
+  readonly pickup_name: string | null;
   /** @nullable */
-  readonly member_cancelled_at?: string | null;
-  readonly share_type_variation_string?: string;
-  readonly share_type_name?: string;
-  readonly share_type_variation_size?: string;
+  readonly member_cancelled_at: string | null;
+  readonly share_type_variation_string: string;
+  readonly share_type_name: string;
+  readonly share_type_variation_size: string;
   /** @nullable */
-  readonly delivery_cycle?: string | null;
-  readonly requires_optin?: boolean;
-  readonly payment_cycle_name?: string;
+  readonly delivery_cycle: string | null;
+  readonly requires_optin: boolean;
+  readonly payment_cycle_name: string;
   /** @nullable */
-  readonly delivery_day_number?: number | null;
+  readonly delivery_day_number: number | null;
   /** @nullable */
-  readonly delivery_station_name?: string | null;
+  readonly delivery_station_name: string | null;
   /** @nullable */
-  readonly cancellation_reason?: string | null;
+  readonly cancellation_reason: string | null;
   is_trial: boolean;
   /** @minimum 1 */
   quantity: number;
   /** @pattern ^-?\d{0,6}(?:\.\d{0,2})?$ */
   price_per_delivery: string;
   /** @nullable */
-  readonly notice_period_duration?: number | null;
+  readonly notice_period_duration: number | null;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;
-  readonly can_be_deleted?: boolean;
-  readonly deliveries_count?: number;
-  readonly jokers_taken?: number;
-  readonly amount_of_jokers?: number;
-  readonly donation_jokers_taken?: number;
-  readonly amount_of_donation_jokers?: number;
+  readonly can_be_deleted: boolean;
+  readonly deliveries_count: number;
+  readonly jokers_taken: number;
+  readonly amount_of_jokers: number;
+  readonly donation_jokers_taken: number;
+  readonly amount_of_donation_jokers: number;
   /**
    * Cancellation deadline = valid_until - N weeks. None when blank.
 
@@ -79,51 +79,51 @@ Pass-through cases:
     valid_until.
    * @nullable
    */
-  readonly automatically_renewed_at?: string | null;
-  readonly admin_confirmed?: boolean;
+  readonly automatically_renewed_at: string | null;
+  readonly admin_confirmed: boolean;
   /** @nullable */
-  readonly admin_confirmed_at?: string | null;
+  readonly admin_confirmed_at: string | null;
   /** @nullable */
-  readonly admin_rejected_at?: string | null;
+  readonly admin_rejected_at: string | null;
   /** @nullable */
-  readonly admin_rejection_reason?: string | null;
-  readonly created_at?: string;
+  readonly admin_rejection_reason: string | null;
+  readonly created_at: string;
   /** @nullable */
-  readonly cancelled_at?: string | null;
+  readonly cancelled_at: string | null;
   /** @nullable */
-  readonly cancelled_effective_at?: string | null;
+  readonly cancelled_effective_at: string | null;
   on_waiting_list?: boolean;
-  readonly waiting_list_status?: WaitingListStatusEnum;
+  readonly waiting_list_status: WaitingListStatusEnum;
   /** @nullable */
-  readonly waiting_list_position?: number | null;
+  readonly waiting_list_position: number | null;
   /** @nullable */
-  readonly notification_sent_at?: string | null;
+  readonly notification_sent_at: string | null;
   /** @nullable */
-  readonly notification_expires_at?: string | null;
+  readonly notification_expires_at: string | null;
   /** @nullable */
-  readonly response_received_at?: string | null;
+  readonly response_received_at: string | null;
   /** @nullable */
-  readonly notification_token?: string | null;
+  readonly notification_token: string | null;
   /** @nullable */
-  readonly waiting_list_reason?: SubscriptionWaitingListReason;
+  readonly waiting_list_reason: SubscriptionWaitingListReason;
   /** @nullable */
-  readonly subscription_number?: number | null;
-  readonly renewal_generation?: number;
+  readonly subscription_number: number | null;
+  readonly renewal_generation: number;
   /** @nullable */
-  readonly admin_confirmed_by?: string | null;
+  readonly admin_confirmed_by: string | null;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   /** @nullable */
-  readonly cancelled_by?: string | null;
+  readonly cancelled_by: string | null;
   /** @nullable */
-  readonly previous_subscription?: string | null;
+  readonly previous_subscription: string | null;
   payment_cycle: string;
   /** @nullable */
   default_delivery_station_day?: string | null;
   /** @nullable */
-  readonly admin_confirmed_by_name?: string | null;
+  readonly admin_confirmed_by_name: string | null;
   /** @nullable */
-  readonly created_by_name?: string | null;
+  readonly created_by_name: string | null;
   /** @nullable */
-  readonly cancelled_by_name?: string | null;
+  readonly cancelled_by_name: string | null;
 }

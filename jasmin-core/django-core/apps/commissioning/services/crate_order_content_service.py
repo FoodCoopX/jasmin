@@ -238,7 +238,9 @@ class CrateOrderContentService:
             )
             written_pks = [row.pk for row in line if row.order_id]
         if update_fields and written_pks:
-            CrateOrderContent.objects.filter(pk__in=written_pks).update(**update_fields)
+            CrateContentService.write_rows(
+                CrateOrderContent.objects.filter(pk__in=written_pks), update_fields
+            )
         if new_total < current_total:
             CrateOrderContentService._take_off_line(line, row_pk, new_total)
         elif new_total > current_total:
@@ -385,7 +387,7 @@ class CrateOrderContentService:
             crate_order_content.pk,
         )
         result["order_id"] = order.id
-        # Mirror the OrderContent path (_serialize_order_metadata) and the
+        # Mirror the OrderContent path (serialize_order_metadata) and the
         # refresh metadata block: the frontend formats the order number as
         # "{prefix}-{display_number}" and seeds those two fields identically
         # from the create response and from a reload. A crates-first save must

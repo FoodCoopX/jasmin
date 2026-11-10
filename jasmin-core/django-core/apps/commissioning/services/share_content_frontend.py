@@ -15,7 +15,6 @@ from apps.shared.iso_week_filters import iso_week_window
 from apps.shared.money import round_money
 
 from ..models import (
-    DeliveryStationDay,
     Forecast,
     ShareArticle,
     ShareContent,
@@ -29,6 +28,7 @@ from ..utils.iso_week_utils import (
     previous_monday,
     weeks_in_range,
 )
+from .delivery_tours import tour_numbers_by_week
 from .share_content_stock import ShareContentStock
 from .stock_service import StockService
 
@@ -154,27 +154,17 @@ class ShareContentFrontendData(ShareContentStock):
     def _prefetch_tour_numbers(
         all_share_contents: list[ShareContent],
     ) -> dict[tuple, int | None]:
-        """Batch the DeliveryStationDay tour_number lookup keyed by
-        (delivery_station_id, delivery_day_id) — avoids a per-row query."""
-        delivery_day_ids = {
-            share_content.share.delivery_day_id for share_content in all_share_contents
-        }
-        station_ids = {
-            share_content.delivery_station_id for share_content in all_share_contents
-        }
-        tour_number_lookup: dict[tuple, int | None] = {}
-        if station_ids and delivery_day_ids:
-            for delivery_station_day in DeliveryStationDay.objects.filter(
-                delivery_station_id__in=station_ids,
-                delivery_day_id__in=delivery_day_ids,
-            ):
-                tour_number_lookup[
-                    (
-                        delivery_station_day.delivery_station_id,
-                        delivery_station_day.delivery_day_id,
-                    )
-                ] = delivery_station_day.tour_number
-        return tour_number_lookup
+        """The tour of each content's station in its week, keyed by
+        (delivery_station_id, delivery_day_id, year, delivery_week)."""
+        return tour_numbers_by_week(
+            (
+                share_content.delivery_station_id,
+                share_content.share.delivery_day_id,
+                share_content.share.year,
+                share_content.share.delivery_week,
+            )
+            for share_content in all_share_contents
+        )
 
     @staticmethod
     def _prefetch_stock_by_week(
@@ -363,10 +353,15 @@ class ShareContentFrontendData(ShareContentStock):
         group_row["variations"][station_key] = amount_str
 
         tour_number = tour_number_lookup.get(
-            (share_content.delivery_station_id, share.delivery_day_id)
+            (
+                share_content.delivery_station_id,
+                share.delivery_day_id,
+                share.year,
+                share.delivery_week,
+            )
         )
         # Tour 0 is a real tour (the field allows it and the save path writes
-        # its cells); only a station with no station day that day has no tour.
+        # its cells); only a station with no station day that week has no tour.
         if tour_number is not None:
             tour_key = f"{base_key}_tour_{tour_number}"
             if tour_key not in group_row["tour_variations"]:

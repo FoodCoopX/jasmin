@@ -48,6 +48,7 @@ class TestExtractForecastFields:
 # get_forecasts_with_relations
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetForecastsWithRelations:
     def test_returns_forecast_with_variation_flags(self, tenant):
         article = ShareArticleFactory()

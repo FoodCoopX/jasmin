@@ -223,12 +223,12 @@ export default function Jokers() {
         />
       </div>
 
-      <div style={{ height: "2em" }}></div>
+      <div className="jokers-spacer"></div>
       {/* Both tables are always shown; an empty one renders "no data". */}
       <h2>{t("abos.jokers")}</h2>
       {boxTable(jokerColumns, jokerRows, jokerFetching)}
 
-      <h2 style={{ marginTop: "2em" }}>{t("abos.donation_jokers")}</h2>
+      <h2 className="mt-2em">{t("abos.donation_jokers")}</h2>
       {boxTable(donationColumns, donationRows, donationFetching)}
 
       <ExplainerText title={t("common.info")}>

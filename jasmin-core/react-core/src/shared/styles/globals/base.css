@@ -91,40 +91,158 @@
   width: max-content;
 }
 
-.mb-1em {
-  margin-bottom: 1em;
+/* Spacing steps. They stand in for inline styles, which outrank every rule in
+   a stylesheet, and AntD's own rules (a heading's margins, a form item's)
+   outrank a single class: hence !important. */
+.m-0 {
+  margin: 0 !important;
 }
 
-.mb-0 {
-  margin-bottom: 0;
+.mt-0 {
+  margin-top: 0 !important;
 }
 
-.mb-16 {
-  margin-bottom: 16px;
+.mt-4 {
+  margin-top: 4px !important;
 }
 
-.mb-3em {
-  margin-bottom: 3em;
-}
-
-.mt-0-5em {
-  margin-top: 0.5em;
+.mt-8 {
+  margin-top: 8px !important;
 }
 
 .mt-12 {
-  margin-top: 12px;
+  margin-top: 12px !important;
 }
 
 .mt-16 {
-  margin-top: 16px;
+  margin-top: 16px !important;
+}
+
+.mt-24 {
+  margin-top: 24px !important;
+}
+
+.mt-0-5em {
+  margin-top: 0.5em !important;
 }
 
 .mt-1em {
-  margin-top: 1em;
+  margin-top: 1em !important;
 }
 
 .mt-2em {
-  margin-top: 2em;
+  margin-top: 2em !important;
+}
+
+.mt-4em {
+  margin-top: 4em !important;
+}
+
+.mb-0 {
+  margin-bottom: 0 !important;
+}
+
+.mb-4 {
+  margin-bottom: 4px !important;
+}
+
+.mb-8 {
+  margin-bottom: 8px !important;
+}
+
+.mb-12 {
+  margin-bottom: 12px !important;
+}
+
+.mb-16 {
+  margin-bottom: 16px !important;
+}
+
+.mb-20 {
+  margin-bottom: 20px !important;
+}
+
+.mb-24 {
+  margin-bottom: 24px !important;
+}
+
+.mb-1em {
+  margin-bottom: 1em !important;
+}
+
+.mb-2em {
+  margin-bottom: 2em !important;
+}
+
+.mb-3em {
+  margin-bottom: 3em !important;
+}
+
+.ml-8 {
+  margin-left: 8px !important;
+}
+
+.p-0 {
+  padding: 0 !important;
+}
+
+.p-24 {
+  padding: 24px !important;
+}
+
+.pl-20 {
+  padding-left: 20px !important;
+}
+
+/* Display and alignment. A plain class: AntD rarely sets these on the
+   elements they go on; where it does, more specifically, keep the style in
+   the component's own CSS. */
+.d-block {
+  display: block;
+}
+
+.d-inline-flex {
+  display: inline-flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.items-start {
+  align-items: flex-start;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-0-5em {
+  gap: 0.5em;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.h-screen {
+  height: 100vh;
+}
+
+.bg-base {
+  background: var(--color-bg-base);
+}
+
+.bg-page {
+  background: var(--color-page-bg);
 }
 
 .text-center {

@@ -11,7 +11,6 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningShareArticlesListParams,
-  PatchedShareArticle,
   ShareArticle,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
@@ -36,6 +35,7 @@ import {
   useOrganicGate,
   useTenant,
   useUnitOptions,
+  useTenantLanguageT,
 } from "@hooks/index";
 import {
   useCrates,
@@ -57,24 +57,19 @@ const SHARE_ARTICLE_LIST_PARAMS: CommissioningShareArticlesListParams = {
   is_data_list: true,
 };
 
-// Typed on TableRecord (not ShareArticle & TableRecord): this page's columns +
-// customEdit are TableRecord-typed, so keeping the whole page on TableRecord
-// avoids a generic clash. The create/update casts sit here (one place).
-const shareArticlesResource: CrudResource<TableRecord> = {
+type ShareArticleRow = ShareArticle & TableRecord;
+
+const shareArticlesResource: CrudResource<ShareArticleRow> = {
   useList: useCommissioningShareArticlesList,
-  create: (payload) =>
-    commissioningShareArticlesCreate(payload as unknown as ShareArticle),
-  update: (id, payload) =>
-    commissioningShareArticlesPartialUpdate(
-      id,
-      payload as PatchedShareArticle,
-    ),
+  create: commissioningShareArticlesCreate,
+  update: commissioningShareArticlesPartialUpdate,
   delete: commissioningShareArticlesDestroy,
   getListQueryKey: getCommissioningShareArticlesListQueryKey,
 };
 
 export default function ListShareArticles() {
   const { t } = useTranslation();
+  const tenantT = useTenantLanguageT();
   const { getSetting } = useTenant();
   const { canEdit, isOffice: canManagePrices } = useRoles();
   const { enabled: organicGateEnabled } = useOrganicGate();
@@ -100,7 +95,7 @@ export default function ListShareArticles() {
     [canEdit],
   );
 
-  const list = useCrudListPage<TableRecord>({
+  const list = useCrudListPage<ShareArticleRow>({
     resource: shareArticlesResource,
     permissions,
     listParams: SHARE_ARTICLE_LIST_PARAMS,
@@ -146,7 +141,7 @@ export default function ListShareArticles() {
   // (disabled → grey background is the only cue; no "—" placeholder leaks into
   // the save payload).
   const renderHarvestNumber = useCallback(
-    (decimals: number) => (value: number, record: TableRecord) =>
+    (decimals: number) => (value: unknown, record: TableRecord) =>
       isHarvestDisabled(record)
         ? null
         : value
@@ -155,7 +150,7 @@ export default function ListShareArticles() {
     [format],
   );
   const renderPurchaseNumber = useCallback(
-    (decimals: number) => (value: number, record: TableRecord) =>
+    (decimals: number) => (value: unknown, record: TableRecord) =>
       isPurchaseDisabled(record)
         ? null
         : value
@@ -185,7 +180,7 @@ export default function ListShareArticles() {
       const synced = syncPurchasedName(
         (transformedData.name as string) || "",
         !!transformedData.is_purchased,
-        t,
+        tenantT,
       );
 
       return {
@@ -195,12 +190,12 @@ export default function ListShareArticles() {
         share_option_list,
       };
     },
-    [shareOptions, t],
+    [shareOptions, tenantT],
   );
 
   const customEdit = useCallback(
     (
-      record: TableRecord,
+      record: ShareArticleRow,
       form: { setFieldsValue: (values: Record<string, unknown>) => void },
     ) => {
       if (record.key === -1) {
@@ -322,7 +317,7 @@ export default function ListShareArticles() {
         />
       </Flex>
 
-      <EditableTable
+      <EditableTable<ShareArticleRow>
         columns={columns}
         apiFunctions={list.apiFunctions}
         uniqueCheck={["name", "default_movement_unit", "is_purchased"]}

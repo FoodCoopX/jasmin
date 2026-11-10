@@ -47,9 +47,18 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
+// Per-test tenant settings over the mock's own.
+const tenantSettings = vi.hoisted(() => ({ values: {} as Record<string, unknown> }));
 vi.mock("@hooks/configuration/useTenant", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
-  const tenant = makeUseTenantMock();
+  const base = makeUseTenantMock();
+  const tenant = {
+    ...base,
+    getSetting: (key: string, defaultValue?: unknown) =>
+      key in tenantSettings.values
+        ? tenantSettings.values[key]
+        : base.getSetting(key, defaultValue),
+  };
   return { useTenant: () => tenant };
 });
 
@@ -358,6 +367,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   auth.roles = ["office"];
+  tenantSettings.values = {};
   plan = [
     planned(2026, 39, TUESDAY),
     planned(2026, 39, FRIDAY, { changed_day_number: SATURDAY }),
@@ -456,6 +466,18 @@ describe("ShareDays loading", () => {
 });
 
 // ── Choosing the week ───────────────────────────────────────────────────────
+
+describe("ShareDays on a farm that hides washing and cleaning", () => {
+  it("shows no washing or cleaning day", async () => {
+    tenantSettings.values = { show_washing: false, show_cleaning: false };
+    renderPage();
+    await loaded();
+
+    expect(screen.queryByText(WASHING)).not.toBeInTheDocument();
+    expect(screen.queryByText(CLEANING)).not.toBeInTheDocument();
+    expect(screen.getAllByText(HARVESTING).length).toBeGreaterThan(0);
+  });
+});
 
 describe("ShareDays choosing the week", () => {
   it("loads next week's plan from the week arrow, with the delivery moved for a holiday", async () => {

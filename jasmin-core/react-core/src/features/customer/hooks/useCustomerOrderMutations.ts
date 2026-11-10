@@ -5,11 +5,10 @@ import {
   commissioningOrderContentsPartialUpdate,
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
-  OrderContent,
-  PatchedOrderContent,
+  OrderContentRequest,
+  PatchedOrderContentRequest,
   UnitEnum,
 } from "@shared/api/generated/models";
-import type { Writable } from "@shared/api/typeHelpers";
 import { notify, pickTierPrice } from "@shared/utils";
 import {
   getErrorCode,
@@ -122,7 +121,7 @@ export function useCustomerOrderMutations({
         : {};
 
       if (record.order_content_id) {
-        const patch: PatchedOrderContent = {
+        const patch: PatchedOrderContentRequest = {
           amount: computedAmount,
           ...pricing,
         };
@@ -134,7 +133,7 @@ export function useCustomerOrderMutations({
       }
 
       if (!resellerId) return;
-      const payload: Writable<OrderContent> = {
+      const payload: OrderContentRequest = {
         offer: offerId,
         year: selectedYear,
         delivery_week: selectedWeek,

@@ -28,34 +28,21 @@ export default function HarvestingCrateSummary({
     return (
       <Card
         size="small"
-        style={{
-          backgroundColor: "var(--color-highlight)",
-          marginTop: "1em",
-          marginBottom: "1em",
-          fontSize: "0.8em",
-        }}
+        className="harvesting-crate-summary-card"
         styles={{ body: { padding: "8px 12px" } }}
         title={
-          <span style={{ fontSize: "0.85em" }}>
+          <span className="text-label-sm">
             {t("commissioning.needed_harvesting_crates")}
           </span>
         }
       >
         {crateSummary.length === 0 ? (
-          <div className="text-muted">{t("table.no_data")}</div>
+          <div className="color-text-tertiary">{t("table.no_data")}</div>
         ) : (
           crateSummary.map((item) => (
-            <div
-              key={item.key}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "2px 0",
-                borderBottom: "1px solid var(--color-highlight-border)",
-              }}
-            >
-              <span style={{ fontWeight: 500 }}>{item.crate_name}</span>
-              <span style={{ fontWeight: 600 }}>{item.quantity}</span>
+            <div key={item.key} className="harvesting-crate-summary-row">
+              <span className="font-medium">{item.crate_name}</span>
+              <span className="font-semibold">{item.quantity}</span>
             </div>
           ))
         )}
@@ -85,13 +72,12 @@ export default function HarvestingCrateSummary({
   ];
 
   return (
-    <div style={{ marginBottom: "2em", marginTop: "2em" }}>
+    <div className="mt-2em mb-2em">
       <ReadOnlyReportTable
         columns={columns}
         dataSource={crateSummary}
         pagination={false}
-        className="compact-table custom-jasmin-table"
-        style={{ width: "22em", marginTop: "1em" }}
+        className="compact-table custom-jasmin-table harvesting-crate-summary-table mt-1em"
       />
     </div>
   );

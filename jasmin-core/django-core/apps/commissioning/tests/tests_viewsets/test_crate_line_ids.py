@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from urllib.parse import urlencode
 
 import pytest
+from auditlog.models import LogEntry
 from django.db.models import Q
 from django.urls import reverse
 from rest_framework import status
@@ -43,6 +44,12 @@ TAX = Decimal("19.00")
 
 def _line_id(crate, *rows) -> str:
     return f"{crate.id}_{min(str(row.pk) for row in rows)}"
+
+
+def _audited_fields(row) -> set[str]:
+    """The fields the audit log records an update of on ``row``."""
+    entries = LogEntry.objects.get_for_object(row).filter(action=LogEntry.Action.UPDATE)
+    return set().union(*(entry.changes_dict for entry in entries))
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +215,24 @@ class TestDocumentCrateLineIds:
         assert sum(row.amount for row in _rows(document, "2.70")) == 3
         assert [row.pk for row in _rows(document, "2.00")] == [old.pk]
         assert resp.data["amount"] == 3
+
+    def test_a_price_edit_is_in_the_audit_log_of_every_row_of_its_line(
+        self, api_client, document
+    ):
+        first = _row(document, 2, "2.50")
+        second = _row(document, 1, "2.50")
+
+        resp = _patch(
+            api_client,
+            document,
+            _line_id(document.crate, first, second),
+            amount=3,
+            price_per_unit="2.70",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert "price_per_unit" in _audited_fields(first)
+        assert "price_per_unit" in _audited_fields(second)
 
     def test_the_row_naming_a_line_survives_a_reduction(self, api_client, document):
         first = _row(document, 3, "2.50")
@@ -1010,6 +1035,7 @@ class TestOrderCrateLineOfferBoundFields:
             5,
             "Pallet",
         )
+        assert {"price_per_unit", "rabatt", "note"} <= _audited_fields(direct)
 
     def test_the_crate_lines_say_how_many_crates_come_with_order_lines(
         self, api_client, order

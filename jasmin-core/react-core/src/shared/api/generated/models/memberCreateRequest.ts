@@ -5,8 +5,6 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
-import type { MemberCreateRequestLinkedUserInfo } from './memberCreateRequestLinkedUserInfo';
-import type { WaitingListStatusEnum } from './waitingListStatusEnum';
 import type { MemberCreateRequestEmail } from './memberCreateRequestEmail';
 
 /**
@@ -15,56 +13,12 @@ fields plus the optional ``notify_user`` flag, which the view strips
 before validating with the plain :class:`MemberSerializer`.
  */
 export interface MemberCreateRequest {
-  readonly id?: string;
-  /** @nullable */
-  readonly linked_user_info?: MemberCreateRequestLinkedUserInfo;
-  readonly active_subscriptions_count?: number;
-  /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */
-  readonly coop_shares_total?: string;
-  /** @pattern ^-?\d{0,12}(?:\.\d{0,2})?$ */
-  readonly coop_shares_value?: string;
-  readonly coop_shares_pending_count?: number;
-  /** @nullable */
-  readonly payback_due_date?: string | null;
-  readonly iban_masked?: string;
-  readonly account_owner_masked?: string;
   notify_user?: boolean;
-  readonly admin_confirmed?: boolean;
-  /** @nullable */
-  readonly admin_confirmed_at?: string | null;
-  /** @nullable */
-  readonly admin_rejected_at?: string | null;
-  /** @nullable */
-  readonly admin_rejection_reason?: string | null;
-  readonly created_at?: string;
-  /** @nullable */
-  readonly cancelled_at?: string | null;
-  /** @nullable */
-  readonly cancelled_effective_at?: string | null;
   on_waiting_list?: boolean;
-  readonly waiting_list_status?: WaitingListStatusEnum;
-  /** @nullable */
-  readonly waiting_list_position?: number | null;
-  /** @nullable */
-  readonly notification_sent_at?: string | null;
-  /** @nullable */
-  readonly notification_expires_at?: string | null;
-  /** @nullable */
-  readonly response_received_at?: string | null;
-  /** @nullable */
-  readonly notification_token?: string | null;
   is_active?: boolean;
-  /** @nullable */
-  readonly entry_date?: string | null;
   is_trial?: boolean;
   /** @nullable */
-  readonly trial_converted_at?: string | null;
-  /** @nullable */
-  readonly cancellation_email_sent_at?: string | null;
-  /** @nullable */
   birth_date?: string | null;
-  /** @nullable */
-  readonly member_number?: number | null;
   /**
    * @maxLength 255
    * @nullable
@@ -121,14 +75,6 @@ export interface MemberCreateRequest {
    */
   iban?: string | null;
   /** @nullable */
-  readonly sepa_consent?: string | null;
-  /** @nullable */
-  readonly withdrawal_consent?: string | null;
-  /** @nullable */
-  readonly privacy_consent?: string | null;
-  /** @nullable */
-  readonly consent_withdrawn_at?: string | null;
-  /** @nullable */
   membership_paper_received_at?: string | null;
   /** @nullable */
   cancellation_reason?: string | null;
@@ -147,17 +93,4 @@ export interface MemberCreateRequest {
   email_3?: string | null;
   /** @nullable */
   note?: string | null;
-  /** @nullable */
-  readonly admin_confirmed_by?: string | null;
-  /** @nullable */
-  readonly created_by?: string | null;
-  /** @nullable */
-  readonly cancelled_by?: string | null;
-  /** @nullable */
-  readonly user?: string | null;
-  readonly can_be_deleted?: boolean;
-  /** @nullable */
-  readonly admin_confirmed_by_name?: string | null;
-  /** @nullable */
-  readonly created_by_name?: string | null;
 }

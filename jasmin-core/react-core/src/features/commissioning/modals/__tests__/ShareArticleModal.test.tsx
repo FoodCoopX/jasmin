@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ActiveShareOptions, ShareArticle } from "@shared/api/generated/models";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
+import { makeShareArticle } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders, type ProfileRendersHandle } from "@/test/profileRenders";
 
 // One `t` for every render, as react-i18next keeps it.
@@ -537,7 +538,7 @@ describe("ShareArticleModal saving", () => {
     await user.type(nameInput(), "{Enter}{Enter}");
 
     expect(api.createArticle).toHaveBeenCalledTimes(1);
-    answer({ id: "article-kale", name: "Kale", default_movement_unit: "BUNCH" });
+    answer(makeShareArticle({ id: "article-kale", name: "Kale", default_movement_unit: "BUNCH" }));
     await dialogClosed();
     expect(api.createArticle).toHaveBeenCalledTimes(1);
     expect(onSuccess).toHaveBeenCalledTimes(1);
@@ -554,7 +555,7 @@ describe("ShareArticleModal saving", () => {
 
     await waitFor(() => expect(saveButton()).toHaveClass("ant-btn-loading"));
     expect(onSuccess).not.toHaveBeenCalled();
-    answer({ id: "article-kale", name: "Kale", default_movement_unit: "BUNCH" });
+    answer(makeShareArticle({ id: "article-kale", name: "Kale", default_movement_unit: "BUNCH" }));
     await dialogClosed();
     expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ id: "article-kale" }));
   });

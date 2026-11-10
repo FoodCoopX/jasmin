@@ -329,13 +329,7 @@ export default function Members() {
         render: (value: unknown, record: MemberRecord) => {
           const display =
             record.is_trial && !value ? (
-              <span
-                style={{
-                  fontSize: "0.85em",
-                  color: "var(--color-text-muted)",
-                  fontStyle: "italic",
-                }}
-              >
+              <span className="text-secondary text-italic">
                 {t("commissioning.trial_member")}
               </span>
             ) : (
@@ -386,7 +380,7 @@ export default function Members() {
                   : undefined,
               render: (value: unknown) => (value ? "✓" : ""),
             },
-          ] as EditableColumnConfig<MemberRecord>[])
+          ] satisfies EditableColumnConfig<MemberRecord>[])
         : []),
       {
         // GenG §30 Eintrittsdatum — the date the Vorstand admitted
@@ -507,7 +501,7 @@ export default function Members() {
                 );
               },
             },
-          ] as EditableColumnConfig<MemberRecord>[])
+          ] satisfies EditableColumnConfig<MemberRecord>[])
         : []),
 
       contactColumns.firstName,

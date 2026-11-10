@@ -352,7 +352,7 @@ export default function ConfigurationShareTypeVariations() {
               value: "ALL_FOUR_WEEKS",
             },
           ],
-          render: (value: string) => {
+          render: (value: unknown) => {
             const option: Record<string, string> = {
               WEEKLY: t("commissioning.weekly"),
               ODD_WEEKS: t("commissioning.odd_weeks"),
@@ -360,12 +360,13 @@ export default function ConfigurationShareTypeVariations() {
               ALL_THREE_WEEKS: t("commissioning.all_three_weeks"),
               ALL_FOUR_WEEKS: t("commissioning.all_four_weeks"),
             };
-            return option[value] || value;
+            const cycle = String(value ?? "");
+            return option[cycle] || cycle;
           },
         },
         {
           title: (
-            <div style={{ fontSize: "0.85em" }}>
+            <div className="text-label-sm">
               {t("commissioning.share_type_variation_sizes_in_use")}
             </div>
           ),
@@ -376,15 +377,15 @@ export default function ConfigurationShareTypeVariations() {
           width: "8em",
           readOnly: true,
           align: "left",
-          render: (value: string) => (
-            <>{getShareTypeVariationSizeLabel(value)}</>
+          render: (value: unknown) => (
+            <>{getShareTypeVariationSizeLabel(String(value ?? ""))}</>
           ),
         },
         // Jokers are a subscription's skipped weeks; a tenant that uploads
         // its weekly share amounts runs no subscriptions.
         ...(weeklyUpload
           ? []
-          : [
+          : ([
               {
                 title: (
                   <div className="checkbox-column-title">
@@ -399,7 +400,9 @@ export default function ConfigurationShareTypeVariations() {
                 // Always editable; the "may only increase while in use" floor
                 // is enforced in ``customSave`` (mirrors the capacity floor).
                 render: (_: unknown, record: TableRecord) =>
-                  record.amount_of_jokers == 0 ? "-" : record.amount_of_jokers,
+                  record.amount_of_jokers == 0
+                    ? "-"
+                    : String(record.amount_of_jokers ?? ""),
               },
               {
                 title: (
@@ -417,9 +420,9 @@ export default function ConfigurationShareTypeVariations() {
                 render: (_: unknown, record: TableRecord) =>
                   record.amount_of_donation_jokers == 0
                     ? "-"
-                    : record.amount_of_donation_jokers,
+                    : String(record.amount_of_donation_jokers ?? ""),
               },
-            ]),
+            ] satisfies EditableColumnConfig<TableRecord>[])),
         {
           title: (
             <>
@@ -472,7 +475,7 @@ export default function ConfigurationShareTypeVariations() {
             </Button>
           ),
         },
-      ] as EditableColumnConfig<TableRecord>[],
+      ] satisfies EditableColumnConfig<TableRecord>[],
     [
       openShareTypeVariationModal,
       activeStatusColumn,
@@ -495,14 +498,14 @@ export default function ConfigurationShareTypeVariations() {
           key: option,
           label: (
             <Flex align="center" gap={10}>
-              <span style={{ fontWeight: 500 }}>
+              <span className="font-medium">
                 {getShareOptionLabel(option)}
               </span>
               {isActive && (
                 <Tag
                   icon={<CheckCircleOutlined />}
                   color="success"
-                  style={{ borderRadius: 12, margin: 0 }}
+                  className="share-option-active-tag m-0"
                 >
                   {t("configuration.active")}
                 </Tag>
@@ -539,7 +542,7 @@ export default function ConfigurationShareTypeVariations() {
   return (
     <div>
       <h1>{t("configuration.share_type_variations")}</h1>
-      <div style={{ marginTop: "4em" }}></div>
+      <div className="mt-4em"></div>
       {/* Share Option Sections — wrapped in a titled Card so the light-blue
           ``settings-card-header`` bar matches the visual rhythm of the other
           config cards. Full width on purpose: the embedded ShareType tables
@@ -548,10 +551,7 @@ export default function ConfigurationShareTypeVariations() {
       <Collapse
         accordion={false}
         expandIcon={({ isActive }) => (
-          <CaretRightOutlined
-            rotate={isActive ? 90 : 0}
-            style={{ fontSize: 14 }}
-          />
+          <CaretRightOutlined rotate={isActive ? 90 : 0} className="text-14" />
         )}
         items={shareOptionCollapseItems}
         className="w-full"

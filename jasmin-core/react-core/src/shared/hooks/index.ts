@@ -51,6 +51,10 @@ export { useTableRowSelection } from './useTableRowSelection';
 export { useSepaMandateStatus } from './useSepaMandateStatus';
 export { useTenant } from './configuration/useTenant';
 export { useCapability } from './configuration/useCapability';
+export {
+  useWashingCleaningVisibility,
+  type WashingCleaningVisibility,
+} from './configuration/useWashingCleaningVisibility';
 export { useOnboardingMode } from './configuration/useOnboardingMode';
 export { useTenantSmtpConfigured } from './configuration/useTenantSmtpConfigured';
 export { useInvitationDisabledReason } from './configuration/useInvitationDisabledReason';
@@ -62,6 +66,7 @@ export {
   organicStatusTagColor,
   type OrganicStatus,
 } from './configuration/useOrganicGate';
+export { useTenantLanguageT } from './configuration/useTenantLanguageT';
 export { useTheme } from './configuration/useTheme';
 export { useUnconfirmedMembers } from './useUnconfirmedMembers';
 export { useUnconfirmedCoopShares } from './useUnconfirmedCoopShares';

@@ -3,13 +3,14 @@
  * articles, and the waste recorded in week 41 and week 39 of 2026.
  */
 import type { ShareArticle, Storage, Waste } from "@shared/api/generated/models";
+import { makeShareArticle, makeStorage } from "@/test/modelFixtures";
 
-export const COLD_STORE: Storage = { id: "st-cold", name: "Cold store", is_active: true };
-export const ROOT_CELLAR: Storage = { id: "st-cellar", name: "Root cellar", is_active: true };
-export const FARM_SHOP: Storage = { id: "st-shop", name: "Farm shop", is_active: true };
+export const COLD_STORE: Storage = makeStorage({ id: "st-cold", name: "Cold store", is_active: true });
+export const ROOT_CELLAR: Storage = makeStorage({ id: "st-cellar", name: "Root cellar", is_active: true });
+export const FARM_SHOP: Storage = makeStorage({ id: "st-shop", name: "Farm shop", is_active: true });
 export const STORAGES = [COLD_STORE, ROOT_CELLAR, FARM_SHOP];
 
-export const article = (name: string, unit: ShareArticle["default_movement_unit"]): ShareArticle => ({
+export const article = (name: string, unit: ShareArticle["default_movement_unit"]): ShareArticle => makeShareArticle({
   id: `sa-${name.toLowerCase()}`, name, default_movement_unit: unit, is_active: true,
 });
 
@@ -39,6 +40,7 @@ export const waste = (
   fields: Partial<WasteRow> = {},
 ): WasteRow => ({
   id,
+  created_at: "2026-10-06T12:00:00Z",
   year: 2026,
   delivery_week: when.week,
   day_number: when.day as Waste["day_number"],

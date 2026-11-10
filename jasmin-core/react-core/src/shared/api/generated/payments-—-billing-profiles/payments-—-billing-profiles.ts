@@ -27,41 +27,15 @@ import type {
 import type {
   BillingProfile,
   BillingProfileMember,
+  BillingProfileRequest,
   ErrorResponse,
-  MySepaMandate,
-  PatchedBillingProfile,
+  MySepaMandateRequest,
+  PatchedBillingProfileRequest,
   PaymentsBillingProfilesListParams,
-  ReplaceMandate
+  ReplaceMandateRequest
 } from '.././models';
 
 import { axiosService } from '../../../services/api';
-
-// https://stackoverflow.com/questions/49579094/typescript-conditional-types-filter-out-readonly-properties-pick-only-requir/49579497#49579497
-type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
-T,
->() => T extends Y ? 1 : 2
-? A
-: B;
-
-type WritableKeys<T> = {
-[P in keyof T]-?: IfEquals<
-  { [Q in P]: T[P] },
-  { -readonly [Q in P]: T[P] },
-  P
->;
-}[keyof T];
-
-type UnionToIntersection<U> =
-  (U extends any ? (k: U)=>void : never) extends ((k: infer I)=>void) ? I : never;
-type DistributeReadOnlyOverUnions<T> = T extends any ? NonReadonly<T> : never;
-
-type Writable<T> = Pick<T, WritableKeys<T>>;
-type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
-  [P in keyof Writable<T>]: T[P] extends object
-    ? NonReadonly<NonNullable<T[P]>>
-    : T[P];
-} : DistributeReadOnlyOverUnions<T>;
-
 
 
 
@@ -175,7 +149,7 @@ silent, un-stepped-up PATCH. Only ``notes`` PATCHes without prompting.
  * @summary Create a billing profile (Office only)
  */
 export const paymentsBillingProfilesCreate = (
-    billingProfile: NonReadonly<BillingProfile>,
+    billingProfileRequest: BillingProfileRequest,
  signal?: AbortSignal
 ) => {
       
@@ -183,7 +157,7 @@ export const paymentsBillingProfilesCreate = (
       return axiosService<BillingProfile>(
       {url: `/api/payments/billing_profiles/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: billingProfile, signal
+      data: billingProfileRequest, signal
     },
       );
     }
@@ -191,8 +165,8 @@ export const paymentsBillingProfilesCreate = (
 
 
 export const getPaymentsBillingProfilesCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>, TError,{data: NonReadonly<BillingProfile>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>, TError,{data: NonReadonly<BillingProfile>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>, TError,{data: BillingProfileRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>, TError,{data: BillingProfileRequest}, TContext> => {
 
 const mutationKey = ['paymentsBillingProfilesCreate'];
 const {mutation: mutationOptions} = options ?
@@ -204,7 +178,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>, {data: NonReadonly<BillingProfile>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>, {data: BillingProfileRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  paymentsBillingProfilesCreate(data,)
@@ -216,18 +190,18 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PaymentsBillingProfilesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>>
-    export type PaymentsBillingProfilesCreateMutationBody = NonReadonly<BillingProfile>
+    export type PaymentsBillingProfilesCreateMutationBody = BillingProfileRequest
     export type PaymentsBillingProfilesCreateMutationError = ErrorResponse
 
     /**
  * @summary Create a billing profile (Office only)
  */
 export const usePaymentsBillingProfilesCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>, TError,{data: NonReadonly<BillingProfile>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>, TError,{data: BillingProfileRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof paymentsBillingProfilesCreate>>,
         TError,
-        {data: NonReadonly<BillingProfile>},
+        {data: BillingProfileRequest},
         TContext
       > => {
 
@@ -354,14 +328,14 @@ silent, un-stepped-up PATCH. Only ``notes`` PATCHes without prompting.
  */
 export const paymentsBillingProfilesUpdate = (
     id: string,
-    billingProfile: NonReadonly<BillingProfile>,
+    billingProfileRequest: BillingProfileRequest,
  ) => {
       
       
       return axiosService<BillingProfile>(
       {url: `/api/payments/billing_profiles/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: billingProfile
+      data: billingProfileRequest
     },
       );
     }
@@ -369,8 +343,8 @@ export const paymentsBillingProfilesUpdate = (
 
 
 export const getPaymentsBillingProfilesUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>, TError,{id: string;data: NonReadonly<BillingProfile>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>, TError,{id: string;data: NonReadonly<BillingProfile>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>, TError,{id: string;data: BillingProfileRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>, TError,{id: string;data: BillingProfileRequest}, TContext> => {
 
 const mutationKey = ['paymentsBillingProfilesUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -382,7 +356,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>, {id: string;data: NonReadonly<BillingProfile>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>, {id: string;data: BillingProfileRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  paymentsBillingProfilesUpdate(id,data,)
@@ -394,18 +368,18 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PaymentsBillingProfilesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>>
-    export type PaymentsBillingProfilesUpdateMutationBody = NonReadonly<BillingProfile>
+    export type PaymentsBillingProfilesUpdateMutationBody = BillingProfileRequest
     export type PaymentsBillingProfilesUpdateMutationError = ErrorResponse
 
     /**
  * @summary Replace a billing profile (Office only)
  */
 export const usePaymentsBillingProfilesUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>, TError,{id: string;data: NonReadonly<BillingProfile>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>, TError,{id: string;data: BillingProfileRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof paymentsBillingProfilesUpdate>>,
         TError,
-        {id: string;data: NonReadonly<BillingProfile>},
+        {id: string;data: BillingProfileRequest},
         TContext
       > => {
 
@@ -429,14 +403,14 @@ silent, un-stepped-up PATCH. Only ``notes`` PATCHes without prompting.
  */
 export const paymentsBillingProfilesPartialUpdate = (
     id: string,
-    patchedBillingProfile: NonReadonly<PatchedBillingProfile>,
+    patchedBillingProfileRequest: PatchedBillingProfileRequest,
  ) => {
       
       
       return axiosService<BillingProfile>(
       {url: `/api/payments/billing_profiles/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedBillingProfile
+      data: patchedBillingProfileRequest
     },
       );
     }
@@ -444,8 +418,8 @@ export const paymentsBillingProfilesPartialUpdate = (
 
 
 export const getPaymentsBillingProfilesPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedBillingProfile>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedBillingProfile>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>, TError,{id: string;data: PatchedBillingProfileRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>, TError,{id: string;data: PatchedBillingProfileRequest}, TContext> => {
 
 const mutationKey = ['paymentsBillingProfilesPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -457,7 +431,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>, {id: string;data: NonReadonly<PatchedBillingProfile>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>, {id: string;data: PatchedBillingProfileRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  paymentsBillingProfilesPartialUpdate(id,data,)
@@ -469,18 +443,18 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PaymentsBillingProfilesPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>>
-    export type PaymentsBillingProfilesPartialUpdateMutationBody = NonReadonly<PatchedBillingProfile>
+    export type PaymentsBillingProfilesPartialUpdateMutationBody = PatchedBillingProfileRequest
     export type PaymentsBillingProfilesPartialUpdateMutationError = ErrorResponse
 
     /**
  * @summary Patch a billing profile (Office only)
  */
 export const usePaymentsBillingProfilesPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedBillingProfile>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>, TError,{id: string;data: PatchedBillingProfileRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof paymentsBillingProfilesPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedBillingProfile>},
+        {id: string;data: PatchedBillingProfileRequest},
         TContext
       > => {
 
@@ -566,7 +540,7 @@ export const usePaymentsBillingProfilesDestroy = <TError = ErrorResponse,
  */
 export const paymentsBillingProfilesReplaceMandateCreate = (
     id: string,
-    replaceMandate: ReplaceMandate,
+    replaceMandateRequest: ReplaceMandateRequest,
  signal?: AbortSignal
 ) => {
       
@@ -574,7 +548,7 @@ export const paymentsBillingProfilesReplaceMandateCreate = (
       return axiosService<BillingProfile>(
       {url: `/api/payments/billing_profiles/${id}/replace_mandate/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: replaceMandate, signal
+      data: replaceMandateRequest, signal
     },
       );
     }
@@ -582,8 +556,8 @@ export const paymentsBillingProfilesReplaceMandateCreate = (
 
 
 export const getPaymentsBillingProfilesReplaceMandateCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>, TError,{id: string;data: ReplaceMandate}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>, TError,{id: string;data: ReplaceMandate}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>, TError,{id: string;data: ReplaceMandateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>, TError,{id: string;data: ReplaceMandateRequest}, TContext> => {
 
 const mutationKey = ['paymentsBillingProfilesReplaceMandateCreate'];
 const {mutation: mutationOptions} = options ?
@@ -595,7 +569,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>, {id: string;data: ReplaceMandate}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>, {id: string;data: ReplaceMandateRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  paymentsBillingProfilesReplaceMandateCreate(id,data,)
@@ -607,18 +581,18 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PaymentsBillingProfilesReplaceMandateCreateMutationResult = NonNullable<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>>
-    export type PaymentsBillingProfilesReplaceMandateCreateMutationBody = ReplaceMandate
+    export type PaymentsBillingProfilesReplaceMandateCreateMutationBody = ReplaceMandateRequest
     export type PaymentsBillingProfilesReplaceMandateCreateMutationError = ErrorResponse
 
     /**
  * @summary Replace the SEPA mandate (Office only)
  */
 export const usePaymentsBillingProfilesReplaceMandateCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>, TError,{id: string;data: ReplaceMandate}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>, TError,{id: string;data: ReplaceMandateRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof paymentsBillingProfilesReplaceMandateCreate>>,
         TError,
-        {id: string;data: ReplaceMandate},
+        {id: string;data: ReplaceMandateRequest},
         TContext
       > => {
 
@@ -631,7 +605,7 @@ export const usePaymentsBillingProfilesReplaceMandateCreate = <TError = ErrorRes
  * @summary Sign the member's own SEPA mandate (self-service)
  */
 export const paymentsMySepaMandateCreate = (
-    mySepaMandate: MySepaMandate,
+    mySepaMandateRequest: MySepaMandateRequest,
  signal?: AbortSignal
 ) => {
       
@@ -639,7 +613,7 @@ export const paymentsMySepaMandateCreate = (
       return axiosService<BillingProfileMember | BillingProfileMember>(
       {url: `/api/payments/my_sepa_mandate/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: mySepaMandate, signal
+      data: mySepaMandateRequest, signal
     },
       );
     }
@@ -647,8 +621,8 @@ export const paymentsMySepaMandateCreate = (
 
 
 export const getPaymentsMySepaMandateCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandate}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandate}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandateRequest}, TContext> => {
 
 const mutationKey = ['paymentsMySepaMandateCreate'];
 const {mutation: mutationOptions} = options ?
@@ -660,7 +634,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, {data: MySepaMandate}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, {data: MySepaMandateRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  paymentsMySepaMandateCreate(data,)
@@ -672,18 +646,18 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PaymentsMySepaMandateCreateMutationResult = NonNullable<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>>
-    export type PaymentsMySepaMandateCreateMutationBody = MySepaMandate
+    export type PaymentsMySepaMandateCreateMutationBody = MySepaMandateRequest
     export type PaymentsMySepaMandateCreateMutationError = ErrorResponse
 
     /**
  * @summary Sign the member's own SEPA mandate (self-service)
  */
 export const usePaymentsMySepaMandateCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandate}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>, TError,{data: MySepaMandateRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof paymentsMySepaMandateCreate>>,
         TError,
-        {data: MySepaMandate},
+        {data: MySepaMandateRequest},
         TContext
       > => {
 

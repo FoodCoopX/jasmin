@@ -97,8 +97,7 @@ export default function SuperAdminSupportTickets() {
       <header className="sa-app-header">
         <button
           onClick={() => navigate("/")}
-          className="sa-btn sa-btn--header"
-          style={{ marginRight: 8 }}
+          className="sa-btn sa-btn--header sa-header-nav-btn"
         >
           ← Dashboard
         </button>
@@ -117,9 +116,8 @@ export default function SuperAdminSupportTickets() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="sa-form-input"
+                className="sa-form-input sa-ticket-status-filter"
                 aria-label="Filter by status"
-                style={{ width: "10em" }}
               >
                 <option value="">All statuses</option>
                 {TICKET_STATUSES.map((s) => (
@@ -289,7 +287,7 @@ function TicketDetailPanel({ id, onBack }: { id: string; onBack: () => void }) {
             <span className="sa-ticket-meta-label">Reporter</span>
             <span>
               {ticket.creator_name}{" "}
-              <span style={{ color: "var(--color-text-secondary)" }}>
+              <span className="color-text-secondary">
                 &lt;{ticket.creator_email}&gt;
               </span>
             </span>
@@ -305,9 +303,8 @@ function TicketDetailPanel({ id, onBack }: { id: string; onBack: () => void }) {
               <select
                 value={ticket.status}
                 onChange={(e) => statusMutation.mutate(e.target.value)}
-                className="sa-form-input"
+                className="sa-form-input sa-ticket-status-select"
                 aria-label="Change status"
-                style={{ maxWidth: 200 }}
               >
                 {TICKET_STATUSES.map((s) => (
                   <option key={s} value={s}>
@@ -353,8 +350,7 @@ function TicketDetailPanel({ id, onBack }: { id: string; onBack: () => void }) {
           <button
             onClick={sendReply}
             disabled={!replyBody.trim() || replyMutation.isPending}
-            className="sa-btn sa-btn--primary"
-            style={{ marginTop: 8 }}
+            className="sa-btn sa-btn--primary mt-8"
           >
             {replyMutation.isPending ? "Sending…" : "Send reply"}
           </button>

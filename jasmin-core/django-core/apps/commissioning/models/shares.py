@@ -239,11 +239,11 @@ class ShareTypeVariation(JasminModel, TimeBoundMixin):
         blank=True,
         related_name="+",
     )
-    # Per-variation override used in MIXED packing mode. Only consulted
-    # when ``TenantSettings.packing_mode == "MIXED"``: variations with
+    # Per-variation override used in MIXED packing mode: variations with
     # ``is_packed_bulk=True`` go onto the bulk packing list and ones with
-    # ``False`` go onto the boxes packing list. Ignored in pure BULK or
-    # BOXES modes (everything goes onto the single matching list).
+    # ``False`` onto the boxes packing list. Ignored in pure BULK or BOXES
+    # modes, where a size saved takes the flag that matches the mode
+    # (``services/packing_mode.py``).
     is_packed_bulk = models.BooleanField(default=False)
 
     # ---- On-off (per-delivery opt-in) semantics --------------------
@@ -503,6 +503,10 @@ class VirtualVariationComponent(JasminModel):
     def __str__(self) -> str:
         return f"{self.virtual_variation} <- {self.physical_variation} x{self.quantity}"
 
+    def save(self, *args, **kwargs) -> None:
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
         if (
@@ -515,10 +519,6 @@ class VirtualVariationComponent(JasminModel):
             != ShareTypeVariation.VariationType.PHYSICAL
         ):
             raise ValidationError("Components must be physical variations")
-
-    def save(self, *args, **kwargs) -> None:
-        self.full_clean()
-        super().save(*args, **kwargs)
 
 
 class ShareTypeVariationGrossPrice(JasminModel, TimeBoundMixin):
@@ -547,6 +547,44 @@ class ShareTypeVariationGrossPrice(JasminModel, TimeBoundMixin):
     solidarity_min_price_per_delivery_if_trial = models.DecimalField(
         max_digits=6, decimal_places=2, blank=True, null=True
     )
+
+    class Meta:
+        constraints = [
+            # One open price window per variation (DB backstop; see
+            # ShareArticleNetPrice).
+            models.UniqueConstraint(
+                fields=["share_type_variation"],
+                condition=models.Q(valid_until__isnull=True),
+                name="sharetypevariationgrossprice_one_open_per_variation",
+            ),
+            time_bound_valid_range_constraint(
+                "sharetypevariationgrossprice_valid_range"
+            ),
+            # DB backstop for TimeBoundMixin's Python overlap check (which is
+            # TOCTOU-racy: two concurrent saves can both pass full_clean and
+            # insert overlapping windows). Two windows for the SAME variation
+            # whose inclusive [valid_from, valid_until] ranges overlap are
+            # rejected by Postgres itself; billing/renewal price resolution can
+            # then never see two active windows on one date. Requires the
+            # btree_gist extension (installed by the accompanying migration).
+            ExclusionConstraint(
+                name="sharetypevariationgrossprice_no_overlap",
+                expressions=[
+                    ("share_type_variation", RangeOperators.EQUAL),
+                    (
+                        InclusiveDateRange(
+                            "valid_from",
+                            "valid_until",
+                            RangeBoundary(inclusive_lower=True, inclusive_upper=True),
+                        ),
+                        RangeOperators.OVERLAPS,
+                    ),
+                ],
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.share_type_variation} - {self.price_per_delivery}"
 
     def clean(self) -> None:
         super().clean()
@@ -597,46 +635,20 @@ class ShareTypeVariationGrossPrice(JasminModel, TimeBoundMixin):
                 }
             )
 
-    class Meta:
-        constraints = [
-            # One open price window per variation (DB backstop; see
-            # ShareArticleNetPrice).
-            models.UniqueConstraint(
-                fields=["share_type_variation"],
-                condition=models.Q(valid_until__isnull=True),
-                name="sharetypevariationgrossprice_one_open_per_variation",
-            ),
-            time_bound_valid_range_constraint(
-                "sharetypevariationgrossprice_valid_range"
-            ),
-            # DB backstop for TimeBoundMixin's Python overlap check (which is
-            # TOCTOU-racy: two concurrent saves can both pass full_clean and
-            # insert overlapping windows). Two windows for the SAME variation
-            # whose inclusive [valid_from, valid_until] ranges overlap are
-            # rejected by Postgres itself; billing/renewal price resolution can
-            # then never see two active windows on one date. Requires the
-            # btree_gist extension (installed by the accompanying migration).
-            ExclusionConstraint(
-                name="sharetypevariationgrossprice_no_overlap",
-                expressions=[
-                    ("share_type_variation", RangeOperators.EQUAL),
-                    (
-                        InclusiveDateRange(
-                            "valid_from",
-                            "valid_until",
-                            RangeBoundary(inclusive_lower=True, inclusive_upper=True),
-                        ),
-                        RangeOperators.OVERLAPS,
-                    ),
-                ],
-            ),
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.share_type_variation} - {self.price_per_delivery}"
-
 
 class Share(JasminModel):
+    # Day field -> the SharesDeliveryDay default it falls back to when NULL. A
+    # NULL harvesting, washing or cleaning day builds no theoretical amount for
+    # the Share's contents, which then miss that list and the theoretical
+    # stock; a NULL packing day packs them on the delivery day.
+    DAY_FIELD_DEFAULTS = {
+        "harvesting_day": "default_harvesting_day",
+        "packing_day": "default_packing_day",
+        "washing_day": "default_washing_day",
+        "cleaning_day": "default_cleaning_day",
+        "get_current_stock_day": "default_get_current_stock_day",
+    }
+
     year = models.PositiveSmallIntegerField(db_index=True)
     delivery_week = delivery_week_field(db_index=True)
     delivery_day = models.ForeignKey(
@@ -691,20 +703,12 @@ class Share(JasminModel):
             ),
         ]
 
-    # Day field -> the SharesDeliveryDay default it falls back to when NULL.
-    # A NULL day field silently drops the Share from every day-filtered list
-    # (packing / harvesting / washing / cleaning), so these must always be
-    # populated whenever there's a delivery_day to source them from.
-    DAY_FIELD_DEFAULTS = {
-        "harvesting_day": "default_harvesting_day",
-        "packing_day": "default_packing_day",
-        "washing_day": "default_washing_day",
-        "cleaning_day": "default_cleaning_day",
-        "get_current_stock_day": "default_get_current_stock_day",
-    }
-
     def __str__(self) -> str:
         return f"Share W{self.delivery_week}/{self.year} - {self.share_type_variation}"
+
+    def save(self, *args, **kwargs) -> None:
+        self._apply_default_day_fields()
+        super().save(*args, **kwargs)
 
     def _apply_default_day_fields(self) -> list[str]:
         """Fill any NULL day field from the delivery_day defaults, in memory.
@@ -721,16 +725,12 @@ class Share(JasminModel):
                 changed.append(field)
         return changed
 
-    def save(self, *args, **kwargs) -> None:
-        self._apply_default_day_fields()
-        super().save(*args, **kwargs)
-
     def ensure_day_fields(self) -> bool:
         """Heal a Share whose day fields are NULL and persist if needed.
 
         ``bulk_create`` and ``get_or_create`` on a *reused* row both bypass
         the defaulting in ``save()``, so a Share can end up with NULL day
-        fields and vanish from day-filtered queries. Call this after
+        fields (see ``DAY_FIELD_DEFAULTS``). Call this after
         fetching/reusing a Share to self-heal. No-op (no write) when there's
         no delivery_day or every field is already set.
 
@@ -780,7 +780,7 @@ class Share(JasminModel):
 
         ``bulk_create`` bypasses ``save()``, so the day-field defaulting that
         ``save()`` performs must be applied up front — otherwise the row lands
-        with NULL day fields and vanishes from day-filtered queries. Use this
+        with NULL day fields (see ``DAY_FIELD_DEFAULTS``). Use this
         for the batch-materialization paths where a per-row
         ``get_or_create_for_delivery`` would be an N+1.
         """
@@ -815,6 +815,8 @@ class Share(JasminModel):
 
 
 class ShareContent(CreatedMixin, FinalizableMixin, ArchivableMixin, JasminModel):
+    archive_week_of = "share"  # a content's delivery week is its share's
+
     share = models.ForeignKey("Share", on_delete=models.CASCADE)
     share_article = models.ForeignKey(
         "ShareArticle", on_delete=models.PROTECT, related_name="+"
@@ -891,10 +893,6 @@ class ShareContent(CreatedMixin, FinalizableMixin, ArchivableMixin, JasminModel)
     def __str__(self) -> str:
         return f"{self.share_article} x{self.amount} ({self.share})"
 
-    def clean(self) -> None:
-        super().clean()
-        self._validate_forecast_dimensions()
-
     def save(self, *args, **kwargs) -> None:
         # ``JasminModel.save`` does NOT call ``full_clean``, so enforce the
         # forecast-dimension invariant here too — otherwise serializer.save() /
@@ -903,6 +901,10 @@ class ShareContent(CreatedMixin, FinalizableMixin, ArchivableMixin, JasminModel)
         # bypass this; the forecast service builds matching dimensions there.
         self._validate_forecast_dimensions()
         super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        super().clean()
+        self._validate_forecast_dimensions()
 
     def _validate_forecast_dimensions(self) -> None:
         """A linked Forecast is this content's harvest-planning source, so the
@@ -1073,6 +1075,21 @@ class ShareDelivery(JasminModel):
     def __str__(self) -> str:
         return f"Delivery {self.share} - {self.subscription}"
 
+    def save(self, *args, **kwargs) -> None:
+        # On insert: stamp ``is_opted_in`` from the variation's
+        # configured default state. Off-by-default variations (one-
+        # off boxes) leave the value at ``False``; on-by-default
+        # variations (unlimited-joker style) flip it to ``True``.
+        # Audit columns stay NULL — they only get stamped when
+        # someone (member or office) explicitly toggles via
+        # ``OptinService.toggle``.
+        if self._state.adding and self.share_id:
+            variation = self.share.share_type_variation
+            if variation.requires_optin:
+                self.is_opted_in = variation.default_optin_state
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     # ------------------------------------------------------------------ #
     # "Does this delivery count?" — single source of truth for the rule  #
     # once hand-encoded across share_demand_service, members_viewsets,    #
@@ -1141,18 +1158,3 @@ class ShareDelivery(JasminModel):
                     "Subscription's share_type_variation must match the share's "
                     "share_type_variation."
                 )
-
-    def save(self, *args, **kwargs) -> None:
-        # On insert: stamp ``is_opted_in`` from the variation's
-        # configured default state. Off-by-default variations (one-
-        # off boxes) leave the value at ``False``; on-by-default
-        # variations (unlimited-joker style) flip it to ``True``.
-        # Audit columns stay NULL — they only get stamped when
-        # someone (member or office) explicitly toggles via
-        # ``OptinService.toggle``.
-        if self._state.adding and self.share_id:
-            variation = self.share.share_type_variation
-            if variation.requires_optin:
-                self.is_opted_in = variation.default_optin_state
-        self.full_clean()
-        super().save(*args, **kwargs)

@@ -18,6 +18,7 @@ bounds mirror the query-param catalogue (year / delivery_week /
 day_number).
  */
 export interface CrateOrderContentCreateRequest {
+  /** @minLength 1 */
   crate_type: string;
   /** @minimum 1 */
   amount: number;
@@ -36,6 +37,7 @@ export interface CrateOrderContentCreateRequest {
    * @maximum 6
    */
   day_number: number;
+  /** @minLength 1 */
   reseller: string;
   /**
    * @nullable

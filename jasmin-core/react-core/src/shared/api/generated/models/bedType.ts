@@ -7,7 +7,7 @@
  */
 
 export interface BedType {
-  readonly id?: string;
+  readonly id: string;
   /**
    * @maxLength 200
    * @nullable

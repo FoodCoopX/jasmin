@@ -80,9 +80,7 @@ export default function SuperAdminDashboard() {
   if (error) {
     return (
       <div className="sa-fullscreen-error">
-        <div style={{ fontSize: "18px", color: "var(--color-error)" }}>
-          {error}
-        </div>
+        <div className="text-18 text-error">{error}</div>
         <button onClick={refetchTenants} className="sa-btn sa-btn--info">
           Retry
         </button>
@@ -98,15 +96,13 @@ export default function SuperAdminDashboard() {
       <header className="sa-app-header">
         <button
           onClick={() => navigate("/ops-checklist")}
-          className="sa-btn sa-btn--header"
-          style={{ marginRight: 8 }}
+          className="sa-btn sa-btn--header sa-header-nav-btn"
         >
           Ops Checklist
         </button>
         <button
           onClick={() => navigate("/support-tickets")}
-          className="sa-btn sa-btn--header"
-          style={{ marginRight: 8 }}
+          className="sa-btn sa-btn--header sa-header-nav-btn"
         >
           Support Tickets
         </button>

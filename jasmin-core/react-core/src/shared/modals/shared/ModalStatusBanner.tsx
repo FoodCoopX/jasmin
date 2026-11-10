@@ -104,7 +104,7 @@ export const ModalStatusBanner: FC<ModalStatusBannerProps> = ({
       type={config.alertType}
       showIcon
       icon={config.icon}
-      style={{ marginBottom: 16 }}
+      className="mb-16"
       message={title ?? config.defaultTitle}
       description={
         hasAt || hasReason ? (
@@ -115,7 +115,7 @@ export const ModalStatusBanner: FC<ModalStatusBannerProps> = ({
               </Paragraph>
             )}
             {hasReason && (
-              <Paragraph style={{ marginBottom: 0 }}>
+              <Paragraph className="mb-0">
                 {t("members.reject_reason_label")}:{" "}
                 <em>{reason}</em>
               </Paragraph>

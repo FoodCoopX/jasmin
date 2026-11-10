@@ -111,6 +111,34 @@ describe("useDeliveryStationsPerDay", () => {
       result.current.stationsPerDay.map((stations) => stations.map((s) => s.value)),
     ).toEqual([["tue-station"], ["thu-station"]]);
   });
+
+  it("asks for a week's stations, keeping deactivated ones only for a past week", async () => {
+    // A Sunday: this week's Saturday lies behind it, but the week is this one.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 11, 12, 0));
+    client.stationsQueryOptions.mockImplementation((params: object) => ({
+      queryKey: ["stations", params],
+      queryFn: async () => [],
+    }));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    renderHook(() => useDeliveryStationsPerDay(["tue"], "2026-10-03"), { wrapper });
+    renderHook(() => useDeliveryStationsPerDay(["tue"], "2026-10-10"), { wrapper });
+    vi.useRealTimers();
+
+    expect(client.stationsQueryOptions).toHaveBeenCalledWith({
+      delivery_day: "tue",
+      active_at_date: "2026-10-03",
+    });
+    expect(client.stationsQueryOptions).toHaveBeenCalledWith({
+      is_active: true,
+      delivery_day: "tue",
+      active_at_date: "2026-10-10",
+    });
+  });
 });
 
 describe("useShareOptions", () => {

@@ -194,6 +194,7 @@
   },
   "share_content": {
     "invalid": "Eintrag ungültig — bitte die Daten prüfen.",
+    "already_planned": "Dieser Artikel ist für diesen Anteil schon geplant — bitte die Seite neu laden und den vorhandenen Eintrag ändern.",
     "not_found": "Eintrag nicht gefunden.",
     "invalid_composite_id": "Ungültige Kennung für den Anteilsinhalt.",
     "invalid_pk": "Ungültige Kennung für den Anteilsinhalt.",
@@ -219,7 +220,8 @@
     "capacity_below_occupancy": "Kapazität kann nicht auf {{capacity}} gesetzt werden — in KW {{week}}/{{year}} sind bereits {{peak}} Anteile gebucht. Bitte mindestens {{peak}} wählen.",
     "in_use": "Diese Verteilstation kann nicht gelöscht werden, weil noch Lieferungen auf ihre Abholtage verweisen. Bitte zuerst die Lieferungen verschieben oder beenden.",
     "not_found": "Verteilstation nicht gefunden.",
-    "more_than_one_fee": "Nur eine Gebühr ist möglich: pro Kiste, pro Monat oder pro Jahr."
+    "more_than_one_fee": "Nur eine Gebühr ist möglich: pro Kiste, pro Monat oder pro Jahr.",
+    "name_required": "Eine Verteilstation braucht ein Kürzel oder einen Firmennamen."
   },
   "my_data": {
     "shared_station_identity_locked": "Name und Adresse dieses Kontos gehören zu einer Verteilstation und können hier nicht geändert werden — bitte ans Büro wenden. E-Mail, Telefon und Bankverbindung bleiben änderbar."
@@ -261,11 +263,15 @@
     "offer_not_in_offer_group": "Dieses Angebot gehört nicht zu deiner Angebotsgruppe.",
     "offer_not_finalized": "Dieses Angebot ist noch nicht freigegeben.",
     "offer_week_mismatch": "Dieses Angebot gilt für eine andere Woche als die Bestellung.",
-    "item_change_forbidden": "Angebot oder Artikel einer Bestellposition kann nur das Büro ändern.",
+    "item_change_forbidden": "Das Angebot einer Bestellposition lässt sich nicht ändern, den Artikel nur das Büro.",
+    "offer_change_refused": "Das Angebot einer Bestellposition lässt sich nicht ändern: die Position löschen und mit dem anderen Angebot neu anlegen.",
     "amount_negative": "Die bestellte Menge darf nicht negativ sein."
   },
   "orderable_item": {
     "reference_invalid": "Eine Position muss genau eine Sache enthalten: entweder ein Angebot oder einen Artikel — nicht beides und nicht nichts."
+  },
+  "packing_mode": {
+    "switch_changes_packing": "Der Pack-Modus kann nicht gewechselt werden, solange diese laufenden oder künftigen Größen anders gepackt werden: {{sizes}}. In „gemischt“ wird jede Größe so gepackt, wie bei ihr eingetragen."
   },
   "packing_list": {
     "amounts_diverge_across_stations": "Die Packmengen unterscheiden sich je nach Verteilstation. Bitte eine Verteilstation (oder Tour) auswählen, um die Packliste anzuzeigen."
@@ -363,7 +369,7 @@
   },
   "shares_delivery_day": {
     "not_found": "Für den angegebenen Tag wurde kein aktiver Liefertag gefunden.",
-    "tours_reduced_while_in_use": "Dieser Liefertag wird bereits verwendet – die Anzahl der Touren kann nur erhöht, nicht verringert werden. Eine Verringerung würde Lieferungen auf den entfernten Touren verwaisen lassen.",
+    "tours_reduced_while_in_use": "An diesem Liefertag sind noch Stationen auf Tour {{highest_tour}} – die Anzahl der Touren kann nicht unter {{highest_tour}} sinken.",
     "shortening_strands_children": "Dieser Liefertag kann nicht zu diesem Datum beendet werden: Zukünftige Stationstage oder Anteile würden danach noch bestehen und verwaisen. Lege stattdessen über eine Nachfolge (neuen Liefertag anlegen) einen Nachfolger an oder wähle ein späteres Enddatum.",
     "start_move_strands_children": "Der Beginn dieses Liefertags kann nicht auf dieses Datum verschoben werden: Bestehende Stationstage oder Anteile liegen davor und wären dann nicht mehr abgedeckt. Wähle ein früheres Startdatum oder verschiebe diese Objekte zuerst.",
     "succession_coverage_gap": "Die Liefertag-Nachfolge konnte nicht abgeschlossen werden: Für eine Station fehlt am neuen Tag ein Stationstag, der die betroffene Woche abdeckt. Richte diesen Stationstag zuerst ein und versuche es erneut.",
@@ -376,7 +382,8 @@
     "in_use": "Dieser Abholtag kann nicht gelöscht werden, weil noch Lieferungen darauf verweisen. Bitte zuerst die Lieferungen verschieben oder beenden.",
     "unknown": "Am {{date}} wird keine Verteilstation „{{delivery_station}}“ am Liefertag {{delivery_day}} beliefert.",
     "ambiguous": "Am {{date}} werden {{matches}} Verteilstationen namens „{{delivery_station}}“ am Liefertag {{delivery_day}} beliefert — bitte eindeutige Kurznamen vergeben.",
-    "tour_number_below_one": "Touren beginnen bei 1. Bitte den Stationstag in der Tourenplanung einer Tour zuordnen."
+    "tour_number_below_one": "Touren beginnen bei 1. Bitte den Stationstag in der Tourenplanung einer Tour zuordnen.",
+    "missing_for_tour": "Die Verteilstation „{{delivery_station}}“ wird ab {{valid_from}} am Liefertag {{delivery_day}} nicht beliefert. Bitte zuerst im Dialog der Verteilstation einen Stationstag anlegen."
   },
   "inventory_entry": {
     "not_found": "Inventureintrag nicht gefunden."
@@ -527,7 +534,8 @@
   },
   "default_share_content": {
     "invalid_composite_id": "Ungültige Kennung für die Standard-Anteilsinhalte.",
-    "no_amounts": "Es wurden keine Mengen für Anteilsvarianten angegeben."
+    "no_amounts": "Es wurden keine Mengen für Anteilsvarianten angegeben.",
+    "no_running_week": "Keine der Größen mit einer Menge läuft in den geplanten Wochen. Bitte Wochen wählen, in denen eine dieser Größen läuft."
   },
   "documentation": {
     "invalid_model": "Ungültiger Modelltyp für die Dokumentation.",
@@ -570,6 +578,7 @@
     "details": "Details:"
   },
   "cultivation": {
+    "plot_name_required": "Eine Fläche braucht einen Namen.",
     "no_batches_to_place": "Für dieses Jahr sind keine finalisierten Freiland-Sätze hinterlegt — es gibt nichts zu planen.",
     "no_plots_available": "Für keine Freiland-Fläche sind Beete hinterlegt. Bitte zuerst Beete je Fläche eintragen.",
     "batch_does_not_fit": "Dieser Satz braucht mehr zusammenhängende Zellen, als eine passende Fläche bietet. Entweder mehr Beete dieses Typs anlegen oder den Beet-Typ des Satzes leeren.",

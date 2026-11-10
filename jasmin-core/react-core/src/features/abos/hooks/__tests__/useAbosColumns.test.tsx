@@ -1,7 +1,8 @@
 /**
  * ``useAbosColumns`` passes the tenant's onboarding mode to
  * ``useSubscriptionTerm`` as ``allowPastStart``: the Abos grid is edited by the
- * office only, so while the mode is on any Monday may be the start date.
+ * office only, so while the mode is on any Monday may be the start date. A
+ * row's suggested price is the one of the price window its start falls in.
  *
  * Boundary mocked: react-i18next, every hook the column factory reads and the
  * shared column / UI modules except the real ``LinkButton``. The term hook
@@ -26,6 +27,20 @@ vi.mock("react-i18next", () => ({
 const hookState = vi.hoisted(() => ({
   onboardingMode: false,
   termOptions: undefined as { allowPastStart?: boolean } | undefined,
+}));
+
+// The size's price windows: 20.00 from 5 January 2026, 22.00 (15.00 for a
+// trial) from 4 January 2027.
+vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
+  useCommissioningShareTypeVariationPriceList: () => ({
+    data: [
+      { share_type_variation: "var-m", valid_from: "2026-01-05", valid_until: "2027-01-03", price_per_delivery: "20.00" },
+      {
+        share_type_variation: "var-m", valid_from: "2027-01-04", valid_until: null,
+        price_per_delivery: "22.00", price_per_delivery_if_trial: "15.00",
+      },
+    ],
+  }),
 }));
 
 vi.mock("@hooks/configuration/useTenant", () => ({
@@ -96,7 +111,7 @@ function renderColumns(
     useAbosColumns({
       members: [],
       paymentCycles,
-      allShareTypeVariations: [],
+      allShareTypeVariations: [{ value: "var-m", active_price_per_delivery: "20.00" }],
       variationDeliveryCycleById: new Map(),
       getDeliveryStationDaysForRow: () => [],
       getShareTypeVariationsForRow: () => [],
@@ -205,5 +220,45 @@ describe("useAbosColumns member link", () => {
     await user.click(link);
 
     expect(screen.queryByText("Member page")).not.toBeInTheDocument();
+  });
+});
+
+describe("useAbosColumns suggested price", () => {
+  /** Moves the start of a row of the M size, whose price field holds `price`. */
+  function moveStart(validFrom: string, price: string, isTrial = false) {
+    const column = renderColumns().result.current.columns.find(
+      (candidate: { key?: unknown }) => candidate.key === "valid_from",
+    );
+    const values: Record<string, unknown> = {
+      share_type_variation_string: "var-m",
+      price_per_delivery: price,
+      is_trial: isTrial,
+    };
+    const form = { setFieldsValue: vi.fn(), getFieldValue: (name: string) => values[name] };
+    column?.onFieldChange?.(
+      validFrom,
+      { key: -1 },
+      form as unknown as Parameters<NonNullable<typeof column.onFieldChange>>[2],
+      "valid_from",
+    );
+    return form.setFieldsValue;
+  }
+
+  it("follows the start into the price window it falls in", () => {
+    expect(moveStart("04.01.2027", "20.00")).toHaveBeenCalledWith({ price_per_delivery: "22.00" });
+  });
+
+  it("suggests a trial row the window's trial price", () => {
+    expect(moveStart("04.01.2027", "", true)).toHaveBeenCalledWith({ price_per_delivery: "15.00" });
+  });
+
+  it("falls back to today's price for a start before every window", () => {
+    expect(moveStart("29.12.2025", "22.00")).toHaveBeenCalledWith({ price_per_delivery: "20.00" });
+  });
+
+  it("keeps a price the office typed", () => {
+    expect(moveStart("04.01.2027", "18.50")).not.toHaveBeenCalledWith(
+      expect.objectContaining({ price_per_delivery: expect.anything() }),
+    );
   });
 });

@@ -12,8 +12,8 @@ import type { TenantEmailConfigAccountingEmail } from './tenantEmailConfigAccoun
  * SMTP-only email config. ``smtp_password`` is write-only.
  */
 export interface TenantEmailConfig {
-  readonly id?: number;
-  readonly tenant?: string;
+  readonly id: number;
+  readonly tenant: string;
   /**
    * @maxLength 255
    * @nullable
@@ -30,9 +30,7 @@ export interface TenantEmailConfig {
    * @nullable
    */
   smtp_username?: string | null;
-  /** @nullable */
-  smtp_password?: string | null;
-  readonly has_smtp_password?: boolean;
+  readonly has_smtp_password: boolean;
   smtp_use_tls?: boolean;
   smtp_use_ssl?: boolean;
   /**
@@ -59,7 +57,7 @@ export interface TenantEmailConfig {
   max_emails_per_hour?: number;
   is_active?: boolean;
   /** Set to True when a test send through this SMTP host succeeds. */
-  readonly is_verified?: boolean;
-  readonly created_at?: string;
-  readonly updated_at?: string;
+  readonly is_verified: boolean;
+  readonly created_at: string;
+  readonly updated_at: string;
 }

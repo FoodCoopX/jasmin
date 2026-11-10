@@ -185,7 +185,7 @@ export default function ConfigurationDeliveryExceptions() {
         onSaveSuccess={onSaveSuccess}
         onDeleteSuccess={onDeleteSuccess}
         permissions={permissions}
-        style={{ width: "70%" }}
+        className="custom-jasmin-table delivery-exceptions-table"
       />
       <DateRangeStatusLegend />
 

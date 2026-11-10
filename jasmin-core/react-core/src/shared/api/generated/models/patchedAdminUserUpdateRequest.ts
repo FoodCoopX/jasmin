@@ -12,14 +12,23 @@ import type { AccountStatusEnum } from './accountStatusEnum';
  * All fields optional — PATCH semantics.
  */
 export interface PatchedAdminUserUpdateRequest {
-  /** @maxLength 255 */
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   first_name?: string;
-  /** @maxLength 255 */
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   last_name?: string;
   /** @nullable */
   user_language?: PatchedAdminUserUpdateRequestUserLanguage;
   roles?: string[];
   account_status?: AccountStatusEnum;
-  /** @nullable */
+  /**
+   * @minLength 1
+   * @nullable
+   */
   reseller_id?: string | null;
 }

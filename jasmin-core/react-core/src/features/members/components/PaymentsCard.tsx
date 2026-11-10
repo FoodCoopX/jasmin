@@ -114,7 +114,7 @@ interface PaymentsCardProps {
 const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
   const { t } = useTranslation();
   const { formatCurrency } = useCurrency();
-  const { formatDate } = useDateFormat();
+  const { formatDate, monthFormat } = useDateFormat();
   // Office viewer → the SEPA modal opens in office mode (signed date, custom
   // reference, paper-received). A member viewing their own card — whatever
   // staff roles they also hold — gets the plain self-service form, which the
@@ -258,15 +258,7 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
             {group.isPaid && <Tag color="default">{t("members.paid")}</Tag>}
           </Space>
           {group.items.map((item, i) => (
-            <div
-              key={`${item.label}-${i}`}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
-                gap: 8,
-              }}
-            >
+            <div key={`${item.label}-${i}`} className="payment-charge-row">
               <Space size={6}>
                 <Text type="secondary">{item.label}</Text>
 
@@ -276,7 +268,7 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
                 type={group.items.length > 1 ? "secondary" : undefined}
                 strong
                 delete={item.status === "WAIVED"}
-                style={{ whiteSpace: "nowrap", marginLeft: "8px" }}
+                className="text-nowrap ml-8"
               >
                 {formatCurrency(item.amount)}
               </Text>
@@ -284,13 +276,10 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
           ))}
           {showTotal && group.items.length > 1 && (
             <>
-              <Divider style={{ margin: "4px 0" }} />
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <Divider className="payment-total-divider" />
+              <div className="flex-row justify-between">
                 <Text strong>{t("members.total")}</Text>
-                <Text
-                  strong
-                  style={{ whiteSpace: "nowrap", marginLeft: "8px" }}
-                >
+                <Text strong className="text-nowrap ml-8">
                   {formatCurrency(group.total)}
                 </Text>
               </div>
@@ -303,7 +292,7 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
     const renderBatchSubtotal = (windowIndex: number, isNextBatch: boolean) => {
       const range = recap!.windowRange(windowIndex);
       const label = recap!.isMonthly
-        ? range.start.format("MMMM YYYY")
+        ? range.start.format(monthFormat)
         : `${formatDate(range.start)} – ${formatDate(range.end)}`;
       return {
         key: `batch-${windowIndex}`,
@@ -318,7 +307,7 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
                 <Tag color="green">{t("members.next_payment")}</Tag>
               )}
             </Space>
-            <Text strong style={{ whiteSpace: "nowrap", marginLeft: "8px" }}>
+            <Text strong className="text-nowrap ml-8">
               {formatCurrency(recap!.windowTotals.get(windowIndex) ?? 0)}
             </Text>
           </div>
@@ -351,7 +340,15 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
       }
     });
     return items;
-  }, [visiblePast, visibleFuture, recap, t, formatCurrency, formatDate]);
+  }, [
+    visiblePast,
+    visibleFuture,
+    recap,
+    t,
+    formatCurrency,
+    formatDate,
+    monthFormat,
+  ]);
 
   return (
     <Card
@@ -376,7 +373,7 @@ const PaymentsCard = ({ memberId }: PaymentsCardProps) => {
       {timelineItems.length > 0 ? (
         <>
           {hasMorePast && (
-            <div style={{ textAlign: "center", marginBottom: 8 }}>
+            <div className="text-center mb-8">
               <Button
                 type="link"
                 icon={<UpOutlined />}

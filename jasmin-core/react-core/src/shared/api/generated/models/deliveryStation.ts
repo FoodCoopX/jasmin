@@ -14,13 +14,12 @@ import type { DeliveryStationOrderEmail } from './deliveryStationOrderEmail';
  * Serializer for DeliveryStation with dynamic contact and day fields.
  */
 export interface DeliveryStation {
-  readonly id?: string;
+  readonly id: string;
   /** Check if this instance can be deleted */
-  readonly can_be_deleted?: boolean;
-  readonly tour_assignment_missing?: boolean;
-  readonly linked_reseller_can_be_deleted?: boolean;
-  readonly iban_masked?: string;
-  readonly iban_stored?: boolean;
+  readonly can_be_deleted: boolean;
+  readonly linked_reseller_can_be_deleted: boolean;
+  readonly iban_masked: string;
+  readonly iban_stored: boolean;
   is_active?: boolean;
   /**
    * @maxLength 100
@@ -76,7 +75,8 @@ export interface DeliveryStation {
   fee_per_year_net?: string;
   /** @nullable */
   fees_billing_period?: DeliveryStationFeesBillingPeriod;
-  readonly contact?: string;
+  /** @nullable */
+  readonly contact: string | null;
   /** @nullable */
   linked_reseller?: string | null;
   /**

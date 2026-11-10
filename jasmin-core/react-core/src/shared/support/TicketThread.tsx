@@ -17,7 +17,7 @@ export default function TicketThread({
   const { formatDate } = useDateFormat();
 
   if (!messages.length) {
-    return <div className="text-muted">{t("support.thread.no_messages")}</div>;
+    return <div className="color-text-tertiary">{t("support.thread.no_messages")}</div>;
   }
 
   return (
@@ -37,10 +37,10 @@ export default function TicketThread({
               {t(`support.author.${message.author_kind}`)}
             </Tag>
           </div>
-          <Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 4 }}>
+          <Paragraph className="text-prewrap mb-4">
             {message.body}
           </Paragraph>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" className="text-12">
             {message.created_at ? formatDate(message.created_at) : ""}
           </Text>
         </List.Item>

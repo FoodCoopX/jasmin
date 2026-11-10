@@ -21,6 +21,9 @@ class CommissioningConfig(AppConfig):
             ContactEntity,
             CoopShare,
             CoopShareTransfer,
+            CrateContentInvoiceReseller,
+            CrateDeliveryNoteContent,
+            CrateOrderContent,
             DeliveryNoteContent,
             DeliveryNoteReseller,
             InvoiceReseller,
@@ -103,10 +106,13 @@ class CommissioningConfig(AppConfig):
         # noise on every mutation.
         auditlog.register(InvoiceReseller, exclude_fields=["document_hash"])
         auditlog.register(InvoiceResellerContent)
+        auditlog.register(CrateContentInvoiceReseller)
         auditlog.register(DeliveryNoteReseller)
         auditlog.register(DeliveryNoteContent)
+        auditlog.register(CrateDeliveryNoteContent)
         auditlog.register(Order)
         auditlog.register(OrderContent)
+        auditlog.register(CrateOrderContent)
 
         # Consent versioning: ConsentRecord is the audit-relevant table.
         # ConsentDocument is append-only by convention; register it too
@@ -115,3 +121,11 @@ class CommissioningConfig(AppConfig):
         # ``body`` and would just duplicate the diff line.
         auditlog.register(ConsentDocument, exclude_fields=["body_sha256"])
         auditlog.register(ConsentRecord)
+
+        # The tenant settings refuse a packing mode switch that would change
+        # how a running or upcoming share size is packed.
+        from apps.shared.packing_mode_hooks import set_packing_mode_switch_guard
+
+        from .services.packing_mode import refuse_packing_mode_switch
+
+        set_packing_mode_switch_guard(refuse_packing_mode_switch)

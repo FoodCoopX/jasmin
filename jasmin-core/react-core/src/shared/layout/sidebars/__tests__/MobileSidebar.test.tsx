@@ -36,6 +36,7 @@ vi.mock("react-i18next", () => ({
 
 let packingMode: string | undefined;
 let sellsToResellers: boolean | undefined;
+let showsWashing = true;
 
 vi.mock("@hooks/index", () => ({
   useTenant: () =>
@@ -50,6 +51,7 @@ vi.mock("@hooks/index", () => ({
         return defaultValue;
       },
     }),
+  useWashingCleaningVisibility: () => ({ showsWashing, showsCleaning: true }),
 }));
 
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
@@ -59,6 +61,7 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
 afterEach(() => {
   packingMode = undefined;
   sellsToResellers = undefined;
+  showsWashing = true;
 });
 
 const routePaths = routeGroups.flatMap((group) =>
@@ -144,6 +147,17 @@ describe("MobileSidebar", () => {
       within(drawer).queryByRole("link", {
         name: "commissioning.commissioning_list_resellers_short",
       }),
+    ).toBeNull();
+    expect(
+      within(drawer).getByRole("link", { name: "commissioning.harvesting_lists" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the washing list on a farm that hides washing", async () => {
+    showsWashing = false;
+    const drawer = await openDrawer();
+    expect(
+      within(drawer).queryByRole("link", { name: "commissioning.washing_list" }),
     ).toBeNull();
     expect(
       within(drawer).getByRole("link", { name: "commissioning.harvesting_lists" }),

@@ -28,7 +28,7 @@ delivery_week: number;
  */
 is_packed_bulk?: boolean;
 /**
- * When true, includes archived/historical data. When false (default), only recent data is returned.
+ * When true, includes archived/historical data. When false (default), delivery weeks more than about two months back are left out.
  */
 is_past?: boolean;
 /**

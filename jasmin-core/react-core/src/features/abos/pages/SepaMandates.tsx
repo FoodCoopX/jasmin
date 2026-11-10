@@ -254,7 +254,7 @@ export default function SepaMandates() {
   return (
     <div>
       <h1>{t("sepa.mandates_title")}</h1>
-      <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
+      <Text type="secondary" className="d-block mb-16">
         {t("sepa.mandates_intro")}
       </Text>
       <EditableTable
@@ -270,7 +270,7 @@ export default function SepaMandates() {
       </ExplainerText>
 
       {isOffice && (
-        <div style={{ marginTop: 24 }}>
+        <div className="mt-24">
           <Space>
             <Button
               type="primary"

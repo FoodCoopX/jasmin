@@ -10,9 +10,17 @@ const { Title, Paragraph, Text } = Typography;
 // date format; bump when the template's wording materially changes.
 const LAST_UPDATED = "2026-10-02";
 
-type TenantInfo = Pick<
-  Tenant,
-  "name" | "address" | "zip_code" | "city" | "country" | "email" | "phone_number"
+type TenantInfo = Partial<
+  Pick<
+    Tenant,
+    | "name"
+    | "address"
+    | "zip_code"
+    | "city"
+    | "country"
+    | "email"
+    | "phone_number"
+  >
 > & {
   /** Set only where Friendly Captcha guards the public forms. */
   friendly_captcha_sitekey?: string;

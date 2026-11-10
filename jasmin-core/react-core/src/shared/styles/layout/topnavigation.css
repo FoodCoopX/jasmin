@@ -119,3 +119,53 @@
   background: var(--color-primary-hover);
   color: var(--color-bg-base);
 }
+
+/* The tenant logo, centred in the top bar whatever sits on either side. */
+.top-navigation-logo {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Pushes the top bar's buttons to its right edge. */
+.top-navigation-spacer {
+  margin-left: auto;
+}
+
+/* The dividers between the top bar's buttons. Doubled with .ant-divider so
+   they outrank AntD's own divider margin. */
+.ant-divider.top-navigation-divider {
+  height: 24px;
+  margin: 0;
+}
+
+/* Doubled with .ant-btn so the size outranks AntD's own button size. */
+.ant-btn.sidebar-toggle-button {
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+}
+
+/* The bar with the section navigation. Doubled with .ant-layout-header so it
+   outranks AntD's own header padding and background. */
+.ant-layout-header.secondary-navigation {
+  padding: 0 24px;
+  background: var(--color-bg-base);
+  border-bottom: solid 1px var(--color-brand);
+  overflow: visible;
+}
+
+/* The section navigation's <nav> landmark generates no box, so the menu stays
+   the flex child between the spacers. */
+.secondary-navigation-landmark {
+  display: contents;
+}
+
+/* Doubled with .ant-menu so it outranks AntD's own horizontal-menu border. */
+.ant-menu.secondary-navigation-menu {
+  border-bottom: none;
+  min-width: max-content;
+  white-space: nowrap;
+}

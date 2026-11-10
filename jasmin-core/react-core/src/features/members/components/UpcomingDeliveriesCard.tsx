@@ -194,9 +194,9 @@ const UpcomingDeliveriesCard = ({
               }}
             >
               <Space>
-                <Text className="text-muted">
+                <Text className="color-text-tertiary">
                   {t("commissioning.KW")} {gap.delivery_week}/{gap.year}
-                  <Tag color="default" style={{ marginLeft: "8px" }}>
+                  <Tag color="default" className="ml-8">
                     {t("members.delivery_paused")}
                   </Tag>
                 </Text>
@@ -246,7 +246,7 @@ const UpcomingDeliveriesCard = ({
               >
                 {t("commissioning.KW")} {delivery.delivery_week}/{delivery.year}
                 {isCurrentWeek && (
-                  <Tag color="green" style={{ marginLeft: "8px" }}>
+                  <Tag color="green" className="ml-8">
                     {t("members.current_week")}
                   </Tag>
                 )}
@@ -270,7 +270,7 @@ const UpcomingDeliveriesCard = ({
                     onChange={(checked) => onToggleOptin(delivery, checked)}
                     aria-label={t("members.optin_toggle")}
                   />
-                  <Text type="secondary" style={{ fontSize: "0.8em" }}>
+                  <Text type="secondary" className="text-xs">
                     {Boolean(delivery.optin_locked) || isPast
                       ? delivery.is_opted_in
                         ? t("members.optin_confirmed")
@@ -308,18 +308,12 @@ const UpcomingDeliveriesCard = ({
               {" - "}
               {delivery.delivery_station_name}{" "}
               {delivery.joker_taken && (
-                <Tag
-                  color="darkorange"
-                  style={{ marginTop: "4px", marginLeft: "2px" }}
-                >
+                <Tag color="darkorange" className="delivery-joker-tag">
                   Joker
                 </Tag>
               )}
               {delivery.donation_joker_taken && (
-                <Tag
-                  color="darkorange"
-                  style={{ marginTop: "4px", marginLeft: "2px" }}
-                >
+                <Tag color="darkorange" className="delivery-joker-tag">
                   {t("members.donation_joker_tag")}
                 </Tag>
               )}
@@ -346,11 +340,10 @@ const UpcomingDeliveriesCard = ({
   return (
     <Card
       title={t("members.deliveries")}
-      className="member-card green-border member-card--blue-title"
-      style={{ marginBottom: 0 }}
+      className="member-card green-border member-card--blue-title mb-0"
     >
       {hasMorePast && (
-        <div style={{ textAlign: "center", marginBottom: 8 }}>
+        <div className="text-center mb-8">
           <Button
             type="link"
             icon={<UpOutlined />}

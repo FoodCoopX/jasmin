@@ -7,7 +7,7 @@
  */
 
 export interface ShareDeliveryOverview {
-  readonly id?: string;
+  readonly id: string;
   readonly quantity?: number;
   readonly share_type_variation_string?: string;
   readonly delivery_week?: number;
@@ -20,21 +20,21 @@ day's ``day_number`` — so the overview matches every other delivery-
 date surface. ``None`` for a malformed year/week/day tuple.
    * @nullable
    */
-  readonly delivery_date?: string | null;
-  readonly amount_of_jokers?: number;
-  readonly amount_of_donation_jokers?: number;
+  readonly delivery_date: string | null;
+  readonly amount_of_jokers: number;
+  readonly amount_of_donation_jokers: number;
   joker_taken?: boolean;
   donation_joker_taken?: boolean;
   /** @nullable */
   note?: string | null;
-  readonly is_opted_in?: boolean;
+  readonly is_opted_in: boolean;
   /** @nullable */
-  readonly optin_decided_at?: string | null;
+  readonly optin_decided_at: string | null;
   /** @nullable */
   subscription?: string | null;
   share: string;
   /** @nullable */
   delivery_station_day?: string | null;
   /** @nullable */
-  readonly optin_decided_by?: string | null;
+  readonly optin_decided_by: string | null;
 }

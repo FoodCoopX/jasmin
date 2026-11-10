@@ -44,6 +44,7 @@ from apps.shared.tenants.tests.conftest import TENANT_HOST
 pytestmark = pytest.mark.django_db
 
 MEMBER_LIST_URL = "/api/commissioning/members/"
+TENANT_LIST_URL = "/api/tenants/tenants/"
 
 TENANT_B_SCHEMA = "test_pytest_b"
 # The only hostname that resolves to tenant B. Distinct from every other
@@ -126,6 +127,18 @@ def _get(host: str, user, url: str):
     client.force_authenticate(user=user)
     try:
         return client.get(url)
+    finally:
+        connection.set_tenant(previous)
+
+
+def _patch(host: str, user, url: str, data: dict):
+    """PATCH ``url`` on ``host`` as ``user``, leaving the test's schema intact
+    (see ``_get``)."""
+    previous = connection.tenant
+    client = APIClient(HTTP_HOST=host)
+    client.force_authenticate(user=user)
+    try:
+        return client.patch(url, data, format="json")
     finally:
         connection.set_tenant(previous)
 
@@ -239,6 +252,81 @@ def test_tenant_a_list_does_not_include_tenant_b_members(
     assert (
         "BMemberFirst" not in body_text
     ), "CRITICAL: tenant-B member name appears in tenant-A list."
+
+
+# ---------------------------------------------------------------------------
+# TenantViewSet — one shared table, scoped by the request's tenant
+# ---------------------------------------------------------------------------
+# Tenant rows live in the public schema, which every tenant's connection can
+# read, so schema isolation does not hide tenant B's row from tenant A. The
+# viewset's queryset, filtered to ``request.tenant``, is what does.
+def test_tenant_a_cannot_retrieve_tenant_b_tenant_row(
+    tenant, tenant_host, _tenant_b_schema, tenant_b_host
+):
+    """Tenant B's pk on tenant A's host is a 404 carrying none of B's data,
+    while the same URL serves B's row on B's own host."""
+    b_url = f"{TENANT_LIST_URL}{_tenant_b_schema.pk}/"
+    with schema_context(TENANT_B_SCHEMA):
+        user_b = JasminUserFactory(roles=["admin"])
+
+    b_resp = _get(tenant_b_host, user_b, b_url)
+    _assert_resolved_to(b_resp, TENANT_B_SCHEMA, tenant_b_host)
+    assert b_resp.status_code == 200, (
+        f"Tenant B's row is not served on tenant B's own host "
+        f"({b_resp.status_code}) — the cross-tenant 404 below would be "
+        f"meaningless."
+    )
+    b_name = b_resp.json()["name"]
+
+    user_a = JasminUserFactory(roles=["admin"])
+    a_resp = _get(tenant_host, user_a, b_url)
+    _assert_resolved_to(a_resp, tenant.schema_name, tenant_host)
+    assert a_resp.status_code == 404, (
+        f"CRITICAL: tenant-A request returned {a_resp.status_code} for "
+        f"tenant B's tenant row; this is a tenant-isolation breach."
+    )
+    assert b_name not in a_resp.content.decode(
+        "utf-8", errors="ignore"
+    ), "CRITICAL: tenant-A 404 body leaks tenant B's tenant row."
+
+
+def test_tenant_a_tenant_list_holds_only_tenant_a(
+    tenant, tenant_host, _tenant_b_schema
+):
+    """The list on tenant A's host is tenant A's own row and nothing else."""
+    user_a = JasminUserFactory(roles=["admin"])
+
+    resp = _get(tenant_host, user_a, TENANT_LIST_URL)
+
+    _assert_resolved_to(resp, tenant.schema_name, tenant_host)
+    assert resp.status_code == 200, resp.content[:200]
+    assert [row["id"] for row in resp.json()] == [tenant.pk]
+    assert _tenant_b_schema.pk not in resp.content.decode("utf-8", errors="ignore")
+
+
+def test_tenant_a_admin_cannot_change_tenant_b_tenant_row(
+    tenant, tenant_host, _tenant_b_schema
+):
+    """A tenant-A admin's PATCH to tenant B's pk is a 404 and leaves B's row
+    unchanged; the same PATCH to tenant A's own pk goes through, so the 404 is
+    the scoping and not the payload or the admin gate."""
+    b_pk = _tenant_b_schema.pk
+    b_name = Tenant.objects.get(pk=b_pk).name
+    user_a = JasminUserFactory(roles=["admin"])
+    payload = {"name": "Renamed from tenant A"}
+
+    a_resp = _patch(tenant_host, user_a, f"{TENANT_LIST_URL}{b_pk}/", payload)
+
+    _assert_resolved_to(a_resp, tenant.schema_name, tenant_host)
+    assert a_resp.status_code == 404, (
+        f"CRITICAL: tenant-A PATCH returned {a_resp.status_code} for tenant "
+        f"B's tenant row; this is a tenant-isolation breach."
+    )
+    assert Tenant.objects.get(pk=b_pk).name == b_name
+
+    own_resp = _patch(tenant_host, user_a, f"{TENANT_LIST_URL}{tenant.pk}/", payload)
+    assert own_resp.status_code == 200, own_resp.content[:200]
+    assert Tenant.objects.get(pk=tenant.pk).name == payload["name"]
 
 
 # Hostname -> the schema that owns it. Every routed test in the suite depends on

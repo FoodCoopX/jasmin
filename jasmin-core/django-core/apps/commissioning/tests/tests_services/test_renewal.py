@@ -517,6 +517,22 @@ class TestRenewalFailureDigest:
         # the reason renders as human text, not the bare code
         assert "no_variation" not in ctx["renewal_failures_text"]
 
+    @pytest.mark.parametrize("language", ["de", "en"])
+    def test_every_failure_reason_has_its_own_text(self, language):
+        import apps.commissioning.tasks as tasks
+        from apps.commissioning.services import renewal
+
+        generic = tasks._renewal_reason_text(renewal.FAIL_INVALID, language)
+        reasons = [
+            value
+            for name, value in vars(renewal).items()
+            if name.startswith("FAIL_") and value != renewal.FAIL_INVALID
+        ]
+
+        assert renewal.FAIL_NO_PRICE in reasons
+        for reason in reasons:
+            assert tasks._renewal_reason_text(reason, language) != generic
+
     def test_digest_skipped_without_office_email(self, monkeypatch):
         import apps.commissioning.tasks as tasks
 

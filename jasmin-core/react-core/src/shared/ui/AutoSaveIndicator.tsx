@@ -41,13 +41,13 @@ export default function AutoSaveIndicator({
     // Polite live region so the saving/saved transition is announced without
     // stealing focus; the spinner/check icons are decorative (the text carries
     // the meaning), so hide them from assistive tech.
-    <div role="status" aria-live="polite" style={{ minHeight: 22 }}>
+    <div role="status" aria-live="polite" className="auto-save-indicator">
       {saving ? (
         <Space size="small">
           <SyncOutlined
             spin
             aria-hidden
-            style={{ color: "var(--color-future-blue)" }}
+            className="auto-save-indicator-saving-icon"
           />
           <Text type="secondary">{t("settings.saving")}</Text>
         </Space>
@@ -55,7 +55,7 @@ export default function AutoSaveIndicator({
         <Space size="small">
           <CloseCircleOutlined
             aria-hidden
-            style={{ color: "var(--color-error)" }}
+            className="text-error"
           />
           <Text type="danger">{t("common.error_saving")}</Text>
         </Space>
@@ -63,7 +63,7 @@ export default function AutoSaveIndicator({
         <Space size="small">
           <CheckCircleOutlined
             aria-hidden
-            style={{ color: "var(--color-success)" }}
+            className="text-success"
           />
           <Text type="secondary">{t("settings.saved")}</Text>
         </Space>

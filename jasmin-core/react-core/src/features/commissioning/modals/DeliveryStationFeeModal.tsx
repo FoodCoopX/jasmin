@@ -11,7 +11,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   DeliveryStation,
-  PatchedDeliveryStation,
+  PatchedDeliveryStationRequest,
 } from "@shared/api/generated/models";
 import { EditFormModal, useModalMutation } from "@shared/modals/shared";
 import NumberInput from "@shared/ui/NumberInput";
@@ -82,7 +82,7 @@ export const DeliveryStationFeeModal: FC<DeliveryStationFeeModalProps> = ({
         // number → coerce back to String so the server DecimalField keeps cents.
         // A cleared field means no fee, which the server stores as 0: it
         // refuses null.
-        const payload: PatchedDeliveryStation = {};
+        const payload: PatchedDeliveryStationRequest = {};
         for (const key of FEE_FIELDS) {
           const value = values[key];
           payload[key] =

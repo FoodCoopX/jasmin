@@ -1,8 +1,8 @@
 """Day-field defaulting / self-healing on Share.
 
-A Share whose ``packing_day`` (or any of the five day fields) is NULL is
-silently dropped from every day-filtered list (packing / harvesting / washing
-/ cleaning). ``save()`` defaults them from the ``delivery_day``, but
+A Share with a NULL day field gets no theoretical harvest, wash or clean
+amount for it, or packs on the delivery day (``Share.DAY_FIELD_DEFAULTS``).
+``save()`` defaults them from the ``delivery_day``, but
 ``bulk_create`` and ``get_or_create`` on a *reused* row both bypass ``save()``
 — so the model exposes explicit healers. These tests pin that behaviour down
 through the REAL entry points.
@@ -140,3 +140,79 @@ class TestShareDayFieldDefaulting:
             year=2026, delivery_week=15, delivery_day=dd, share_type_variation=variation
         )
         assert Share.heal_day_fields([good]) == 0
+
+
+@pytest.mark.django_db
+class TestReusedSharesHeal:
+    """Every path that reuses an existing Share heals its day fields, as
+    ``Share.get_or_create_for_delivery`` does."""
+
+    def test_a_delivery_moved_to_another_weekday_heals_that_days_share(self, tenant):
+        from apps.commissioning.viewsets.shares_viewsets import ShareDeliveryViewSet
+
+        variation = ShareTypeVariationFactory()
+        wednesday = SharesDeliveryDayFactory(day_number=2)
+        friday = SharesDeliveryDayFactory(day_number=4)
+        source = Share.objects.create(
+            year=2026,
+            delivery_week=15,
+            delivery_day=wednesday,
+            share_type_variation=variation,
+        )
+        stale = _null_day_share(friday, variation)
+
+        target = ShareDeliveryViewSet._share_for_delivery_day(source, friday)
+
+        assert target.pk == stale.pk
+        target.refresh_from_db()
+        for field, value in EXPECTED.items():
+            assert getattr(target, field) == value
+
+    def test_a_subscriptions_shares_heal_a_reused_share(self, tenant):
+        import datetime
+
+        import time_machine
+
+        from apps.commissioning.services.subscription_service import (
+            SubscriptionService,
+        )
+        from apps.commissioning.tests.factories import SubscriptionFactory
+
+        with time_machine.travel(datetime.datetime(2026, 1, 5, 12, 0), tick=False):
+            subscription = SubscriptionFactory()
+            service = SubscriptionService()
+            (_year, week), *_ = service._delivery_weeks_excluding_paused(subscription)
+            stale = _null_day_share(
+                subscription.default_delivery_station_day.delivery_day,
+                subscription.share_type_variation,
+                week=week,
+            )
+
+            service._create_shares(subscription)
+
+        stale.refresh_from_db()
+        for field, value in EXPECTED.items():
+            assert getattr(stale, field) == value
+
+    def test_a_forecasts_lookup_heals_a_reused_share(self, tenant):
+        from apps.commissioning.services.forecast_service import ForecastService
+        from apps.commissioning.tests.factories import ShareArticleFactory
+
+        variation = ShareTypeVariationFactory()
+        stale = _null_day_share(SharesDeliveryDayFactory(), variation)
+
+        *_, existing_shares, _contents = (
+            ForecastService._prefetch_share_content_context(
+                share_article=ShareArticleFactory(),
+                size=None,
+                year=2026,
+                unit=None,
+                delivery_week=15,
+                variation_ids=[variation.pk],
+            )
+        )
+
+        assert stale.pk in {share.pk for share in existing_shares.values()}
+        stale.refresh_from_db()
+        for field, value in EXPECTED.items():
+            assert getattr(stale, field) == value

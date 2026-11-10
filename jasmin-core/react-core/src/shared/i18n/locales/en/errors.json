@@ -194,6 +194,7 @@
   },
   "share_content": {
     "invalid": "Invalid share content input — please check the data.",
+    "already_planned": "This article is already planned for this share — reload the page and change the existing entry.",
     "not_found": "Share content not found.",
     "invalid_composite_id": "Invalid share content id.",
     "invalid_pk": "Invalid share content id.",
@@ -219,7 +220,8 @@
     "capacity_below_occupancy": "Capacity can't be set to {{capacity}} — {{peak}} share(s) are already booked for week {{week}}/{{year}}. Please choose at least {{peak}}.",
     "in_use": "This delivery station cannot be deleted while deliveries still reference its pickup days. Move or end those deliveries first.",
     "not_found": "Delivery station does not exist.",
-    "more_than_one_fee": "Only one fee applies: per box, per month or per year."
+    "more_than_one_fee": "Only one fee applies: per box, per month or per year.",
+    "name_required": "A delivery station needs an abbreviation or a company name."
   },
   "my_data": {
     "shared_station_identity_locked": "The name and address on this account belong to a delivery station and cannot be changed here — please contact the office. Email, phone and bank details remain editable."
@@ -261,11 +263,15 @@
     "offer_not_in_offer_group": "This offer is not part of your offer group.",
     "offer_not_finalized": "This offer is not approved yet.",
     "offer_week_mismatch": "This offer is for a different week than the order.",
-    "item_change_forbidden": "Only office staff can change the offer or article of an order line.",
+    "item_change_forbidden": "An order line's offer can't be changed, and only office staff can change its article.",
+    "offer_change_refused": "An order line's offer can't be changed: delete the line and add it again with the other offer.",
     "amount_negative": "The ordered amount cannot be negative."
   },
   "orderable_item": {
     "reference_invalid": "A line must reference exactly one item: either an offer or an article — not both, and not neither."
+  },
+  "packing_mode": {
+    "switch_changes_packing": "The packing mode can't be switched while these running or upcoming sizes are packed otherwise: {{sizes}}. Under \"mixed\", each size is packed as entered for it."
   },
   "packing_list": {
     "amounts_diverge_across_stations": "Packing amounts differ between delivery stations. Select a delivery station (or tour) to view the packing list."
@@ -363,7 +369,7 @@
   },
   "shares_delivery_day": {
     "not_found": "No active delivery day found for the given day.",
-    "tours_reduced_while_in_use": "This delivery day is already in use — the number of tours can only be increased, not reduced. Lowering it would strand deliveries on the removed tours.",
+    "tours_reduced_while_in_use": "Stations of this delivery day are still on tour {{highest_tour}}, so the number of tours can't go below {{highest_tour}}.",
     "shortening_strands_children": "This delivery day can't end on that date: future station-days or shares would outlive it and be stranded. Create a successor instead (add a new delivery day), or pick a later end date.",
     "start_move_strands_children": "This delivery day can't start on that date: existing station-days or shares fall before it and would no longer be covered. Pick an earlier start date, or move them first.",
     "succession_coverage_gap": "Couldn't complete the delivery-day succession: a station has no station-day covering the affected week on the new day. Set up that station-day first, then retry.",
@@ -376,7 +382,8 @@
     "in_use": "This pickup day cannot be deleted while deliveries still reference it. Move or end those deliveries first.",
     "unknown": "No delivery station \"{{delivery_station}}\" is served on delivery day {{delivery_day}} on {{date}}.",
     "ambiguous": "{{matches}} delivery stations named \"{{delivery_station}}\" are served on delivery day {{delivery_day}} on {{date}} — give them distinct short names.",
-    "tour_number_below_one": "Tours start at 1. Assign the station day to a tour in the tour planning."
+    "tour_number_below_one": "Tours start at 1. Assign the station day to a tour in the tour planning.",
+    "missing_for_tour": "Delivery station \"{{delivery_station}}\" is not served on delivery day {{delivery_day}} from {{valid_from}}. Create a station day in the station's dialog first."
   },
   "inventory_entry": {
     "not_found": "Inventory entry not found."
@@ -527,7 +534,8 @@
   },
   "default_share_content": {
     "invalid_composite_id": "Invalid default share content id.",
-    "no_amounts": "No share type variation amounts were provided."
+    "no_amounts": "No share type variation amounts were provided.",
+    "no_running_week": "None of the sizes with an amount runs in the planned weeks. Choose weeks in which one runs."
   },
   "documentation": {
     "invalid_model": "Invalid documentation model.",
@@ -570,6 +578,7 @@
     "details": "Details:"
   },
   "cultivation": {
+    "plot_name_required": "A plot needs a name.",
     "no_batches_to_place": "There are no finalized outdoor batches for this year, so there is nothing to plan.",
     "no_plots_available": "No outdoor plot has any beds configured. Add beds per plot first.",
     "batch_does_not_fit": "This batch needs more contiguous cells than any matching block offers. Either add more beds of that type, or clear the batch's bed type so it can go anywhere.",

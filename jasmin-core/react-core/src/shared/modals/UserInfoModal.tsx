@@ -115,13 +115,7 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
           <Tag color={STATUS_TAG_COLOR[accountStatus]}>
             {t(`users.${statusKey}`)}
           </Tag>
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: "12px",
-              color: "var(--color-text-secondary)",
-            }}
-          >
+          <div className="mt-8 text-12 color-text-secondary">
             {t(`users.${descriptionKey}`)}
           </div>
         </Descriptions.Item>
@@ -129,7 +123,7 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
           <Descriptions.Item label={t("users.invitation_expires")}>
             {formatDateWithFallback(invitationExpiresAt)}
             {isInvitationExpired && (
-              <Tag color="red" style={{ marginLeft: 8 }}>
+              <Tag color="red" className="ml-8">
                 {t("users.invitation_expired")}
               </Tag>
             )}
@@ -152,19 +146,14 @@ const UserInfoModal: FC<UserInfoModalProps> = ({
         ) : null}
         {accountStatus === "active" && !lastLogin ? (
           <Descriptions.Item label={t("users.last_login")}>
-            <span
-              style={{
-                color: "var(--color-text-tertiary)",
-                fontStyle: "italic",
-              }}
-            >
+            <span className="color-text-tertiary text-italic">
               {t("users.never")}
             </span>
           </Descriptions.Item>
         ) : null}
       </Descriptions>
 
-      <div style={{ marginTop: 16, textAlign: "right" }}>
+      <div className="mt-16 text-right">
         <Space>
           {accountStatus === "no_user" && onSendInvitation && (
             <DisabledReasonTooltip reason={disabledReason}>

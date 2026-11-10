@@ -117,6 +117,8 @@ export interface TenantSettingsToDict {
   number_packing_stations?: number;
   allows_solidarity_pricing?: boolean;
   show_size_column?: boolean;
+  show_washing?: boolean;
+  show_cleaning?: boolean;
   distribute_forecast_by_weight?: boolean;
   show_summary_in_harvest_share_planning_on_top?: boolean;
   show_seller_name_of_share_article_in_share_for_member_on_page?: boolean;

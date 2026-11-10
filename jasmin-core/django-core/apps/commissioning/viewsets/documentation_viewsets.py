@@ -19,6 +19,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.authz.permissions import IsOffice, IsStaff, RolePermissionsMixin
+from apps.authz.scoping import enforce_privileged
 from apps.shared.request_utils import auth_user, body
 from core.serializers import ErrorResponseSerializer
 
@@ -155,6 +156,18 @@ def _validated_model(request: Request) -> str:
             details={"model": model},
         )
     return model
+
+
+def _enforce_office_for_wash_clean_amount(request: Request, model: str) -> None:
+    """Every staff role reads the washing and cleaning lists, but only office
+    and admin add or change their amounts; harvest and purchase amounts stay
+    open to the crew."""
+    if model in ("washamount", "cleanamount"):
+        enforce_privileged(
+            request,
+            "Only the office may add or change washing and cleaning amounts.",
+            privileged_roles=IsOffice.required_roles,
+        )
 
 
 def _validated_additional_theoretical_body(
@@ -814,6 +827,7 @@ class DocumentationSummaryViewSet(RolePermissionsMixin, viewsets.ViewSet):
     @action(detail=False, methods=["post"])
     def add_additional_theoretical_amount(self, request: Request) -> Response:
         model = _validated_model(request)
+        _enforce_office_for_wash_clean_amount(request, model)
         data = _validated_additional_theoretical_body(request, partial=False)
         refuse_read_only_week(data["year"], data["delivery_week"])
 
@@ -842,6 +856,7 @@ class DocumentationSummaryViewSet(RolePermissionsMixin, viewsets.ViewSet):
         self, request: Request, pk: str
     ) -> Response:
         model = _validated_model(request)
+        _enforce_office_for_wash_clean_amount(request, model)
         data = _validated_additional_theoretical_body(request, partial=True)
         _refuse_another_week(model, pk, data)
         _refuse_read_only_stored_week(model, pk)

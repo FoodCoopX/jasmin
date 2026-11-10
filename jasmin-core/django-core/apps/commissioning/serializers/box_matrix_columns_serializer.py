@@ -22,6 +22,10 @@ class PackingBoxesMatrixAddOnSerializer(serializers.Serializer):
     share_type_id = serializers.CharField()
     share_type_short_name = serializers.CharField(allow_blank=True)
     share_type_sort_index = serializers.IntegerField()
+    is_packed_bulk = serializers.BooleanField(
+        help_text="The variation's own setting, which decides only in MIXED "
+        "packing mode."
+    )
 
 
 class PackingBoxesMatrixColumnSerializer(serializers.Serializer):
@@ -36,5 +40,9 @@ class PackingBoxesMatrixColumnSerializer(serializers.Serializer):
     base_share_type_name = serializers.CharField(allow_blank=True)
     base_share_type_short_name = serializers.CharField(allow_blank=True)
     base_share_type_sort_index = serializers.IntegerField()
+    base_is_packed_bulk = serializers.BooleanField(
+        help_text="The base variation's own setting, which decides only in MIXED "
+        "packing mode; false for a combination without a base."
+    )
     add_ons = PackingBoxesMatrixAddOnSerializer(many=True)
     count = serializers.IntegerField()

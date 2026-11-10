@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from django.db import models
 from django.db.models import Q, QuerySet
 from django.utils import timezone
+
+from apps.shared.iso_week_filters import iso_week_bound
 
 from ..constants import CUT_OFF_DAYS, CUT_OFF_MONTHS
 
@@ -53,25 +55,18 @@ class CurrentActiveManager(CurrentActiveManagerMixin, models.Manager):
 class _ArchiveCutoffManager(models.Manager):
     """Base for managers that hide records older than ``archive_months``.
 
-    Subclasses must set ``cutoff_field`` to the model field used for the cutoff
-    (e.g. ``"created_at"`` or ``"date"``).
+    Subclasses say what "older" means in ``_recent_q``.
     """
-
-    cutoff_field: str = ""
 
     def __init__(self, archive_months: int = CUT_OFF_MONTHS) -> None:
         super().__init__()
         self.archive_months: int = archive_months
 
-    def _cutoff(self) -> datetime:
-        return timezone.now() - timedelta(days=CUT_OFF_DAYS * self.archive_months)
+    def _recent_q(self) -> Q:
+        raise NotImplementedError
 
     def get_queryset(self) -> QuerySet:
-        return (
-            super()
-            .get_queryset()
-            .filter(**{f"{self.cutoff_field}__gte": self._cutoff()})
-        )
+        return super().get_queryset().filter(self._recent_q())
 
     def for_period(self, is_past: bool = False) -> QuerySet:
         """Single entry point for views/services.
@@ -84,13 +79,34 @@ class _ArchiveCutoffManager(models.Manager):
         return self.get_queryset()
 
 
-class ActiveOnlyManager(_ArchiveCutoffManager):
-    """Default queryset = records with ``created_at`` newer than the cutoff."""
+class DeliveryWeekActiveOnlyManager(_ArchiveCutoffManager):
+    """Default queryset = records of a delivery week no older than the cutoff.
 
-    cutoff_field = "created_at"
+    The week a record is for decides, not when it was written: share contents,
+    forecasts and the amounts planned from them are entered months ahead and
+    must still be in their week's lists when that week comes. The model names
+    the relation that carries ``year`` / ``delivery_week`` in
+    ``archive_week_of`` (empty when it carries them itself).
+    """
+
+    def _recent_q(self) -> Q:
+        week_of: str = getattr(self.model, "archive_week_of", "")
+        prefix = f"{week_of}__" if week_of else ""
+        return iso_week_bound(
+            archive_cutoff_week(self.archive_months), "gte", prefix=prefix
+        )
+
+
+def archive_cutoff_week(archive_months: int = CUT_OFF_MONTHS) -> tuple[int, int]:
+    """The ISO year and week of the oldest delivery week still current."""
+    cutoff = timezone.localdate() - timedelta(days=CUT_OFF_DAYS * archive_months)
+    iso = cutoff.isocalendar()
+    return iso.year, iso.week
 
 
 class DateActiveOnlyManager(_ArchiveCutoffManager):
     """Default queryset = records with ``date`` newer than the cutoff."""
 
-    cutoff_field = "date"
+    def _recent_q(self) -> Q:
+        cutoff = timezone.now() - timedelta(days=CUT_OFF_DAYS * self.archive_months)
+        return Q(date__gte=cutoff)

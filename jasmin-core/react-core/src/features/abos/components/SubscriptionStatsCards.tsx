@@ -31,9 +31,10 @@ export default function SubscriptionStatsCards() {
     getSetting("allows_waiting_list_for_subscriptions", true),
   );
   const { data: subscriptions } = useCommissioningAbosList({});
+  // Every physical size, ended ones too — the catalogue the dashboard reads,
+  // so both give each size the same colour.
   const { data: variations } = useCommissioningShareTypeVariationsList({
     physical: true,
-    include_future: true,
   });
   const { variationLegendById, snapshot } = useSubscriptionVariationStats(
     subscriptions,
@@ -47,26 +48,13 @@ export default function SubscriptionStatsCards() {
         .filter((r) => r.qty > 0);
       if (rows.length === 0) return null;
       return (
-        <div style={{ marginTop: 6 }}>
+        <div className="summary-stats-card__breakdown">
           {rows.map(({ info, qty }) => (
             <div
               key={info.id}
-              className="summary-stats-card__subvalue"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-                padding: "1px 0",
-              }}
+              className="summary-stats-card__subvalue summary-stats-card__breakdown-row"
             >
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  minWidth: 0,
-                }}
-              >
+              <span className="summary-stats-card__breakdown-label">
                 <span
                   style={{
                     width: 7,
@@ -76,13 +64,7 @@ export default function SubscriptionStatsCards() {
                     flex: "0 0 auto",
                   }}
                 />
-                <span
-                  style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <span className="summary-stats-card__breakdown-name">
                   {info.label}
                 </span>
               </span>
@@ -122,7 +104,7 @@ export default function SubscriptionStatsCards() {
   if (variationLegendById.size === 0) return null;
 
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div className="mb-12">
       <SummaryStatsCard stats={subscriptionTiles} equalWidth />
     </div>
   );

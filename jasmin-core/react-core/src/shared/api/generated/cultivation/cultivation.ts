@@ -26,66 +26,49 @@ import type {
 
 import type {
   BedType,
+  BedTypeRequest,
   CultivationBatch,
+  CultivationBatchRequest,
   CultivationBreakFamily,
+  CultivationBreakFamilyRequest,
   CultivationCultivationBatchesListParams,
   CultivationPlanSolution,
   CultivationPlanSolutionWithDetails,
   CultivationPlanSolutionsListParams,
   CultivationPlot,
+  CultivationPlotRequest,
   ErrorResponse,
   HistoricalPlanting,
-  PatchedBedType,
-  PatchedCultivationBatch,
-  PatchedCultivationBreakFamily,
-  PatchedCultivationPlot,
-  PatchedHistoricalPlanting,
-  PatchedPlotContent,
-  PatchedSeedlingsVendor,
-  PatchedSeedsVendor,
+  HistoricalPlantingRequest,
+  PatchedBedTypeRequest,
+  PatchedCultivationBatchRequest,
+  PatchedCultivationBreakFamilyRequest,
+  PatchedCultivationPlotRequest,
+  PatchedHistoricalPlantingRequest,
+  PatchedPlotContentRequest,
+  PatchedSeedlingsVendorRequest,
+  PatchedSeedsVendorRequest,
   PatchedUpdateSolverSettingsRequest,
-  PatchedVegetable,
-  PatchedVegetableAggregation,
+  PatchedVegetableAggregationRequest,
+  PatchedVegetableRequest,
   PlotContent,
+  PlotContentRequest,
   RunCultivationSolverRequest,
   RunCultivationSolverResponse,
   SavePlacementsRequest,
   SeedlingsVendor,
+  SeedlingsVendorRequest,
   SeedsVendor,
+  SeedsVendorRequest,
   SolverSettings,
   UpdateSolverSettingsRequest,
   Vegetable,
-  VegetableAggregation
+  VegetableAggregation,
+  VegetableAggregationRequest,
+  VegetableRequest
 } from '.././models';
 
 import { axiosService } from '../../../services/api';
-
-// https://stackoverflow.com/questions/49579094/typescript-conditional-types-filter-out-readonly-properties-pick-only-requir/49579497#49579497
-type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
-T,
->() => T extends Y ? 1 : 2
-? A
-: B;
-
-type WritableKeys<T> = {
-[P in keyof T]-?: IfEquals<
-  { [Q in P]: T[P] },
-  { -readonly [Q in P]: T[P] },
-  P
->;
-}[keyof T];
-
-type UnionToIntersection<U> =
-  (U extends any ? (k: U)=>void : never) extends ((k: infer I)=>void) ? I : never;
-type DistributeReadOnlyOverUnions<T> = T extends any ? NonReadonly<T> : never;
-
-type Writable<T> = Pick<T, WritableKeys<T>>;
-type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
-  [P in keyof Writable<T>]: T[P] extends object
-    ? NonReadonly<NonNullable<T[P]>>
-    : T[P];
-} : DistributeReadOnlyOverUnions<T>;
-
 
 
 
@@ -177,7 +160,7 @@ export function useCultivationBedTypesList<TData = Awaited<ReturnType<typeof cul
 
 
 export const cultivationBedTypesCreate = (
-    bedType: NonReadonly<BedType>,
+    bedTypeRequest: BedTypeRequest,
  signal?: AbortSignal
 ) => {
       
@@ -185,7 +168,7 @@ export const cultivationBedTypesCreate = (
       return axiosService<BedType>(
       {url: `/api/cultivation/bed_types/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: bedType, signal
+      data: bedTypeRequest, signal
     },
       );
     }
@@ -193,8 +176,8 @@ export const cultivationBedTypesCreate = (
 
 
 export const getCultivationBedTypesCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesCreate>>, TError,{data: NonReadonly<BedType>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesCreate>>, TError,{data: NonReadonly<BedType>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesCreate>>, TError,{data: BedTypeRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesCreate>>, TError,{data: BedTypeRequest}, TContext> => {
 
 const mutationKey = ['cultivationBedTypesCreate'];
 const {mutation: mutationOptions} = options ?
@@ -206,7 +189,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationBedTypesCreate>>, {data: NonReadonly<BedType>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationBedTypesCreate>>, {data: BedTypeRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationBedTypesCreate(data,)
@@ -218,15 +201,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationBedTypesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationBedTypesCreate>>>
-    export type CultivationBedTypesCreateMutationBody = NonReadonly<BedType>
+    export type CultivationBedTypesCreateMutationBody = BedTypeRequest
     export type CultivationBedTypesCreateMutationError = ErrorResponse
 
     export const useCultivationBedTypesCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesCreate>>, TError,{data: NonReadonly<BedType>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesCreate>>, TError,{data: BedTypeRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationBedTypesCreate>>,
         TError,
-        {data: NonReadonly<BedType>},
+        {data: BedTypeRequest},
         TContext
       > => {
 
@@ -322,14 +305,14 @@ export function useCultivationBedTypesRetrieve<TData = Awaited<ReturnType<typeof
 
 export const cultivationBedTypesUpdate = (
     id: string,
-    bedType: NonReadonly<BedType>,
+    bedTypeRequest: BedTypeRequest,
  ) => {
       
       
       return axiosService<BedType>(
       {url: `/api/cultivation/bed_types/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: bedType
+      data: bedTypeRequest
     },
       );
     }
@@ -337,8 +320,8 @@ export const cultivationBedTypesUpdate = (
 
 
 export const getCultivationBedTypesUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>, TError,{id: string;data: NonReadonly<BedType>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>, TError,{id: string;data: NonReadonly<BedType>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>, TError,{id: string;data: BedTypeRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>, TError,{id: string;data: BedTypeRequest}, TContext> => {
 
 const mutationKey = ['cultivationBedTypesUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -350,7 +333,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>, {id: string;data: NonReadonly<BedType>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>, {id: string;data: BedTypeRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationBedTypesUpdate(id,data,)
@@ -362,15 +345,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationBedTypesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>>
-    export type CultivationBedTypesUpdateMutationBody = NonReadonly<BedType>
+    export type CultivationBedTypesUpdateMutationBody = BedTypeRequest
     export type CultivationBedTypesUpdateMutationError = ErrorResponse
 
     export const useCultivationBedTypesUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>, TError,{id: string;data: NonReadonly<BedType>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesUpdate>>, TError,{id: string;data: BedTypeRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationBedTypesUpdate>>,
         TError,
-        {id: string;data: NonReadonly<BedType>},
+        {id: string;data: BedTypeRequest},
         TContext
       > => {
 
@@ -380,14 +363,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationBedTypesPartialUpdate = (
     id: string,
-    patchedBedType: NonReadonly<PatchedBedType>,
+    patchedBedTypeRequest: PatchedBedTypeRequest,
  ) => {
       
       
       return axiosService<BedType>(
       {url: `/api/cultivation/bed_types/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedBedType
+      data: patchedBedTypeRequest
     },
       );
     }
@@ -395,8 +378,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationBedTypesPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedBedType>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedBedType>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>, TError,{id: string;data: PatchedBedTypeRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>, TError,{id: string;data: PatchedBedTypeRequest}, TContext> => {
 
 const mutationKey = ['cultivationBedTypesPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -408,7 +391,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>, {id: string;data: NonReadonly<PatchedBedType>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>, {id: string;data: PatchedBedTypeRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationBedTypesPartialUpdate(id,data,)
@@ -420,15 +403,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationBedTypesPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>>
-    export type CultivationBedTypesPartialUpdateMutationBody = NonReadonly<PatchedBedType>
+    export type CultivationBedTypesPartialUpdateMutationBody = PatchedBedTypeRequest
     export type CultivationBedTypesPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationBedTypesPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedBedType>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>, TError,{id: string;data: PatchedBedTypeRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationBedTypesPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedBedType>},
+        {id: string;data: PatchedBedTypeRequest},
         TContext
       > => {
 
@@ -579,7 +562,7 @@ export function useCultivationCultivationBatchesList<TData = Awaited<ReturnType<
 
 
 export const cultivationCultivationBatchesCreate = (
-    cultivationBatch: NonReadonly<CultivationBatch>,
+    cultivationBatchRequest: CultivationBatchRequest,
  signal?: AbortSignal
 ) => {
       
@@ -587,7 +570,7 @@ export const cultivationCultivationBatchesCreate = (
       return axiosService<CultivationBatch>(
       {url: `/api/cultivation/cultivation_batches/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: cultivationBatch, signal
+      data: cultivationBatchRequest, signal
     },
       );
     }
@@ -595,8 +578,8 @@ export const cultivationCultivationBatchesCreate = (
 
 
 export const getCultivationCultivationBatchesCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>, TError,{data: NonReadonly<CultivationBatch>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>, TError,{data: NonReadonly<CultivationBatch>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>, TError,{data: CultivationBatchRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>, TError,{data: CultivationBatchRequest}, TContext> => {
 
 const mutationKey = ['cultivationCultivationBatchesCreate'];
 const {mutation: mutationOptions} = options ?
@@ -608,7 +591,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>, {data: NonReadonly<CultivationBatch>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>, {data: CultivationBatchRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationCultivationBatchesCreate(data,)
@@ -620,15 +603,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationCultivationBatchesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>>
-    export type CultivationCultivationBatchesCreateMutationBody = NonReadonly<CultivationBatch>
+    export type CultivationCultivationBatchesCreateMutationBody = CultivationBatchRequest
     export type CultivationCultivationBatchesCreateMutationError = ErrorResponse
 
     export const useCultivationCultivationBatchesCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>, TError,{data: NonReadonly<CultivationBatch>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>, TError,{data: CultivationBatchRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationCultivationBatchesCreate>>,
         TError,
-        {data: NonReadonly<CultivationBatch>},
+        {data: CultivationBatchRequest},
         TContext
       > => {
 
@@ -724,14 +707,14 @@ export function useCultivationCultivationBatchesRetrieve<TData = Awaited<ReturnT
 
 export const cultivationCultivationBatchesUpdate = (
     id: string,
-    cultivationBatch: NonReadonly<CultivationBatch>,
+    cultivationBatchRequest: CultivationBatchRequest,
  ) => {
       
       
       return axiosService<CultivationBatch>(
       {url: `/api/cultivation/cultivation_batches/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: cultivationBatch
+      data: cultivationBatchRequest
     },
       );
     }
@@ -739,8 +722,8 @@ export const cultivationCultivationBatchesUpdate = (
 
 
 export const getCultivationCultivationBatchesUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>, TError,{id: string;data: NonReadonly<CultivationBatch>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>, TError,{id: string;data: NonReadonly<CultivationBatch>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>, TError,{id: string;data: CultivationBatchRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>, TError,{id: string;data: CultivationBatchRequest}, TContext> => {
 
 const mutationKey = ['cultivationCultivationBatchesUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -752,7 +735,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>, {id: string;data: NonReadonly<CultivationBatch>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>, {id: string;data: CultivationBatchRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationCultivationBatchesUpdate(id,data,)
@@ -764,15 +747,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationCultivationBatchesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>>
-    export type CultivationCultivationBatchesUpdateMutationBody = NonReadonly<CultivationBatch>
+    export type CultivationCultivationBatchesUpdateMutationBody = CultivationBatchRequest
     export type CultivationCultivationBatchesUpdateMutationError = ErrorResponse
 
     export const useCultivationCultivationBatchesUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>, TError,{id: string;data: NonReadonly<CultivationBatch>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>, TError,{id: string;data: CultivationBatchRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationCultivationBatchesUpdate>>,
         TError,
-        {id: string;data: NonReadonly<CultivationBatch>},
+        {id: string;data: CultivationBatchRequest},
         TContext
       > => {
 
@@ -782,14 +765,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationCultivationBatchesPartialUpdate = (
     id: string,
-    patchedCultivationBatch: NonReadonly<PatchedCultivationBatch>,
+    patchedCultivationBatchRequest: PatchedCultivationBatchRequest,
  ) => {
       
       
       return axiosService<CultivationBatch>(
       {url: `/api/cultivation/cultivation_batches/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedCultivationBatch
+      data: patchedCultivationBatchRequest
     },
       );
     }
@@ -797,8 +780,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationCultivationBatchesPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationBatch>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationBatch>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>, TError,{id: string;data: PatchedCultivationBatchRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>, TError,{id: string;data: PatchedCultivationBatchRequest}, TContext> => {
 
 const mutationKey = ['cultivationCultivationBatchesPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -810,7 +793,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>, {id: string;data: NonReadonly<PatchedCultivationBatch>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>, {id: string;data: PatchedCultivationBatchRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationCultivationBatchesPartialUpdate(id,data,)
@@ -822,15 +805,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationCultivationBatchesPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>>
-    export type CultivationCultivationBatchesPartialUpdateMutationBody = NonReadonly<PatchedCultivationBatch>
+    export type CultivationCultivationBatchesPartialUpdateMutationBody = PatchedCultivationBatchRequest
     export type CultivationCultivationBatchesPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationCultivationBatchesPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationBatch>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>, TError,{id: string;data: PatchedCultivationBatchRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationCultivationBatchesPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedCultivationBatch>},
+        {id: string;data: PatchedCultivationBatchRequest},
         TContext
       > => {
 
@@ -980,7 +963,7 @@ export function useCultivationCultivationBreakFamiliesList<TData = Awaited<Retur
 
 
 export const cultivationCultivationBreakFamiliesCreate = (
-    cultivationBreakFamily: NonReadonly<CultivationBreakFamily>,
+    cultivationBreakFamilyRequest: CultivationBreakFamilyRequest,
  signal?: AbortSignal
 ) => {
       
@@ -988,7 +971,7 @@ export const cultivationCultivationBreakFamiliesCreate = (
       return axiosService<CultivationBreakFamily>(
       {url: `/api/cultivation/cultivation_break_families/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: cultivationBreakFamily, signal
+      data: cultivationBreakFamilyRequest, signal
     },
       );
     }
@@ -996,8 +979,8 @@ export const cultivationCultivationBreakFamiliesCreate = (
 
 
 export const getCultivationCultivationBreakFamiliesCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>, TError,{data: NonReadonly<CultivationBreakFamily>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>, TError,{data: NonReadonly<CultivationBreakFamily>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>, TError,{data: CultivationBreakFamilyRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>, TError,{data: CultivationBreakFamilyRequest}, TContext> => {
 
 const mutationKey = ['cultivationCultivationBreakFamiliesCreate'];
 const {mutation: mutationOptions} = options ?
@@ -1009,7 +992,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>, {data: NonReadonly<CultivationBreakFamily>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>, {data: CultivationBreakFamilyRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationCultivationBreakFamiliesCreate(data,)
@@ -1021,15 +1004,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationCultivationBreakFamiliesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>>
-    export type CultivationCultivationBreakFamiliesCreateMutationBody = NonReadonly<CultivationBreakFamily>
+    export type CultivationCultivationBreakFamiliesCreateMutationBody = CultivationBreakFamilyRequest
     export type CultivationCultivationBreakFamiliesCreateMutationError = ErrorResponse
 
     export const useCultivationCultivationBreakFamiliesCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>, TError,{data: NonReadonly<CultivationBreakFamily>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>, TError,{data: CultivationBreakFamilyRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesCreate>>,
         TError,
-        {data: NonReadonly<CultivationBreakFamily>},
+        {data: CultivationBreakFamilyRequest},
         TContext
       > => {
 
@@ -1125,14 +1108,14 @@ export function useCultivationCultivationBreakFamiliesRetrieve<TData = Awaited<R
 
 export const cultivationCultivationBreakFamiliesUpdate = (
     id: string,
-    cultivationBreakFamily: NonReadonly<CultivationBreakFamily>,
+    cultivationBreakFamilyRequest: CultivationBreakFamilyRequest,
  ) => {
       
       
       return axiosService<CultivationBreakFamily>(
       {url: `/api/cultivation/cultivation_break_families/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: cultivationBreakFamily
+      data: cultivationBreakFamilyRequest
     },
       );
     }
@@ -1140,8 +1123,8 @@ export const cultivationCultivationBreakFamiliesUpdate = (
 
 
 export const getCultivationCultivationBreakFamiliesUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>, TError,{id: string;data: NonReadonly<CultivationBreakFamily>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>, TError,{id: string;data: NonReadonly<CultivationBreakFamily>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>, TError,{id: string;data: CultivationBreakFamilyRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>, TError,{id: string;data: CultivationBreakFamilyRequest}, TContext> => {
 
 const mutationKey = ['cultivationCultivationBreakFamiliesUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -1153,7 +1136,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>, {id: string;data: NonReadonly<CultivationBreakFamily>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>, {id: string;data: CultivationBreakFamilyRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationCultivationBreakFamiliesUpdate(id,data,)
@@ -1165,15 +1148,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationCultivationBreakFamiliesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>>
-    export type CultivationCultivationBreakFamiliesUpdateMutationBody = NonReadonly<CultivationBreakFamily>
+    export type CultivationCultivationBreakFamiliesUpdateMutationBody = CultivationBreakFamilyRequest
     export type CultivationCultivationBreakFamiliesUpdateMutationError = ErrorResponse
 
     export const useCultivationCultivationBreakFamiliesUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>, TError,{id: string;data: NonReadonly<CultivationBreakFamily>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>, TError,{id: string;data: CultivationBreakFamilyRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesUpdate>>,
         TError,
-        {id: string;data: NonReadonly<CultivationBreakFamily>},
+        {id: string;data: CultivationBreakFamilyRequest},
         TContext
       > => {
 
@@ -1183,14 +1166,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationCultivationBreakFamiliesPartialUpdate = (
     id: string,
-    patchedCultivationBreakFamily: NonReadonly<PatchedCultivationBreakFamily>,
+    patchedCultivationBreakFamilyRequest: PatchedCultivationBreakFamilyRequest,
  ) => {
       
       
       return axiosService<CultivationBreakFamily>(
       {url: `/api/cultivation/cultivation_break_families/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedCultivationBreakFamily
+      data: patchedCultivationBreakFamilyRequest
     },
       );
     }
@@ -1198,8 +1181,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationCultivationBreakFamiliesPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationBreakFamily>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationBreakFamily>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>, TError,{id: string;data: PatchedCultivationBreakFamilyRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>, TError,{id: string;data: PatchedCultivationBreakFamilyRequest}, TContext> => {
 
 const mutationKey = ['cultivationCultivationBreakFamiliesPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -1211,7 +1194,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>, {id: string;data: NonReadonly<PatchedCultivationBreakFamily>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>, {id: string;data: PatchedCultivationBreakFamilyRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationCultivationBreakFamiliesPartialUpdate(id,data,)
@@ -1223,15 +1206,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationCultivationBreakFamiliesPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>>
-    export type CultivationCultivationBreakFamiliesPartialUpdateMutationBody = NonReadonly<PatchedCultivationBreakFamily>
+    export type CultivationCultivationBreakFamiliesPartialUpdateMutationBody = PatchedCultivationBreakFamilyRequest
     export type CultivationCultivationBreakFamiliesPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationCultivationBreakFamiliesPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationBreakFamily>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>, TError,{id: string;data: PatchedCultivationBreakFamilyRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationCultivationBreakFamiliesPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedCultivationBreakFamily>},
+        {id: string;data: PatchedCultivationBreakFamilyRequest},
         TContext
       > => {
 
@@ -1381,7 +1364,7 @@ export function useCultivationHistoricalPlantingsList<TData = Awaited<ReturnType
 
 
 export const cultivationHistoricalPlantingsCreate = (
-    historicalPlanting: NonReadonly<HistoricalPlanting>,
+    historicalPlantingRequest: HistoricalPlantingRequest,
  signal?: AbortSignal
 ) => {
       
@@ -1389,7 +1372,7 @@ export const cultivationHistoricalPlantingsCreate = (
       return axiosService<HistoricalPlanting>(
       {url: `/api/cultivation/historical_plantings/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: historicalPlanting, signal
+      data: historicalPlantingRequest, signal
     },
       );
     }
@@ -1397,8 +1380,8 @@ export const cultivationHistoricalPlantingsCreate = (
 
 
 export const getCultivationHistoricalPlantingsCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>, TError,{data: NonReadonly<HistoricalPlanting>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>, TError,{data: NonReadonly<HistoricalPlanting>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>, TError,{data: HistoricalPlantingRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>, TError,{data: HistoricalPlantingRequest}, TContext> => {
 
 const mutationKey = ['cultivationHistoricalPlantingsCreate'];
 const {mutation: mutationOptions} = options ?
@@ -1410,7 +1393,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>, {data: NonReadonly<HistoricalPlanting>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>, {data: HistoricalPlantingRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationHistoricalPlantingsCreate(data,)
@@ -1422,15 +1405,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationHistoricalPlantingsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>>
-    export type CultivationHistoricalPlantingsCreateMutationBody = NonReadonly<HistoricalPlanting>
+    export type CultivationHistoricalPlantingsCreateMutationBody = HistoricalPlantingRequest
     export type CultivationHistoricalPlantingsCreateMutationError = ErrorResponse
 
     export const useCultivationHistoricalPlantingsCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>, TError,{data: NonReadonly<HistoricalPlanting>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>, TError,{data: HistoricalPlantingRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationHistoricalPlantingsCreate>>,
         TError,
-        {data: NonReadonly<HistoricalPlanting>},
+        {data: HistoricalPlantingRequest},
         TContext
       > => {
 
@@ -1526,14 +1509,14 @@ export function useCultivationHistoricalPlantingsRetrieve<TData = Awaited<Return
 
 export const cultivationHistoricalPlantingsUpdate = (
     id: string,
-    historicalPlanting: NonReadonly<HistoricalPlanting>,
+    historicalPlantingRequest: HistoricalPlantingRequest,
  ) => {
       
       
       return axiosService<HistoricalPlanting>(
       {url: `/api/cultivation/historical_plantings/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: historicalPlanting
+      data: historicalPlantingRequest
     },
       );
     }
@@ -1541,8 +1524,8 @@ export const cultivationHistoricalPlantingsUpdate = (
 
 
 export const getCultivationHistoricalPlantingsUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>, TError,{id: string;data: NonReadonly<HistoricalPlanting>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>, TError,{id: string;data: NonReadonly<HistoricalPlanting>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>, TError,{id: string;data: HistoricalPlantingRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>, TError,{id: string;data: HistoricalPlantingRequest}, TContext> => {
 
 const mutationKey = ['cultivationHistoricalPlantingsUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -1554,7 +1537,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>, {id: string;data: NonReadonly<HistoricalPlanting>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>, {id: string;data: HistoricalPlantingRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationHistoricalPlantingsUpdate(id,data,)
@@ -1566,15 +1549,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationHistoricalPlantingsUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>>
-    export type CultivationHistoricalPlantingsUpdateMutationBody = NonReadonly<HistoricalPlanting>
+    export type CultivationHistoricalPlantingsUpdateMutationBody = HistoricalPlantingRequest
     export type CultivationHistoricalPlantingsUpdateMutationError = ErrorResponse
 
     export const useCultivationHistoricalPlantingsUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>, TError,{id: string;data: NonReadonly<HistoricalPlanting>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>, TError,{id: string;data: HistoricalPlantingRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationHistoricalPlantingsUpdate>>,
         TError,
-        {id: string;data: NonReadonly<HistoricalPlanting>},
+        {id: string;data: HistoricalPlantingRequest},
         TContext
       > => {
 
@@ -1584,14 +1567,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationHistoricalPlantingsPartialUpdate = (
     id: string,
-    patchedHistoricalPlanting: NonReadonly<PatchedHistoricalPlanting>,
+    patchedHistoricalPlantingRequest: PatchedHistoricalPlantingRequest,
  ) => {
       
       
       return axiosService<HistoricalPlanting>(
       {url: `/api/cultivation/historical_plantings/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedHistoricalPlanting
+      data: patchedHistoricalPlantingRequest
     },
       );
     }
@@ -1599,8 +1582,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationHistoricalPlantingsPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedHistoricalPlanting>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedHistoricalPlanting>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>, TError,{id: string;data: PatchedHistoricalPlantingRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>, TError,{id: string;data: PatchedHistoricalPlantingRequest}, TContext> => {
 
 const mutationKey = ['cultivationHistoricalPlantingsPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -1612,7 +1595,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>, {id: string;data: NonReadonly<PatchedHistoricalPlanting>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>, {id: string;data: PatchedHistoricalPlantingRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationHistoricalPlantingsPartialUpdate(id,data,)
@@ -1624,15 +1607,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationHistoricalPlantingsPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>>
-    export type CultivationHistoricalPlantingsPartialUpdateMutationBody = NonReadonly<PatchedHistoricalPlanting>
+    export type CultivationHistoricalPlantingsPartialUpdateMutationBody = PatchedHistoricalPlantingRequest
     export type CultivationHistoricalPlantingsPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationHistoricalPlantingsPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedHistoricalPlanting>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>, TError,{id: string;data: PatchedHistoricalPlantingRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationHistoricalPlantingsPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedHistoricalPlanting>},
+        {id: string;data: PatchedHistoricalPlantingRequest},
         TContext
       > => {
 
@@ -2158,7 +2141,7 @@ export function useCultivationPlotContentsList<TData = Awaited<ReturnType<typeof
 
 
 export const cultivationPlotContentsCreate = (
-    plotContent: NonReadonly<PlotContent>,
+    plotContentRequest: PlotContentRequest,
  signal?: AbortSignal
 ) => {
       
@@ -2166,7 +2149,7 @@ export const cultivationPlotContentsCreate = (
       return axiosService<PlotContent>(
       {url: `/api/cultivation/plot_contents/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: plotContent, signal
+      data: plotContentRequest, signal
     },
       );
     }
@@ -2174,8 +2157,8 @@ export const cultivationPlotContentsCreate = (
 
 
 export const getCultivationPlotContentsCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>, TError,{data: NonReadonly<PlotContent>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>, TError,{data: NonReadonly<PlotContent>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>, TError,{data: PlotContentRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>, TError,{data: PlotContentRequest}, TContext> => {
 
 const mutationKey = ['cultivationPlotContentsCreate'];
 const {mutation: mutationOptions} = options ?
@@ -2187,7 +2170,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>, {data: NonReadonly<PlotContent>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>, {data: PlotContentRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationPlotContentsCreate(data,)
@@ -2199,15 +2182,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationPlotContentsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>>
-    export type CultivationPlotContentsCreateMutationBody = NonReadonly<PlotContent>
+    export type CultivationPlotContentsCreateMutationBody = PlotContentRequest
     export type CultivationPlotContentsCreateMutationError = ErrorResponse
 
     export const useCultivationPlotContentsCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>, TError,{data: NonReadonly<PlotContent>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsCreate>>, TError,{data: PlotContentRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationPlotContentsCreate>>,
         TError,
-        {data: NonReadonly<PlotContent>},
+        {data: PlotContentRequest},
         TContext
       > => {
 
@@ -2303,14 +2286,14 @@ export function useCultivationPlotContentsRetrieve<TData = Awaited<ReturnType<ty
 
 export const cultivationPlotContentsUpdate = (
     id: string,
-    plotContent: NonReadonly<PlotContent>,
+    plotContentRequest: PlotContentRequest,
  ) => {
       
       
       return axiosService<PlotContent>(
       {url: `/api/cultivation/plot_contents/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: plotContent
+      data: plotContentRequest
     },
       );
     }
@@ -2318,8 +2301,8 @@ export const cultivationPlotContentsUpdate = (
 
 
 export const getCultivationPlotContentsUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>, TError,{id: string;data: NonReadonly<PlotContent>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>, TError,{id: string;data: NonReadonly<PlotContent>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>, TError,{id: string;data: PlotContentRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>, TError,{id: string;data: PlotContentRequest}, TContext> => {
 
 const mutationKey = ['cultivationPlotContentsUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -2331,7 +2314,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>, {id: string;data: NonReadonly<PlotContent>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>, {id: string;data: PlotContentRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationPlotContentsUpdate(id,data,)
@@ -2343,15 +2326,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationPlotContentsUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>>
-    export type CultivationPlotContentsUpdateMutationBody = NonReadonly<PlotContent>
+    export type CultivationPlotContentsUpdateMutationBody = PlotContentRequest
     export type CultivationPlotContentsUpdateMutationError = ErrorResponse
 
     export const useCultivationPlotContentsUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>, TError,{id: string;data: NonReadonly<PlotContent>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>, TError,{id: string;data: PlotContentRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationPlotContentsUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PlotContent>},
+        {id: string;data: PlotContentRequest},
         TContext
       > => {
 
@@ -2361,14 +2344,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationPlotContentsPartialUpdate = (
     id: string,
-    patchedPlotContent: NonReadonly<PatchedPlotContent>,
+    patchedPlotContentRequest: PatchedPlotContentRequest,
  ) => {
       
       
       return axiosService<PlotContent>(
       {url: `/api/cultivation/plot_contents/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedPlotContent
+      data: patchedPlotContentRequest
     },
       );
     }
@@ -2376,8 +2359,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationPlotContentsPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedPlotContent>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedPlotContent>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>, TError,{id: string;data: PatchedPlotContentRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>, TError,{id: string;data: PatchedPlotContentRequest}, TContext> => {
 
 const mutationKey = ['cultivationPlotContentsPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -2389,7 +2372,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>, {id: string;data: NonReadonly<PatchedPlotContent>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>, {id: string;data: PatchedPlotContentRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationPlotContentsPartialUpdate(id,data,)
@@ -2401,15 +2384,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationPlotContentsPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>>
-    export type CultivationPlotContentsPartialUpdateMutationBody = NonReadonly<PatchedPlotContent>
+    export type CultivationPlotContentsPartialUpdateMutationBody = PatchedPlotContentRequest
     export type CultivationPlotContentsPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationPlotContentsPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedPlotContent>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>, TError,{id: string;data: PatchedPlotContentRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationPlotContentsPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedPlotContent>},
+        {id: string;data: PatchedPlotContentRequest},
         TContext
       > => {
 
@@ -2559,7 +2542,7 @@ export function useCultivationPlotsList<TData = Awaited<ReturnType<typeof cultiv
 
 
 export const cultivationPlotsCreate = (
-    cultivationPlot: NonReadonly<CultivationPlot>,
+    cultivationPlotRequest: CultivationPlotRequest,
  signal?: AbortSignal
 ) => {
       
@@ -2567,7 +2550,7 @@ export const cultivationPlotsCreate = (
       return axiosService<CultivationPlot>(
       {url: `/api/cultivation/plots/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: cultivationPlot, signal
+      data: cultivationPlotRequest, signal
     },
       );
     }
@@ -2575,8 +2558,8 @@ export const cultivationPlotsCreate = (
 
 
 export const getCultivationPlotsCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsCreate>>, TError,{data: NonReadonly<CultivationPlot>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsCreate>>, TError,{data: NonReadonly<CultivationPlot>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsCreate>>, TError,{data: CultivationPlotRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsCreate>>, TError,{data: CultivationPlotRequest}, TContext> => {
 
 const mutationKey = ['cultivationPlotsCreate'];
 const {mutation: mutationOptions} = options ?
@@ -2588,7 +2571,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotsCreate>>, {data: NonReadonly<CultivationPlot>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotsCreate>>, {data: CultivationPlotRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationPlotsCreate(data,)
@@ -2600,15 +2583,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationPlotsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationPlotsCreate>>>
-    export type CultivationPlotsCreateMutationBody = NonReadonly<CultivationPlot>
+    export type CultivationPlotsCreateMutationBody = CultivationPlotRequest
     export type CultivationPlotsCreateMutationError = ErrorResponse
 
     export const useCultivationPlotsCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsCreate>>, TError,{data: NonReadonly<CultivationPlot>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsCreate>>, TError,{data: CultivationPlotRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationPlotsCreate>>,
         TError,
-        {data: NonReadonly<CultivationPlot>},
+        {data: CultivationPlotRequest},
         TContext
       > => {
 
@@ -2704,14 +2687,14 @@ export function useCultivationPlotsRetrieve<TData = Awaited<ReturnType<typeof cu
 
 export const cultivationPlotsUpdate = (
     id: string,
-    cultivationPlot: NonReadonly<CultivationPlot>,
+    cultivationPlotRequest: CultivationPlotRequest,
  ) => {
       
       
       return axiosService<CultivationPlot>(
       {url: `/api/cultivation/plots/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: cultivationPlot
+      data: cultivationPlotRequest
     },
       );
     }
@@ -2719,8 +2702,8 @@ export const cultivationPlotsUpdate = (
 
 
 export const getCultivationPlotsUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsUpdate>>, TError,{id: string;data: NonReadonly<CultivationPlot>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsUpdate>>, TError,{id: string;data: NonReadonly<CultivationPlot>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsUpdate>>, TError,{id: string;data: CultivationPlotRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsUpdate>>, TError,{id: string;data: CultivationPlotRequest}, TContext> => {
 
 const mutationKey = ['cultivationPlotsUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -2732,7 +2715,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotsUpdate>>, {id: string;data: NonReadonly<CultivationPlot>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotsUpdate>>, {id: string;data: CultivationPlotRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationPlotsUpdate(id,data,)
@@ -2744,15 +2727,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationPlotsUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationPlotsUpdate>>>
-    export type CultivationPlotsUpdateMutationBody = NonReadonly<CultivationPlot>
+    export type CultivationPlotsUpdateMutationBody = CultivationPlotRequest
     export type CultivationPlotsUpdateMutationError = ErrorResponse
 
     export const useCultivationPlotsUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsUpdate>>, TError,{id: string;data: NonReadonly<CultivationPlot>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsUpdate>>, TError,{id: string;data: CultivationPlotRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationPlotsUpdate>>,
         TError,
-        {id: string;data: NonReadonly<CultivationPlot>},
+        {id: string;data: CultivationPlotRequest},
         TContext
       > => {
 
@@ -2762,14 +2745,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationPlotsPartialUpdate = (
     id: string,
-    patchedCultivationPlot: NonReadonly<PatchedCultivationPlot>,
+    patchedCultivationPlotRequest: PatchedCultivationPlotRequest,
  ) => {
       
       
       return axiosService<CultivationPlot>(
       {url: `/api/cultivation/plots/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedCultivationPlot
+      data: patchedCultivationPlotRequest
     },
       );
     }
@@ -2777,8 +2760,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationPlotsPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationPlot>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationPlot>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>, TError,{id: string;data: PatchedCultivationPlotRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>, TError,{id: string;data: PatchedCultivationPlotRequest}, TContext> => {
 
 const mutationKey = ['cultivationPlotsPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -2790,7 +2773,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>, {id: string;data: NonReadonly<PatchedCultivationPlot>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>, {id: string;data: PatchedCultivationPlotRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationPlotsPartialUpdate(id,data,)
@@ -2802,15 +2785,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationPlotsPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>>
-    export type CultivationPlotsPartialUpdateMutationBody = NonReadonly<PatchedCultivationPlot>
+    export type CultivationPlotsPartialUpdateMutationBody = PatchedCultivationPlotRequest
     export type CultivationPlotsPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationPlotsPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedCultivationPlot>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>, TError,{id: string;data: PatchedCultivationPlotRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationPlotsPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedCultivationPlot>},
+        {id: string;data: PatchedCultivationPlotRequest},
         TContext
       > => {
 
@@ -2960,7 +2943,7 @@ export function useCultivationSeedlingsVendorsList<TData = Awaited<ReturnType<ty
 
 
 export const cultivationSeedlingsVendorsCreate = (
-    seedlingsVendor: NonReadonly<SeedlingsVendor>,
+    seedlingsVendorRequest: SeedlingsVendorRequest,
  signal?: AbortSignal
 ) => {
       
@@ -2968,7 +2951,7 @@ export const cultivationSeedlingsVendorsCreate = (
       return axiosService<SeedlingsVendor>(
       {url: `/api/cultivation/seedlings_vendors/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: seedlingsVendor, signal
+      data: seedlingsVendorRequest, signal
     },
       );
     }
@@ -2976,8 +2959,8 @@ export const cultivationSeedlingsVendorsCreate = (
 
 
 export const getCultivationSeedlingsVendorsCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>, TError,{data: NonReadonly<SeedlingsVendor>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>, TError,{data: NonReadonly<SeedlingsVendor>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>, TError,{data: SeedlingsVendorRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>, TError,{data: SeedlingsVendorRequest}, TContext> => {
 
 const mutationKey = ['cultivationSeedlingsVendorsCreate'];
 const {mutation: mutationOptions} = options ?
@@ -2989,7 +2972,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>, {data: NonReadonly<SeedlingsVendor>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>, {data: SeedlingsVendorRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationSeedlingsVendorsCreate(data,)
@@ -3001,15 +2984,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationSeedlingsVendorsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>>
-    export type CultivationSeedlingsVendorsCreateMutationBody = NonReadonly<SeedlingsVendor>
+    export type CultivationSeedlingsVendorsCreateMutationBody = SeedlingsVendorRequest
     export type CultivationSeedlingsVendorsCreateMutationError = ErrorResponse
 
     export const useCultivationSeedlingsVendorsCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>, TError,{data: NonReadonly<SeedlingsVendor>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>, TError,{data: SeedlingsVendorRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationSeedlingsVendorsCreate>>,
         TError,
-        {data: NonReadonly<SeedlingsVendor>},
+        {data: SeedlingsVendorRequest},
         TContext
       > => {
 
@@ -3105,14 +3088,14 @@ export function useCultivationSeedlingsVendorsRetrieve<TData = Awaited<ReturnTyp
 
 export const cultivationSeedlingsVendorsUpdate = (
     id: string,
-    seedlingsVendor: NonReadonly<SeedlingsVendor>,
+    seedlingsVendorRequest: SeedlingsVendorRequest,
  ) => {
       
       
       return axiosService<SeedlingsVendor>(
       {url: `/api/cultivation/seedlings_vendors/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: seedlingsVendor
+      data: seedlingsVendorRequest
     },
       );
     }
@@ -3120,8 +3103,8 @@ export const cultivationSeedlingsVendorsUpdate = (
 
 
 export const getCultivationSeedlingsVendorsUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>, TError,{id: string;data: NonReadonly<SeedlingsVendor>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>, TError,{id: string;data: NonReadonly<SeedlingsVendor>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>, TError,{id: string;data: SeedlingsVendorRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>, TError,{id: string;data: SeedlingsVendorRequest}, TContext> => {
 
 const mutationKey = ['cultivationSeedlingsVendorsUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -3133,7 +3116,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>, {id: string;data: NonReadonly<SeedlingsVendor>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>, {id: string;data: SeedlingsVendorRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationSeedlingsVendorsUpdate(id,data,)
@@ -3145,15 +3128,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationSeedlingsVendorsUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>>
-    export type CultivationSeedlingsVendorsUpdateMutationBody = NonReadonly<SeedlingsVendor>
+    export type CultivationSeedlingsVendorsUpdateMutationBody = SeedlingsVendorRequest
     export type CultivationSeedlingsVendorsUpdateMutationError = ErrorResponse
 
     export const useCultivationSeedlingsVendorsUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>, TError,{id: string;data: NonReadonly<SeedlingsVendor>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>, TError,{id: string;data: SeedlingsVendorRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationSeedlingsVendorsUpdate>>,
         TError,
-        {id: string;data: NonReadonly<SeedlingsVendor>},
+        {id: string;data: SeedlingsVendorRequest},
         TContext
       > => {
 
@@ -3163,14 +3146,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationSeedlingsVendorsPartialUpdate = (
     id: string,
-    patchedSeedlingsVendor: NonReadonly<PatchedSeedlingsVendor>,
+    patchedSeedlingsVendorRequest: PatchedSeedlingsVendorRequest,
  ) => {
       
       
       return axiosService<SeedlingsVendor>(
       {url: `/api/cultivation/seedlings_vendors/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedSeedlingsVendor
+      data: patchedSeedlingsVendorRequest
     },
       );
     }
@@ -3178,8 +3161,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationSeedlingsVendorsPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedSeedlingsVendor>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedSeedlingsVendor>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>, TError,{id: string;data: PatchedSeedlingsVendorRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>, TError,{id: string;data: PatchedSeedlingsVendorRequest}, TContext> => {
 
 const mutationKey = ['cultivationSeedlingsVendorsPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -3191,7 +3174,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>, {id: string;data: NonReadonly<PatchedSeedlingsVendor>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>, {id: string;data: PatchedSeedlingsVendorRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationSeedlingsVendorsPartialUpdate(id,data,)
@@ -3203,15 +3186,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationSeedlingsVendorsPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>>
-    export type CultivationSeedlingsVendorsPartialUpdateMutationBody = NonReadonly<PatchedSeedlingsVendor>
+    export type CultivationSeedlingsVendorsPartialUpdateMutationBody = PatchedSeedlingsVendorRequest
     export type CultivationSeedlingsVendorsPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationSeedlingsVendorsPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedSeedlingsVendor>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>, TError,{id: string;data: PatchedSeedlingsVendorRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationSeedlingsVendorsPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedSeedlingsVendor>},
+        {id: string;data: PatchedSeedlingsVendorRequest},
         TContext
       > => {
 
@@ -3361,7 +3344,7 @@ export function useCultivationSeedsVendorsList<TData = Awaited<ReturnType<typeof
 
 
 export const cultivationSeedsVendorsCreate = (
-    seedsVendor: NonReadonly<SeedsVendor>,
+    seedsVendorRequest: SeedsVendorRequest,
  signal?: AbortSignal
 ) => {
       
@@ -3369,7 +3352,7 @@ export const cultivationSeedsVendorsCreate = (
       return axiosService<SeedsVendor>(
       {url: `/api/cultivation/seeds_vendors/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: seedsVendor, signal
+      data: seedsVendorRequest, signal
     },
       );
     }
@@ -3377,8 +3360,8 @@ export const cultivationSeedsVendorsCreate = (
 
 
 export const getCultivationSeedsVendorsCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>, TError,{data: NonReadonly<SeedsVendor>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>, TError,{data: NonReadonly<SeedsVendor>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>, TError,{data: SeedsVendorRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>, TError,{data: SeedsVendorRequest}, TContext> => {
 
 const mutationKey = ['cultivationSeedsVendorsCreate'];
 const {mutation: mutationOptions} = options ?
@@ -3390,7 +3373,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>, {data: NonReadonly<SeedsVendor>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>, {data: SeedsVendorRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationSeedsVendorsCreate(data,)
@@ -3402,15 +3385,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationSeedsVendorsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>>
-    export type CultivationSeedsVendorsCreateMutationBody = NonReadonly<SeedsVendor>
+    export type CultivationSeedsVendorsCreateMutationBody = SeedsVendorRequest
     export type CultivationSeedsVendorsCreateMutationError = ErrorResponse
 
     export const useCultivationSeedsVendorsCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>, TError,{data: NonReadonly<SeedsVendor>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>, TError,{data: SeedsVendorRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationSeedsVendorsCreate>>,
         TError,
-        {data: NonReadonly<SeedsVendor>},
+        {data: SeedsVendorRequest},
         TContext
       > => {
 
@@ -3506,14 +3489,14 @@ export function useCultivationSeedsVendorsRetrieve<TData = Awaited<ReturnType<ty
 
 export const cultivationSeedsVendorsUpdate = (
     id: string,
-    seedsVendor: NonReadonly<SeedsVendor>,
+    seedsVendorRequest: SeedsVendorRequest,
  ) => {
       
       
       return axiosService<SeedsVendor>(
       {url: `/api/cultivation/seeds_vendors/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: seedsVendor
+      data: seedsVendorRequest
     },
       );
     }
@@ -3521,8 +3504,8 @@ export const cultivationSeedsVendorsUpdate = (
 
 
 export const getCultivationSeedsVendorsUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>, TError,{id: string;data: NonReadonly<SeedsVendor>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>, TError,{id: string;data: NonReadonly<SeedsVendor>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>, TError,{id: string;data: SeedsVendorRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>, TError,{id: string;data: SeedsVendorRequest}, TContext> => {
 
 const mutationKey = ['cultivationSeedsVendorsUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -3534,7 +3517,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>, {id: string;data: NonReadonly<SeedsVendor>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>, {id: string;data: SeedsVendorRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationSeedsVendorsUpdate(id,data,)
@@ -3546,15 +3529,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationSeedsVendorsUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>>
-    export type CultivationSeedsVendorsUpdateMutationBody = NonReadonly<SeedsVendor>
+    export type CultivationSeedsVendorsUpdateMutationBody = SeedsVendorRequest
     export type CultivationSeedsVendorsUpdateMutationError = ErrorResponse
 
     export const useCultivationSeedsVendorsUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>, TError,{id: string;data: NonReadonly<SeedsVendor>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>, TError,{id: string;data: SeedsVendorRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationSeedsVendorsUpdate>>,
         TError,
-        {id: string;data: NonReadonly<SeedsVendor>},
+        {id: string;data: SeedsVendorRequest},
         TContext
       > => {
 
@@ -3564,14 +3547,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationSeedsVendorsPartialUpdate = (
     id: string,
-    patchedSeedsVendor: NonReadonly<PatchedSeedsVendor>,
+    patchedSeedsVendorRequest: PatchedSeedsVendorRequest,
  ) => {
       
       
       return axiosService<SeedsVendor>(
       {url: `/api/cultivation/seeds_vendors/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedSeedsVendor
+      data: patchedSeedsVendorRequest
     },
       );
     }
@@ -3579,8 +3562,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationSeedsVendorsPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedSeedsVendor>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedSeedsVendor>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>, TError,{id: string;data: PatchedSeedsVendorRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>, TError,{id: string;data: PatchedSeedsVendorRequest}, TContext> => {
 
 const mutationKey = ['cultivationSeedsVendorsPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -3592,7 +3575,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>, {id: string;data: NonReadonly<PatchedSeedsVendor>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>, {id: string;data: PatchedSeedsVendorRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationSeedsVendorsPartialUpdate(id,data,)
@@ -3604,15 +3587,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationSeedsVendorsPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>>
-    export type CultivationSeedsVendorsPartialUpdateMutationBody = NonReadonly<PatchedSeedsVendor>
+    export type CultivationSeedsVendorsPartialUpdateMutationBody = PatchedSeedsVendorRequest
     export type CultivationSeedsVendorsPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationSeedsVendorsPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedSeedsVendor>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>, TError,{id: string;data: PatchedSeedsVendorRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationSeedsVendorsPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedSeedsVendor>},
+        {id: string;data: PatchedSeedsVendorRequest},
         TContext
       > => {
 
@@ -3979,7 +3962,7 @@ export function useCultivationVegetableAggregationsList<TData = Awaited<ReturnTy
 
 
 export const cultivationVegetableAggregationsCreate = (
-    vegetableAggregation: NonReadonly<VegetableAggregation>,
+    vegetableAggregationRequest: VegetableAggregationRequest,
  signal?: AbortSignal
 ) => {
       
@@ -3987,7 +3970,7 @@ export const cultivationVegetableAggregationsCreate = (
       return axiosService<VegetableAggregation>(
       {url: `/api/cultivation/vegetable_aggregations/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: vegetableAggregation, signal
+      data: vegetableAggregationRequest, signal
     },
       );
     }
@@ -3995,8 +3978,8 @@ export const cultivationVegetableAggregationsCreate = (
 
 
 export const getCultivationVegetableAggregationsCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>, TError,{data: NonReadonly<VegetableAggregation>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>, TError,{data: NonReadonly<VegetableAggregation>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>, TError,{data: VegetableAggregationRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>, TError,{data: VegetableAggregationRequest}, TContext> => {
 
 const mutationKey = ['cultivationVegetableAggregationsCreate'];
 const {mutation: mutationOptions} = options ?
@@ -4008,7 +3991,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>, {data: NonReadonly<VegetableAggregation>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>, {data: VegetableAggregationRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationVegetableAggregationsCreate(data,)
@@ -4020,15 +4003,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationVegetableAggregationsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>>
-    export type CultivationVegetableAggregationsCreateMutationBody = NonReadonly<VegetableAggregation>
+    export type CultivationVegetableAggregationsCreateMutationBody = VegetableAggregationRequest
     export type CultivationVegetableAggregationsCreateMutationError = ErrorResponse
 
     export const useCultivationVegetableAggregationsCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>, TError,{data: NonReadonly<VegetableAggregation>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>, TError,{data: VegetableAggregationRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationVegetableAggregationsCreate>>,
         TError,
-        {data: NonReadonly<VegetableAggregation>},
+        {data: VegetableAggregationRequest},
         TContext
       > => {
 
@@ -4124,14 +4107,14 @@ export function useCultivationVegetableAggregationsRetrieve<TData = Awaited<Retu
 
 export const cultivationVegetableAggregationsUpdate = (
     id: string,
-    vegetableAggregation: NonReadonly<VegetableAggregation>,
+    vegetableAggregationRequest: VegetableAggregationRequest,
  ) => {
       
       
       return axiosService<VegetableAggregation>(
       {url: `/api/cultivation/vegetable_aggregations/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: vegetableAggregation
+      data: vegetableAggregationRequest
     },
       );
     }
@@ -4139,8 +4122,8 @@ export const cultivationVegetableAggregationsUpdate = (
 
 
 export const getCultivationVegetableAggregationsUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>, TError,{id: string;data: NonReadonly<VegetableAggregation>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>, TError,{id: string;data: NonReadonly<VegetableAggregation>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>, TError,{id: string;data: VegetableAggregationRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>, TError,{id: string;data: VegetableAggregationRequest}, TContext> => {
 
 const mutationKey = ['cultivationVegetableAggregationsUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -4152,7 +4135,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>, {id: string;data: NonReadonly<VegetableAggregation>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>, {id: string;data: VegetableAggregationRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationVegetableAggregationsUpdate(id,data,)
@@ -4164,15 +4147,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationVegetableAggregationsUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>>
-    export type CultivationVegetableAggregationsUpdateMutationBody = NonReadonly<VegetableAggregation>
+    export type CultivationVegetableAggregationsUpdateMutationBody = VegetableAggregationRequest
     export type CultivationVegetableAggregationsUpdateMutationError = ErrorResponse
 
     export const useCultivationVegetableAggregationsUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>, TError,{id: string;data: NonReadonly<VegetableAggregation>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>, TError,{id: string;data: VegetableAggregationRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationVegetableAggregationsUpdate>>,
         TError,
-        {id: string;data: NonReadonly<VegetableAggregation>},
+        {id: string;data: VegetableAggregationRequest},
         TContext
       > => {
 
@@ -4182,14 +4165,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationVegetableAggregationsPartialUpdate = (
     id: string,
-    patchedVegetableAggregation: NonReadonly<PatchedVegetableAggregation>,
+    patchedVegetableAggregationRequest: PatchedVegetableAggregationRequest,
  ) => {
       
       
       return axiosService<VegetableAggregation>(
       {url: `/api/cultivation/vegetable_aggregations/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedVegetableAggregation
+      data: patchedVegetableAggregationRequest
     },
       );
     }
@@ -4197,8 +4180,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationVegetableAggregationsPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedVegetableAggregation>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedVegetableAggregation>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>, TError,{id: string;data: PatchedVegetableAggregationRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>, TError,{id: string;data: PatchedVegetableAggregationRequest}, TContext> => {
 
 const mutationKey = ['cultivationVegetableAggregationsPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -4210,7 +4193,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>, {id: string;data: NonReadonly<PatchedVegetableAggregation>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>, {id: string;data: PatchedVegetableAggregationRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationVegetableAggregationsPartialUpdate(id,data,)
@@ -4222,15 +4205,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationVegetableAggregationsPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>>
-    export type CultivationVegetableAggregationsPartialUpdateMutationBody = NonReadonly<PatchedVegetableAggregation>
+    export type CultivationVegetableAggregationsPartialUpdateMutationBody = PatchedVegetableAggregationRequest
     export type CultivationVegetableAggregationsPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationVegetableAggregationsPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedVegetableAggregation>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>, TError,{id: string;data: PatchedVegetableAggregationRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationVegetableAggregationsPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedVegetableAggregation>},
+        {id: string;data: PatchedVegetableAggregationRequest},
         TContext
       > => {
 
@@ -4380,7 +4363,7 @@ export function useCultivationVegetablesList<TData = Awaited<ReturnType<typeof c
 
 
 export const cultivationVegetablesCreate = (
-    vegetable: NonReadonly<Vegetable>,
+    vegetableRequest: VegetableRequest,
  signal?: AbortSignal
 ) => {
       
@@ -4388,7 +4371,7 @@ export const cultivationVegetablesCreate = (
       return axiosService<Vegetable>(
       {url: `/api/cultivation/vegetables/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: vegetable, signal
+      data: vegetableRequest, signal
     },
       );
     }
@@ -4396,8 +4379,8 @@ export const cultivationVegetablesCreate = (
 
 
 export const getCultivationVegetablesCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesCreate>>, TError,{data: NonReadonly<Vegetable>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesCreate>>, TError,{data: NonReadonly<Vegetable>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesCreate>>, TError,{data: VegetableRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesCreate>>, TError,{data: VegetableRequest}, TContext> => {
 
 const mutationKey = ['cultivationVegetablesCreate'];
 const {mutation: mutationOptions} = options ?
@@ -4409,7 +4392,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetablesCreate>>, {data: NonReadonly<Vegetable>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetablesCreate>>, {data: VegetableRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  cultivationVegetablesCreate(data,)
@@ -4421,15 +4404,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationVegetablesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationVegetablesCreate>>>
-    export type CultivationVegetablesCreateMutationBody = NonReadonly<Vegetable>
+    export type CultivationVegetablesCreateMutationBody = VegetableRequest
     export type CultivationVegetablesCreateMutationError = ErrorResponse
 
     export const useCultivationVegetablesCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesCreate>>, TError,{data: NonReadonly<Vegetable>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesCreate>>, TError,{data: VegetableRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationVegetablesCreate>>,
         TError,
-        {data: NonReadonly<Vegetable>},
+        {data: VegetableRequest},
         TContext
       > => {
 
@@ -4525,14 +4508,14 @@ export function useCultivationVegetablesRetrieve<TData = Awaited<ReturnType<type
 
 export const cultivationVegetablesUpdate = (
     id: string,
-    vegetable: NonReadonly<Vegetable>,
+    vegetableRequest: VegetableRequest,
  ) => {
       
       
       return axiosService<Vegetable>(
       {url: `/api/cultivation/vegetables/${id}/`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: vegetable
+      data: vegetableRequest
     },
       );
     }
@@ -4540,8 +4523,8 @@ export const cultivationVegetablesUpdate = (
 
 
 export const getCultivationVegetablesUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>, TError,{id: string;data: NonReadonly<Vegetable>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>, TError,{id: string;data: NonReadonly<Vegetable>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>, TError,{id: string;data: VegetableRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>, TError,{id: string;data: VegetableRequest}, TContext> => {
 
 const mutationKey = ['cultivationVegetablesUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -4553,7 +4536,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>, {id: string;data: NonReadonly<Vegetable>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>, {id: string;data: VegetableRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationVegetablesUpdate(id,data,)
@@ -4565,15 +4548,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationVegetablesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>>
-    export type CultivationVegetablesUpdateMutationBody = NonReadonly<Vegetable>
+    export type CultivationVegetablesUpdateMutationBody = VegetableRequest
     export type CultivationVegetablesUpdateMutationError = ErrorResponse
 
     export const useCultivationVegetablesUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>, TError,{id: string;data: NonReadonly<Vegetable>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesUpdate>>, TError,{id: string;data: VegetableRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationVegetablesUpdate>>,
         TError,
-        {id: string;data: NonReadonly<Vegetable>},
+        {id: string;data: VegetableRequest},
         TContext
       > => {
 
@@ -4583,14 +4566,14 @@ const {mutation: mutationOptions} = options ?
     }
     export const cultivationVegetablesPartialUpdate = (
     id: string,
-    patchedVegetable: NonReadonly<PatchedVegetable>,
+    patchedVegetableRequest: PatchedVegetableRequest,
  ) => {
       
       
       return axiosService<Vegetable>(
       {url: `/api/cultivation/vegetables/${id}/`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: patchedVegetable
+      data: patchedVegetableRequest
     },
       );
     }
@@ -4598,8 +4581,8 @@ const {mutation: mutationOptions} = options ?
 
 
 export const getCultivationVegetablesPartialUpdateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedVegetable>}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedVegetable>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>, TError,{id: string;data: PatchedVegetableRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>, TError,{id: string;data: PatchedVegetableRequest}, TContext> => {
 
 const mutationKey = ['cultivationVegetablesPartialUpdate'];
 const {mutation: mutationOptions} = options ?
@@ -4611,7 +4594,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>, {id: string;data: NonReadonly<PatchedVegetable>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>, {id: string;data: PatchedVegetableRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  cultivationVegetablesPartialUpdate(id,data,)
@@ -4623,15 +4606,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CultivationVegetablesPartialUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>>
-    export type CultivationVegetablesPartialUpdateMutationBody = NonReadonly<PatchedVegetable>
+    export type CultivationVegetablesPartialUpdateMutationBody = PatchedVegetableRequest
     export type CultivationVegetablesPartialUpdateMutationError = ErrorResponse
 
     export const useCultivationVegetablesPartialUpdate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>, TError,{id: string;data: NonReadonly<PatchedVegetable>}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>, TError,{id: string;data: PatchedVegetableRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cultivationVegetablesPartialUpdate>>,
         TError,
-        {id: string;data: NonReadonly<PatchedVegetable>},
+        {id: string;data: PatchedVegetableRequest},
         TContext
       > => {
 

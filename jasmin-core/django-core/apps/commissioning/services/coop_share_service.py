@@ -409,6 +409,7 @@ class CoopShareService:
         from apps.commissioning.models import CoopShare, CoopShareTransfer, Member
         from apps.commissioning.services.member_cancellation import (
             cancel_member_with_coop_shares,
+            lock_open_subscriptions,
         )
         from apps.commissioning.services.trial_conversion import (
             convert_trial_member_on_first_coop_share,
@@ -425,6 +426,8 @@ class CoopShareService:
         # deadlock.
         for member_id in sorted({str(from_member.pk), str(to_member.pk)}):
             acquire_advisory_xact_lock(f"coop_share_bounds:{member_id}")
+        # Before the members, as the giver's cancellation below takes them.
+        lock_open_subscriptions(from_member.pk)
         locked = {
             member.pk: member
             for member in Member.objects.select_for_update()

@@ -15,14 +15,14 @@ per (share_article, share_type_variation) pair). The ``unit`` is optional
 and falls back to the share article's ``default_movement_unit``.
  */
 export interface DefaultShareArticleInShare {
-  readonly id?: string;
-  readonly share_type_variation_size?: string;
-  readonly share_type_id?: string;
+  readonly id: string;
+  readonly share_type_variation_size: string;
+  readonly share_type_id: string;
   /** @pattern ^-?\d{0,4}(?:\.\d{0,3})?$ */
   quantity: string;
   /** @nullable */
   unit?: DefaultShareArticleInShareUnit;
   share_type_variation: string;
   share_article: string;
-  readonly share_article_name?: string;
+  readonly share_article_name: string;
 }

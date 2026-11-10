@@ -100,6 +100,21 @@ class TestClearLegacyCrateNotes:
         assert f"Tenant {tenant.schema_name}:" in output
         assert f"{model.__name__}: cleared {len(LEGACY_NOTES)}" in output
 
+    def test_each_cleared_note_is_in_the_audit_log(self, tenant, documents):
+        from auditlog.models import LogEntry
+
+        rows = [_crate_row(documents, model, "+2") for model in MODELS]
+
+        _run(tenant=tenant.schema_name)
+
+        for row in rows:
+            updates = LogEntry.objects.get_for_object(row).filter(
+                action=LogEntry.Action.UPDATE
+            )
+            assert [entry.changes_dict for entry in updates] == [
+                {"note": ["+2", "None"]}
+            ]
+
     def test_a_dry_run_changes_nothing_and_counts_what_it_would_clear(
         self, tenant, documents
     ):

@@ -60,7 +60,7 @@ def _attempt(
 @pytest.mark.django_db
 class TestAlertOnAxesBursts:
     def test_no_alert_below_threshold(self, tenant):
-        _attempt("1.2.3.4", failures=axes_tasks.BURST_THRESHOLD - 1)
+        _attempt("1.2.3.4", failures=axes_tasks.burst_threshold() - 1)
 
         with patch.object(axes_tasks, "mail_admins") as mock_mail:
             axes_tasks.alert_on_axes_bursts.call_local()
@@ -68,8 +68,17 @@ class TestAlertOnAxesBursts:
         mock_mail.assert_not_called()
         assert "1.2.3.4" not in axes_tasks._last_alerted
 
+    def test_a_changed_failure_limit_moves_the_threshold(self, tenant, settings):
+        settings.AXES_FAILURE_LIMIT = 2
+        _attempt("1.2.3.4", failures=2)
+
+        with patch.object(axes_tasks, "mail_admins") as mock_mail:
+            axes_tasks.alert_on_axes_bursts.call_local()
+
+        mock_mail.assert_called_once()
+
     def test_alerts_at_threshold(self, tenant):
-        _attempt("1.2.3.4", failures=axes_tasks.BURST_THRESHOLD)
+        _attempt("1.2.3.4", failures=axes_tasks.burst_threshold())
 
         with patch.object(axes_tasks, "mail_admins") as mock_mail:
             axes_tasks.alert_on_axes_bursts.call_local()
@@ -79,7 +88,7 @@ class TestAlertOnAxesBursts:
         subject, body = mock_mail.call_args.args[0], mock_mail.call_args.args[1]
         assert "1 brute-force burst" in subject
         assert "1.2.3.4" in body
-        assert str(axes_tasks.BURST_THRESHOLD) in body
+        assert str(axes_tasks.burst_threshold()) in body
         assert "1.2.3.4" in axes_tasks._last_alerted
 
     def test_attempts_outside_window_are_ignored(self, tenant):
@@ -88,7 +97,7 @@ class TestAlertOnAxesBursts:
         _attempt(
             "1.2.3.4",
             username="fresh",
-            failures=axes_tasks.BURST_THRESHOLD - 1,
+            failures=axes_tasks.burst_threshold() - 1,
         )
         _attempt(
             "1.2.3.4",
@@ -103,7 +112,7 @@ class TestAlertOnAxesBursts:
         mock_mail.assert_not_called()
 
     def test_cooldown_suppresses_second_alert(self, tenant):
-        _attempt("1.2.3.4", failures=axes_tasks.BURST_THRESHOLD)
+        _attempt("1.2.3.4", failures=axes_tasks.burst_threshold())
 
         with patch.object(axes_tasks, "mail_admins") as mock_mail:
             axes_tasks.alert_on_axes_bursts.call_local()
@@ -114,8 +123,8 @@ class TestAlertOnAxesBursts:
         assert mock_mail.call_count == 1
 
     def test_separate_ips_each_alert_independently(self, tenant):
-        _attempt("1.2.3.4", failures=axes_tasks.BURST_THRESHOLD)
-        _attempt("5.6.7.8", failures=axes_tasks.BURST_THRESHOLD)
+        _attempt("1.2.3.4", failures=axes_tasks.burst_threshold())
+        _attempt("5.6.7.8", failures=axes_tasks.burst_threshold())
 
         with patch.object(axes_tasks, "mail_admins") as mock_mail:
             axes_tasks.alert_on_axes_bursts.call_local()

@@ -112,9 +112,10 @@ fi
 # ``createsuperadmin --email … --update-if-exists`` by hand.
 # -----------------------------------------------------------------------------
 echo "Checking for a SuperAdmin ..."
+# The command reads DJANGO_SUPERUSER_PASSWORD from the environment itself: as an
+# argument, ps would show it on every start.
 python manage.py createsuperadmin --bootstrap \
     --email "${DJANGO_SUPERUSER_EMAIL:-}" \
-    ${DJANGO_SUPERUSER_PASSWORD:+--password "${DJANGO_SUPERUSER_PASSWORD}"} \
     || echo "createsuperadmin failed — starting anyway; fix DJANGO_SUPERUSER_* and restart, or run 'docker compose exec backend python manage.py createsuperadmin --email …' (it asks for the password)."
 
 # -----------------------------------------------------------------------------

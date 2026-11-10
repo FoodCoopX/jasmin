@@ -197,14 +197,7 @@ function MobileCardList<T extends TableRecord>({
       )}
 
       {activeData.length === 0 ? (
-        <div
-          className="mobile-card-empty"
-          style={{
-            textAlign: "center",
-            padding: "24px 0",
-            color: "var(--color-text-muted)",
-          }}
-        >
+        <div className="mobile-card-empty">
           {t("table.no_data")}
         </div>
       ) : (

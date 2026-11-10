@@ -91,6 +91,7 @@ class HostCapabilitiesSerializer(serializers.Serializer):
     web_app = serializers.BooleanField(read_only=True)
     manual_share_import = serializers.BooleanField(read_only=True)
     delivery_stations = serializers.BooleanField(read_only=True)
+    about = serializers.BooleanField(read_only=True)
 
 
 class _HostCapabilitiesMixin:

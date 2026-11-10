@@ -215,6 +215,7 @@ def _share(variation, delivery_day):
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetBoxesMatrix:
     def test_base_plus_addon_single_combination(self, tenant):
         delivery_day = SharesDeliveryDayFactory(day_number=_DAY)
@@ -506,6 +507,54 @@ class TestGetBoxesMatrix:
 
         assert len(result["columns"]) == 1
         assert result["columns"][0]["base_variation_id"] == boxed_var.id
+
+    def test_columns_tell_whether_the_base_and_each_add_on_lie_loose(self, tenant):
+        delivery_day = SharesDeliveryDayFactory(day_number=_DAY)
+        station_day = DeliveryStationDayFactory(delivery_day=delivery_day)
+        base_share_type = ShareTypeFactory(
+            share_option="HARVEST_SHARE", is_additional_share_type=False
+        )
+        boxed_var = ShareTypeVariationFactory(
+            share_type=base_share_type, size="M", is_packed_bulk=False
+        )
+        loose_var = ShareTypeVariationFactory(
+            share_type=base_share_type, size="L", is_packed_bulk=True
+        )
+        honey_var = _addon_variation("HONEY_SHARE", "HONIG")
+        honey_var.is_packed_bulk = True
+        honey_var.save()
+
+        boxed_member = MemberFactory()
+        for member, variation in (
+            (boxed_member, boxed_var),
+            (boxed_member, honey_var),
+            (MemberFactory(), loose_var),
+        ):
+            sub = SubscriptionFactory(
+                member=member,
+                share_type_variation=variation,
+                quantity=1,
+                default_delivery_station_day=station_day,
+            )
+            ShareDeliveryFactory(
+                share=_share(variation, delivery_day),
+                delivery_station_day=station_day,
+                subscription=sub,
+            )
+
+        result = PackingListBoxesMatrixService.get_station_member_matrix(
+            year=_YEAR,
+            delivery_week=_WEEK,
+            day_number=_DAY,
+            delivery_station=station_day.delivery_station_id,
+        )
+
+        by_base = {col["base_variation_id"]: col for col in result["columns"]}
+        assert by_base[boxed_var.id]["base_is_packed_bulk"] is False
+        assert [
+            addon["is_packed_bulk"] for addon in by_base[boxed_var.id]["add_ons"]
+        ] == [True]
+        assert by_base[loose_var.id]["base_is_packed_bulk"] is True
 
     def test_base_and_addon_on_different_dsd_rows_same_station_combine(self, tenant):
         # A member's base and add-on can land on different DeliveryStationDay
@@ -918,6 +967,7 @@ class TestGetWeeklyCombinationMatrix:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestVirtualFolding:
     """A virtual variation is folded into its physical components before box
     derivation: it packs as its component boxes (× component quantity), the

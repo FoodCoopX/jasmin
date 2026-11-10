@@ -15,7 +15,9 @@ when the transfer leaves the giving member without shares, which cancels the
 membership.
  */
 export interface CoopShareTransferRequest {
+  /** @minLength 1 */
   from_member: string;
+  /** @minLength 1 */
   to_member: string;
   /** @minimum 1 */
   amount_of_coop_shares: number;

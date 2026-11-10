@@ -1,0 +1,20 @@
+/* ErrorBoundary's fallback: a card centred on the page. */
+.error-boundary-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-page-bg);
+  padding: 16px;
+}
+
+.error-boundary-card {
+  max-width: 560px;
+  width: 100%;
+}
+
+/* The raw error message, shown in development: a long URL or stack frame
+   wraps inside the card. */
+.error-boundary-details {
+  word-break: break-word;
+}

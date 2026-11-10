@@ -357,7 +357,7 @@ export default function CultivationPlanner() {
       <div className="cultivation-planner__toolbar">
         <YearSelector selectedYear={year} setSelectedYear={setYear} />
         <Select
-          style={{ minWidth: "18em" }}
+          className="cultivation-planner__solution-select"
           placeholder={t("cultivation.select_solution")}
           aria-label={t("cultivation.select_solution")}
           value={solutionId}
@@ -399,7 +399,7 @@ export default function CultivationPlanner() {
       <div className="cultivation-planner__toolbar">
         <Text>{t("cultivation.show_week", { week })}</Text>
         <Slider
-          style={{ flex: "1 1 20em", minWidth: "14em" }}
+          className="cultivation-planner__week-slider"
           min={1}
           max={52}
           value={week}
@@ -451,7 +451,7 @@ export default function CultivationPlanner() {
         <Alert
           type="info"
           showIcon
-          style={{ marginBottom: "1em" }}
+          className="mb-1em"
           message={t("cultivation.unsaved_adjustments")}
         />
       )}
@@ -488,10 +488,7 @@ export default function CultivationPlanner() {
                 </div>
               )}
               {canEditCultivation && (
-                <p
-                  className="cultivation-planner__hint"
-                  style={{ marginTop: "0.75em" }}
-                >
+                <p className="cultivation-planner__hint cultivation-planner__unplace-hint">
                   {t("cultivation.click_placed_to_unplace")}
                 </p>
               )}

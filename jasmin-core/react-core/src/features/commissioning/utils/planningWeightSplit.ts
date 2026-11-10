@@ -1,7 +1,7 @@
 /**
  * Client-side mirror of
  * ``apps/commissioning/utils/forecast_distribution.py::split_forecast_amount_by_weight``,
- * plus the week division from ``_calculate_needed_amount`` — powers the reverse
+ * plus the week count behind the long-term list's ``needed_amount`` — powers the reverse
  * total-amount input mode (``commissioning.planning_long_term.mode_total``) on
  * the long-term planning page, which suggests a per-share amount from a target
  * total.
@@ -22,6 +22,9 @@ export interface VariationWeightCount {
   averageWeight: number | null;
   /** physical shares of this size delivered per week (subscriber snapshot). */
   subscriberCount: number;
+  /** The planned weeks this size runs in; all of them when left out. A size
+   *  replaced during the year shares the weeks with its successor. */
+  weeks?: number;
 }
 
 export interface WeightSplitResult {
@@ -49,44 +52,46 @@ function floorToStep(value: number, step: number): number {
   return Number((steps * step).toFixed(6));
 }
 
+interface WeekPattern {
+  onlyOdd?: boolean;
+  onlyEven?: boolean;
+  onlyEveryThree?: boolean;
+}
+
 /**
- * Count the delivery weeks in ``[range1, range2]`` after the parity pattern —
+ * The delivery weeks in ``[range1, range2]`` after the parity pattern —
  * mirror of ``DefaultShareContentService._filter_weeks``. ``onlyEveryThree``
  * keeps every third week counting from ``range1``.
  */
-export function countDeliveryWeeks(
+export function deliveryWeekNumbers(
   range1: number | null | undefined,
   range2: number | null | undefined,
-  pattern: {
-    onlyOdd?: boolean;
-    onlyEven?: boolean;
-    onlyEveryThree?: boolean;
-  } = {},
-): number {
-  if (range1 == null || range2 == null) return 0;
+  pattern: WeekPattern = {},
+): number[] {
+  if (range1 == null || range2 == null) return [];
   const start = Number(range1);
   const end = Number(range2);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return [];
 
-  let count = 0;
+  const weeks: number[] = [];
   for (let week = start; week <= end; week++) {
     if (pattern.onlyOdd && week % 2 === 0) continue;
     if (pattern.onlyEven && week % 2 !== 0) continue;
     if (pattern.onlyEveryThree && (week - start) % 3 !== 0) continue;
-    count++;
+    weeks.push(week);
   }
-  return count;
+  return weeks;
 }
+
 
 /**
  * Suggest a per-share amount for each size that distributes ``targetTotal``
  * across the whole planning window, proportional to ``averageWeight`` and
- * weighted by ``subscriberCount``.
+ * weighted by ``subscriberCount`` and the weeks the size runs in.
  *
  * The inverse of ``needed_amount = Σ (count × amount × weeks)``:
  *
- *   perDelivery   = targetTotal / numFilteredWeeks
- *   perWeightUnit = perDelivery / Σ (count × weight)
+ *   perWeightUnit = targetTotal / Σ (count × weight × weeks[size])
  *   amount[size]  = floorToStep(weight[size] × perWeightUnit)
  *
  * so a size that weighs half of another gets half the amount, and the total
@@ -110,22 +115,23 @@ export function suggestPerShareAmounts(
 
   if (!(targetTotal > 0) || !(numFilteredWeeks > 0)) return empty;
 
-  const perDelivery = targetTotal / numFilteredWeeks;
+  const weeksOf = (v: VariationWeightCount) => v.weeks ?? numFilteredWeeks;
 
   // Eligible = sizes with a positive average_weight (mirrors the Python skip;
-  // a size with no weight can't be weighted, so it gets no suggestion).
+  // a size with no weight can't be weighted, so it gets no suggestion), and
+  // that run in one of the weeks at all.
   const eligible = variations.filter(
     (v): v is VariationWeightCount & { averageWeight: number } =>
-      v.averageWeight != null && v.averageWeight > 0,
+      v.averageWeight != null && v.averageWeight > 0 && weeksOf(v) > 0,
   );
 
   const denominator = eligible.reduce(
-    (sum, v) => sum + (v.subscriberCount || 0) * v.averageWeight,
+    (sum, v) => sum + (v.subscriberCount || 0) * v.averageWeight * weeksOf(v),
     0,
   );
   if (!(denominator > 0)) return empty;
 
-  const perWeightUnit = perDelivery / denominator;
+  const perWeightUnit = targetTotal / denominator;
 
   const amountsByVariation: Record<string, number> = {};
   let actualTotal = 0;
@@ -133,7 +139,7 @@ export function suggestPerShareAmounts(
     let amount = floorToStep(v.averageWeight * perWeightUnit, floorStep);
     if (amount > capThreshold) amount = cap;
     amountsByVariation[v.variationId] = amount;
-    actualTotal += (v.subscriberCount || 0) * amount * numFilteredWeeks;
+    actualTotal += (v.subscriberCount || 0) * amount * weeksOf(v);
   }
 
   return {

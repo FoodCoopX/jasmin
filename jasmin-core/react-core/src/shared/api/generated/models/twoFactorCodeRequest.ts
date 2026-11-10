@@ -7,5 +7,6 @@
  */
 
 export interface TwoFactorCodeRequest {
+  /** @minLength 1 */
   code: string;
 }

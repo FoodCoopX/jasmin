@@ -115,17 +115,10 @@ vi.mock("@features/commissioning/pdfs/forResellers/OfferPDFGenerator", () => ({
   default: () => null,
 }));
 
-vi.mock("@shared/tables", async () => {
-  const { gatedByPermission, READ_ONLY_PERMISSION } = await import(
-    "@shared/tables/tablePermissions"
-  );
-  const { wrapApiFunctions } = await import(
-    "@shared/tables/BasicEditableTable/wrapApiFunctions"
-  );
+vi.mock("@shared/tables", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/tables")>();
   return {
-    gatedByPermission,
-    READ_ONLY_PERMISSION,
-    wrapApiFunctions,
+    ...actual,
     EditableTable: (props: EditableTableProps) => (
       <table
         data-testid="offers-grid"

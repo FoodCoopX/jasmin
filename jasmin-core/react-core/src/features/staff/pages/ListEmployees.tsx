@@ -43,9 +43,7 @@ export default function ListEmployees() {
 
   const columns = useMemo<EditableColumnConfig<EmployeeRow>[]>(
     () => [
-      // The shared column hook returns a loosely-typed config (inputType widened
-      // to string); cast the one hook column rather than loosen the whole array.
-      isActiveColumn as EditableColumnConfig<EmployeeRow>,
+      isActiveColumn,
       {
         title: <>{t("staff.short_name_for_weekly_plan")}</>,
         dataIndex: "short_name_for_weekly_plan",

@@ -46,7 +46,10 @@ export const useShareDeliveryDays = (params: CommissioningSharesDeliveryDaysList
     shareDeliveryDays,
     dayNumbers,
     shareDeliveryDaysCount: shareDeliveryDays.length,
-    toursExist: shareDeliveryDays.some(day => (day.number_of_tours ?? 0) > 1),
+    // A day has several tours when its stations sit on several. The list
+    // carries them (``used_tours``) only when asked with ``need_info_on_tours``
+    // and ``active_at_date``.
+    toursExist: shareDeliveryDays.some(day => (day.used_tours?.length ?? 0) > 1),
     toursByDay,
     loading: isLoading,
     // True until the list is in, also while the request waits offline for

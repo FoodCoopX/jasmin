@@ -49,3 +49,26 @@ export const renderNumber =
       return "";
     return format(Number(value), decimals);
   };
+
+/**
+ * A produce amount as members read it on the station notice: less than a
+ * kilogram in grams, and without trailing zeros — "500 g", "1,5 kg", "2".
+ * Returns the number in the tenant's format and the unit it is in now.
+ */
+export const formatMemberAmount = (
+  value: number,
+  unit: string | null | undefined,
+  format: NumberFormatter,
+): { amount: string; unit: string | null } => {
+  const inGrams = unit === UnitEnum.KG && value < 1;
+  const shown = inGrams ? Math.round(value * 1000) : value;
+  const shownUnit = inGrams ? UnitEnum.G : (unit ?? null);
+  const maxDecimals = decimalsForUnit(shownUnit);
+  const rounded = (decimals: number) =>
+    Math.round(shown * 10 ** decimals) / 10 ** decimals;
+  let decimals = maxDecimals;
+  while (decimals > 0 && rounded(decimals - 1) === rounded(maxDecimals)) {
+    decimals -= 1;
+  }
+  return { amount: format(shown, decimals), unit: shownUnit };
+};

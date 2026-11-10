@@ -22,16 +22,10 @@ import {
   CHARGE_STATUS_ORDER,
 } from "@shared/utils/chargeStatusColors";
 
-interface ChargeRow extends ChargeSchedule {
-  member_name?: string;
-  member_number?: number;
-  subscription_label?: string;
-}
-
 interface MemberGroup {
   memberId: string;
   memberLabel: string;
-  rows: ChargeRow[];
+  rows: ChargeSchedule[];
   total: number;
 }
 
@@ -45,7 +39,7 @@ interface DisplayRowBase {
 
 // A charge row always carries its charge; a subtotal row has none.
 type DisplayRow =
-  | (DisplayRowBase & { type: "charge"; charge: ChargeRow })
+  | (DisplayRowBase & { type: "charge"; charge: ChargeSchedule })
   | (DisplayRowBase & { type: "subtotal"; charge?: undefined });
 
 export default function ChargesAbos() {
@@ -83,7 +77,7 @@ export default function ChargesAbos() {
   // previously-loaded year/month (cached, staleTime:0) still shows the spinner
   // while it refetches.
   const { data, isFetching, refetch } = usePaymentsChargeSchedulesList(params);
-  const rows = useMemo<ChargeRow[]>(() => (data ?? []) as ChargeRow[], [data]);
+  const rows = useMemo<ChargeSchedule[]>(() => data ?? [], [data]);
 
   // Per-status totals (amount + count) across the whole loaded set.
   const statusTotals = useMemo(() => {

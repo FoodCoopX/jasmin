@@ -5,7 +5,8 @@ endpoint hit by ``src/features/customer/pages/CustomerOrderPage.tsx`` for *their
 own* reseller (read+edit own reseller, list/create/update/delete own
 order contents, read own delivery notes / invoices) and must be denied (403)
 or get nothing for everything else. Their own crate lines they may read but not
-write, since a crate line write carries the line's price and rabatt.
+write, since a crate line write carries the line's price and rabatt. Offers,
+delivery notes and invoices reach them once finalized; drafts stay hidden.
 """
 
 from __future__ import annotations
@@ -20,14 +21,22 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from apps.commissioning.models import CrateOrderContent, OrderContent
+from apps.commissioning.models import (
+    CrateOrderContent,
+    DeliveryNoteReseller,
+    InvoiceReseller,
+    InvoiceResellerContent,
+    OrderContent,
+)
 from apps.commissioning.services import DeliveryNoteService
 from apps.commissioning.tests.factories.accounts import JasminUserFactory
 from apps.commissioning.tests.factories.basics import CrateFactory, ShareArticleFactory
 from apps.commissioning.tests.factories.days import OrdersDeliveryDayFactory
 from apps.commissioning.tests.factories.members import MemberFactory
 from apps.commissioning.tests.factories.resellers import (
+    DeliveryNoteContentFactory,
     DeliveryNoteResellerFactory,
+    InvoiceResellerFactory,
     OfferFactory,
     OfferGroupFactory,
     OrderContentFactory,
@@ -163,9 +172,14 @@ class TestCustomerOrderPage_OfferScoping:
         self, customer_caller_client, customer_caller, other_reseller
     ):
         _u, my_reseller, my_group = customer_caller
-        my_offer = OfferFactory(offer_group=my_group, year=2026, delivery_week=15)
+        my_offer = OfferFactory(
+            offer_group=my_group, year=2026, delivery_week=15, is_finalized=True
+        )
         foreign_offer = OfferFactory(
-            offer_group=other_reseller.offer_group, year=2026, delivery_week=15
+            offer_group=other_reseller.offer_group,
+            year=2026,
+            delivery_week=15,
+            is_finalized=True,
         )
 
         resp = customer_caller_client.get(
@@ -175,6 +189,35 @@ class TestCustomerOrderPage_OfferScoping:
         ids = {row["id"] for row in resp.data}
         assert my_offer.id in ids
         assert foreign_offer.id not in ids
+
+    def test_list_hides_draft_offers(self, customer_caller_client, customer_caller):
+        _u, _r, my_group = customer_caller
+        published = OfferFactory(
+            offer_group=my_group, year=2026, delivery_week=15, is_finalized=True
+        )
+        OfferFactory(offer_group=my_group, year=2026, delivery_week=15)
+
+        resp = customer_caller_client.get(
+            "/api/commissioning/offers/?year=2026&delivery_week=15"
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert {row["id"] for row in resp.data} == {published.id}
+
+    @pytest.mark.parametrize("role", ["office", "staff"])
+    def test_the_office_and_crew_see_draft_offers(self, customer_caller, role):
+        _u, _r, my_group = customer_caller
+        draft = OfferFactory(offer_group=my_group, year=2026, delivery_week=15)
+        client = APIClient()
+        client.force_authenticate(user=JasminUserFactory(roles=[role]))
+
+        resp = client.get(
+            "/api/commissioning/offers/",
+            {"year": 2026, "delivery_week": 15, "offer_group": my_group.id},
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert draft.id in {row["id"] for row in resp.data}
 
 
 # --- OrderContentViewSet --------------------------------------------------
@@ -1145,9 +1188,11 @@ class TestCustomerOrderPage_DocumentsScoping:
         self, customer_caller_client, customer_caller, other_reseller
     ):
         _u, my_reseller, _g = customer_caller
-        mine = DeliveryNoteResellerFactory(order=OrderFactory(reseller=my_reseller))
+        mine = DeliveryNoteResellerFactory(
+            order=OrderFactory(reseller=my_reseller), is_finalized=True
+        )
         foreign = DeliveryNoteResellerFactory(
-            order=OrderFactory(reseller=other_reseller)
+            order=OrderFactory(reseller=other_reseller), is_finalized=True
         )
 
         resp = customer_caller_client.get("/api/commissioning/delivery_notes/")
@@ -1155,6 +1200,70 @@ class TestCustomerOrderPage_DocumentsScoping:
         ids = {row["id"] for row in resp.data}
         assert mine.id in ids
         assert foreign.id not in ids
+
+    def test_a_draft_delivery_note_and_its_lines_are_hidden(
+        self, customer_caller_client, customer_caller
+    ):
+        _u, my_reseller, _g = customer_caller
+        draft = DeliveryNoteResellerFactory(order=OrderFactory(reseller=my_reseller))
+        DeliveryNoteContentFactory(delivery_note=draft)
+        published = DeliveryNoteResellerFactory(
+            order=OrderFactory(reseller=my_reseller, delivery_week=16)
+        )
+        published_line = DeliveryNoteContentFactory(delivery_note=published)
+        DeliveryNoteReseller.objects.filter(pk=published.pk).update(is_finalized=True)
+
+        draft_resp = customer_caller_client.get(
+            f"/api/commissioning/delivery_notes/{draft.id}/"
+        )
+        draft_lines = customer_caller_client.get(
+            "/api/commissioning/delivery_note_contents/",
+            {"delivery_note_id": draft.id},
+        )
+        published_lines = customer_caller_client.get(
+            "/api/commissioning/delivery_note_contents/",
+            {"delivery_note_id": published.id},
+        )
+
+        assert draft_resp.status_code == status.HTTP_404_NOT_FOUND
+        assert draft_lines.status_code == status.HTTP_200_OK
+        assert draft_lines.data == []
+        assert [row["id"] for row in published_lines.data] == [published_line.id]
+
+    def test_a_draft_invoice_and_its_lines_are_hidden(
+        self, customer_caller_client, customer_caller
+    ):
+        _u, my_reseller, _g = customer_caller
+        draft = InvoiceResellerFactory(reseller=my_reseller)
+        published = InvoiceResellerFactory(reseller=my_reseller)
+        for invoice in (draft, published):
+            InvoiceResellerContent.objects.create(
+                invoice=invoice,
+                share_article=ShareArticleFactory(),
+                amount=Decimal("10.000"),
+                unit="KG",
+                size="M",
+                tax_rate=Decimal("7.00"),
+            )
+        InvoiceReseller.objects.filter(pk=published.pk).update(is_finalized=True)
+
+        draft_resp = customer_caller_client.get(
+            f"/api/commissioning/invoices/{draft.id}/"
+        )
+        published_resp = customer_caller_client.get(
+            f"/api/commissioning/invoices/{published.id}/"
+        )
+        draft_lines = customer_caller_client.get(
+            "/api/commissioning/invoice_contents/", {"invoice_id": draft.id}
+        )
+        published_lines = customer_caller_client.get(
+            "/api/commissioning/invoice_contents/", {"invoice_id": published.id}
+        )
+
+        assert draft_resp.status_code == status.HTTP_404_NOT_FOUND
+        assert published_resp.status_code == status.HTTP_200_OK
+        assert draft_lines.data == []
+        assert len(published_lines.data) == 1
 
     def test_delivery_note_create_forbidden(self, customer_caller_client):
         # write_permission = IsOffice
@@ -1220,7 +1329,9 @@ class TestCustomerOrderPage_OfferAnnotationScoping:
         # peer's 42.
         _u, _my_reseller, my_group = customer_caller
         peer = ResellerFactory(offer_group=my_group)
-        offer = OfferFactory(offer_group=my_group, year=2026, delivery_week=15)
+        offer = OfferFactory(
+            offer_group=my_group, year=2026, delivery_week=15, is_finalized=True
+        )
         peer_order = OrderFactory(reseller=peer, year=2026, delivery_week=15)
         # OrderContent references exactly one item type — the offer (not a free
         # share_article), so it joins the annotation via its ``offer`` FK.

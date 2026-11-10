@@ -141,7 +141,7 @@ export default function StepConfirmEmail({ data, update, next, back }: StepProps
         <Alert
           type="error"
           showIcon
-          style={{ marginBottom: 12 }}
+          className="mb-12"
           message={getErrorMessage(
             sendCode.error,
             t("auth.registration.confirm.send_error"),
@@ -173,7 +173,7 @@ export default function StepConfirmEmail({ data, update, next, back }: StepProps
             type="error"
             showIcon
             message={error}
-            style={{ marginBottom: 12 }}
+            className="mb-12"
           />
         )}
 
@@ -197,7 +197,7 @@ export default function StepConfirmEmail({ data, update, next, back }: StepProps
         </Flex>
       </Form>
 
-      <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 12 }}>
+      <Text type="secondary" className="text-12 d-block mt-12">
         {t("auth.registration.confirm.hint")}
       </Text>
     </>

@@ -63,3 +63,18 @@
 .email-tpl-subject .ql-editor p {
   margin: 0;
 }
+
+/* The read-only default body, set apart from the editable one. */
+.email-tpl-default-body-editor {
+  background: var(--color-bg-elevated);
+}
+
+.ant-input.email-tpl-test-recipient {
+  width: 280px;
+}
+
+/* A variable in the side panel; a click inserts it into the active field. */
+.email-tpl-var-tag {
+  cursor: pointer;
+  user-select: none;
+}

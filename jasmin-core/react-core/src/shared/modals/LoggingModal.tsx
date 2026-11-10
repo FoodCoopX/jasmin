@@ -162,7 +162,7 @@ const LoggingModal: FC<LoggingModalProps> = ({
       width={480}
     >
       {visibleEntries.length === 0 ? (
- <span className="text-muted">
+ <span className="color-text-tertiary">
           {t("logging.no_data")}
         </span>
       ) : (
@@ -178,10 +178,10 @@ const LoggingModal: FC<LoggingModalProps> = ({
             >
               <div>{formatDateTime(entry.date)}</div>
               {entry.by && (
-                <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{entry.by}</div>
+                <div className="text-12 color-text-muted">{entry.by}</div>
               )}
               {entry.extra && (
-                <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{entry.extra}</div>
+                <div className="text-12 color-text-muted">{entry.extra}</div>
               )}
             </Descriptions.Item>
           ))}

@@ -26,6 +26,7 @@ from typing import Any
 from django.db import transaction
 from django.utils import timezone
 from django_tenants.utils import get_public_schema_name, schema_context
+from huey.exceptions import CancelExecution
 
 from core.tenant_db import connection
 
@@ -92,16 +93,33 @@ def _current_schema_name() -> str:
     return schema_name
 
 
-def mark_running(job_id: str) -> None:
-    """Flip a queued job to ``running``. Idempotent.
+class JobNotQueued(CancelExecution):
+    """The job's row was no longer queued when its task started, so the task
+    did nothing: the stale-job sweep had already failed it.
+
+    An expected outcome, not a fault: Huey logs a cancelled task as a one-line
+    warning, without the traceback of an error, and doesn't retry one raised
+    with ``retry=False``."""
+
+
+def mark_running(job_id: str) -> bool:
+    """Flip a queued job to ``running``; whether it was still queued.
+
+    Only a queued row moves: one the stale-job sweep failed while its queue
+    message waited stays failed, as the office saw it, and may have started the
+    job again.
 
     Stamps ``heartbeat_at`` — the first sign of worker liveness, and the
     baseline the stale-job reconciliation measures against until the first
     progress tick.
     """
-    BackgroundJob.objects.filter(pk=job_id).update(
-        status=BackgroundJob.STATUS_RUNNING,
-        heartbeat_at=timezone.now(),
+    return bool(
+        BackgroundJob.objects.filter(
+            pk=job_id, status=BackgroundJob.STATUS_QUEUED
+        ).update(
+            status=BackgroundJob.STATUS_RUNNING,
+            heartbeat_at=timezone.now(),
+        )
     )
 
 
@@ -127,9 +145,12 @@ def mark_done(job_id: str, result: dict[str, Any] | None) -> None:
     # a task body that completes without setting handle.result (left as None)
     # would write SQL NULL → IntegrityError, flipping a SUCCEEDED job to 'failed'.
     # Coerce to the field's own default.
+    # A job the sweep took for lost but that finished after all is done; the
+    # sweep's error would contradict that.
     BackgroundJob.objects.filter(pk=job_id).update(
         status=BackgroundJob.STATUS_DONE,
         result=result if result is not None else {},
+        error="",
         completed_at=timezone.now(),
     )
 
@@ -164,6 +185,8 @@ def run_job(schema_name: str, job_id: str):
 
     Enters the tenant schema, flips the job to ``running``, and on clean exit
     flips it to ``done`` with whatever the body recorded on ``handle.result``.
+    A job no longer queued (the stale-job sweep failed it while its message
+    waited) raises ``JobNotQueued`` before the body runs.
     On ANY exception it logs the traceback and flips the job to ``failed`` —
     the exception is deliberately swallowed so Huey doesn't retry (a retry on
     a half-finished SMTP blast is almost never what you want; the failure is
@@ -176,8 +199,14 @@ def run_job(schema_name: str, job_id: str):
     """
     handle = _JobHandle(job_id)
     with schema_context(schema_name):
+        if not mark_running(job_id):
+            _task_logger.warning(
+                "background_job.not_queued schema=%s job=%s", schema_name, job_id
+            )
+            raise JobNotQueued(
+                f"background job {job_id} is no longer queued", retry=False
+            )
         try:
-            mark_running(job_id)
             yield handle
             mark_done(job_id, handle.result)
         except Exception as exc:

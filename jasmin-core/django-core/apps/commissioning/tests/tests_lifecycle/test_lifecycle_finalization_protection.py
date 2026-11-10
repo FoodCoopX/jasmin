@@ -130,7 +130,7 @@ def _raw_update(table: str, pk: str, **columns) -> None:
     cursor. Used to assert the Postgres trigger fires when both Python
     layers are bypassed."""
     set_clause = ", ".join(f"{col} = %s" for col in columns)
-    params = list(columns.values()) + [pk]
+    params = [*columns.values(), pk]
     with connection.cursor() as cursor:
         cursor.execute(
             f"UPDATE {table} SET {set_clause} WHERE id = %s",  # noqa: S608

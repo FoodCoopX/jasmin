@@ -26,92 +26,91 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface ShareArticle {
-  readonly id?: string;
-  share_option_list?: string[];
+  readonly id: string;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_boxes_kg?: string | null;
+  readonly net_price_for_boxes_kg: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_boxes_pieces?: string | null;
+  readonly net_price_for_boxes_pieces: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_boxes_bunch?: string | null;
+  readonly net_price_for_boxes_bunch: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_kg_1?: string | null;
+  readonly net_price_for_orders_kg_1: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_kg_2?: string | null;
+  readonly net_price_for_orders_kg_2: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_kg_3?: string | null;
+  readonly net_price_for_orders_kg_3: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_kg_4?: string | null;
+  readonly net_price_for_orders_kg_4: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_pieces_1?: string | null;
+  readonly net_price_for_orders_pieces_1: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_pieces_2?: string | null;
+  readonly net_price_for_orders_pieces_2: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_pieces_3?: string | null;
+  readonly net_price_for_orders_pieces_3: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_pieces_4?: string | null;
+  readonly net_price_for_orders_pieces_4: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_bunch_1?: string | null;
+  readonly net_price_for_orders_bunch_1: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_bunch_2?: string | null;
+  readonly net_price_for_orders_bunch_2: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_bunch_3?: string | null;
+  readonly net_price_for_orders_bunch_3: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,8}(?:\.\d{0,2})?$
    */
-  readonly net_price_for_orders_bunch_4?: string | null;
+  readonly net_price_for_orders_bunch_4: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,3}(?:\.\d{0,2})?$
    */
-  readonly tax_rate?: string | null;
+  readonly tax_rate: string | null;
   /** @nullable */
-  readonly default_crate_harvest_name?: string | null;
+  readonly default_crate_harvest_name: string | null;
   /** @nullable */
-  readonly default_crate_reseller_name?: string | null;
+  readonly default_crate_reseller_name: string | null;
   is_active?: boolean;
   is_extra?: boolean;
   /**
@@ -285,12 +284,12 @@ export interface ShareArticle {
   seller_1?: string | null;
   /** @nullable */
   seller_2?: string | null;
-  readonly can_be_deleted?: boolean;
-  readonly harvest_share?: boolean;
-  readonly harvest_share_fruit?: boolean;
-  readonly chicken_share?: boolean;
-  readonly honey_share?: boolean;
-  readonly oil_share?: boolean;
-  readonly grain_share?: boolean;
-  readonly bread_share?: boolean;
+  readonly can_be_deleted: boolean;
+  readonly harvest_share: boolean;
+  readonly harvest_share_fruit: boolean;
+  readonly chicken_share: boolean;
+  readonly honey_share: boolean;
+  readonly oil_share: boolean;
+  readonly grain_share: boolean;
+  readonly bread_share: boolean;
 }

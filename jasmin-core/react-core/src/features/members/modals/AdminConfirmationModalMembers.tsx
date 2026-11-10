@@ -110,8 +110,8 @@ export const AdminConfirmationModalMembers: FC<
       width={600}
       destroyOnHidden
     >
-      <div style={{ padding: "20px 0" }}>
-        <Title level={4} style={{ marginBottom: 24 }}>
+      <div className="admin-confirmation-body">
+        <Title level={4} className="mb-24">
           # {member.member_number} - {member.first_name} {member.last_name}
         </Title>
 
@@ -127,7 +127,7 @@ export const AdminConfirmationModalMembers: FC<
           column={1}
           bordered
           size="small"
-          style={{ marginBottom: 20 }}
+          className="mb-20"
         >
           {member.is_trial && (
             <Descriptions.Item label={t("members.member_type")}>

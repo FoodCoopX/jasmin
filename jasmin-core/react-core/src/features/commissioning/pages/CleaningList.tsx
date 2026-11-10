@@ -3,14 +3,13 @@ import { CleaningListPDFGenerator } from "@features/commissioning/pdfs";
 import AdditionalTheoreticalSummaryList from "@features/commissioning/components/AdditionalTheoreticalSummaryList";
 
 export default function CleaningList() {
-  // Cleaning is editable by gardener/staff/office/admin (washing is
-  // office-only — see WashingList). Pre-existing drift, preserved per page.
-  const { canEdit } = useRoles();
+  // The crew reads the list; only office and admin plan cleaning amounts.
+  const { isOffice } = useRoles();
 
   return (
     <AdditionalTheoreticalSummaryList
       model="cleanamount"
-      canEdit={canEdit}
+      canEdit={isOffice}
       titleKey="commissioning.cleaning_list"
       daySuffixKey="commissioning.cleaning_day"
       teamViewLabelKey="commissioning.clean_team_view"

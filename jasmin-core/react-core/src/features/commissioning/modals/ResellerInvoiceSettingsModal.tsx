@@ -16,13 +16,16 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { commissioningResellersPartialUpdate } from "@shared/api/generated/commissioning/commissioning";
-import type { PatchedReseller, Reseller } from "@shared/api/generated/models";
+import type {
+  PatchedResellerRequest,
+  Reseller,
+} from "@shared/api/generated/models";
 
 const { Title, Paragraph } = Typography;
 
 /** The form's values: the discount field's NumberInput yields a number. */
 type InvoiceSettingsValues = Omit<
-  PatchedReseller,
+  PatchedResellerRequest,
   "early_payment_discount_percent"
 > & { early_payment_discount_percent?: number | string | null };
 
@@ -102,7 +105,7 @@ export const ResellerInvoiceSettingsModal: FC<
         // sending so the server-side ``DecimalField`` parser doesn't lose
         // trailing zeros.
         const { early_payment_discount_percent: discount, ...rest } = values;
-        const payload: PatchedReseller = {
+        const payload: PatchedResellerRequest = {
           ...rest,
           early_payment_discount_percent:
             typeof discount === "number" ? String(discount) : discount,
@@ -130,7 +133,7 @@ export const ResellerInvoiceSettingsModal: FC<
     );
 
   const sectionTitle = (key: string) => (
-    <Title level={5} style={{ marginBottom: 8, marginTop: 16 }}>
+    <Title level={5} className="mt-16 mb-8">
       {t(key)}
     </Title>
   );
@@ -152,7 +155,7 @@ export const ResellerInvoiceSettingsModal: FC<
         </Space>
       }
       description={
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+        <Paragraph type="secondary" className="mb-0">
           {t("resellers.invoice_settings_intro")}
         </Paragraph>
       }
@@ -206,7 +209,7 @@ export const ResellerInvoiceSettingsModal: FC<
         </Col>
       </Row>
 
-      <Divider style={{ margin: "8px 0 0" }} />
+      <Divider className="mt-8 mb-0" />
 
       {sectionTitle("resellers.invoice_section_address")}
       <Form.Item name="invoice_name" label={t("resellers.invoice_name")}>
@@ -231,7 +234,7 @@ export const ResellerInvoiceSettingsModal: FC<
         </Col>
       </Row>
 
-      <Divider style={{ margin: "8px 0 0" }} />
+      <Divider className="mt-8 mb-0" />
 
       {sectionTitle("resellers.invoice_section_delivery")}
       <Row gutter={12} align="middle">
@@ -260,7 +263,7 @@ export const ResellerInvoiceSettingsModal: FC<
         </Col>
       </Row>
 
-      <Divider style={{ margin: "8px 0 0" }} />
+      <Divider className="mt-8 mb-0" />
 
       {sectionTitle("resellers.invoice_section_payment")}
       <Row gutter={12}>

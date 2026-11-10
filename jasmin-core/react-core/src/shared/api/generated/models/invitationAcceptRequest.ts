@@ -7,6 +7,8 @@
  */
 
 export interface InvitationAcceptRequest {
+  /** @minLength 1 */
   token: string;
+  /** @minLength 1 */
   password: string;
 }

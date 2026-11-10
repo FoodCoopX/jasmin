@@ -6,6 +6,7 @@ import SidebarShell from "./SidebarShell";
 import { useDeliveryStationNavItems } from "./useDeliveryStationNavItems";
 import { usePackingListVisibility } from "./usePackingListVisibility";
 import { usePlanningNavItems } from "./usePlanningNavItems";
+import { useWorkListNavItems } from "./useWorkListNavItems";
 
 import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import BubbleChartIcon from "@mui/icons-material/BubbleChart";
@@ -34,6 +35,7 @@ export default function CommissioningSidebar({
   const sells_to_resellers = getSetting("sells_to_resellers", true);
   const weekly_upload = getSetting("uploads_weekly_share_amount", false);
   const offersManualShareImport = useCapability("manual_share_import");
+  const workListItems = useWorkListNavItems();
   const {
     packingMode,
     showBulkPackingList,
@@ -327,26 +329,7 @@ export default function CommissioningSidebar({
         </div>
       ),
       children: [
-        {
-          key: "commissioning-washing-list",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/washing-list">
-              {t("commissioning.washing_list")}
-            </Link>
-          ),
-        },
-        {
-          key: "commissioning-cleaning-list",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/cleaning-list">
-              {t("commissioning.cleaning_list")}
-            </Link>
-          ),
-        },
+        ...workListItems,
         {
           key: "commissioning-harvesting-lists",
 

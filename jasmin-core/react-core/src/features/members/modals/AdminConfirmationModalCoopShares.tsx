@@ -89,7 +89,7 @@ export const AdminConfirmationModalCoopShares: FC<
         column={1}
         bordered
         size="small"
-        style={{ marginTop: 16, marginBottom: 12 }}
+        className="mt-16 mb-12"
       >
         {coopShare.member_string && (
           <Descriptions.Item label={t("members.member")}>

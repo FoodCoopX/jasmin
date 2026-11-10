@@ -83,7 +83,7 @@ def _make_confirm(
 @pytest.mark.django_db
 class TestLodgeBurst:
     def test_no_alert_below_threshold(self, tenant):
-        for _ in range(gdpr_tasks.DELETION_LODGE_BURST_THRESHOLD - 1):
+        for _ in range(gdpr_tasks.deletion_lodge_burst_threshold() - 1):
             _make_lodge(user=JasminUserFactory(), ip="9.9.9.9")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -93,7 +93,7 @@ class TestLodgeBurst:
     def test_alerts_at_threshold_for_one_ip_many_users(self, tenant):
         """The interesting case: ONE IP, MANY users — what the per-user
         throttle can't catch."""
-        for _ in range(gdpr_tasks.DELETION_LODGE_BURST_THRESHOLD):
+        for _ in range(gdpr_tasks.deletion_lodge_burst_threshold()):
             _make_lodge(user=JasminUserFactory(), ip="9.9.9.9")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -114,7 +114,7 @@ class TestLodgeBurst:
         """Legacy rows have ``requested_ip IS NULL``. They
         must not aggregate (would false-positive on a fleet of legacy
         rows that share NULL as a synthetic key)."""
-        for _ in range(gdpr_tasks.DELETION_LODGE_BURST_THRESHOLD * 2):
+        for _ in range(gdpr_tasks.deletion_lodge_burst_threshold() * 2):
             _make_lodge(user=JasminUserFactory(), ip=None)
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -125,7 +125,7 @@ class TestLodgeBurst:
 @pytest.mark.django_db
 class TestConfirmBurst:
     def test_alerts_at_threshold(self, tenant):
-        for _ in range(gdpr_tasks.DELETION_CONFIRM_BURST_THRESHOLD):
+        for _ in range(gdpr_tasks.deletion_confirm_burst_threshold()):
             _make_confirm(user=JasminUserFactory(), confirm_ip="42.42.42.42")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -141,7 +141,7 @@ class TestConfirmBurst:
         ) in gdpr_tasks._last_confirm_burst_alerted
 
     def test_no_alert_below_threshold(self, tenant):
-        for _ in range(gdpr_tasks.DELETION_CONFIRM_BURST_THRESHOLD - 1):
+        for _ in range(gdpr_tasks.deletion_confirm_burst_threshold() - 1):
             _make_confirm(user=JasminUserFactory(), confirm_ip="42.42.42.42")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -153,9 +153,9 @@ class TestConfirmBurst:
         burst from the same IP X — they're distinct signals with
         distinct cooldowns."""
         ip = "7.7.7.7"
-        for _ in range(gdpr_tasks.DELETION_LODGE_BURST_THRESHOLD):
+        for _ in range(gdpr_tasks.deletion_lodge_burst_threshold()):
             _make_lodge(user=JasminUserFactory(), ip=ip)
-        for _ in range(gdpr_tasks.DELETION_CONFIRM_BURST_THRESHOLD):
+        for _ in range(gdpr_tasks.deletion_confirm_burst_threshold()):
             _make_confirm(user=JasminUserFactory(), confirm_ip=ip)
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -174,7 +174,7 @@ class TestConfirmBurst:
 @pytest.mark.django_db
 class TestWindowAndCooldown:
     def test_lodges_outside_window_are_ignored(self, tenant):
-        for _ in range(gdpr_tasks.DELETION_LODGE_BURST_THRESHOLD):
+        for _ in range(gdpr_tasks.deletion_lodge_burst_threshold()):
             _make_lodge(
                 user=JasminUserFactory(),
                 ip="9.9.9.9",
@@ -186,7 +186,7 @@ class TestWindowAndCooldown:
         mock_mail.assert_not_called()
 
     def test_cooldown_suppresses_second_alert(self, tenant):
-        for _ in range(gdpr_tasks.DELETION_LODGE_BURST_THRESHOLD):
+        for _ in range(gdpr_tasks.deletion_lodge_burst_threshold()):
             _make_lodge(user=JasminUserFactory(), ip="9.9.9.9")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:

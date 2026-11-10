@@ -85,8 +85,8 @@ class JasminModel(models.Model):
 
 def week_field(**kwargs) -> models.PositiveSmallIntegerField:
     """The ISO ``delivery_week`` field with its 1..53 range validators. Extra
-    kwargs (e.g. ``db_index=True``) pass straight through; the validators are
-    the shared, previously-duplicated part."""
+    kwargs (e.g. ``db_index=True``) pass straight through, so every week field
+    shares the validators and differs only in those."""
     return models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(53)],
         **kwargs,

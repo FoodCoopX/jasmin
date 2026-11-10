@@ -16,9 +16,9 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface CrateNetPrice {
-  readonly id?: string;
-  readonly name?: string;
-  readonly short_name?: string;
+  readonly id: string;
+  readonly name: string;
+  readonly short_name: string;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;
@@ -27,5 +27,5 @@ export interface CrateNetPrice {
   /** @pattern ^-?\d{0,3}(?:\.\d{0,2})?$ */
   tax_rate: string;
   crate: string;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }

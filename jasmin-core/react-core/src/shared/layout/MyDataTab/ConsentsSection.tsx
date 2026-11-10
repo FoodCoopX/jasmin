@@ -228,16 +228,10 @@ function ConsentDocumentModal({
         />
       ) : (
         <>
-          <div
-            className="consent-document-box"
-            style={{ maxHeight: 360, whiteSpace: "pre-wrap", fontSize: 13 }}
-          >
+          <div className="consent-document-box consent-document-own">
             {data.body}
           </div>
-          <Paragraph
-            type="secondary"
-            style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}
-          >
+          <Paragraph type="secondary" className="text-11 mt-8 mb-0">
             {t("consent.block.version_label")} {data.version}
             {data.valid_from
               ? ` · ${t("consent.block.effective_label")} ${formatDateWithFallback(data.valid_from)}`

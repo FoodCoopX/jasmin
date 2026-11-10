@@ -6,8 +6,10 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "CSA Management Platform API",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
-    # THE KEY SETTING - Don't split request/response into separate schemas
-    "COMPONENT_SPLIT_REQUEST": False,
+    # Request bodies get their own ``…Request`` components without the
+    # read-only fields, so a response type can require them (see
+    # ``COMPONENT_NO_READ_ONLY_REQUIRED`` below).
+    "COMPONENT_SPLIT_REQUEST": True,
     "COMPONENT_SPLIT_PATCH": True,  # all-optional ``Patched…`` PATCH bodies
     # Map your enum classes to prevent duplicates
     "ENUM_NAME_OVERRIDES": {
@@ -43,13 +45,17 @@ SPECTACULAR_SETTINGS = {
         "BulkFinalizeRequestModelEnum": "apps.commissioning.serializers.finalize_serializer.FINALIZABLE_MODEL_NAMES",
         "ModelEnum": ["delivery_note", "invoice"],
     },
-    "COMPONENT_NO_READ_ONLY_REQUIRED": True,
+    # A read-only field a response always carries (``id``, ``status``, …) is
+    # required in its type, so a guard on it narrows for real.
+    "COMPONENT_NO_READ_ONLY_REQUIRED": False,
     "SCHEMA_PATH_PREFIX": "/api/",
     "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,
     "SCHEMA_COERCE_PATH_PK": True,
     # Postprocessing to handle any remaining edge cases
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",
+        "core.openapi.collapse_doubled_request_suffix",
+        "core.openapi.mark_sometimes_absent_fields_optional",
         # Auto-inject canonical 4xx error responses (400/401/403/404)
         # into every operation so the orval-generated frontend client
         # carries a typed ErrorResponse for every endpoint without us

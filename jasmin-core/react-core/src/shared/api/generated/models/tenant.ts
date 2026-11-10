@@ -35,13 +35,13 @@ The ``settings`` / ``current_settings`` overlays live here, not on
 operational config.
  */
 export interface Tenant {
-  readonly id?: string;
-  readonly current_settings?: TenantCurrentSettings;
-  readonly settings?: TenantSettingsProperty;
-  readonly capabilities?: HostCapabilities;
-  readonly app_icon_version?: string;
+  readonly id: string;
+  readonly current_settings: TenantCurrentSettings;
+  readonly settings: TenantSettingsProperty;
+  readonly capabilities: HostCapabilities;
+  readonly app_icon_version: string;
   tenant_language?: TenantLanguageEnum;
-  readonly schema_name?: string;
+  readonly schema_name: string;
   /** @maxLength 200 */
   name: string;
   /** @nullable */
@@ -106,9 +106,9 @@ export interface Tenant {
   auditing_association?: string;
   professional_association?: string;
   legal_notice_extra_html?: string;
-  readonly is_active?: boolean;
-  readonly created_at?: string;
-  readonly updated_at?: string;
+  readonly is_active: boolean;
+  readonly created_at: string;
+  readonly updated_at: string;
   /** @maxLength 8 */
   currency?: string;
   /**
@@ -164,5 +164,5 @@ export interface Tenant {
   /** @maxLength 140 */
   sepa_remittance_template?: string;
   privacy_policy_html?: string;
-  readonly action_rate_limit_overrides?: unknown;
+  readonly action_rate_limit_overrides: unknown;
 }

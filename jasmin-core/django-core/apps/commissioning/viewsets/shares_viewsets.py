@@ -113,11 +113,13 @@ from ..services import (
     ShareDeliveryService,
     SharesDayChangeService,
 )
+from ..services.planning_subscriber_counts import subscriber_counts_for_planning
 from ..services.share_delivery_service import JokerScope
 from ..utils.composite_id_utils import parse_slot_id
 from ..utils.iso_week_utils import week_day_to_date
 from ..utils.lookup import get_or_404
 from ..utils.query_params import validate_query_params
+from ..utils.read_only_week import first_writable_week
 from ..utils.sort_order import size_order_annotation
 from ..utils.weight import mean_weight, quantize_weight
 from .base_viewsets import BaseArchivableViewSet, CanBeDeletedDestroyMixin
@@ -397,7 +399,7 @@ class ShareTypeVariationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         # + upcoming variations, excluding only the already-ended ones. The
         # reference date is the explicit ``active_at_date`` if given, else today.
         if include_future:
-            reference_date = active_at_date or timezone.now().date()
+            reference_date = active_at_date or timezone.localdate()
             queryset = queryset.filter(
                 id__in=ShareTypeVariation.current.active_at_date_or_future(
                     reference_date
@@ -629,7 +631,7 @@ class _ShareDeliveryWriteChoreographyMixin:
         Share, creating it the first time a delivery lands on that day."""
         if share.delivery_day_id == target_delivery_day.id:
             return share
-        new_share, _ = Share.objects.get_or_create(
+        new_share, _ = Share.get_or_create_for_delivery(
             year=share.year,
             delivery_week=share.delivery_week,
             delivery_day=target_delivery_day,
@@ -677,7 +679,7 @@ class ShareDeliveryViewSet(
     def get_permissions(self):
         if self.action in self._MEMBER_ACTIONS:
             base = [permission() for permission in self.permission_classes]
-            return base + [IsOfficeOrMember()]
+            return [*base, IsOfficeOrMember()]
         return super().get_permissions()
 
     @extend_schema(
@@ -1111,7 +1113,7 @@ class ShareDeliveryViewSet(
             # Hoist the per-delivery DeliveryStationDay lookup out of the loop:
             # every future delivery resolves within ONE (station, target-day)
             # succession chain. Fetch it once and resolve each delivery's week in
-            # Python — mirrors delivery_viewsets._migrate_succession_children.
+            # Python, as station_day_succession.repoint_succession_children does.
             station_day_chain = list(
                 DeliveryStationDay.objects.filter(
                     delivery_station=new_delivery_station_day.delivery_station,
@@ -1604,9 +1606,7 @@ class DefaultShareContentViewSet(RolePermissionsMixin, viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="subscriber_counts")
     def subscriber_counts(self, request: Request) -> Response:
         params = validate_query_params(request, optional=["year", "share_option"])
-        counts = DefaultShareContentService.get_subscriber_counts_for_planning(
-            params["year"], params["share_option"]
-        )
+        counts = subscriber_counts_for_planning(params["share_option"])
         return Response(counts, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -2235,20 +2235,19 @@ class VirtualComponentsViewSet(RolePermissionsMixin, viewsets.ViewSet):
 
     @staticmethod
     def _recompute_for_physical_variations(physical_variation_ids: set) -> None:
-        """Rebuild theoreticals/SHARECONTENT movements for every current-or-
-        future Share of the given physical variations, after a virtual
+        """Rebuild theoreticals/SHARECONTENT movements of the given physical
+        variations' Shares in the weeks not yet read-only, after a virtual
         variation's component config changed how virtual demand fans into them.
-        Scoped to ``year >= current`` so historical seasons aren't re-walked."""
+        A read-only week's stock ledger is closed, so it keeps its figures."""
         if not physical_variation_ids:
             return
-        from django.utils import timezone
-
         from ..services.recompute import recompute_shares
 
+        first_week = first_writable_week()
         share_ids = list(
             Share.objects.filter(
+                iso_week_bound((first_week.year, first_week.week), "gte"),
                 share_type_variation_id__in=physical_variation_ids,
-                year__gte=timezone.now().year,
             ).values_list("id", flat=True)
         )
         recompute_shares(share_ids)

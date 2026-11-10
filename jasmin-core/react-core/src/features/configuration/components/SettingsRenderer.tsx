@@ -11,6 +11,7 @@ import type { ComponentType } from "react";
 import { ReactNode } from "react";
 import { blockNonNumericKeys } from "@shared/utils/numberFormat";
 import NumberInput from "@shared/ui/NumberInput";
+import DisabledReasonTooltip from "@shared/ui/DisabledReasonTooltip";
 import ToolTipIcon from "@shared/ui/ToolTipIcon";
 import { RemittanceTemplateInput } from "./RemittanceTemplateInput";
 
@@ -36,6 +37,8 @@ interface SelectOption {
   /** Render the option greyed-out and unselectable (kept visible on purpose,
    *  e.g. a strategy that's temporarily withdrawn but should still be seen). */
   disabled?: boolean;
+  /** Why a disabled option can't be picked, on hover and to screen readers. */
+  disabledReason?: string;
 }
 
 export interface SettingsCategory {
@@ -154,7 +157,7 @@ export const SettingsRenderer = {
     switch (setting.type) {
       case "checkbox":
         return (
-          <span style={{ display: "inline-flex", alignItems: "center" }}>
+          <span className="d-inline-flex items-center">
             <Checkbox
               checked={value as boolean}
               onChange={(e) => onChange(e.target.checked)}
@@ -186,22 +189,14 @@ export const SettingsRenderer = {
               value={value as string}
               onChange={(e) => onChange(e.target.value)}
               placeholder={setting.defaultValue?.toString()}
-              style={{ marginTop: 4 }}
+              className="mt-4"
               required={setting.required}
               disabled={setting.disabled}
               maxLength={setting.maxLength}
               status={validationError ? "error" : undefined}
             />
             {validationError && (
-              <div
-                style={{
-                  fontSize: "0.85em",
-                  color: "var(--color-error)",
-                  marginTop: 2,
-                }}
-              >
-                {validationError}
-              </div>
+              <div className="settings-validation-error">{validationError}</div>
             )}
           </div>
         );
@@ -228,7 +223,7 @@ export const SettingsRenderer = {
               value={value as string}
               onChange={(e) => onChange(e.target.value)}
               placeholder={setting.defaultValue?.toString()}
-              style={{ marginTop: 4 }}
+              className="mt-4"
               rows={setting.rows || 3}
               disabled={setting.disabled}
             />
@@ -244,7 +239,7 @@ export const SettingsRenderer = {
               value={value as number}
               onChange={onChange}
               placeholder={setting.defaultValue?.toString()}
-              style={{ width: "100%", marginTop: 4 }}
+              className="w-full mt-4"
               min={setting.min}
               max={setting.max}
               // Default to whole-number entry (reject "100,4" / stray chars);
@@ -268,7 +263,7 @@ export const SettingsRenderer = {
             <Select
               value={value as string | number}
               onChange={onChange}
-              style={{ width: "100%", marginTop: 4 }}
+              className="w-full mt-4"
               disabled={setting.disabled}
             >
               {setting.options?.map((option) => (
@@ -277,7 +272,13 @@ export const SettingsRenderer = {
                   value={option.value}
                   disabled={option.disabled}
                 >
-                  {option.label}
+                  <DisabledReasonTooltip
+                    reason={option.disabled ? option.disabledReason : null}
+                  >
+                    {(reasonId) => (
+                      <span aria-describedby={reasonId}>{option.label}</span>
+                    )}
+                  </DisabledReasonTooltip>
                 </Option>
               ))}
             </Select>
@@ -294,7 +295,7 @@ export const SettingsRenderer = {
                 onChange(toApiDate(date))
               }
               format={options.dateFormat}
-              style={{ width: "100%", marginTop: 4 }}
+              className="w-full mt-4"
               placeholder={setting.defaultValue as string}
               disabled={setting.disabled}
               disabledDate={setting.disabledDate}
@@ -305,13 +306,7 @@ export const SettingsRenderer = {
       case "checkbox_with_pricing":
         return (
           <div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-              }}
-            >
+            <div className="flex-center-y gap-12">
               <Checkbox
                 checked={value as boolean}
                 onChange={(e) => onChange(e.target.checked)}
@@ -368,7 +363,7 @@ export const SettingsRenderer = {
           marginLeft: setting.type === "checkbox" ? "24px" : "0",
         }}
       >
-        <Text type="secondary" style={{ fontSize: "12px" }}>
+        <Text type="secondary" className="text-12">
           {setting.description}
         </Text>
       </div>

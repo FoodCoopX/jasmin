@@ -24,6 +24,12 @@ def is_week_read_only(year: int, week: int, today: _dt.date | None = None) -> bo
     return today >= Week(year, week).monday() + _dt.timedelta(weeks=2)
 
 
+def first_writable_week(today: _dt.date | None = None) -> Week:
+    """The earliest week that is not read-only: the one before the current
+    ISO week."""
+    return Week.withdate(today or timezone.localdate()) - 1
+
+
 def refuse_read_only_week(year: int, week: int) -> None:
     """Raise :class:`PastWeekError` (409) for a week that is read-only."""
     if not is_week_read_only(year, week):

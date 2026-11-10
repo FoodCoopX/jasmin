@@ -12,13 +12,14 @@ import type {
   TourOverview,
   DeliveryStationsToursOverviewResponse,
 } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay, makeShareTypeVariation } from "@/test/modelFixtures";
 
 // Backend day numbers: 0 = Monday … 6 = Sunday.
 export const TUESDAY = 1;
 export const WEDNESDAY = 2;
 export const FRIDAY = 4;
 
-export const deliveryDay = (id: string, dayNumber: number, tours = 2): SharesDeliveryDay => ({
+export const deliveryDay = (id: string, dayNumber: number, tours = 2): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
@@ -31,7 +32,7 @@ export const shareSize = (
   shareType: "veg" | "honey" | "bread",
   size: ShareTypeVariation["size"],
   packedInBulk = false,
-): ShareTypeVariation => ({
+): ShareTypeVariation => makeShareTypeVariation({
   id: `var-${shareType}-${size}`,
   share_type: `st-${shareType}`,
   size,
@@ -76,6 +77,7 @@ export const addOn = (shareType: string, shortName: string, size: string, sortIn
   share_type_id: `st-${shareType}`,
   share_type_short_name: shortName,
   share_type_sort_index: sortIndex,
+  is_packed_bulk: false,
 }) satisfies PackingBoxesMatrixAddOn;
 
 export const HONEY_ADD_ON = addOn("honey", "Honey", "S", 1);
@@ -113,6 +115,7 @@ export const box = (
     base_share_type_short_name: base?.shortName ?? "",
     // Boxes without a base share come after every share type.
     base_share_type_sort_index: base?.sortIndex ?? 99,
+    base_is_packed_bulk: false,
     add_ons: addOns,
     count,
   };

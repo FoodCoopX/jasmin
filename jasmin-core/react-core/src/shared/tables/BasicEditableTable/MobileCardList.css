@@ -15,7 +15,9 @@
 }
 
 .mobile-card-empty {
-  padding: 32px 0;
+  text-align: center;
+  padding: 24px 0;
+  color: var(--color-text-muted);
 }
 
 .mobile-card-add-btn {

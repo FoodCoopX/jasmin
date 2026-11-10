@@ -10,12 +10,13 @@
  * What this deployment offers (``apps.shared.host_capabilities``).
  */
 export interface HostCapabilities {
-  readonly support_tickets?: boolean;
-  readonly gdpr?: boolean;
-  readonly user_accounts?: boolean;
-  readonly operating_mode_choice?: boolean;
-  readonly legal_notice?: boolean;
-  readonly web_app?: boolean;
-  readonly manual_share_import?: boolean;
-  readonly delivery_stations?: boolean;
+  readonly support_tickets: boolean;
+  readonly gdpr: boolean;
+  readonly user_accounts: boolean;
+  readonly operating_mode_choice: boolean;
+  readonly legal_notice: boolean;
+  readonly web_app: boolean;
+  readonly manual_share_import: boolean;
+  readonly delivery_stations: boolean;
+  readonly about: boolean;
 }

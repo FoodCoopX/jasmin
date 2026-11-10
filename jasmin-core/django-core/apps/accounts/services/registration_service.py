@@ -119,7 +119,7 @@ def register_public_applicant(
     # same value gates consent AND the CoopShare row below.
     from django.utils import timezone
 
-    as_of = timezone.now().date()
+    as_of = timezone.localdate()
     accepted = data.get("accepted_consent_documents")
     accepted = accepted if isinstance(accepted, dict) else {}
     is_trial = bool(data.get("is_trial"))
@@ -253,7 +253,7 @@ def register_public_applicant(
 
         from apps.commissioning.services.consent_service import ConsentService
 
-        today = timezone.now().date()
+        today = timezone.localdate()
         for kind, doc_id in accepted.items():
             doc = (
                 ConsentDocument.objects.filter(

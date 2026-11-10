@@ -14,7 +14,7 @@ import {
 import type {
   ConsentDocumentSummary,
   ConsentRecord,
-  ConsentRecordRevoke,
+  ConsentRecordRevokeRequest,
 } from "@shared/api/generated/models";
 import { downloadConsentPdf } from "@shared/consent/downloadConsentPdf";
 import { isSupersededConsent } from "@shared/consent/supersededConsent";
@@ -109,8 +109,7 @@ const MemberConsentsCard = ({
     return (
       <Card
         title={t("consent.card_title")}
-        className="member-card--blue-title"
-        style={{ marginTop: 24 }}
+        className="member-card--blue-title mt-24"
       >
         <Spin />
       </Card>
@@ -121,8 +120,7 @@ const MemberConsentsCard = ({
     return (
       <Card
         title={t("consent.card_title")}
-        className="member-card--blue-title"
-        style={{ marginTop: 24 }}
+        className="member-card--blue-title mt-24"
       >
         <Alert type="error" showIcon message={t("consent.load_error")} />
       </Card>
@@ -132,8 +130,7 @@ const MemberConsentsCard = ({
   return (
     <Card
       title={t("consent.card_title")}
-      className="member-card--blue-title blue-border"
-      style={{ marginTop: 24 }}
+      className="member-card--blue-title blue-border mt-24"
     >
       {records.length === 0 ? (
         // Just the explanatory text — no big placeholder icon.
@@ -173,15 +170,10 @@ const MemberConsentsCard = ({
                 <List.Item.Meta
                   avatar={
                     active ? (
-                      <CheckCircleOutlined
-                        style={{ color: "var(--color-success)", fontSize: 20 }}
-                      />
+                      <CheckCircleOutlined className="consent-status-icon" />
                     ) : (
                       <CloseCircleOutlined
-                        style={{
-                          color: "var(--color-text-tertiary)",
-                          fontSize: 20,
-                        }}
+                        className="consent-status-icon consent-status-icon--inactive"
                       />
                     )
                   }
@@ -239,7 +231,7 @@ const MemberConsentsCard = ({
           if (revokeTarget?.id) {
             revokeMutation.mutate({
               id: revokeTarget.id,
-              data: { reason: revokeReason } satisfies ConsentRecordRevoke,
+              data: { reason: revokeReason } satisfies ConsentRecordRevokeRequest,
             });
           }
         }}

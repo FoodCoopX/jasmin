@@ -143,7 +143,8 @@ EXEMPTIONS = [
         module="apps/shared/invitations.py",
         imports="apps.commissioning",
         reason=(
-            "Invitation flow reads Member / UserInvitation / InvitationStatus. The "
+            "Invitation flow reads Member / UserInvitation / InvitationStatus and "
+            "catches MemberCoopSharesOutOfRange from a member's confirm. The "
             "invitation models are commissioning-owned domain data; unwind by moving "
             "the invitation models down into shared, or the flow up into commissioning."
         ),

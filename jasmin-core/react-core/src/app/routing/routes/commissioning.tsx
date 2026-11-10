@@ -24,6 +24,9 @@ const DeliveryStationsOverview = lazy(
 const DeliveryStationsDetails = lazy(
   () => import("@features/commissioning/pages/DeliveryStationsDetails"),
 );
+const StationNotices = lazy(
+  () => import("@features/commissioning/pages/StationNotices"),
+);
 const DeliveryTours = lazy(
   () => import("@features/commissioning/pages/DeliveryTours"),
 );
@@ -425,6 +428,14 @@ export const commissioningRoutes: AppRoute[] = [
           <DeliveryStationsDetails />
         </RequireRole>
       </RequireCapability>
+    ),
+  },
+  {
+    path: "/commissioning/station-notices",
+    element: (
+      <RequireRole flag="isStaff">
+        <StationNotices />
+      </RequireRole>
     ),
   },
   {

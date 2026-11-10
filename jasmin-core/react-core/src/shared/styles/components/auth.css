@@ -62,6 +62,23 @@
   line-height: 1.5;
 }
 
+/* The registration wizard's card, and the chosen variation on its
+   share-type step. */
+.registration-card {
+  width: 1000px;
+  box-shadow: 0 4px 12px var(--color-shadow);
+}
+
+.registration-chosen-variation {
+  margin-bottom: 16px;
+  border-color: var(--color-primary);
+  border-width: 2px;
+}
+
+.registration-zip-code {
+  width: 140px;
+}
+
 /* ------------------------------------------------------------------
  * Login page: a vertical stack of
  *   header banner  →  row of (1 or 3) cards  →  footer banner
@@ -98,6 +115,21 @@
 
 .auth-banner {
   text-align: center;
+}
+
+/* The tenant logo in the header banner: 75px tall, its width following the
+   image's aspect ratio. */
+.auth-banner-logo {
+  height: 75px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* The "forgot password" link, pulled up under the password field. */
+.auth-forgot-password {
+  text-align: right;
+  margin-top: -12px;
+  margin-bottom: 12px;
 }
 
 /* ------------------------------------------------------------------

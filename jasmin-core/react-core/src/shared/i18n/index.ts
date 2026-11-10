@@ -70,6 +70,22 @@ async function importLanguage(
   }
 }
 
+/** Bring a language's bundle in without switching to it; true when it was
+ * added now. A failed fetch leaves the bundle out, and keys fall back to
+ * German. */
+export async function loadLanguageBundle(code: string): Promise<boolean> {
+  if (i18n.hasResourceBundle(code, 'translation')) return false;
+  try {
+    const bundle = await importLanguage(code);
+    if (!bundle) return false;
+    i18n.addResourceBundle(code, 'translation', bundle, true, true);
+    return true;
+  } catch (err) {
+    console.warn(`Failed to load the "${code}" translations:`, err);
+    return false;
+  }
+}
+
 /** How many ``activateLanguage`` calls have begun, so each can tell whether a
  * later one started while it waited. */
 let activationCount = 0;
@@ -102,19 +118,7 @@ export async function activateLanguage(language: string): Promise<void> {
   const code = (language || '').split('-')[0];
   if (!code) return;
   const activation = ++activationCount;
-  let added = false;
-
-  if (!i18n.hasResourceBundle(code, 'translation')) {
-    try {
-      const bundle = await importLanguage(code);
-      if (bundle) {
-        i18n.addResourceBundle(code, 'translation', bundle, true, true);
-        added = true;
-      }
-    } catch (err) {
-      console.warn(`Failed to load the "${code}" translations:`, err);
-    }
-  }
+  const added = await loadLanguageBundle(code);
   if (activation !== activationCount) return;
 
   const target = i18n.hasResourceBundle(code, 'translation') ? code : 'de';

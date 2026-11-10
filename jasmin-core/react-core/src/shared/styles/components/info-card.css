@@ -36,3 +36,17 @@
   font-weight: 500;
   color: var(--color-text-primary);
 }
+
+.order-note {
+  cursor: pointer;
+  min-width: 10em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+/* AntD's own ``textarea.ant-input { max-width: 100% }`` (0,1,1) outranks a
+   single class, hence the doubled one. */
+.ant-input.order-note-input {
+  max-width: 30em;
+}

@@ -5,26 +5,18 @@ import { Link } from "react-router-dom";
 import { useCapability, useTenant } from "@hooks/index";
 
 interface ImportSharesModeBannerProps {
-  /**
-   * i18n key for the banner text. Defaults to the generic "demand comes from
-   * the CSV import" note (abos/members areas). Pages where a feature is simply
-   * unavailable under import mode (e.g. pickup lists) pass their own message.
-   */
-  messageKey?: string;
+  /** i18n key of what the page can't offer while the amounts are imported. */
+  messageKey: string;
 }
 
 /**
- * Mode banner for the abos + members areas (and, with a custom ``messageKey``,
- * any page that needs to explain import-shares behaviour).
- *
- * When the tenant sources weekly share demand from the CSV import
- * (``uploads_weekly_share_amount``), member subscriptions / deliveries do
- * NOT drive planning demand or delivery-station capacity — those come from
- * the imported amounts (``ExternalShareDemand``). Renders nothing when the
- * tenant runs the normal subscription-driven flow.
+ * Explains on a page what the import-shares mode changes there: the tenant
+ * takes its weekly share demand from imported amounts
+ * (``uploads_weekly_share_amount``) instead of subscriptions. Renders nothing
+ * when the tenant runs the normal subscription-driven flow.
  */
 export default function ImportSharesModeBanner({
-  messageKey = "common.import_shares_mode_banner",
+  messageKey,
 }: ImportSharesModeBannerProps) {
   const { t } = useTranslation();
   const { getSetting } = useTenant();

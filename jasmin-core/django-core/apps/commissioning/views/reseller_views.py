@@ -294,7 +294,7 @@ class BulkCreateDocumentsFromOrdersView(APIViewRolePermissionsMixin, APIView):
         summary="Bulk Create Documents",
         description="""
         Create delivery notes or invoices from multiple orders.
-        
+
         - For delivery_note: Creates delivery note from order
         - For invoice: Creates/finalizes delivery note, then creates invoice
         """,

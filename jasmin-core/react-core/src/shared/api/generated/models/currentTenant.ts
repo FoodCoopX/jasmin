@@ -66,16 +66,16 @@ the full ``TenantSerializer`` served by the auth-gated
 login completes.
  */
 export interface CurrentTenant {
-  readonly id?: string;
+  readonly id: string;
   /** @maxLength 200 */
   name: string;
   /** @nullable */
   description?: string | null;
   /** @nullable */
-  readonly logo?: string | null;
+  readonly logo: string | null;
   /** @nullable */
-  readonly bio_logo?: string | null;
-  readonly app_icon_version?: string;
+  readonly bio_logo: string | null;
+  readonly app_icon_version: string;
   /** @maxLength 8 */
   tenant_language?: string;
   /** @maxLength 32 */
@@ -143,21 +143,21 @@ export interface CurrentTenant {
   auditing_association?: string;
   professional_association?: string;
   legal_notice_extra_html?: string;
-  readonly friendly_captcha_sitekey?: string;
-  readonly allows_trial_subscriptions?: boolean;
-  readonly allows_trial_subscriptions_for_trial_members?: boolean;
-  readonly min_number_coop_shares?: number;
-  readonly max_number_coop_shares?: number;
-  readonly value_one_coop_share?: number;
-  readonly requires_paper_signature_for_membership?: boolean;
-  readonly info_sentence_about_coop_shares?: string;
-  readonly allowed_trial_subscription_duration?: number;
-  readonly subscriptions_end_at_end_of_season?: boolean;
-  readonly subscriptions_end_after_one_year?: boolean;
+  readonly friendly_captcha_sitekey: string;
+  readonly allows_trial_subscriptions: boolean;
+  readonly allows_trial_subscriptions_for_trial_members: boolean;
+  readonly min_number_coop_shares: number;
+  readonly max_number_coop_shares: number;
+  readonly value_one_coop_share: number;
+  readonly requires_paper_signature_for_membership: boolean;
+  readonly info_sentence_about_coop_shares: string;
+  readonly allowed_trial_subscription_duration: number;
+  readonly subscriptions_end_at_end_of_season: boolean;
+  readonly subscriptions_end_after_one_year: boolean;
   /** @nullable */
-  readonly season_start_week?: number | null;
-  readonly min_weeks_from_creation_to_start_delivery?: number;
-  readonly allows_solidarity_pricing?: boolean;
-  readonly allows_waiting_list_for_subscriptions?: boolean;
-  readonly capabilities?: HostCapabilities;
+  readonly season_start_week: number | null;
+  readonly min_weeks_from_creation_to_start_delivery: number;
+  readonly allows_solidarity_pricing: boolean;
+  readonly allows_waiting_list_for_subscriptions: boolean;
+  readonly capabilities: HostCapabilities;
 }

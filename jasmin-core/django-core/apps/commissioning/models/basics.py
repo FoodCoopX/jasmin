@@ -134,6 +134,11 @@ class Storage(JasminModel):
 
 # this model contains everything that can go into shares, like vegetable, fruit, mushrooms, eggs
 class ShareArticle(JasminModel, PricingMixin):
+    class OrganicStatus(models.TextChoices):
+        ORGANIC = "organic", "Bio"
+        IN_CONVERSION = "in_conversion", "Umstellung"
+        CONVENTIONAL = "conventional", "Konventionell"
+
     # Basic info
     is_active = models.BooleanField(default=True, db_index=True)
     is_extra = models.BooleanField(
@@ -166,11 +171,6 @@ class ShareArticle(JasminModel, PricingMixin):
     is_purchased = models.BooleanField(default=False)
     is_sold_to_resellers = models.BooleanField(default=False)
     for_markets = models.BooleanField(default=False)
-
-    class OrganicStatus(models.TextChoices):
-        ORGANIC = "organic", "Bio"
-        IN_CONVERSION = "in_conversion", "Umstellung"
-        CONVENTIONAL = "conventional", "Konventionell"
 
     organic_status = models.CharField(
         max_length=20,

@@ -8,10 +8,10 @@
 import type { BedSegment } from './bedSegment';
 
 export interface CultivationPlot {
-  readonly id?: string;
-  readonly total_beds?: number;
-  readonly cell_capacity?: number;
-  readonly bed_segments?: readonly BedSegment[];
+  readonly id: string;
+  readonly total_beds: number;
+  readonly cell_capacity: number;
+  readonly bed_segments: readonly BedSegment[];
   /**
    * @maxLength 200
    * @nullable

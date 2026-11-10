@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { RequireRole } from "@shared/auth";
+import { RequireMembersAndSubscriptions, RequireRole } from "@shared/auth";
 import type { AppRoute } from "../types";
 
 // Lazy load all abos components - only loaded when the specific route is accessed
@@ -22,75 +22,93 @@ export const abosRoutes: AppRoute[] = [
   {
     path: "/abos/dashboard",
     element: (
-      <RequireRole flag="isOffice">
-        <DashboardAbos />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <DashboardAbos />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
     path: "/abos/abos-emails",
     element: (
-      <RequireRole flag="isOffice">
-        <AbosEmails />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <AbosEmails />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
     path: "/abos/share-deliveries",
     element: (
-      <RequireRole flag="isOffice">
-        <ShareDeliveries />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <ShareDeliveries />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
     path: "/abos/abos",
     element: (
-      <RequireRole flag="isOffice">
-        <Abos />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <Abos />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
 
   {
     path: "/abos/debits-abos",
     element: (
-      <RequireRole flag="isOffice">
-        <DebitsAbos />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <DebitsAbos />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
     path: "/abos/charges",
     element: (
-      <RequireRole flag="isOffice">
-        <ChargesAbos />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <ChargesAbos />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
     path: "/abos/jokers",
     element: (
-      <RequireRole flag="isOffice">
-        <Jokers />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <Jokers />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
 
   {
     path: "/abos/waiting-list-abos",
     element: (
-      <RequireRole flag="isOffice">
-        <WaitingListAbos />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <WaitingListAbos />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
   {
     path: "/abos/sepa-mandates",
     element: (
-      <RequireRole flag="isOffice">
-        <SepaMandates />
-      </RequireRole>
+      <RequireMembersAndSubscriptions>
+        <RequireRole flag="isOffice">
+          <SepaMandates />
+        </RequireRole>
+      </RequireMembersAndSubscriptions>
     ),
   },
 ];

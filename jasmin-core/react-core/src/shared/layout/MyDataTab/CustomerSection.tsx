@@ -17,7 +17,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   MyCustomerDataRead,
-  PatchedMyCustomerDataUpdate,
+  PatchedMyCustomerDataUpdateRequest,
 } from "@shared/api/generated/models";
 import { notify } from "@shared/utils";
 import StoredOrEditField from "./StoredOrEditField";
@@ -90,7 +90,7 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
     ]),
   );
 
-  const onFinish = (values: PatchedMyCustomerDataUpdate) => {
+  const onFinish = (values: PatchedMyCustomerDataUpdateRequest) => {
     const payload = { ...values };
     if (!editingIban) delete payload.iban;
     mutate({ data: payload });
@@ -98,7 +98,7 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div>
-      <Title level={5} style={{ marginTop: 0 }}>
+      <Title level={5} className="mt-0">
         {t("profile.customer_data")}
       </Title>
 
@@ -146,7 +146,7 @@ export default function CustomerSection({ onSaved }: { onSaved: () => void }) {
           <Form.Item
             name="city"
             label={t("profile.city")}
-            style={{ flex: 2 }}
+            className="profile-city-field"
           >
             <Input />
           </Form.Item>

@@ -45,6 +45,9 @@ vi.mock("../useShareArticleColumn", () => ({
 vi.mock("../useAmountUnitSizeColumns", () => ({
   useAmountUnitSizeColumns: () => ({ amountUnitSizeColumns: [] }),
 }));
+vi.mock("@hooks/configuration/useWashingCleaningVisibility", () => ({
+  useWashingCleaningVisibility: () => ({ showsWashing: true, showsCleaning: true }),
+}));
 
 import { useOffersColumns } from "../useOffersColumns";
 

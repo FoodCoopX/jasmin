@@ -24,8 +24,8 @@ import type {
   CommissioningSharesDeliveryDaysListParams,
   DeliveryStation,
   DeliveryTourResponse,
-  DeliveryToursUpdate,
-  DeliveryTourUpdate,
+  DeliveryToursUpdateRequest,
+  DeliveryTourUpdateRequest,
   SharesDeliveryDay,
 } from "@shared/api/generated/models";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
@@ -98,7 +98,7 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
     }) =>
       useMutation({
         mutationKey: ["commissioningDeliveryToursUpdateToursCreate"],
-        mutationFn: async ({ data }: { data: DeliveryToursUpdate }) => api.saveTours(data),
+        mutationFn: async ({ data }: { data: DeliveryToursUpdateRequest }) => api.saveTours(data),
         onError: options?.mutation?.onError,
         meta: options?.mutation?.meta,
       }),
@@ -106,72 +106,43 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
 });
 
 import DeliveryTours from "../DeliveryTours";
+import {
+  at,
+  BAKERY,
+  CHURCH,
+  dayLabel,
+  ENDED_MONDAY,
+  ENDED_TUESDAY,
+  FRIDAY,
+  MARKET_HALL,
+  MILL,
+  nameOf,
+  NEXT_FRIDAY,
+  ORGANIC_SHOP,
+  SCHOOL,
+  TOWN_HALL,
+  TUESDAY,
+  TUESDAY_SHOWN,
+  type Day,
+  type Station,
+} from "./deliveryTours.fixtures";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-type Day = SharesDeliveryDay & { id: string };
-type Station = DeliveryStation & { id: string };
-
 const TODAY = new Date(2026, 9, 6, 12, 0);
-
-// Backend day numbers: 0 = Monday … 6 = Sunday.
-const TUESDAY: Day = {
-  id: "day-tue", day_number: 1, valid_from: "2026-01-05", valid_until: null, number_of_tours: 2,
-};
-// Runs until 25 October; its successor takes Friday over from the 26th.
-const FRIDAY: Day = {
-  id: "day-fri", day_number: 4, valid_from: "2026-01-05", valid_until: "2026-10-25",
-  number_of_tours: 3,
-};
-const NEXT_FRIDAY: Day = {
-  id: "day-fri-next", day_number: 4, valid_from: "2026-10-26", valid_until: null,
-  number_of_tours: null,
-};
-// A Monday that ended in the spring; the day picker still offers it, first.
-const ENDED_MONDAY: Day = {
-  id: "day-mon-ended", day_number: 0, valid_from: "2025-01-06", valid_until: "2026-03-29",
-  number_of_tours: 1,
-};
-// An earlier Tuesday, ended in January; the day picker still offers it.
-const ENDED_TUESDAY: Day = {
-  id: "day-tue-ended", day_number: 1, valid_from: "2025-01-06", valid_until: "2026-01-04",
-  number_of_tours: 2,
-};
-
-const WEEKDAY_KEYS: Record<number, string> = { 1: "delivery.di", 4: "delivery.fr" };
-const shownDate = (isoDate: string) => isoDate.split("-").reverse().join(".");
-/** What the delivery-day selector shows for a day: its weekday and validity. */
-const dayLabel = (day: Day) =>
-  `${WEEKDAY_KEYS[day.day_number]}commissioning.valid_from ${shownDate(day.valid_from)}` +
-  (day.valid_until ? ` commissioning.valid_until ${shownDate(day.valid_until)}` : "");
-
-const station = (
-  id: string,
-  shortName: string | null,
-  companyName: string | null = null,
-): Station => ({ id, short_name: shortName, company_name: companyName, is_active: true });
-const MARKET_HALL = station("st-market-hall", "Market Hall");
-const BAKERY = station("st-bakery", "Bakery Lindner");
-const SCHOOL = station("st-school", "Village School");
-const TOWN_HALL = station("st-town-hall", "Town Hall");
-// Has no short name, so it goes by its company name.
-const ORGANIC_SHOP = station("st-organic-shop", null, "Organic Shop Ltd");
-const MILL = station("st-mill", "Old Mill");
-const CHURCH = station("st-church", "Church Square");
-
-const nameOf = (of: Station) => of.short_name ?? of.company_name ?? "";
-
-/** A station at a position of a tour, as a plan is stored and saved. */
-const at = (position: number, of: Station) => ({ position, delivery_station_id: of.id });
-
-/** Tuesday's saved plan as the grid shows it: per tour, "position station". */
-const TUESDAY_SHOWN = [["1 Market Hall", "2 Bakery Lindner"], ["1 Village School"]];
+// The stations a day offers: those served on it from the Monday after TODAY,
+// when the tour plan applies.
+const stationsOf = (day: Day) => ({
+  is_active: true,
+  delivery_day: day.id,
+  active_at_date_or_future: "2026-10-12",
+});
 
 /** What the in-memory farm holds; the request spies answer from it. */
 let farm: {
   days: Day[];
   stations: Record<string, Station[]>;
-  plans: Record<string, DeliveryTourUpdate[]>;
+  plans: Record<string, DeliveryTourUpdateRequest[]>;
 };
 
 const activeOn = (day: Day, date: string) =>
@@ -219,7 +190,7 @@ const listedPlan = ({ delivery_day }: CommissioningDeliveryToursListParams): Del
     }));
 
 /** Replaces the day's whole plan, as the backend does. */
-function savePlan({ delivery_day, tours }: DeliveryToursUpdate) {
+function savePlan({ delivery_day, tours }: DeliveryToursUpdateRequest) {
   farm.plans = { ...farm.plans, [delivery_day]: tours.map((tour) => ({ ...tour })) };
   return { message: "Tours updated." };
 }
@@ -274,7 +245,7 @@ const answer = (respond: (() => void) | undefined) =>
     await flushMicrotasks();
   });
 
-const lastSave = () => api.saveTours.mock.lastCall?.[0] as DeliveryToursUpdate | undefined;
+const lastSave = () => api.saveTours.mock.lastCall?.[0] as DeliveryToursUpdateRequest | undefined;
 
 /** The plan of the one save the page sent. */
 async function savedPlan() {
@@ -423,10 +394,11 @@ describe("DeliveryTours loading", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "commissioning.delivery_tours" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("commissioning.tour_plan_applies_from(week=42)")).toBeInTheDocument();
     expect(api.deliveryDays).toHaveBeenCalledWith({ active_at_date: "2026-10-06" });
     expect(api.deliveryDays).toHaveBeenCalledWith({ active_at_date: "2026-10-06", future: true });
     expect(selectedDay()).toBe(dayLabel(TUESDAY));
-    expect(api.stations.mock.calls).toEqual([[{ is_active: true, delivery_day: TUESDAY.id }]]);
+    expect(api.stations.mock.calls).toEqual([[stationsOf(TUESDAY)]]);
     expect(api.tours.mock.calls).toEqual([[{ delivery_day: TUESDAY.id }]]);
     expect(tourHeadings()).toEqual([
       "commissioning.tour_label(number=1)",
@@ -486,7 +458,7 @@ describe("DeliveryTours loading", () => {
 
       await opened();
       expect(selectedDay()).toBe(dayLabel(TUESDAY));
-      expect(api.stations.mock.calls).toEqual([[{ is_active: true, delivery_day: TUESDAY.id }]]);
+      expect(api.stations.mock.calls).toEqual([[stationsOf(TUESDAY)]]);
       expect(api.tours.mock.calls).toEqual([[{ delivery_day: TUESDAY.id }]]);
     },
   );
@@ -529,7 +501,7 @@ describe("DeliveryTours choosing a delivery day", () => {
 
     await opened([[], [], ["2 Church Square"]]);
     expect(selectedDay()).toBe(dayLabel(FRIDAY));
-    expect(api.stations).toHaveBeenLastCalledWith({ is_active: true, delivery_day: FRIDAY.id });
+    expect(api.stations).toHaveBeenLastCalledWith(stationsOf(FRIDAY));
     expect(api.tours).toHaveBeenLastCalledWith({ delivery_day: FRIDAY.id });
     expect(tourHeadings()).toEqual([
       "commissioning.tour_label(number=1)",
@@ -661,7 +633,7 @@ describe("DeliveryTours placing stations", () => {
   it("shows that the plan is being saved, then that it is saved", async () => {
     let finish: (() => void) | undefined;
     api.saveTours.mockImplementation(
-      (body: DeliveryToursUpdate) =>
+      (body: DeliveryToursUpdateRequest) =>
         new Promise((resolve) => (finish = () => resolve(savePlan(body)))),
     );
     const { user } = renderPage();

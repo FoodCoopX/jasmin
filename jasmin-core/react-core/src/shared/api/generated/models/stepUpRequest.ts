@@ -14,6 +14,7 @@ stable across the ``STEP_UP_REQUIRES_TOTP`` flag; the backend
 rejects when the flag is on and the code is missing/wrong.
  */
 export interface StepUpRequest {
+  /** @minLength 1 */
   password: string;
   totp_code?: string;
 }

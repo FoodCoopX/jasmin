@@ -138,7 +138,7 @@ class CrateOrderSummarySerializer(serializers.Serializer):
 
 # The two write bodies below are what the crate lines on delivery notes and
 # invoices are built from. ``create`` inserts a row and ``update`` rewrites the
-# rows of one crate line through ``QuerySet.update()``; neither path runs
+# rows of one crate line through ``save(update_fields=…)``; neither path runs
 # ``full_clean()``, so these fields are the only place the model's limits hold
 # (``rabatt`` 0-100, ``numeric(5, 2)`` prices and tax rates, a 500-char note).
 # Each field mirrors its model column. The optional ones are left out of

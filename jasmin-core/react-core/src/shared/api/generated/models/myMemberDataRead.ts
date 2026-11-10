@@ -18,32 +18,32 @@ value; we don't echo the old one back over the wire.
  */
 export interface MyMemberDataRead {
   /** @nullable */
-  readonly first_name?: string | null;
+  readonly first_name: string | null;
   /** @nullable */
-  readonly last_name?: string | null;
+  readonly last_name: string | null;
   /** @nullable */
-  readonly company_name?: string | null;
+  readonly company_name: string | null;
   /** @nullable */
-  readonly pickup_name?: string | null;
+  readonly pickup_name: string | null;
   /** @nullable */
-  readonly address?: string | null;
+  readonly address: string | null;
   /** @nullable */
-  readonly zip_code?: string | null;
+  readonly zip_code: string | null;
   /** @nullable */
-  readonly city?: string | null;
+  readonly city: string | null;
   /** @nullable */
-  readonly country?: string | null;
+  readonly country: string | null;
   /** @nullable */
-  readonly birth_date?: string | null;
-  readonly iban_stored?: boolean;
-  readonly account_owner_stored?: boolean;
+  readonly birth_date: string | null;
+  readonly iban_stored: boolean;
+  readonly account_owner_stored: boolean;
   /** @nullable */
-  readonly email?: string | null;
+  readonly email: string | null;
   /** @nullable */
-  readonly member_number?: number | null;
-  readonly is_trial?: boolean;
-  readonly is_active?: boolean;
+  readonly member_number: number | null;
+  readonly is_trial: boolean;
+  readonly is_active: boolean;
   /** @nullable */
-  readonly entry_date?: string | null;
-  readonly coop_shares?: readonly MyDataCoopShare[];
+  readonly entry_date: string | null;
+  readonly coop_shares: readonly MyDataCoopShare[];
 }

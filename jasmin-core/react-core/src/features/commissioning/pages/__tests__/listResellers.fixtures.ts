@@ -3,11 +3,12 @@
  * builders for a reseller row and the login the backend nests into it.
  */
 import type { AdminUserRow, OfferGroup, Reseller } from "@shared/api/generated/models";
+import { makeOfferGroup, makeReseller } from "@/test/modelFixtures";
 
 type Row = Record<string, unknown>;
 
-export const STANDARD: OfferGroup = { id: "og-standard", number: 1, name: "Standard", is_default: true };
-export const WHOLESALE: OfferGroup = { id: "og-wholesale", number: 2, name: "Wholesale" };
+export const STANDARD: OfferGroup = makeOfferGroup({ id: "og-standard", number: 1, name: "Standard", is_default: true });
+export const WHOLESALE: OfferGroup = makeOfferGroup({ id: "og-wholesale", number: 2, name: "Wholesale" });
 
 /** A reseller's login, as the backend nests it into the reseller row. */
 export function login(overrides: Partial<AdminUserRow> & { id: string }): Row {
@@ -22,15 +23,13 @@ export function login(overrides: Partial<AdminUserRow> & { id: string }): Row {
 }
 
 export function reseller(overrides: Partial<Reseller> & { id: string }): Reseller {
-  return {
-    is_reseller: true, is_active_reseller: true, is_seller: false,
-    is_also_delivery_station: false, linked_delivery_station_can_be_deleted: true,
+  return makeReseller({
+    is_reseller: true, is_active_reseller: true, is_seller: false, is_also_delivery_station: false,
     offer_via_email: false, delivery_note_via_email: false,
     company_name: null, first_name: null, last_name: null, address: "", zip_code: "", city: "",
     email: null, phone: null, note: null, offer_group: STANDARD.id, payment_terms_in_days: 14,
-    linked_user_info: null, can_be_deleted: true,
     ...overrides,
-  };
+  });
 }
 
 // Has orders, so the backend protects it; signs in as a customer.

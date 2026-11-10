@@ -7,6 +7,7 @@ import {
   useDateFormat,
   useDateRangePresets,
   useNumberFormat,
+  useWashingCleaningVisibility,
 } from "@hooks/index";
 import {
   useCommissioningStorageLoggingList,
@@ -44,6 +45,14 @@ type WorkflowEntry =
   | TheoreticalWashAmount
   | TheoreticalPurchase;
 
+// Every kind of theoretical amount the workflow view can list.
+const WORKFLOW_SOURCES = [
+  { value: "HARVEST", label: "HARVEST", color: "green" },
+  { value: "CLEAN", label: "CLEAN", color: "magenta" },
+  { value: "WASH", label: "WASH", color: "purple" },
+  { value: "PURCHASE", label: "PURCHASE", color: "cyan" },
+];
+
 export default function LoggingStorage() {
   // Storage Logging State
   const [selectedStorage, setSelectedStorage] = useState<string | null>(null);
@@ -59,6 +68,7 @@ export default function LoggingStorage() {
   const [selectedWorkflowShareArticle, setSelectedWorkflowShareArticle] =
     useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState("HARVEST");
+  const shownWorkDays = useWashingCleaningVisibility();
 
   // Hide rows with amount = 0 (default on). One toggle per table — independent.
   const [hideInactiveStorage, setHideInactiveStorage] = useState(true);
@@ -258,7 +268,7 @@ export default function LoggingStorage() {
       key: "type",
       width: "9em",
       render: (type: string) => (
-        <Tag color={getTypeColor(type)} style={{ fontSize: "9px" }}>
+        <Tag color={getTypeColor(type)} className="logging-storage-type-tag">
           {getTypeLabel(type)}
         </Tag>
       ),
@@ -348,7 +358,7 @@ export default function LoggingStorage() {
             : null;
         if (!type) return null;
         return (
-          <Tag color={getTypeColor(type)} style={{ fontSize: "9px" }}>
+          <Tag color={getTypeColor(type)} className="logging-storage-type-tag">
             {getTypeLabel(type)}
           </Tag>
         );
@@ -377,12 +387,11 @@ export default function LoggingStorage() {
     ...(amountUnitSizeColumns as unknown as ColumnsType<WorkflowEntry>),
   ];
 
-  const sourceOptions = [
-    { value: "HARVEST", label: "HARVEST", color: "green" },
-    { value: "CLEAN", label: "CLEAN", color: "magenta" },
-    { value: "WASH", label: "WASH", color: "purple" },
-    { value: "PURCHASE", label: "PURCHASE", color: "cyan" },
-  ];
+  const sourceOptions = WORKFLOW_SOURCES.filter(
+    ({ value }) =>
+      (shownWorkDays.showsCleaning || value !== "CLEAN") &&
+      (shownWorkDays.showsWashing || value !== "WASH"),
+  );
 
   const [pageSize, setPageSize] = useState(10);
   const paginationConfig: TablePaginationConfig = {
@@ -440,14 +449,14 @@ export default function LoggingStorage() {
             placeholder={[t("common.start_date"), t("common.end_date")]}
             className="logging-storage-range-picker"
           />
-          <span style={{ marginLeft: "1em" }}>
+          <span className="logging-storage-hide-inactive">
             <Switch
               size="small"
               aria-label={t("commissioning.hide_inactive_rows")}
               checked={hideInactiveStorage}
               onChange={setHideInactiveStorage}
             />
-            <span style={{ marginLeft: "0.5em" }}>
+            <span className="logging-storage-hide-inactive__label">
               {t("commissioning.hide_inactive_rows")}
             </span>
           </span>
@@ -467,7 +476,7 @@ export default function LoggingStorage() {
         </div>
       )}
 
-      <Divider style={{ margin: "3em 0" }} />
+      <Divider className="logging-storage-divider" />
 
       <h1>{t("commissioning.internal_workflow")}</h1>
       <h5>{t("commissioning.workflow_explanation")}</h5>
@@ -497,12 +506,7 @@ export default function LoggingStorage() {
             role="button"
             tabIndex={0}
             aria-pressed={selectedSource === option.value}
-            style={{
-              cursor: "pointer",
-              fontSize: "12px",
-              padding: "4px 12px",
-              marginBottom: "8px",
-            }}
+            className="logging-storage-source-tag"
             onClick={() => setSelectedSource(option.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -514,14 +518,14 @@ export default function LoggingStorage() {
             {getWorkflowSourceLabel(option.value)}
           </Tag>
         ))}
-        <span style={{ marginLeft: "1em" }}>
+        <span className="logging-storage-hide-inactive">
           <Switch
             size="small"
             aria-label={t("commissioning.hide_inactive_rows")}
             checked={hideInactiveWorkflow}
             onChange={setHideInactiveWorkflow}
           />
-          <span style={{ marginLeft: "0.5em" }}>
+          <span className="logging-storage-hide-inactive__label">
             {t("commissioning.hide_inactive_rows")}
           </span>
         </span>

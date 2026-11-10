@@ -114,14 +114,7 @@ export default function JasminApp() {
   if (bootstrapping) {
     return (
       <ConfigProvider theme={antdTheme} locale={antdLocale}>
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex-center"
-          style={{
-            height: "100vh",
-          }}
-        >
+        <div role="status" aria-live="polite" className="flex-center h-screen">
           {t("app.loading")}
         </div>
       </ConfigProvider>
@@ -196,25 +189,11 @@ export default function JasminApp() {
     const memberPath = memberId ? `/members/members/${memberId}` : "/login";
     return (
       <ConfigProvider theme={antdTheme} locale={antdLocale}>
-        <Layout style={{ minHeight: "100vh" }}>
-          <Layout.Header
-            className="flex-end"
-            style={{
-              alignItems: "center",
-              padding: "0 16px",
-              background: "var(--color-bg-container)",
-              borderBottom: "1px solid var(--color-border)",
-            }}
-          >
+        <Layout className="min-h-screen">
+          <Layout.Header className="flex-end role-layout-header">
             <UserMenu />
           </Layout.Header>
-          <Layout.Content
-            style={{
-              padding: "24px",
-              background: "var(--color-bg-base)",
-              minHeight: "100vh",
-            }}
-          >
+          <Layout.Content className="role-layout-content">
             <ErrorBoundary>
               <Suspense
                 fallback={
@@ -247,25 +226,11 @@ export default function JasminApp() {
   if (hasOnlyRole("customer")) {
     return (
       <ConfigProvider theme={antdTheme} locale={antdLocale}>
-        <Layout style={{ minHeight: "100vh" }}>
-          <Layout.Header
-            className="flex-end"
-            style={{
-              alignItems: "center",
-              padding: "0 16px",
-              background: "var(--color-bg-container)",
-              borderBottom: "1px solid var(--color-border)",
-            }}
-          >
+        <Layout className="min-h-screen">
+          <Layout.Header className="flex-end role-layout-header">
             <UserMenu />
           </Layout.Header>
-          <Layout.Content
-            style={{
-              padding: "24px",
-              background: "var(--color-bg-base)",
-              minHeight: "100vh",
-            }}
-          >
+          <Layout.Content className="role-layout-content">
             <ErrorBoundary>
               <Suspense
                 fallback={
@@ -294,7 +259,7 @@ export default function JasminApp() {
     <ConfigProvider theme={antdTheme} locale={antdLocale}>
       <NavigationProvider>
         <ModalProvider>
-          <Layout style={{ minHeight: "100vh" }}>
+          <Layout className="min-h-screen">
             <SkipToMainLink />
             <TopNavigation />
             <Layout>

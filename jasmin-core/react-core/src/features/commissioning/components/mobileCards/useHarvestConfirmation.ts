@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import type { Key } from "react";
 import { useTranslation } from "react-i18next";
 import { commissioningHarvestPartialUpdate } from "@shared/api/generated/commissioning/commissioning";
-import type { DayNumberEnum, PatchedHarvest } from "@shared/api/generated/models";
+import type { DayNumberEnum, PatchedHarvestRequest } from "@shared/api/generated/models";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
 import { notify } from "@shared/utils";
 import { getServerErrorMessage } from "@shared/utils/apiError";
@@ -53,7 +53,7 @@ export function useHarvestConfirmation(params: {
     if (!record) return;
     setSaving(true);
     try {
-      const confirmation: PatchedHarvest = {
+      const confirmation: PatchedHarvestRequest = {
         amount: (amount ?? 0).toFixed(2),
         year: selectedYear,
         delivery_week: selectedWeek,

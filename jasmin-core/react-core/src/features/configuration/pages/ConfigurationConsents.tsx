@@ -187,7 +187,7 @@ export default function ConfigurationConsents() {
           align: "center",
           render: (value: unknown) =>
             value ? (
-              <Text code style={{ fontSize: 11 }}>
+              <Text code className="text-11">
                 {(value as string).slice(0, 8)}…
               </Text>
             ) : (
@@ -226,7 +226,7 @@ export default function ConfigurationConsents() {
             </Space>
           ),
         },
-      ] as EditableColumnConfig<TableRecord>[],
+      ] satisfies EditableColumnConfig<TableRecord>[],
     [activeStatusColumn, renderDate, t],
   );
 
@@ -235,7 +235,7 @@ export default function ConfigurationConsents() {
       <h1>{t("consent.admin.title")}</h1>
       <Paragraph type="secondary">{t("consent.admin.subtitle")}</Paragraph>
 
-      <div style={{ marginBottom: 16 }}>
+      <div className="mb-16">
         <Button
           type="primary"
           icon={<PlusOutlined />}

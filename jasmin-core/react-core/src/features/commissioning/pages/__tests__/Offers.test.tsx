@@ -200,13 +200,8 @@ vi.mock("@features/commissioning/pdfs/forResellers/OfferPDFGenerator", () => ({
 // The offers grid's props from its latest render.
 const table = vi.hoisted(() => ({ props: null as unknown }));
 
-vi.mock("@shared/tables", async () => {
-  const { gatedByPermission, READ_ONLY_PERMISSION } = await import(
-    "@shared/tables/tablePermissions"
-  );
-  const { wrapApiFunctions } = await import(
-    "@shared/tables/BasicEditableTable/wrapApiFunctions"
-  );
+vi.mock("@shared/tables", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/tables")>();
   const leafColumns = (
     columns: EditableColumnConfig<TableRecord>[],
   ): EditableColumnConfig<TableRecord>[] =>
@@ -214,9 +209,7 @@ vi.mock("@shared/tables", async () => {
       column.children ? leafColumns(column.children) : [column],
     );
   return {
-    gatedByPermission,
-    READ_ONLY_PERMISSION,
-    wrapApiFunctions,
+    ...actual,
     EditableTable: (props: EditableTableProps) => {
       table.props = props;
       const columns = leafColumns(props.columns).filter((c) => !c.hidden);

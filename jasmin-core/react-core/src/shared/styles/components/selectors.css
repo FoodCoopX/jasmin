@@ -71,6 +71,10 @@
   box-shadow: 0 0 0 2px var(--color-primary-light) !important;
 }
 
+.ant-select.week-selector-year {
+  width: 6em;
+}
+
 .week-selector-small-buttons {
   border-color: var(--color-primary) !important;
   box-shadow:
@@ -103,6 +107,36 @@
   margin-left: 2em;
 }
 
+/* The "hide inactive rows" switch beside a logging filter row. */
+.logging-storage-hide-inactive {
+  margin-left: 1em;
+}
+
+.logging-storage-hide-inactive__label {
+  margin-left: 0.5em;
+}
+
+/* The workflow's source filter: a row of clickable tags. These and the type
+   tags are doubled with .ant-tag so they outrank AntD's own tag size and
+   padding. */
+.logging-storage-source-tag.ant-tag {
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 12px;
+  margin-bottom: 8px;
+}
+
+/* An entry's type in the logging tables. */
+.logging-storage-type-tag.ant-tag {
+  font-size: 9px;
+}
+
+/* Between the storage log and the internal workflow. ``.ant-divider``
+   outranks AntD's own divider margin. */
+.logging-storage-divider.ant-divider {
+  margin: 3em 0;
+}
+
 .documentation-source-select {
   width: 12em;
 }
@@ -114,6 +148,10 @@
 
 .delivery-station-day-selector {
   width: 18em;
+}
+
+.shares-delivery-day-selector {
+  width: 30em;
 }
 
 .tour-selector {

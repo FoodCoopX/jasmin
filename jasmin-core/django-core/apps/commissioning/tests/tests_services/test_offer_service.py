@@ -345,6 +345,31 @@ class TestCopyOffersToOfferGroup:
         assert result["created_count"] == 0
         assert result["skipped_count"] == 1
 
+    def test_an_offer_of_another_week_is_skipped_not_copied(self, tenant):
+        # The already-present check looks in the requested week; copying an
+        # offer of another week would write where nothing was checked.
+        article = ShareArticleFactory()
+        group = OfferGroupFactory()
+        other_week = OfferFactory(
+            year=2026, delivery_week=16, share_article=article, unit="KG", size="M"
+        )
+        OfferFactory(
+            year=2026,
+            delivery_week=16,
+            share_article=article,
+            unit="KG",
+            size="M",
+            offer_group=group,
+        )
+
+        result = OfferService.copy_offers_to_offer_group(
+            [other_week.pk], year=2026, delivery_week=15, offer_group=group.pk
+        )
+
+        assert result["created_count"] == 0
+        assert result["skipped_count"] == 1
+        assert Offer.objects.filter(offer_group=group, delivery_week=16).count() == 1
+
 
 # ---------------------------------------------------------------------------
 # create_offers

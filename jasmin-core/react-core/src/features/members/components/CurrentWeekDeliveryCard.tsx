@@ -11,6 +11,7 @@ import {
   useShareTypeVariationSizeOptions,
   useTenant,
   useUnitOptions,
+  useTenantLanguageT,
 } from "@hooks/index";
 import { removePurchasedSuffix } from "@shared/utils";
 
@@ -56,6 +57,7 @@ const CurrentWeekDeliveryCard = ({
   currentYear,
 }: CurrentWeekDeliveryCardProps) => {
   const { t } = useTranslation();
+  const tenantT = useTenantLanguageT();
   const { getUnitLabel } = useUnitOptions();
   const { getSetting } = useTenant();
   const usesJokers = getSetting("uses_jokers", true);
@@ -165,20 +167,10 @@ const CurrentWeekDeliveryCard = ({
             flexShrink: 0,
           }}
         />
-        <Text
-          style={{
-            fontSize: "13px",
-            fontWeight: "500",
-            color: "var(--color-text-primary)",
-            flex: 1,
-          }}
-        >
-          {removePurchasedSuffix(item.name, t)}
+        <Text className="current-week-article-name">
+          {removePurchasedSuffix(item.name, tenantT)}
           {showSellerName && item.sellerName && (
-            <Text
-              type="secondary"
-              style={{ fontSize: "12px", fontWeight: 400 }}
-            >
+            <Text type="secondary" className="text-12 font-normal">
               {" "}
               ({item.sellerName})
             </Text>
@@ -188,20 +180,14 @@ const CurrentWeekDeliveryCard = ({
               {" "}
               <Tag
                 color={organicStatusTagColor(item.organicStatus)}
-                style={{ marginInlineEnd: 0, fontSize: 11, lineHeight: 1.2 }}
+                className="current-week-organic-tag"
               >
                 {organicStatusLabel(t, item.organicStatus)}
               </Tag>
             </>
           )}
         </Text>
-        <Text
-          style={{
-            fontSize: "12px",
-            color: "var(--color-text-muted)",
-            whiteSpace: "nowrap",
-          }}
-        >
+        <Text className="current-week-article-amount">
           {item.amount} {getUnitLabel(item.unit)}
         </Text>
       </Space>
@@ -211,7 +197,7 @@ const CurrentWeekDeliveryCard = ({
   const renderArticles = (group: VariationGroup) => {
     if (group.articles.length === 0) {
       return (
-        <Text type="secondary" style={{ fontSize: "12px" }}>
+        <Text type="secondary" className="text-12">
           {t("members.no_share_content_yet")}
         </Text>
       );
@@ -225,14 +211,7 @@ const CurrentWeekDeliveryCard = ({
         <>
           {ownArticles.length > 0 && (
             <>
-              <Text
-                type="secondary"
-                style={{
-                  fontSize: "11px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                }}
-              >
+              <Text type="secondary" className="current-week-source-label">
                 {t("members.from_own_fields")}
               </Text>
               <List
@@ -314,21 +293,21 @@ const CurrentWeekDeliveryCard = ({
                   marginBottom: group.articles.length > 0 ? "6px" : 0,
                 }}
               >
-                <Text strong style={{ fontSize: "14px" }}>
+                <Text strong className="text-14">
                   {group.orderedVariation}
                 </Text>
                 {group.orderedVariationType === "virtual" && (
-                  <Tag color="purple" style={{ margin: 0 }}>
+                  <Tag color="purple" className="m-0">
                     {group.physicalVariations.join(" + ")}
                   </Tag>
                 )}
                 {usesJokers && group.jokerTaken && (
-                  <Tag color="darkorange" style={{ margin: 0 }}>
+                  <Tag color="darkorange" className="m-0">
                     Joker
                   </Tag>
                 )}
                 {group.donationJokerTaken && (
-                  <Tag color="darkorange" style={{ margin: 0 }}>
+                  <Tag color="darkorange" className="m-0">
                     {t("members.donation_joker_tag")}
                   </Tag>
                 )}

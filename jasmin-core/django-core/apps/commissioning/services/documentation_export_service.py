@@ -366,7 +366,8 @@ class DocumentationExportService:
             amount_cell,
         ]
         if model == "purchase":
-            return common_prefix + [
+            return [
+                *common_prefix,
                 # Reseller has no ``name`` of its own — the display name lives on
                 # the linked ContactEntity (mirrors the summary service).
                 instance.seller.contact.name if instance.seller else "",
@@ -380,7 +381,4 @@ class DocumentationExportService:
                 instance.note or "",
             ]
         # harvest
-        return common_prefix + [
-            instance.storage.name,
-            instance.note or "",
-        ]
+        return [*common_prefix, instance.storage.name, instance.note or ""]

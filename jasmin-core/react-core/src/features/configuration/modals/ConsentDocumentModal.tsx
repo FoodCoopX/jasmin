@@ -15,6 +15,7 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
+import "@shared/quill/SanitizingClipboard";
 import {
   getCommissioningConsentDocumentsListQueryKey,
   useCommissioningConsentDocumentsCreate,
@@ -167,15 +168,14 @@ export default function ConsentDocumentModal({
                 ? dayjs(document.valid_from).format(dateFormat)
                 : "—"}
             </Text>
-            <Text type="secondary" style={{ fontSize: 11 }}>
+            <Text type="secondary" className="text-11">
               SHA-256:{" "}
-              <Text code style={{ fontSize: 11 }}>
+              <Text code className="text-11">
                 {document.body_sha256}
               </Text>
             </Text>
             <div
-              className="consent-document-box"
-              style={{ marginTop: 8, maxHeight: 480, fontSize: 13 }}
+              className="consent-document-box consent-document-preview mt-8"
               // Body is office-authored HTML (Quill); sanitise on render.
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(document.body),
@@ -215,7 +215,7 @@ export default function ConsentDocumentModal({
             name="version"
             label={t("consent.admin.col_version")}
             rules={[{ required: true, max: 40 }]}
-            style={{ flex: 1, marginLeft: 8 }}
+            className="flex-1 ml-8"
           >
             <Input placeholder="2026-05-20 / 3.1 / …" />
           </Form.Item>
@@ -249,7 +249,7 @@ export default function ConsentDocumentModal({
       <Alert
         type="info"
         showIcon
-        style={{ marginTop: 8 }}
+        className="mt-8"
         message={t("consent.admin.append_only_notice")}
       />
     </Modal>

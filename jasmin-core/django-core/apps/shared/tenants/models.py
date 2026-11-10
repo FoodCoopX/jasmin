@@ -94,6 +94,9 @@ class JasminModel(models.Model):
 
 
 class Tenant(TenantMixin, JasminModel):
+    auto_create_schema = True
+    auto_drop_schema = True
+
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     address = models.CharField(max_length=200, blank=True, null=True)
@@ -198,33 +201,6 @@ class Tenant(TenantMixin, JasminModel):
     # ``name[:12]`` in the manifest rather than shipping a clipped long name.
     app_short_name = models.CharField(max_length=12, blank=True, default="")
 
-    @property
-    def app_icon_version(self) -> str:
-        """Cache-busting stamp for the unsigned launcher-icon URL.
-
-        Empty string when there is no icon, which doubles as the frontend's
-        "there is nothing to point at" signal — so one field answers both
-        "does this tenant have an icon?" and "which version is it?".
-
-        ``updated_at`` is ``auto_now``, so any PATCH that stores a new icon
-        moves the stamp and defeats the icon route's day-long cache. Without
-        it, replacing an icon would leave every client showing the old one for
-        up to ``_APP_ICON_MAX_AGE``.
-
-        MICROSECONDS are included deliberately: whole seconds are too coarse:
-        an admin who replaces an icon twice inside the same second (or any
-        automated flow that does) would produce a byte-identical URL for
-        different bytes, and every client would keep the stale icon for a day.
-
-        Trade-off accepted: the stamp also moves when an unrelated tenant field
-        is edited, costing one ~5 KB re-download. Deriving it from the stored
-        filename instead would avoid that but breaks when Django reuses a name
-        after a delete-then-upload, which is the failure that actually hurts.
-        """
-        if not self.app_icon:
-            return ""
-        return f"{int(self.updated_at.timestamp())}{self.updated_at.microsecond:06d}"
-
     fiscal_year_start_month = models.PositiveSmallIntegerField(
         default=1,
         validators=[MinValueValidator(1), MaxValueValidator(12)],
@@ -290,11 +266,35 @@ class Tenant(TenantMixin, JasminModel):
         default=dict, blank=True, editable=False
     )
 
-    auto_create_schema = True
-    auto_drop_schema = True
-
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def app_icon_version(self) -> str:
+        """Cache-busting stamp for the unsigned launcher-icon URL.
+
+        Empty string when there is no icon, which doubles as the frontend's
+        "there is nothing to point at" signal — so one field answers both
+        "does this tenant have an icon?" and "which version is it?".
+
+        ``updated_at`` is ``auto_now``, so any PATCH that stores a new icon
+        moves the stamp and defeats the icon route's day-long cache. Without
+        it, replacing an icon would leave every client showing the old one for
+        up to ``_APP_ICON_MAX_AGE``.
+
+        MICROSECONDS are included deliberately: whole seconds are too coarse:
+        an admin who replaces an icon twice inside the same second (or any
+        automated flow that does) would produce a byte-identical URL for
+        different bytes, and every client would keep the stale icon for a day.
+
+        Trade-off accepted: the stamp also moves when an unrelated tenant field
+        is edited, costing one ~5 KB re-download. Deriving it from the stored
+        filename instead would avoid that but breaks when Django reuses a name
+        after a delete-then-upload, which is the failure that actually hurts.
+        """
+        if not self.app_icon:
+            return ""
+        return f"{int(self.updated_at.timestamp())}{self.updated_at.microsecond:06d}"
 
 
 class Domain(DomainMixin):
@@ -377,6 +377,12 @@ class PackingMode(models.TextChoices):
     MIXED = "MIXED", "Mixed (per share-type variation)"
 
 
+class PlanningGranularity(models.TextChoices):
+    BASIC = "basic", "Basic"
+    TOURS = "tours", "Tours"
+    STATIONS = "stations", "Stations"
+
+
 def validate_offer_tiers(value: Any) -> None:
     """Offer tiers are a list of quantity thresholds.
 
@@ -407,6 +413,13 @@ def validate_offer_tiers(value: Any) -> None:
 
 class TenantSettings(JasminModel):
     # versioned settings for tenants with historical tracking, because these settings can change over time
+
+    BILLING_STRATEGY_EXACT = "EXACT_PER_PERIOD"
+    BILLING_STRATEGY_SMOOTHED = "SMOOTHED"
+    BILLING_STRATEGY_CHOICES = [
+        (BILLING_STRATEGY_EXACT, "Exact per period (count actual deliveries)"),
+        (BILLING_STRATEGY_SMOOTHED, "Smoothed across subscription term"),
+    ]
 
     tenant = models.ForeignKey(
         Tenant, on_delete=models.CASCADE, related_name="tenant_settings"
@@ -513,6 +526,11 @@ class TenantSettings(JasminModel):
 
     # layout app
     show_size_column = models.BooleanField(default=True)
+    # Off, the frontend leaves out the washing / cleaning days, lists and
+    # columns; the backend plans them either way. The database default lets a
+    # release from before them still insert a settings row.
+    show_washing = models.BooleanField(default=True, db_default=True)
+    show_cleaning = models.BooleanField(default=True, db_default=True)
     # When True, the harvest-share content planner auto-prefills each physical
     # variation's EMPTY day cells with the forecast amount split across sizes by
     # ``average_weight`` and weighted by the physical-variation counts (floored
@@ -616,8 +634,8 @@ class TenantSettings(JasminModel):
 
     default_planning_granularity = models.CharField(
         max_length=10,
-        choices=[("basic", "Basic"), ("tours", "Tours"), ("stations", "Stations")],
-        default="basic",
+        choices=PlanningGranularity.choices,
+        default=PlanningGranularity.BASIC,
     )
 
     # When True the tenant uploads weekly share-amount totals via CSV
@@ -639,12 +657,6 @@ class TenantSettings(JasminModel):
     )
 
     # ---- Member billing settings (used by apps.payments) ----
-    BILLING_STRATEGY_EXACT = "EXACT_PER_PERIOD"
-    BILLING_STRATEGY_SMOOTHED = "SMOOTHED"
-    BILLING_STRATEGY_CHOICES = [
-        (BILLING_STRATEGY_EXACT, "Exact per period (count actual deliveries)"),
-        (BILLING_STRATEGY_SMOOTHED, "Smoothed across subscription term"),
-    ]
     billing_strategy = models.CharField(
         max_length=20,
         choices=BILLING_STRATEGY_CHOICES,

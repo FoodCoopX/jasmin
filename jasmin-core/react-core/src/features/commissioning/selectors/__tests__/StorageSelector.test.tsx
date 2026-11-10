@@ -12,6 +12,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Storage } from "@shared/api/generated/models";
+import { makeStorage } from "@/test/modelFixtures";
 import { flushMicrotasks } from "@/test/profileRenders";
 
 const i18nMock = vi.hoisted(() => ({
@@ -53,12 +54,12 @@ import StorageSelector from "../StorageSelector";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-const storage = (id: string | undefined, name: string): Storage => ({ id, name, is_active: true });
+const storage = (id: string, name: string): Storage => makeStorage({ id, name, is_active: true });
 
 const COLD_ROOM = storage("st-cold", "Kühlraum");
 const CELLAR = storage("st-cellar", "Keller");
 // A row without an id can't be picked.
-const UNSAVED = storage(undefined, "Neu");
+const UNSAVED: Omit<Storage, "id"> = { name: "Neu", is_active: true, can_be_deleted: true };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -45,19 +45,13 @@ export default function PublicLegalNoticePage() {
   const extraHtml = tenant?.legal_notice_extra_html?.trim();
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        padding: "40px 24px",
-      }}
-    >
-      <Card style={{ maxWidth: 800, margin: "0 auto" }}>
+    <div className="public-legal-page">
+      <Card className="public-legal-card">
         <Button
           type="link"
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate(-1)}
-          style={{ padding: 0, marginBottom: 16 }}
+          className="p-0 mb-16"
         >
           {t("common.back")}
         </Button>
@@ -203,7 +197,7 @@ export default function PublicLegalNoticePage() {
               <Text type="secondary">
                 {t("impressum.auditing_association_note")}
               </Text>
-              <Paragraph style={{ whiteSpace: "pre-line", marginTop: 8 }}>
+              <Paragraph className="text-preline mt-8">
                 {auditingAssociation}
               </Paragraph>
             </>
@@ -223,7 +217,7 @@ export default function PublicLegalNoticePage() {
               <Title level={4}>
                 {t("impressum.professional_association_title")}
               </Title>
-              <Paragraph style={{ whiteSpace: "pre-line" }}>
+              <Paragraph className="text-preline">
                 {professionalAssociation}
               </Paragraph>
             </>

@@ -236,12 +236,7 @@ export default function SettingsPage({
       if (setting.type === "richtext") {
         return (
           <div>
-            <div
-              className="flex-between"
-              style={{
-                marginBottom: "8px",
-              }}
-            >
+            <div className="flex-between mb-8">
               <Text strong>{setting.label}</Text>
               <Button
                 icon={<EditOutlined />}
@@ -324,7 +319,7 @@ export default function SettingsPage({
             className="settings-card-header"
           >
             {category.description && (
-              <div style={{ marginBottom: "12px" }}>
+              <div className="mb-12">
                 <Text type="secondary">{category.description}</Text>
               </div>
             )}
@@ -343,7 +338,7 @@ export default function SettingsPage({
                     span={SettingsRenderer.getColumnSpan(setting)}
                     key={setting.key}
                   >
-                    <div style={{ padding: "4px 0" }}>
+                    <div className="settings-item">
                       {renderSetting(setting)}
                     </div>
                   </Col>
@@ -421,8 +416,8 @@ function TiersField({ setting, value, onChange }: TiersFieldProps) {
     <div>
       <Text strong>{setting.label}</Text>
       {setting.description && (
-        <div style={{ marginTop: "4px", marginBottom: "8px" }}>
-          <Text type="secondary" style={{ fontSize: "12px" }}>
+        <div className="mt-4 mb-8">
+          <Text type="secondary" className="text-12">
             {setting.description}
           </Text>
         </div>
@@ -430,7 +425,7 @@ function TiersField({ setting, value, onChange }: TiersFieldProps) {
       <Flex vertical gap="8px">
         {tiers.map((tier, index) => (
           <div key={tierKeys.current[index]} className="flex-center-y gap-8">
-            <Text style={{ minWidth: "60px" }}>
+            <Text className="settings-tier-label">
               {tierLabel} {index + 1}:
             </Text>
             <Text>{tierFrom}</Text>
@@ -439,7 +434,7 @@ function TiersField({ setting, value, onChange }: TiersFieldProps) {
               min={1}
               value={tier}
               onChange={(val) => updateTier(index, val)}
-              style={{ width: "100px" }}
+              className="settings-tier-input"
               disabled={index === 0}
               onKeyDown={blockNonNumericKeys({ allowDecimal: true })}
             />
@@ -461,7 +456,7 @@ function TiersField({ setting, value, onChange }: TiersFieldProps) {
             type="dashed"
             size="small"
             onClick={() => onChange([1])}
-            style={{ width: "fit-content" }}
+            className="settings-tier-add"
           >
             {t("common.add")} {tierLabel}
           </Button>
@@ -471,7 +466,7 @@ function TiersField({ setting, value, onChange }: TiersFieldProps) {
             type="dashed"
             size="small"
             onClick={addTier}
-            style={{ width: "fit-content" }}
+            className="settings-tier-add"
           >
             + {tierLabel} {tiers.length + 1}
           </Button>

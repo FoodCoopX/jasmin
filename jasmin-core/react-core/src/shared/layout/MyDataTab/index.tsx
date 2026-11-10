@@ -88,7 +88,7 @@ export default function MyDataTab({ onRequestDeletion }: MyDataTabProps) {
 
       <ConsentsSection />
       <Divider />
-      <Title level={5} style={{ marginBottom: 0 }}>
+      <Title level={5} className="mb-0">
         {t("gdpr.data_protection")}
       </Title>
       <Alert
@@ -177,7 +177,7 @@ function AdvancedRightsFooter({
                     t("gdpr.status_no_reason")}
                 </div>
                 {status.admin_confirmed_at && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-muted)" }}>
+                  <div className="mt-4 text-12 color-text-muted">
                     {t("gdpr.status_rejected_at", {
                       date: fmt(status.admin_confirmed_at),
                     })}

@@ -43,9 +43,7 @@ export default function ListAbsenceCategory() {
 
   const columns = useMemo<EditableColumnConfig<AbsenceCategoryRow>[]>(
     () => [
-      // The shared column hook returns a loosely-typed config (inputType widened
-      // to string); cast the one hook column rather than loosen the whole array.
-      isActiveColumn as EditableColumnConfig<AbsenceCategoryRow>,
+      isActiveColumn,
       {
         title: <>{t("common.year")}</>,
         dataIndex: "year",

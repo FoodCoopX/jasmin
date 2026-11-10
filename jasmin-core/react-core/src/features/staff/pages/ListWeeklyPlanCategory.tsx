@@ -43,9 +43,7 @@ export default function ListWeeklyPlanCategory() {
 
   const columns = useMemo<EditableColumnConfig<WeeklyPlanCategoryRow>[]>(
     () => [
-      // The shared column hook returns a loosely-typed config (inputType widened
-      // to string); cast the one hook column rather than loosen the whole array.
-      isActiveColumn as EditableColumnConfig<WeeklyPlanCategoryRow>,
+      isActiveColumn,
       {
         // Manual order for the weekly plan; blank = unordered (falls to the end).
         title: <>{t("staff.sort_order")}</>,

@@ -7,8 +7,11 @@
  */
 
 export interface PasswordResetConfirmRequest {
+  /** @minLength 1 */
   uid: string;
+  /** @minLength 1 */
   token: string;
+  /** @minLength 1 */
   password: string;
   frc_captcha_solution?: string;
 }

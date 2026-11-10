@@ -60,7 +60,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -sSL https://install.python-poetry.org | python3 -
+# Poetry from PyPI at the pinned version, into a venv of its own; the
+# installer script would be piped into python3 unverified. Only the poetry
+# command goes into $POETRY_HOME/bin, which is on PATH: the venv's own python
+# there would shadow the app's.
+RUN python3 -m venv "$POETRY_HOME/venv" \
+    && "$POETRY_HOME/venv/bin/pip" install --no-cache-dir "poetry==${POETRY_VERSION}" \
+    && mkdir -p "$POETRY_HOME/bin" \
+    && ln -s "$POETRY_HOME/venv/bin/poetry" "$POETRY_HOME/bin/poetry"
 ENV PATH="${POETRY_HOME}/bin:${PATH}"
 
 COPY pyproject.toml poetry.lock ./
@@ -93,7 +100,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -sSL https://install.python-poetry.org | python3 -
+    && python3 -m venv "$POETRY_HOME/venv" \
+    && "$POETRY_HOME/venv/bin/pip" install --no-cache-dir "poetry==${POETRY_VERSION}" \
+    && mkdir -p "$POETRY_HOME/bin" \
+    && ln -s "$POETRY_HOME/venv/bin/poetry" "$POETRY_HOME/bin/poetry"
 ENV PATH="${POETRY_HOME}/bin:/app/.venv/bin:${PATH}"
 
 COPY pyproject.toml poetry.lock ./

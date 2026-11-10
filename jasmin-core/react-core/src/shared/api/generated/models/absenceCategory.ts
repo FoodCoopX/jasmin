@@ -16,7 +16,7 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface AbsenceCategory {
-  readonly id?: string;
+  readonly id: string;
   is_active?: boolean;
   /**
    * @minimum 0
@@ -25,5 +25,5 @@ export interface AbsenceCategory {
   year: number;
   /** @maxLength 200 */
   name: string;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }

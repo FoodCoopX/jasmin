@@ -196,7 +196,7 @@ class SharesDeliveryDayViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
         validated_data: dict = serializer.validated_data
 
         valid_from = validated_data["valid_from"]
-        today = timezone.now().date()
+        today = timezone.localdate()
 
         if valid_from < today:
             raise DeliveryDayValidFromInPast(

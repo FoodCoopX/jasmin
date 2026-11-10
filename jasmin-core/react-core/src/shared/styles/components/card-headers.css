@@ -39,3 +39,10 @@
   color: var(--color-text-secondary);
   text-transform: none;
 }
+
+/* The card under that chip holding a reseller's order on the commissioning
+   list. ``.ant-card`` outranks AntD's own card margin. */
+.reseller-order-card.ant-card {
+  width: 60%;
+  margin-bottom: 16px;
+}

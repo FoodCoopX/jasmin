@@ -74,6 +74,10 @@ class RequiresShortTermStorageMixin(models.Model):
     class Meta:
         abstract = True
 
+    def save(self, *args, **kwargs) -> None:
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
         if not self.storage_id:
@@ -82,10 +86,6 @@ class RequiresShortTermStorageMixin(models.Model):
             raise ValidationError(
                 {"storage": "Storage must be the short-term harvest storage."}
             )
-
-    def save(self, *args, **kwargs) -> None:
-        self.full_clean()
-        super().save(*args, **kwargs)
 
 
 class RequiresHarvestStorageMixin(models.Model):
@@ -105,6 +105,10 @@ class RequiresHarvestStorageMixin(models.Model):
     class Meta:
         abstract = True
 
+    def save(self, *args, **kwargs) -> None:
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
         if not self.storage_id:
@@ -120,10 +124,6 @@ class RequiresHarvestStorageMixin(models.Model):
                     )
                 }
             )
-
-    def save(self, *args, **kwargs) -> None:
-        self.full_clean()
-        super().save(*args, **kwargs)
 
 
 class Forecast(

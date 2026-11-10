@@ -322,7 +322,7 @@ warn_not_ready() {
 ⚠️        # "health.ready.unavailable component=..." names what failed, the
 ⚠️        # traceback below it says why
 ⚠️    docker compose logs --tail=100 postgres redis gateway
-⚠️    docker compose exec redis sh -c 'redis-cli -a "\$REDIS_PASSWORD" --no-auth-warning info memory'
+⚠️    docker compose exec redis sh -c 'REDISCLI_AUTH="\$REDIS_PASSWORD" redis-cli info memory'
 ⚠️        # used_memory over maxmemory: Redis refuses writes
 ⚠️  Check again with: curl -k $1
 ⚠️  If this release is the cause: ./scripts/rollback.sh

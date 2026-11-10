@@ -175,6 +175,20 @@ class BillingProfile(JasminModel):
     def __str__(self) -> str:
         return f"BillingProfile<{self.member_id}>"
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        # Assign the Mandatsreferenz the first time this becomes a SEPA mandate
+        # with bank details. Generated once and kept stable (never regenerated),
+        # because ``is_sepa_ready`` + the pain.008 export both require it and a
+        # changing reference would break an in-flight mandate at the bank.
+        if (
+            not self.sepa_mandate_reference
+            and self.payment_method == PaymentMethodOptions.SEPA_DIRECT_DEBIT
+            and self.iban
+        ):
+            self.sepa_mandate_reference = self._generate_sepa_mandate_reference()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
         if (
@@ -220,20 +234,6 @@ class BillingProfile(JasminModel):
         unlikely; the ``unique=True`` column is the hard backstop.
         """
         return f"MND-{uuid.uuid4().hex[:18].upper()}"
-
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        # Assign the Mandatsreferenz the first time this becomes a SEPA mandate
-        # with bank details. Generated once and kept stable (never regenerated),
-        # because ``is_sepa_ready`` + the pain.008 export both require it and a
-        # changing reference would break an in-flight mandate at the bank.
-        if (
-            not self.sepa_mandate_reference
-            and self.payment_method == PaymentMethodOptions.SEPA_DIRECT_DEBIT
-            and self.iban
-        ):
-            self.sepa_mandate_reference = self._generate_sepa_mandate_reference()
-        self.full_clean()
-        super().save(*args, **kwargs)
 
     @property
     def is_sepa_ready(self) -> bool:
@@ -332,25 +332,6 @@ class ChargeSchedule(JasminModel):
             f"{self.expected_amount}{self.currency} [{self.status}]>"
         )
 
-    def clean(self) -> None:
-        super().clean()
-        if (
-            self.due_date is not None
-            and self.period_start is not None
-            and self.due_date < self.period_start
-        ):
-            raise ValidationError(
-                {"due_date": "Due date cannot be before the period start."}
-            )
-        if (
-            self.due_date is not None
-            and self.period_end is not None
-            and self.due_date > self.period_end
-        ):
-            raise ValidationError(
-                {"due_date": "Due date cannot be after the period end."}
-            )
-
     def save(
         self, *args: Any, allow_immutable_change: bool = False, **kwargs: Any
     ) -> None:
@@ -389,6 +370,25 @@ class ChargeSchedule(JasminModel):
                         f"(current status={existing.status})."
                     )
         super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        super().clean()
+        if (
+            self.due_date is not None
+            and self.period_start is not None
+            and self.due_date < self.period_start
+        ):
+            raise ValidationError(
+                {"due_date": "Due date cannot be before the period start."}
+            )
+        if (
+            self.due_date is not None
+            and self.period_end is not None
+            and self.due_date > self.period_end
+        ):
+            raise ValidationError(
+                {"due_date": "Due date cannot be after the period end."}
+            )
 
     @property
     def is_open(self) -> bool:

@@ -14,15 +14,15 @@ import type { SharesDeliveryDayDefaultCleaningDay } from './sharesDeliveryDayDef
 import type { SharesDeliveryDayDefaultGetCurrentStockDay } from './sharesDeliveryDayDefaultGetCurrentStockDay';
 
 export interface SharesDeliveryDay {
-  readonly id?: string;
+  readonly id: string;
   /** Check if this instance can be deleted.
 
 On the LIST path, read the parent ListSerializer's bulk-precomputed sets
 (one batch + one Subscription query for the whole page). The detail /
 create / update path (no list parent, or a bulk-batch failure) falls
 through to the per-instance check — identical result. */
-  readonly can_be_deleted?: boolean;
-  readonly delivery_stations?: readonly _DeliveryStationEntry[];
+  readonly can_be_deleted: boolean;
+  readonly delivery_stations: readonly _DeliveryStationEntry[];
   /** @nullable */
   readonly used_tours?: readonly number[] | null;
   valid_from: string;

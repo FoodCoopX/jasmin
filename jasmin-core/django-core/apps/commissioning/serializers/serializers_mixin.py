@@ -766,7 +766,9 @@ class DynamicContactFieldsMixin:
         # not become a required write field that rejects the flattened-field
         # payload with "contact: this field is required".
         if "contact" in self.fields:
-            self.fields["contact"] = serializers.PrimaryKeyRelatedField(read_only=True)
+            self.fields["contact"] = serializers.PrimaryKeyRelatedField(
+                read_only=True, allow_null=True
+            )
 
     def _create_contact_field(self, field, is_required: bool):
         """Create appropriate serializer field for a Django model field."""
@@ -913,7 +915,7 @@ class DynamicDeliveryDayFieldsMixin:
 
         from ..models import SharesDeliveryDay
 
-        now = timezone.now().date()
+        now = timezone.localdate()
 
         try:
             current_shares_delivery_days = list(

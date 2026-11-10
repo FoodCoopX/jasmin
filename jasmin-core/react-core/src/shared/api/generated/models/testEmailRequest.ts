@@ -7,6 +7,9 @@
  */
 
 export interface TestEmailRequest {
-  /** Address to send the test email to. Must be the requesting user's own email or the tenant contact email. */
+  /**
+   * Address to send the test email to. Must be the requesting user's own email or the tenant contact email.
+   * @minLength 1
+   */
   to_email: string;
 }

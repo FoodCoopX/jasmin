@@ -23,19 +23,14 @@ interface UseForecastColumnsArgs {
   noteColumn: EditableColumnConfig<TableRecord>;
   fruit_and_veg_shares_are_separate: boolean;
   shareTypeVariationsCount: number;
-  // The per-variation / offer-group child columns are built in the page from
-  // dynamic share-type-variation / offer-group lists. They're plain column
-  // literals spread into `children` (which get cast on return), so they're
-  // typed loosely here to avoid forcing the page's `.map()` memos to carry
-  // full `EditableColumnConfig` literal types.
-  shareTypeVariationColumns: Record<string, unknown>[];
+  shareTypeVariationColumns: EditableColumnConfig<TableRecord>[];
   shareTypeVariationsFruitsCount: number;
-  shareTypeVariationFruitsColumns: Record<string, unknown>[];
+  shareTypeVariationFruitsColumns: EditableColumnConfig<TableRecord>[];
   onForAllVegChange: (value: unknown) => Record<string, unknown>;
   onForAllFruitChange: (value: unknown) => Record<string, unknown>;
   sells_to_resellers: boolean;
   offerGroupsCount: number;
-  offerGroupColumns: Record<string, unknown>[];
+  offerGroupColumns: EditableColumnConfig<TableRecord>[];
   isResellerDisabled: (record: Record<string, unknown>) => boolean;
   has_markets: boolean;
   countPlots: number;
@@ -75,9 +70,9 @@ export function useForecastColumns({
         disabled: editableOnlyOnCreate,
       },
       ...amountUnitSizeColumns,
-      ...(fruit_and_veg_shares_are_separate
+      ...((fruit_and_veg_shares_are_separate
         ? [
-            ...(shareTypeVariationsCount > 0
+            ...((shareTypeVariationsCount > 0
               ? [
                   {
                     title: (
@@ -85,6 +80,7 @@ export function useForecastColumns({
                         {t("commissioning.for_veg_shares")}
                       </span>
                     ),
+                    dataIndex: "for_veg_shares",
                     key: "for_veg_shares",
                     className: "column-group-start",
                     children: [
@@ -110,8 +106,8 @@ export function useForecastColumns({
                     required: false,
                     className: "column-group-start",
                   },
-                ]),
-            ...(shareTypeVariationsFruitsCount > 0
+                ]) satisfies EditableColumnConfig<TableRecord>[]),
+            ...((shareTypeVariationsFruitsCount > 0
               ? [
                   {
                     title: (
@@ -119,6 +115,7 @@ export function useForecastColumns({
                         {t("commissioning.for_fruit_shares")}
                       </span>
                     ),
+                    dataIndex: "for_fruit_shares",
                     key: "for_fruit_shares",
                     className: "column-group-start",
                     children: [
@@ -144,13 +141,14 @@ export function useForecastColumns({
                     required: false,
                     className: "column-group-start",
                   },
-                ]),
+                ]) satisfies EditableColumnConfig<TableRecord>[]),
           ]
         : [
             {
               title: (
                 <span className="text-xs">{t("commissioning.for_shares")}</span>
               ),
+              dataIndex: "for_shares",
               key: "for_shares",
               className: "column-group-start",
               children: [
@@ -166,10 +164,10 @@ export function useForecastColumns({
                 ...shareTypeVariationColumns,
               ],
             },
-          ]),
-      ...(sells_to_resellers
+          ]) satisfies EditableColumnConfig<TableRecord>[]),
+      ...((sells_to_resellers
         ? [
-            ...(offerGroupsCount > 1
+            ...((offerGroupsCount > 1
               ? [
                   {
                     title: (
@@ -177,6 +175,7 @@ export function useForecastColumns({
                         {t("commissioning.for_resellers")}
                       </span>
                     ),
+                    dataIndex: "for_resellers",
                     key: "for_resellers",
                     className: "column-group-start",
                     children: [
@@ -203,10 +202,10 @@ export function useForecastColumns({
                     className: "column-group-start",
                     disabled: isResellerDisabled,
                   },
-                ]),
+                ]) satisfies EditableColumnConfig<TableRecord>[]),
           ]
-        : []),
-      ...(has_markets
+        : []) satisfies EditableColumnConfig<TableRecord>[]),
+      ...((has_markets
         ? [
             {
               title: <>{t("commissioning.for_all_markets")}</>,
@@ -217,8 +216,8 @@ export function useForecastColumns({
               className: "column-group-start",
             },
           ]
-        : []),
-      ...(countPlots > 0
+        : []) satisfies EditableColumnConfig<TableRecord>[]),
+      ...((countPlots > 0
         ? [
             {
               title: <>{t("commissioning.plot")}</>,
@@ -248,7 +247,7 @@ export function useForecastColumns({
               sortable: true,
             },
           ]
-        : []),
+        : []) satisfies EditableColumnConfig<TableRecord>[]),
 
       {
         ...noteColumn,
@@ -256,7 +255,7 @@ export function useForecastColumns({
         inputType: "optional",
         ...(countPlots === 0 && { className: "column-group-start" }),
       },
-    ] as EditableColumnConfig<TableRecord>[];
+    ] satisfies EditableColumnConfig<TableRecord>[];
   }, [
     columnsReady,
     shareArticleColumn,

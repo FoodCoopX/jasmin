@@ -11,27 +11,54 @@ import {
   type ShareTypeVariation,
   type UnitEnum,
 } from "@shared/api/generated/models";
+import {
+  makeReseller,
+  makeShareArticle,
+  makeShareType,
+  makeShareTypeVariation,
+} from "@/test/modelFixtures";
 
 export const HARVEST = ShareTypeEnum.HARVEST_SHARE;
 export const HONEY = ShareTypeEnum.HONEY_SHARE;
 
-const shareType = (option: ShareTypeEnum, fields: Partial<ShareType>): ShareType => ({
+const shareType = (option: ShareTypeEnum, fields: Partial<ShareType>): ShareType => makeShareType({
   id: `st-${option}`, share_option: option, valid_from: "2026-01-05", valid_until: null, ...fields,
 });
 export const HARVEST_SHARE_TYPE = shareType(HARVEST, { needs_complex_planning: true });
 export const HONEY_SHARE_TYPE = shareType(HONEY, { needs_complex_planning: false, is_additional_share_type: true });
 
 // The two physical share sizes, their average weights and active subscribers.
+// They run from the first week of ISO year 2026 on, so all the planned year.
 export const VARIATIONS: ShareTypeVariation[] = [
-  { id: "var-small", size: "S", average_weight: "2.00", share_type: "st-HARVEST_SHARE", valid_from: "2026-01-05" },
-  { id: "var-large", size: "L", average_weight: "4.00", share_type: "st-HARVEST_SHARE", valid_from: "2026-01-05" },
+  makeShareTypeVariation({
+    id: "var-small", size: "S", average_weight: "2.00", share_type: "st-HARVEST_SHARE", valid_from: "2025-12-29",
+  }),
+  makeShareTypeVariation({
+    id: "var-large", size: "L", average_weight: "4.00", share_type: "st-HARVEST_SHARE", valid_from: "2025-12-29",
+  }),
 ];
 export const SUBSCRIBERS: Record<string, number> = { "var-small": 20, "var-large": 10 };
 
-export const article = (id: string, name: string, unit: UnitEnum, extra: Partial<ShareArticle> = {}): ShareArticle => ({
-  id, name, default_movement_unit: unit, is_active: true, is_purchased: false,
-  share_option_list: [HARVEST], ...extra,
-});
+export const article = (id: string, name: string, unit: UnitEnum, extra: Partial<ShareArticle> = {}): ShareArticle =>
+  makeShareArticle({
+    id, name, default_movement_unit: unit, is_active: true, is_purchased: false, harvest_share: true, ...extra,
+  });
+
+/** The flag an article carries for each share option it is offered for. */
+const SHARE_OPTION_FLAGS = {
+  HARVEST_SHARE: "harvest_share",
+  HARVEST_SHARE_FRUIT: "harvest_share_fruit",
+  CHICKEN_SHARE: "chicken_share",
+  HONEY_SHARE: "honey_share",
+  OIL_SHARE: "oil_share",
+  GRAIN_SHARE: "grain_share",
+  BREAD_SHARE: "bread_share",
+} as const satisfies Record<ShareTypeEnum, keyof ShareArticle>;
+
+/** Whether the article list returns an article for a share option filter. */
+export const offeredFor = (item: ShareArticle, option?: string) =>
+  !option || item[SHARE_OPTION_FLAGS[option as ShareTypeEnum]] === true;
+
 export const ARTICLES: ShareArticle[] = [
   article("art-carrot", "Carrots", "KG"),
   article("art-apple", "Apples", "KG", { is_purchased: true }),
@@ -39,10 +66,10 @@ export const ARTICLES: ShareArticle[] = [
   article("art-beet", "Beetroot", "KG"),
   article("art-pear", "Pears", "KG", { is_purchased: true }),
   article("art-lettuce", "Lettuce", "PCS"),
-  article("art-honey", "Forest honey", "PCS", { is_purchased: true, share_option_list: [HONEY] }),
+  article("art-honey", "Forest honey", "PCS", { is_purchased: true, harvest_share: false, honey_share: true }),
 ];
 export const SELLERS: Reseller[] = [
-  { id: "seller-orchard", company_name: "Orchard Co", address: "Hill 1", zip_code: "3400", city: "Krems" },
+  makeReseller({ id: "seller-orchard", company_name: "Orchard Co", address: "Hill 1", zip_code: "3400", city: "Krems" }),
 ];
 
 export type PlanRow = DefaultShareContentResponse & Record<`amount_${string}`, string>;
@@ -100,3 +127,27 @@ export const CARROTS_2025 = planRow({
   year: 2025, share_article: "art-carrot", range_1: 18, range_2: 30,
   "amount_var-small": "2.000", "amount_var-large": "4.000",
 });
+
+/** A slot as the backend saves it: an update keeps the year, article, unit and
+ *  size its id names. */
+export function savedSlot(id: string | null, payload: Record<string, unknown>): PlanRow {
+  const [year, shareArticle, unit, size] = id
+    ? id.split("_")
+    : [payload.year, payload.share_article, payload.unit, payload.size].map(String);
+  const amounts = Object.fromEntries(
+    Object.entries(payload)
+      .filter(([key]) => key.startsWith("amount_"))
+      .map(([key, value]) => [key, Number(value).toFixed(3)]),
+  );
+  return planRow({
+    ...amounts,
+    year: Number(year), share_article: shareArticle, unit, size,
+    share_option: String(payload.share_option),
+    range_1: Number(payload.range_1), range_2: Number(payload.range_2),
+    only_odd_weeks: Boolean(payload.only_odd_weeks),
+    only_even_weeks: Boolean(payload.only_even_weeks),
+    only_every_three_weeks: Boolean(payload.only_every_three_weeks),
+    note: (payload.note as string | null) || null,
+    seller: (payload.seller as string | null) ?? null,
+  });
+}

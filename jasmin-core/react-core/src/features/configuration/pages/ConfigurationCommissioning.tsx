@@ -3,9 +3,15 @@ import { useTranslation } from "react-i18next";
 
 import { SettingsCategory } from "@features/configuration/components/SettingsRenderer";
 import SettingsPage from "@features/configuration/components/SettingsPage";
+import { useCapability } from "@hooks/index";
+import { usePackingModeOptions } from "@features/configuration/hooks/usePackingModeOptions";
 
 export default function ConfigurationCommissioning() {
   const { t } = useTranslation();
+  // Members see their boxes on jasmin's own member pages, which a host
+  // without jasmin's logins doesn't have.
+  const offersUserAccounts = useCapability("user_accounts");
+  const packingModeOptions = usePackingModeOptions();
 
   const settingsConfig = useMemo<SettingsCategory[]>(
     () => [
@@ -19,20 +25,7 @@ export default function ConfigurationCommissioning() {
 
             type: "select",
             defaultValue: "BOXES",
-            options: [
-              {
-                value: "BOXES",
-                label: t("settings.commissioning.packing_mode_boxes"),
-              },
-              {
-                value: "BULK",
-                label: t("settings.commissioning.packing_mode_bulk"),
-              },
-              {
-                value: "MIXED",
-                label: t("settings.commissioning.packing_mode_mixed"),
-              },
-            ],
+            options: packingModeOptions,
           },
 
           {
@@ -70,6 +63,20 @@ export default function ConfigurationCommissioning() {
             type: "checkbox",
             defaultValue: true,
           },
+          {
+            key: "show_washing",
+            label: t("settings.commissioning.show_washing"),
+            description: t("settings.commissioning.show_washing_description"),
+            type: "checkbox",
+            defaultValue: true,
+          },
+          {
+            key: "show_cleaning",
+            label: t("settings.commissioning.show_cleaning"),
+            description: t("settings.commissioning.show_cleaning_description"),
+            type: "checkbox",
+            defaultValue: true,
+          },
 
           {
             key: "distribute_forecast_by_weight",
@@ -86,12 +93,16 @@ export default function ConfigurationCommissioning() {
             type: "checkbox",
             defaultValue: true,
           },
-          {
-            key: "show_seller_name_of_share_article_in_share_for_member_on_page",
-            label: t("settings.commissioning.show_seller_name_in_share"),
-            type: "checkbox",
-            defaultValue: true,
-          },
+          ...(offersUserAccounts
+            ? [
+                {
+                  key: "show_seller_name_of_share_article_in_share_for_member_on_page",
+                  label: t("settings.commissioning.show_seller_name_in_share"),
+                  type: "checkbox" as const,
+                  defaultValue: true,
+                },
+              ]
+            : []),
           {
             // Wired into ``PlanningShareContentBase.tsx`` as the initial
             // value of ``planningMode`` (lazy useState seed). The
@@ -189,7 +200,7 @@ export default function ConfigurationCommissioning() {
         ],
       },
     ],
-    [t],
+    [t, offersUserAccounts, packingModeOptions],
   );
 
   return (

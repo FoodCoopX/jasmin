@@ -7,8 +7,8 @@
  */
 
 export interface SolverSettings {
-  readonly id?: string;
-  readonly is_active?: boolean;
+  readonly id: string;
+  readonly is_active: boolean;
   /**
    * Wall-clock budget for ONE solve. A hard plan legitimately needs 10+ minutes, so this goes up to 2 hours; the default stays low for quick feedback. A run computes several plans, so the total is this times the number of solutions.
    * @minimum 1
@@ -69,5 +69,5 @@ export interface SolverSettings {
    * @maximum 1000
    */
   weight_fleece_count?: number;
-  readonly updated_at?: string;
+  readonly updated_at: string;
 }

@@ -40,7 +40,7 @@ class CombinedOrderOverviewView(APIViewRolePermissionsMixin, APIView):
         - Related delivery note (if exists)
         - Related invoice (if exists)
         - Payment status
-        
+
         Results can be filtered by year, week, day_number, and reseller.
         """,
         parameters=[

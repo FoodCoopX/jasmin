@@ -11,11 +11,11 @@ import type { DefaultPlanningGranularityEnum } from './defaultPlanningGranularit
 import type { BillingStrategyEnum } from './billingStrategyEnum';
 
 export interface TenantSettings {
-  readonly id?: string;
+  readonly id: string;
   valid_from: string;
   /** @nullable */
   valid_until?: string | null;
-  readonly created_at?: string;
+  readonly created_at: string;
   has_coop_shares?: boolean;
   /**
    * @minimum -2147483648
@@ -100,6 +100,8 @@ export interface TenantSettings {
   number_packing_stations?: number;
   allows_solidarity_pricing?: boolean;
   show_size_column?: boolean;
+  show_washing?: boolean;
+  show_cleaning?: boolean;
   distribute_forecast_by_weight?: boolean;
   show_summary_in_harvest_share_planning_on_top?: boolean;
   show_seller_name_of_share_article_in_share_for_member_on_page?: boolean;

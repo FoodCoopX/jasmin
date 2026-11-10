@@ -19,3 +19,29 @@
   gap: 8px;
   cursor: pointer;
 }
+
+/* The "share content" / "order content" titles under each column group. */
+.harvesting-list-content-title {
+  font-size: 0.7em;
+}
+
+/* "Needed harvesting crates" under the list: a highlighted card of crate
+   rows on a phone, a narrow table on a desktop. ``.ant-card`` outranks AntD's
+   own card background and margin. */
+.harvesting-crate-summary-card.ant-card {
+  background-color: var(--color-highlight);
+  margin-top: 1em;
+  margin-bottom: 1em;
+  font-size: 0.8em;
+}
+
+.harvesting-crate-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--color-highlight-border);
+}
+
+.harvesting-crate-summary-table {
+  width: 22em;
+}

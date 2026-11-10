@@ -27,6 +27,7 @@ import type {
   StorageLoggingEntry,
   TheoreticalHarvest,
 } from "@shared/api/generated/models";
+import { makeShareArticle, makeStorage } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 import { makeUseTenantMock, type UseTenantMockShape } from "@/test/tenantMock";
 
@@ -95,11 +96,11 @@ import LoggingStorage from "../LoggingStorage";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-const CELLAR: Storage = { id: "storage-cellar", name: "Cellar", is_active: true };
-const COLD_ROOM: Storage = { id: "storage-cold-room", name: "Cold room", is_active: true };
+const CELLAR: Storage = makeStorage({ id: "storage-cellar", name: "Cellar", is_active: true });
+const COLD_ROOM: Storage = makeStorage({ id: "storage-cold-room", name: "Cold room", is_active: true });
 
-const CARROTS: ShareArticle = { id: "sa-carrots", name: "Carrots", default_movement_unit: "KG" };
-const LEEK: ShareArticle = { id: "sa-leek", name: "Leek", default_movement_unit: "PCS" };
+const CARROTS: ShareArticle = makeShareArticle({ id: "sa-carrots", name: "Carrots", default_movement_unit: "KG" });
+const LEEK: ShareArticle = makeShareArticle({ id: "sa-leek", name: "Leek", default_movement_unit: "PCS" });
 
 /** The ISO year, week and backend day number (0 = Monday) of a date. */
 function isoDay(isoDate: string) {
@@ -159,10 +160,13 @@ function theoretical(
   isoDate: string,
   article: ShareArticle,
   amount: string | null,
-  links: Pick<TheoreticalHarvest, "share_content" | "order_content"> = {},
+  links: Partial<Pick<TheoreticalHarvest, "share_content" | "order_content">> = {},
 ): TheoreticalHarvest {
   return {
     id,
+    created_at: `${isoDate}T08:00:00Z`,
+    created_by: null,
+    forecast: null,
     ...isoDay(isoDate),
     amount,
     unit: article.default_movement_unit,
@@ -825,6 +829,17 @@ describe("LoggingStorage internal workflow", () => {
       "aria-pressed",
       "true",
     );
+  });
+
+  it("offers no washing or cleaning amounts on a farm that hides them", async () => {
+    setTenant({ show_washing: false, show_cleaning: false });
+    renderPage();
+    await harvestsShown();
+
+    const shown = (label: string) => screen.queryByRole("button", { name: label });
+    expect(shown("commissioning.theoretical_wash_amounts")).not.toBeInTheDocument();
+    expect(shown("commissioning.theoretical_clean_amounts")).not.toBeInTheDocument();
+    expect(shown("commissioning.theoretical_purchase_amounts")).toBeInTheDocument();
   });
 
   it("opens on the year of the day the page is opened, not the day the app was loaded", async () => {

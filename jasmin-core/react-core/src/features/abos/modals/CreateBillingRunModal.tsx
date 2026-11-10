@@ -31,7 +31,7 @@ export function CreateBillingRunModal({
   const [submitting, setSubmitting] = useState(false);
   const { getSetting } = useTenant();
   const collectionDay = getSetting("sepa_collection_day_of_month", 5) || 5;
-  const { dateFormat } = useDateFormat();
+  const { dateFormat, monthFormat } = useDateFormat();
 
   const handleCreate = async () => {
     let values: FormValues;
@@ -101,7 +101,7 @@ export function CreateBillingRunModal({
           }
           rules={[{ required: true }]}
         >
-          <DatePicker picker="month" format="MMMM YYYY" className="w-full" />
+          <DatePicker picker="month" format={monthFormat} className="w-full" />
         </Form.Item>
         <Form.Item
           name="collection_date"

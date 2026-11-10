@@ -297,13 +297,7 @@ export default function CoopSharesModal({
           const valueOne = record.value_one_coop_share ?? value_one_coop_share;
           if (!record.amount_of_coop_shares || !valueOne) return "";
           return (
-            <div
-              style={{
-                fontSize: "0.85em",
-                color: "var(--color-text-muted)",
-                textAlign: "center",
-              }}
-            >
+            <div className="text-secondary text-center">
               {format(Number(record.amount_of_coop_shares) * valueOne, 0)}{" "}
               {currencySymbol}
             </div>
@@ -549,7 +543,7 @@ export default function CoopSharesModal({
         // The member has left — the min/max equity window no longer applies;
         // show the exit date instead (their shares are winding down).
         <Alert
-          style={{ marginBottom: 12 }}
+          className="mb-12"
           type="warning"
           showIcon
           message={t("members.member_cancelled_title", {
@@ -560,7 +554,7 @@ export default function CoopSharesModal({
         boundsApply &&
         (minShares != null || maxShares != null) && (
           <Alert
-            style={{ marginBottom: 12 }}
+            className="mb-12"
             type={rangeAlertType}
             showIcon
             message={
@@ -579,7 +573,7 @@ export default function CoopSharesModal({
 
       {pendingConfirmationCount > 0 && (
         <Alert
-          style={{ marginBottom: 12 }}
+          className="mb-12"
           type="warning"
           showIcon
           message={t("members.coop_shares_awaiting_confirmation", {

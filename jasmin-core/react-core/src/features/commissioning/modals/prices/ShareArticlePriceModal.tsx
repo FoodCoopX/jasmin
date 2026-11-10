@@ -16,7 +16,7 @@ import {
   useTimeBoundColumns,
 } from "@hooks/index";
 import { useOfferTiers } from "@features/commissioning/hooks";
-import type { EditableColumnConfig } from "@shared/tables/BasicEditableTable/types";
+import type { EditableColumnConfig, TableRecord } from "@shared/tables/BasicEditableTable/types";
 import PriceEditorModal, { type PriceModalApi } from "./PriceEditorModal";
 import { buildCurrencyPriceColumn, buildTaxRateColumn } from "./priceColumns";
 
@@ -66,7 +66,7 @@ export default function ShareArticlePriceModal({
   // [1, 3, 5] — that bumped non-tier tenants into multi-tier pricing.
   const offerTiers = useOfferTiers();
 
-  const columns = useMemo<EditableColumnConfig[]>(() => {
+  const columns = useMemo<EditableColumnConfig<TableRecord>[]>(() => {
     const tiers: Array<{ tier: number; idx: 1 | 2 | 3 }> = offerTiers.map(
       (tier, i) => ({ tier, idx: (i + 1) as 1 | 2 | 3 }),
     );
@@ -81,7 +81,7 @@ export default function ShareArticlePriceModal({
       }),
     );
 
-    const resellerChildren: EditableColumnConfig[] = [];
+    const resellerChildren: EditableColumnConfig<TableRecord>[] = [];
     for (const unit of UNITS) {
       tiers.forEach(({ tier, idx }, tierIndex) => {
         resellerChildren.push(
@@ -124,7 +124,7 @@ export default function ShareArticlePriceModal({
         className: "column-group-start",
         children: resellerChildren,
       },
-    ] as EditableColumnConfig[];
+    ];
   }, [
     t,
     currencySymbol,

@@ -17,9 +17,12 @@ typos, middleware, decorators, serializer drift).
 
 from __future__ import annotations
 
+import datetime
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
+import time_machine
 from django.conf import settings
 from django.urls import reverse
 from django_otp.oath import totp
@@ -181,6 +184,15 @@ class TestVerify:
         with pytest.raises(TwoFactorInvalidCode):
             two_factor_service.verify_code(user=user, code="000000")
 
+    def test_a_totp_code_is_accepted_once(self, tenant):
+        user = JasminUserFactory()
+        device = _enrol(user)
+        code = _current_totp(device)
+
+        assert two_factor_service.verify_code(user=user, code=code)
+        with pytest.raises(TwoFactorInvalidCode):
+            two_factor_service.verify_code(user=user, code=code)
+
     def test_verify_without_device_raises_not_enrolled(self, tenant):
         user = JasminUserFactory()
         with pytest.raises(TwoFactorNotEnrolled):
@@ -272,6 +284,64 @@ class TestChallengeToken:
             two_factor_service.consume_challenge_token(
                 challenge="not-a-jwt", tenant_schema=tenant.schema_name
             )
+
+    def test_a_token_expires_after_its_lifetime(self, tenant, settings):
+        settings.TWO_FACTOR_CHALLENGE_LIFETIME = timedelta(minutes=5)
+        user = JasminUserFactory()
+        start = datetime.datetime(2026, 9, 7, 12, 0, tzinfo=datetime.UTC)
+        with time_machine.travel(start, tick=False) as traveller:
+            token = two_factor_service.issue_challenge_token(
+                user=user, tenant_schema=tenant.schema_name
+            )
+
+            traveller.move_to(start + timedelta(minutes=4, seconds=59))
+            two_factor_service.consume_challenge_token(
+                challenge=token, tenant_schema=tenant.schema_name
+            )
+            traveller.move_to(start + timedelta(minutes=5, seconds=1))
+            with pytest.raises(TwoFactorChallengeInvalid):
+                two_factor_service.consume_challenge_token(
+                    challenge=token, tenant_schema=tenant.schema_name
+                )
+
+    def test_a_user_deactivated_during_the_challenge_is_rejected(self, tenant):
+        user = JasminUserFactory()
+        token = two_factor_service.issue_challenge_token(
+            user=user, tenant_schema=tenant.schema_name
+        )
+        user.account_status = "inactive"
+        user.save()
+
+        with pytest.raises(TwoFactorChallengeInvalid):
+            two_factor_service.consume_challenge_token(
+                challenge=token, tenant_schema=tenant.schema_name
+            )
+
+
+class TestTokenLifetimes:
+    @pytest.mark.parametrize(
+        ("issue", "token_class", "setting"),
+        [
+            (
+                two_factor_service.issue_challenge_token,
+                two_factor_service._ChallengeToken,
+                "TWO_FACTOR_CHALLENGE_LIFETIME",
+            ),
+            (
+                two_factor_service.issue_enrolment_token,
+                two_factor_service._EnrolmentToken,
+                "TWO_FACTOR_ENROLMENT_LIFETIME",
+            ),
+        ],
+    )
+    def test_a_token_lives_as_long_as_its_setting_says(
+        self, tenant, settings, issue, token_class, setting
+    ):
+        setattr(settings, setting, timedelta(minutes=7))
+        encoded = issue(user=JasminUserFactory(), tenant_schema=tenant.schema_name)
+
+        token = token_class(encoded)
+        assert token["exp"] - token["iat"] == 7 * 60
 
 
 # --------------------------------------------------------------------------- #

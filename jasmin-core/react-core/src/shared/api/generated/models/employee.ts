@@ -16,7 +16,7 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface Employee {
-  readonly id?: string;
+  readonly id: string;
   is_active?: boolean;
   /** @maxLength 50 */
   short_name_for_weekly_plan: string;
@@ -37,5 +37,5 @@ export interface Employee {
   employee_number?: string | null;
   /** @nullable */
   user?: string | null;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }

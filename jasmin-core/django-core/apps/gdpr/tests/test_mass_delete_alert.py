@@ -74,7 +74,7 @@ class TestMassDeleteAlerts:
     def test_no_alert_below_threshold(self, tenant):
         actor = JasminUserFactory()
         # One fewer than threshold — no burst.
-        for i in range(gdpr_tasks.MASS_DELETE_THRESHOLD - 1):
+        for i in range(gdpr_tasks.mass_delete_threshold() - 1):
             _log_delete(actor=actor, model=Member, object_pk=f"m{i}")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -83,9 +83,21 @@ class TestMassDeleteAlerts:
         mock_mail.assert_not_called()
         assert not gdpr_tasks._last_mass_delete_alerted
 
+    def test_a_changed_setting_moves_the_threshold(self, tenant, settings):
+        settings.MASS_DELETE_THRESHOLD = 2
+        actor = JasminUserFactory()
+        for i in range(2):
+            _log_delete(actor=actor, model=Member, object_pk=f"m{i}")
+
+        with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
+            gdpr_tasks.alert_on_mass_deletes.call_local()
+
+        mock_mail.assert_called_once()
+        assert "Threshold: 2" in mock_mail.call_args.kwargs["message"]
+
     def test_alerts_at_threshold(self, tenant):
         actor = JasminUserFactory()
-        for i in range(gdpr_tasks.MASS_DELETE_THRESHOLD):
+        for i in range(gdpr_tasks.mass_delete_threshold()):
             _log_delete(actor=actor, model=Member, object_pk=f"m{i}")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -96,7 +108,7 @@ class TestMassDeleteAlerts:
         assert "mass-delete burst" in kwargs["subject"]
         assert str(actor.pk) in kwargs["message"]
         assert "commissioning.Member" in kwargs["message"]
-        assert str(gdpr_tasks.MASS_DELETE_THRESHOLD) in kwargs["message"]
+        assert str(gdpr_tasks.mass_delete_threshold()) in kwargs["message"]
         # Triage starts from a query on the tenant's audit log (no Django
         # admin is installed).
         assert (
@@ -114,7 +126,7 @@ class TestMassDeleteAlerts:
         """Two sensitive models, neither alone over threshold, but the
         SUM by the same actor crosses it."""
         actor = JasminUserFactory()
-        half = gdpr_tasks.MASS_DELETE_THRESHOLD // 2 + 1
+        half = gdpr_tasks.mass_delete_threshold() // 2 + 1
         for i in range(half):
             _log_delete(actor=actor, model=Member, object_pk=f"m{i}")
             _log_delete(actor=actor, model=BillingProfile, object_pk=f"b{i}")
@@ -136,7 +148,7 @@ class TestTriageQuery:
         bursts = [(('farm"x', "o'id"), Counter({"commissioning.Member": 30}), 30)]
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
-            gdpr_tasks._send_mass_delete_ops_alert(bursts)
+            gdpr_tasks._send_mass_delete_ops_alert(bursts, threshold=5)
 
         body = mock_mail.call_args.kwargs["message"]
         assert 'FROM "farm""x".auditlog_logentry ' in body
@@ -156,7 +168,7 @@ class TestNonSensitiveIgnored:
         assert f"{ct.app_label}.{ct.model}" not in {
             m.lower() for m in gdpr_tasks.SENSITIVE_DELETION_MODELS
         }
-        for i in range(gdpr_tasks.MASS_DELETE_THRESHOLD * 3):
+        for i in range(gdpr_tasks.mass_delete_threshold() * 3):
             LogEntry.objects.create(
                 content_type=ct,
                 object_pk=f"ct{i}",
@@ -178,7 +190,7 @@ class TestAnonymousActor:
         """System / migration deletes (``actor_id IS NULL``) must not
         trigger alerts — the retention sweep alone would produce
         constant false positives if they did."""
-        for i in range(gdpr_tasks.MASS_DELETE_THRESHOLD * 2):
+        for i in range(gdpr_tasks.mass_delete_threshold() * 2):
             _log_delete(actor=None, model=Member, object_pk=f"m{i}")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:
@@ -191,7 +203,7 @@ class TestAnonymousActor:
 class TestWindowAndCooldown:
     def test_deletes_outside_window_are_ignored(self, tenant):
         actor = JasminUserFactory()
-        for i in range(gdpr_tasks.MASS_DELETE_THRESHOLD):
+        for i in range(gdpr_tasks.mass_delete_threshold()):
             _log_delete(
                 actor=actor,
                 model=Member,
@@ -206,7 +218,7 @@ class TestWindowAndCooldown:
 
     def test_cooldown_suppresses_second_alert(self, tenant):
         actor = JasminUserFactory()
-        for i in range(gdpr_tasks.MASS_DELETE_THRESHOLD):
+        for i in range(gdpr_tasks.mass_delete_threshold()):
             _log_delete(actor=actor, model=Member, object_pk=f"m{i}")
 
         with patch.object(gdpr_tasks, "mail_admins") as mock_mail:

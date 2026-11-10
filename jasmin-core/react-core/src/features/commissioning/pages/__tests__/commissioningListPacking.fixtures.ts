@@ -9,6 +9,7 @@ import type {
   ShareTypeVariation,
   SharesDeliveryDay,
 } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay, makeShareType, makeShareTypeVariation } from "@/test/modelFixtures";
 
 export const VEGETABLES: ShareTypeEnum = "HARVEST_SHARE";
 export const FRUIT: ShareTypeEnum = "HARVEST_SHARE_FRUIT";
@@ -17,14 +18,14 @@ export const shareType = (
   id: string,
   name: string,
   shareOption: ShareTypeEnum | null,
-): ShareType => ({ id, name, share_option: shareOption, valid_from: "2026-01-05" });
+): ShareType => makeShareType({ id, name, share_option: shareOption, valid_from: "2026-01-05" });
 
 /** A share size of a share type, packed in bulk or in boxes. */
 export const variation = (
   shareTypeId: string,
   size: ShareTypeVariation["size"],
   packing: "bulk" | "boxes",
-): ShareTypeVariation => ({
+): ShareTypeVariation => makeShareTypeVariation({
   id: `var-${shareTypeId}-${size}`,
   share_type: shareTypeId,
   size,
@@ -36,7 +37,7 @@ export const VEGETABLE_SHARE = shareType("st-veg", "Vegetables", VEGETABLES);
 export const FRUIT_SHARE = shareType("st-fruit", "Fruit", FRUIT);
 
 // Backend day numbers: 0 = Monday … 6 = Sunday.
-export const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => ({
+export const deliveryDay = (id: string, dayNumber: number): SharesDeliveryDay => makeSharesDeliveryDay({
   id,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",

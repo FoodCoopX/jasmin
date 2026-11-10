@@ -27,7 +27,7 @@ module docstring of this file. The explicit list means adding
 a new column to the model never silently widens the public API.
  */
 export interface ConsentDocument {
-  readonly id?: string;
+  readonly id: string;
   kind: ConsentKindEnum;
   /**
    * Stable identifier. ISO date like '2026-05-20' or semver-style '3.1' both work; pick one convention per tenant.
@@ -40,11 +40,11 @@ export interface ConsentDocument {
   title?: string;
   valid_from: string;
   /** @nullable */
-  readonly valid_until?: string | null;
+  readonly valid_until: string | null;
   /** Verbatim text shown to the member. Markdown or HTML depending on tenant convention — store it as-shown. */
   body: string;
   /** Computed on save. Lets us detect post-hoc edits to ``body`` even though by policy they shouldn't happen. */
-  readonly body_sha256?: string;
-  readonly created_at?: string;
-  readonly can_be_deleted?: boolean;
+  readonly body_sha256: string;
+  readonly created_at: string;
+  readonly can_be_deleted: boolean;
 }

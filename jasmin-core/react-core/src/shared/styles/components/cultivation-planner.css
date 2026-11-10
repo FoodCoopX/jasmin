@@ -8,6 +8,15 @@
   margin: 1em 0;
 }
 
+.cultivation-planner__solution-select {
+  min-width: 18em;
+}
+
+.cultivation-planner__week-slider {
+  flex: 1 1 20em;
+  min-width: 14em;
+}
+
 .cultivation-planner__metrics {
   display: flex;
   flex-wrap: wrap;
@@ -238,6 +247,10 @@
 .cultivation-planner__hint {
   color: var(--color-text-muted);
   font-size: 0.9em;
+}
+
+.cultivation-planner__unplace-hint {
+  margin-top: 0.75em;
 }
 
 .cultivation-planner__legend {

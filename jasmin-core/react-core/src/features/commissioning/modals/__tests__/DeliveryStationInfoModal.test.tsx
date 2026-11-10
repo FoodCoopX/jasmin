@@ -23,6 +23,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCommissioningDeliveryStationsListQueryKey } from "@shared/api/generated/commissioning/commissioning";
 import type { DeliveryStation } from "@shared/api/generated/models";
 import i18n from "@shared/i18n";
+import { makeDeliveryStation } from "@/test/modelFixtures";
 import {
   flushMicrotasks,
   profileRenders,
@@ -94,7 +95,7 @@ const MEDIA = "https://media.example/pictures_delivery_station";
 
 // A station with everything filled in, as the server sends it: coordinates
 // with the ten decimals the backend keeps.
-const MILL: DeliveryStation = {
+const MILL: DeliveryStation = makeDeliveryStation({
   id: "station-mill",
   short_name: "Mill",
   info: "The crates are in the barn behind the mill.",
@@ -107,10 +108,10 @@ const MILL: DeliveryStation = {
   self_service: true,
   coords_lat: "48.2082000000",
   coords_lon: "16.3738000000",
-};
+});
 
 // A station the members have not been told anything about yet.
-const BAKERY: DeliveryStation = {
+const BAKERY: DeliveryStation = makeDeliveryStation({
   id: "station-bakery",
   short_name: "Bakery",
   info: null,
@@ -123,7 +124,7 @@ const BAKERY: DeliveryStation = {
   self_service: false,
   coords_lat: null,
   coords_lon: null,
-};
+});
 
 // What a save sends for each station when nothing is changed.
 const MILL_AS_SHOWN = {

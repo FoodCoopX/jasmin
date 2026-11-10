@@ -72,12 +72,12 @@ class DocumentationOverviewView(APIViewRolePermissionsMixin, APIView):
         summary="Documentation Aggregation Overview",
         description="""
         Aggregates documentation data (harvest, purchase, or waste) by share article.
-        
+
         Returns sum of amounts grouped by:
         - Share article name
         - Unit (kg, pieces, etc.)
         - Size specification
-        
+
         Can be filtered by year, week, and day_number.
 
         ``delivery_day`` is accepted as an alias for ``day_number``, carrying

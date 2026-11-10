@@ -7,7 +7,7 @@
  */
 
 export interface VegetableAggregation {
-  readonly id?: string;
+  readonly id: string;
   /** @maxLength 100 */
   name: string;
 }

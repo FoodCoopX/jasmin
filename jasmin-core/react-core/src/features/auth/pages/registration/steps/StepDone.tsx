@@ -19,10 +19,10 @@ export default function StepDone({ data }: StepProps) {
       subTitle={t("auth.registration.done.subtitle", { email: data.email })}
       extra={
         <>
-          <Paragraph type="secondary" style={{ textAlign: "left" }}>
+          <Paragraph type="secondary" className="text-left">
             {t("auth.registration.done.set_password")}
           </Paragraph>
-          <Paragraph type="secondary" style={{ textAlign: "left" }}>
+          <Paragraph type="secondary" className="text-left">
             {t("auth.registration.done.office_review")}
           </Paragraph>
           <Link to="/login">

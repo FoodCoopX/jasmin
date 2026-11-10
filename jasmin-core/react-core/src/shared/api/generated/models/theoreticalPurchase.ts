@@ -13,8 +13,8 @@ import type { VegetableSizeEnum } from './vegetableSizeEnum';
  * Mixin to automatically add related name fields.
  */
 export interface TheoreticalPurchase {
-  readonly id?: string;
-  readonly created_at?: string;
+  readonly id: string;
+  readonly created_at: string;
   /**
    * @minimum 0
    * @maximum 32767
@@ -46,14 +46,14 @@ export interface TheoreticalPurchase {
    */
   price_per_unit?: string | null;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   share_article: string;
   storage: string;
   /** @nullable */
-  readonly share_content?: string | null;
+  readonly share_content: string | null;
   /** @nullable */
-  readonly order_content?: string | null;
+  readonly order_content: string | null;
   /** @nullable */
   seller?: string | null;
-  readonly share_article_name?: string;
+  readonly share_article_name: string;
 }

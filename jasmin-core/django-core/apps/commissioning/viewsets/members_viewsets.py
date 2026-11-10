@@ -180,7 +180,7 @@ def _build_member_queryset(request: Request, *, filtered: bool) -> QuerySet[Memb
     if consent_withdrawn is not None:
         queryset = queryset.filter(consent_withdrawn_at__isnull=not consent_withdrawn)
 
-    today = timezone.now().date()
+    today = timezone.localdate()
     active_count_sq = (
         Subscription.objects.filter(
             active_on_date_q(today),

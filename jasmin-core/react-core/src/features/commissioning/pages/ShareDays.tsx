@@ -26,7 +26,11 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText, PastWarningMessage } from "@shared/ui";
-import { useInvalidateAfterTableMutation, useYearWeekState } from "@hooks/index";
+import {
+  useInvalidateAfterTableMutation,
+  useWashingCleaningVisibility,
+  useYearWeekState,
+} from "@hooks/index";
 
 /** A weekday cell: the day's short name, marked when it differs from the
  *  share type's usual day. */
@@ -150,82 +154,91 @@ export default function ShareDays() {
     [selectedYear, selectedWeek],
   );
 
+  // A farm that hides washing or cleaning sets no days for them.
+  const { showsWashing, showsCleaning } = useWashingCleaningVisibility();
   const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
-    () => [
-      {
-        title: t("configuration.delivery_day_shares"),
-        dataIndex: "delivery_day",
-        key: "delivery_day",
-        inputType: "select",
-        required: true,
-        align: "center",
-        width: "7em",
-        options: weekdayChoices,
-        render: (value: unknown) => weekdayCell(value, weekdayChoices),
-        disabled: true,
-      },
-      {
-        title: t("configuration.changed_delivery_day_shares"),
-        dataIndex: "changed_day_number",
-        key: "changed_day_number",
-        inputType: "select",
-        required: false,
-        align: "center",
-        width: "9em",
-        options: weekdayChoices,
-        render: (value: unknown) => weekdayCell(value, weekdayChoices, true),
-        disabled: false,
-      },
-      {
-        title: t("configuration.default_washing_day"),
-        dataIndex: "washing_day",
-        key: "washing_day",
-        inputType: "select",
-        required: false,
-        width: "7em",
-        align: "center",
-        options: weekdayChoices,
-        render: (value: unknown, record: TableRecord) =>
-          weekdayCell(value, weekdayChoices, !!record.washing_day_changed),
-      },
-      {
-        title: t("configuration.default_cleaning_day"),
-        dataIndex: "cleaning_day",
-        key: "cleaning_day",
-        inputType: "select",
-        required: false,
-        align: "center",
-        width: "7em",
-        options: weekdayChoices,
-        render: (value: unknown, record: TableRecord) =>
-          weekdayCell(value, weekdayChoices, !!record.cleaning_day_changed),
-      },
-      {
-        title: t("configuration.default_harvesting_day"),
-        dataIndex: "harvesting_day",
-        key: "harvesting_day",
-        inputType: "select",
-        required: false,
-        width: "7em",
-        align: "center",
-        options: weekdayChoices,
-        render: (value: unknown, record: TableRecord) =>
-          weekdayCell(value, weekdayChoices, !!record.harvesting_day_changed),
-      },
-      {
-        title: t("configuration.default_packing_day"),
-        dataIndex: "packing_day",
-        key: "packing_day",
-        inputType: "select",
-        required: false,
-        width: "7em",
-        align: "center",
-        options: weekdayChoices,
-        render: (value: unknown, record: TableRecord) =>
-          weekdayCell(value, weekdayChoices, !!record.packing_day_changed),
-      },
-    ],
-    [t, weekdayChoices],
+    () =>
+      (
+        [
+          {
+            title: t("configuration.delivery_day_shares"),
+            dataIndex: "delivery_day",
+            key: "delivery_day",
+            inputType: "select",
+            required: true,
+            align: "center",
+            width: "7em",
+            options: weekdayChoices,
+            render: (value: unknown) => weekdayCell(value, weekdayChoices),
+            disabled: true,
+          },
+          {
+            title: t("configuration.changed_delivery_day_shares"),
+            dataIndex: "changed_day_number",
+            key: "changed_day_number",
+            inputType: "select",
+            required: false,
+            align: "center",
+            width: "9em",
+            options: weekdayChoices,
+            render: (value: unknown) => weekdayCell(value, weekdayChoices, true),
+            disabled: false,
+          },
+          {
+            title: t("configuration.default_washing_day"),
+            dataIndex: "washing_day",
+            key: "washing_day",
+            inputType: "select",
+            required: false,
+            width: "7em",
+            align: "center",
+            options: weekdayChoices,
+            render: (value: unknown, record: TableRecord) =>
+              weekdayCell(value, weekdayChoices, !!record.washing_day_changed),
+          },
+          {
+            title: t("configuration.default_cleaning_day"),
+            dataIndex: "cleaning_day",
+            key: "cleaning_day",
+            inputType: "select",
+            required: false,
+            align: "center",
+            width: "7em",
+            options: weekdayChoices,
+            render: (value: unknown, record: TableRecord) =>
+              weekdayCell(value, weekdayChoices, !!record.cleaning_day_changed),
+          },
+          {
+            title: t("configuration.default_harvesting_day"),
+            dataIndex: "harvesting_day",
+            key: "harvesting_day",
+            inputType: "select",
+            required: false,
+            width: "7em",
+            align: "center",
+            options: weekdayChoices,
+            render: (value: unknown, record: TableRecord) =>
+              weekdayCell(value, weekdayChoices, !!record.harvesting_day_changed),
+          },
+          {
+            title: t("configuration.default_packing_day"),
+            dataIndex: "packing_day",
+            key: "packing_day",
+            inputType: "select",
+            required: false,
+            width: "7em",
+            align: "center",
+            options: weekdayChoices,
+            render: (value: unknown, record: TableRecord) =>
+              weekdayCell(value, weekdayChoices, !!record.packing_day_changed),
+          },
+        ] satisfies EditableColumnConfig<TableRecord>[]
+      ).filter(
+        (column) =>
+          (showsWashing || column.dataIndex !== "washing_day") &&
+          (showsCleaning || column.dataIndex !== "cleaning_day"),
+      ),
+    [t, weekdayChoices, showsWashing, showsCleaning],
   );
 
   // Share days are edit-only, and only while the week hasn't begun.

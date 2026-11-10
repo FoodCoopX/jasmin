@@ -29,9 +29,14 @@ from apps.shared.tenants.sweep import for_each_tenant
 log = logging.getLogger("django.security")
 ops_log = logging.getLogger("tasks")
 
-# Tunables — keep aligned with AXES_FAILURE_LIMIT in settings.py so the
-# alert threshold matches what actually triggers a lockout.
-BURST_THRESHOLD = getattr(settings, "AXES_FAILURE_LIMIT", 5)
+
+def burst_threshold() -> int:
+    """Failed logins from one IP, summed over every email and tenant, that
+    make a burst. Reuses ``AXES_FAILURE_LIMIT``, the limit axes counts per
+    (email, IP) pair, so a single number describes a burst."""
+    return getattr(settings, "AXES_FAILURE_LIMIT", 5)
+
+
 BURST_WINDOW = datetime.timedelta(hours=1)
 
 # Cooldown to avoid re-emailing about the same IP every 15 min while the
@@ -88,9 +93,10 @@ def alert_on_axes_bursts() -> None:
     for_each_tenant(aggregate, label="axes.burst", logger=log)
 
     now = timezone.now()
+    threshold = burst_threshold()
     fresh_bursts: list[tuple[str, int]] = []
     for ip, count in by_ip.items():
-        if count < BURST_THRESHOLD:
+        if count < threshold:
             continue
         last = _last_alerted.get(ip)
         if last is not None and now - last < _ALERT_COOLDOWN:
@@ -104,14 +110,14 @@ def alert_on_axes_bursts() -> None:
             ip,
             count,
             int(BURST_WINDOW.total_seconds() // 3600),
-            BURST_THRESHOLD,
+            threshold,
         )
 
     if fresh_bursts:
-        _send_ops_alert(fresh_bursts)
+        _send_ops_alert(fresh_bursts, threshold)
 
 
-def _send_ops_alert(bursts: list[tuple[str, int]]) -> None:
+def _send_ops_alert(bursts: list[tuple[str, int]], threshold: int) -> None:
     """Email ``settings.ADMINS`` about the bursts.
 
     Uses ``mail_admins`` (Django built-in) rather than the per-tenant
@@ -122,7 +128,7 @@ def _send_ops_alert(bursts: list[tuple[str, int]]) -> None:
     subject = f"[Jasmin] {len(bursts)} brute-force burst(s) detected"
     body_lines = [
         f"Window: last {int(BURST_WINDOW.total_seconds() // 3600)}h, "
-        f"threshold >={BURST_THRESHOLD} failed-login attempts per IP "
+        f"threshold >={threshold} failed-login attempts per IP "
         f"(aggregated across all tenants).",
         "",
         "IP                            count",

@@ -15,6 +15,7 @@ import { useCommissioningDeliveryStationToursOverviewRetrieve } from "@shared/ap
 import type {
   CommissioningDeliveryStationToursOverviewRetrieveParams,
   PackingBoxesMatrixColumn,
+  PackingModeEnum,
   ShareTypeVariationMetadata,
   StationOverview,
   TourOverview,
@@ -242,12 +243,16 @@ export default function DeliveryStationsOverview() {
     [responseData?.variations],
   );
 
-  // Bulk-packed variations belong on the bulk packing list, not the tour /
-  // delivery box lists — hide them here. The tour metadata carries no
-  // ``is_packed_bulk`` flag, so we look it up from the variations list
-  // (frontend-only filter) and drop those ids from the flat columns.
+  // Loose-packed variations belong on the bulk packing list, not the tour /
+  // delivery box lists — hide them here: the flagged ones in "mixed", none in
+  // "boxes" (whatever flag a size kept), and every box in "bulk", where no
+  // share is boxed. The tour metadata carries no ``is_packed_bulk`` flag, so
+  // in "mixed" it comes from the variations list.
+  const packingMode = getSetting("packing_mode", "BOXES") as PackingModeEnum;
   const { shareTypeVariations: bulkVariations, loading: bulkLoading } =
-    useShareTypeVariations({ is_packed_bulk: true });
+    useShareTypeVariations(
+      packingMode === "MIXED" ? { is_packed_bulk: true } : null,
+    );
   const bulkVariationIds = useMemo(
     () => new Set(bulkVariations.map((variation) => String(variation.id))),
     [bulkVariations],
@@ -262,13 +267,21 @@ export default function DeliveryStationsOverview() {
   // tables and the PDF both see only the tours left with something to deliver.
   const tours = useMemo<TourOverview[]>(
     () =>
-      toursWithoutBulk(
-        responseData?.tours ?? [],
-        bulkVariationIds,
-        variations,
-        usesExternalDemand,
-      ),
-    [responseData?.tours, bulkVariationIds, variations, usesExternalDemand],
+      packingMode === "BULK"
+        ? []
+        : toursWithoutBulk(
+            responseData?.tours ?? [],
+            bulkVariationIds,
+            variations,
+            usesExternalDemand,
+          ),
+    [
+      packingMode,
+      responseData?.tours,
+      bulkVariationIds,
+      variations,
+      usesExternalDemand,
+    ],
   );
 
   const showTours = dayInWeek && toursLoaded && !bulkLoading;

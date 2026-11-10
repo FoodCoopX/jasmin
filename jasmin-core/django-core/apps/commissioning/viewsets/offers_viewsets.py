@@ -29,7 +29,12 @@ from ..schemas import (
     get_reseller_parameter,
     get_year_parameter,
 )
-from ..scoping import is_privileged, own_reseller_id, scope_to_offer_group
+from ..scoping import (
+    is_privileged,
+    own_reseller_id,
+    scope_to_finalized,
+    scope_to_offer_group,
+)
 from ..serializers import OfferSerializer
 from ..services import OfferService
 from ..services.offer_deletion import annotate_offer_deletability, delete_offer
@@ -143,6 +148,12 @@ class OfferViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             queryset,
             self.request,
             path="offer_group_id",
+            privileged_roles=IsStaff.required_roles,
+        )
+        queryset = scope_to_finalized(
+            queryset,
+            self.request,
+            path="is_finalized",
             privileged_roles=IsStaff.required_roles,
         )
 

@@ -139,6 +139,14 @@ class ConsentDocument(JasminModel, TimeBoundMixin):
     def __str__(self) -> str:
         return f"{self.kind}/{self.version}/{self.locale}"
 
+    def save(self, *args, **kwargs):
+        # Recompute the hash on every save so the row is always
+        # self-consistent. Once a ConsentRecord points here you
+        # shouldn't be calling .save() at all, but if it happens the
+        # hash stays truthful and any tampering is detectable.
+        self.body_sha256 = _sha256_of(self.body)
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         """Skip the Monday-only check on ``valid_from``.
 
@@ -159,14 +167,6 @@ class ConsentDocument(JasminModel, TimeBoundMixin):
         super(TimeBoundMixin, self).clean()
         self.validate_date_range(self.valid_from, self.valid_until)
         self._validate_no_overlap()
-
-    def save(self, *args, **kwargs):
-        # Recompute the hash on every save so the row is always
-        # self-consistent. Once a ConsentRecord points here you
-        # shouldn't be calling .save() at all, but if it happens the
-        # hash stays truthful and any tampering is detectable.
-        self.body_sha256 = _sha256_of(self.body)
-        super().save(*args, **kwargs)
 
     @property
     def pdf_filename(self) -> str:

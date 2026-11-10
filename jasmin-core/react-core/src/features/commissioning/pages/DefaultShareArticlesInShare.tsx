@@ -11,7 +11,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   DefaultShareArticleInShare,
-  DefaultShareArticleInShareBulkEntry,
+  DefaultShareArticleInShareBulkEntryRequest,
   DefaultShareArticleInShareBulkUpsertRequest,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
@@ -96,9 +96,16 @@ export default function DefaultShareArticlesInShare() {
   } = useShareTypeVariationColumns({
     // Only PHYSICAL variations get content planning here — virtual variations
     // resolve into their physical components and carry no content of their own.
-    filters: { active_at_date: today, physical: true } as Record<string, unknown>,
+    // The upcoming ones too, so their amounts are in before their first week
+    // is forecast and planned.
+    filters: {
+      active_at_date: today,
+      include_future: true,
+      physical: true,
+    } as Record<string, unknown>,
     inputType: "positive_decimal2",
     width: "5em",
+    showValidity: true,
   });
 
   // --- Default-share rows -------------------------------------------------
@@ -185,7 +192,7 @@ export default function DefaultShareArticlesInShare() {
       update: async (id, data) => {
         // Only the cells that differ from what is stored: a cell the office
         // didn't touch must not overwrite, or clear, an amount on the server.
-        const entries: DefaultShareArticleInShareBulkEntry[] = [];
+        const entries: DefaultShareArticleInShareBulkEntryRequest[] = [];
         for (const v of variations) {
           if (!v.id || !(variationColumnKey(v.id) in data)) continue;
           const quantity = quantityOf(data[variationColumnKey(v.id)]);
@@ -248,7 +255,7 @@ export default function DefaultShareArticlesInShare() {
     };
 
     return [
-      shareArticleColumn as EditableColumnConfig<TableRecord>,
+      shareArticleColumn,
       unitColumn,
       ...variationColumns,
     ];

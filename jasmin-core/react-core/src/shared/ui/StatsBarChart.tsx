@@ -127,7 +127,7 @@ export default function StatsBarChart({
     data.some((d) => bars.some((s) => Number(d[s.id] ?? 0) !== 0));
 
   if (!hasData) {
-    return <EmptyHint style={{ padding: "2em 0" }}>{emptyText}</EmptyHint>;
+    return <EmptyHint chart>{emptyText}</EmptyHint>;
   }
 
   const axisTick = { fill: token.colorText, fontSize: 12 };

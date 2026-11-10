@@ -7,16 +7,16 @@
  */
 
 export interface ExternalShareDemand {
-  readonly id?: string;
-  readonly batch?: string;
-  readonly year?: number;
-  readonly delivery_week?: number;
-  readonly delivery_station_day?: string;
-  readonly share_type_variation?: string;
-  readonly quantity?: number;
+  readonly id: string;
+  readonly batch: string;
+  readonly year: number;
+  readonly delivery_week: number;
+  readonly delivery_station_day: string;
+  readonly share_type_variation: string;
+  readonly quantity: number;
   /** @nullable */
-  readonly external_ref?: string | null;
+  readonly external_ref: string | null;
   /** @nullable */
-  readonly note?: string | null;
-  readonly is_estimate?: boolean;
+  readonly note: string | null;
+  readonly is_estimate: boolean;
 }

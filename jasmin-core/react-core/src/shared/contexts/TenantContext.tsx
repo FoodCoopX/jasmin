@@ -27,6 +27,9 @@ import {
  *     ``Record`` because ``getSetting(key)`` does dotted-key lookups
  *     against arbitrary ``TenantSettings`` columns that the generated
  *     ``TenantSettingsProperty`` enumerates more strictly than we use.
+ *   - **``Partial``** — the context first holds the anonymous
+ *     ``/tenants/current/`` payload, a subset of the row, until the full
+ *     one arrives after sign-in (and a stand-in when the API is blocked).
  *   - **Index signature** — accepts ad-hoc fields that exist on the
  *     backend response but aren't yet in the orval schema (i.e. the gap
  *     between a backend field addition and the next ``make
@@ -37,7 +40,7 @@ import {
  * The net effect: every backend field auto-flows in via ``Tenant``; we
  * only maintain the *frontend-only* additions here.
  */
-type TenantData = Omit<Tenant, "settings" | "current_settings"> & {
+type TenantData = Partial<Omit<Tenant, "settings" | "current_settings">> & {
   slug?: string;
   settings?: Record<string, unknown>;
   current_settings?: Record<string, unknown>;
