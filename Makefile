@@ -401,11 +401,16 @@ check-frontend: deps-check secrets $(FRONTEND_GATES) test-cross-stack test-front
 
 # The local version label makes every build a new version, so pip replaces an
 # installed wheel instead of skipping it as already installed.
+# Tapir serves the assets as static files from the build's "static" folder, so
+# they're built with the dev config (the production one forces assets/js/).
 .PHONY: poetry-build
 poetry-build: BUILD_ID := $(shell git rev-parse --short HEAD)
 poetry-build: BUILD_TIME := $(shell date -u +%Y%m%d%H%M%S)
 poetry-build:
-	cd $(REACT_DIR) && npm ci && NODE_ENV=production VITE_BUILD_ID=$(BUILD_ID) npm run build
+	cd $(REACT_DIR) && npm ci
+	$(MAKE) generate-frontend-api
+	rm -rf $(REACT_DIR)/dist
+	cd $(REACT_DIR) && npx vite build --assetsDir static/assets --sourcemap
 	rm -rf $(DJANGO_DIR)/apps/static/jasmin-dist/dist
 	mkdir -p $(DJANGO_DIR)/apps/static/jasmin-dist
 	cp -r $(REACT_DIR)/dist $(DJANGO_DIR)/apps/static/jasmin-dist
