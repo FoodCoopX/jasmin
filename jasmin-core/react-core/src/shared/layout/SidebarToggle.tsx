@@ -14,11 +14,7 @@ export default function SidebarToggle() {
         type="text"
         icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
         onClick={toggleSidebar}
-        style={{
-          fontSize: "16px",
-          width: 32,
-          height: 32,
-        }}
+        className="sidebar-toggle-button"
         title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
       />
       <ToolTipIcon title={t("tooltip.sidebar_collapse")} />

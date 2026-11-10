@@ -59,8 +59,7 @@ export default function DeliveryStationDaysCard({
           {t("members.my_delivery_stations")}
         </Space>
       }
-      className="member-card member-card--blue-title"
-      style={{ marginTop: 16 }}
+      className="member-card member-card--blue-title mt-16"
       styles={{ body: { padding: "12px 16px" } }}
     >
       {rows.length === 0 ? (
@@ -72,7 +71,7 @@ export default function DeliveryStationDaysCard({
               key={stationDay.id}
               type="link"
               icon={<EnvironmentOutlined />}
-              style={{ paddingLeft: 0, textAlign: "left" }}
+              className="delivery-station-day-link"
               onClick={() => setSelectedId(stationDay.id ?? null)}
             >
               {formatStationDayLabel(t, stationDay)}

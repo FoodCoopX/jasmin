@@ -112,7 +112,7 @@ export default function SendOffersModal({
         />
       }
     >
-      <div style={{ marginBottom: 16 }}>
+      <div className="mb-16">
         <p>
           {t(
             "commissioning.send_offers_description",
@@ -132,18 +132,18 @@ export default function SendOffersModal({
       )}
 
       {notSentResellers.length === 0 && (
-        <div style={{ padding: 16, textAlign: "center", color: "var(--color-text-tertiary)" }}>
+        <div className="send-offers-modal__all-sent">
           {t("commissioning.all_offers_already_sent")}
         </div>
       )}
 
       {resellers.filter((r) => r.sent).length > 0 && (
-        <div style={{ marginTop: 16, padding: 12, backgroundColor: "var(--color-bg-subtle)", borderRadius: 6 }}>
+        <div className="send-offers-modal__already-sent">
           <strong>
             {t("commissioning.already_sent")} (
             {resellers.filter((r) => r.sent).length}):
           </strong>
-          <ul style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20 }}>
+          <ul className="mt-8 mb-0 pl-20">
             {resellers
               .filter((r) => r.sent)
               .map((r) => (

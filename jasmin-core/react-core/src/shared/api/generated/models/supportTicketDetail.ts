@@ -10,16 +10,16 @@ import type { TicketPriorityEnum } from './ticketPriorityEnum';
 import type { SupportTicketMessage } from './supportTicketMessage';
 
 export interface SupportTicketDetail {
-  readonly id?: string;
-  readonly subject?: string;
-  readonly status?: TicketStatusEnum;
-  readonly priority?: TicketPriorityEnum;
-  readonly creator_id?: string;
-  readonly creator_name?: string;
-  readonly context?: unknown;
-  readonly created_at?: string;
-  readonly updated_at?: string;
+  readonly id: string;
+  readonly subject: string;
+  readonly status: TicketStatusEnum;
+  readonly priority: TicketPriorityEnum;
+  readonly creator_id: string;
+  readonly creator_name: string;
+  readonly context: unknown;
+  readonly created_at: string;
+  readonly updated_at: string;
   /** @nullable */
-  readonly resolved_at?: string | null;
-  readonly messages?: readonly SupportTicketMessage[];
+  readonly resolved_at: string | null;
+  readonly messages: readonly SupportTicketMessage[];
 }

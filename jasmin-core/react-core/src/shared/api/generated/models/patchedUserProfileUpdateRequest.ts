@@ -12,9 +12,15 @@ import type { ThemeEnum } from './themeEnum';
  * Request body for ``PATCH /api/auth/<user_id>/``.
  */
 export interface PatchedUserProfileUpdateRequest {
-  /** @maxLength 255 */
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   first_name?: string;
-  /** @maxLength 255 */
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   last_name?: string;
   user_language?: UserLanguageEnum;
   theme?: ThemeEnum;

@@ -14,25 +14,25 @@ so DRF would silently drop the key from every payload (SkipField) while
 the schema declares it present.
  */
 export interface CoopShare {
-  readonly id?: string;
-  readonly member_string?: string;
-  readonly admin_confirmed?: boolean;
+  readonly id: string;
+  readonly member_string: string;
+  readonly admin_confirmed: boolean;
   /** @nullable */
-  readonly admin_confirmed_at?: string | null;
+  readonly admin_confirmed_at: string | null;
   /** @nullable */
-  readonly admin_rejected_at?: string | null;
+  readonly admin_rejected_at: string | null;
   /** @nullable */
-  readonly admin_rejection_reason?: string | null;
+  readonly admin_rejection_reason: string | null;
   /** @nullable */
-  readonly cancelled_at?: string | null;
+  readonly cancelled_at: string | null;
   /** @nullable */
-  readonly cancelled_effective_at?: string | null;
+  readonly cancelled_effective_at: string | null;
   /** @nullable */
   cancellation_reason?: string | null;
   /** @nullable */
   due_date?: string | null;
   /** @nullable */
-  readonly paid_at?: string | null;
+  readonly paid_at: string | null;
   /** @pattern ^-?\d{0,8}(?:\.\d{0,2})?$ */
   amount_of_coop_shares: string;
   /**
@@ -45,18 +45,18 @@ export interface CoopShare {
   /** @nullable */
   note?: string | null;
   /** @nullable */
-  readonly payback_due_date?: string | null;
+  readonly payback_due_date: string | null;
   /** @nullable */
   paid_back_date?: string | null;
   /** @nullable */
-  readonly admin_confirmed_by?: string | null;
+  readonly admin_confirmed_by: string | null;
   /** @nullable */
-  readonly cancelled_by?: string | null;
+  readonly cancelled_by: string | null;
   member: string;
   /** @nullable */
-  readonly transfer?: string | null;
+  readonly transfer: string | null;
   /** @nullable */
-  readonly settled_by_transfer?: string | null;
+  readonly settled_by_transfer: string | null;
   /** @nullable */
-  readonly admin_confirmed_by_name?: string | null;
+  readonly admin_confirmed_by_name: string | null;
 }

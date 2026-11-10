@@ -277,6 +277,31 @@
   margin: 8px 0;
 }
 
+/* The add button above an editable table. Doubled with AntD's button classes
+   so the width outranks AntD's own small icon-only button. */
+.ant-btn.ant-btn-sm.editable-table-add-button {
+  width: 2em;
+}
+
+/* A section heading between the fields of an editable table's edit modal. */
+.editable-modal-section-header {
+  margin-top: 24px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+/* A checkbox or switch in the edit modal, with its label beside it. */
+.editable-modal-boolean-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
 /* Small dense table that lives inside a Card (e.g. the per-reseller
    commissioning cards). The global ``.ant-table-container`` /
    ``.ant-table-body`` min-height rules in
@@ -356,6 +381,14 @@
 .planning-row-stock {
   color: var(--color-planning-row-highlight);
   font-weight: normal;
+}
+
+/* A record's picture as a small square thumbnail in its table cell. */
+.table-picture-thumbnail {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
 }
 
 .still-free-ok {
@@ -449,6 +482,12 @@
   font-size: 0.9rem;
   padding: 2px 10px;
   line-height: 1.6;
+}
+
+/* Customer order-amount input in edit mode. ``.ant-input-affix-wrapper``
+   outranks AntD's full-width input. */
+.order-amount-input.ant-input-affix-wrapper {
+  width: 80px;
 }
 
 /* Customer order-amount column header: the column title stacked above its

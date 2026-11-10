@@ -8,14 +8,24 @@
 import type { AdminUserCreateRequestUserLanguage } from './adminUserCreateRequestUserLanguage';
 
 export interface AdminUserCreateRequest {
+  /** @minLength 1 */
   email: string;
-  /** @maxLength 255 */
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   first_name: string;
-  /** @maxLength 255 */
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   last_name: string;
   roles?: string[];
   /** @nullable */
   user_language?: AdminUserCreateRequestUserLanguage;
-  /** @nullable */
+  /**
+   * @minLength 1
+   * @nullable
+   */
   reseller_id?: string | null;
 }

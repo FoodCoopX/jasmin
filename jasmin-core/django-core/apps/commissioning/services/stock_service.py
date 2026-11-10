@@ -227,7 +227,7 @@ class StockService:
         - is_finalized, washed, cleaned, for_shares, for_resellers, for_markets
         """
         target_dt_start, target_dt_end = _day_window(year, delivery_week, day_number)
-        if target_dt_start.date() == timezone.now().date():
+        if target_dt_start.date() == timezone.localdate():
             return StockService._current_stock_from_projection(
                 target_dt_start, target_dt_end, storage, entity_filter
             )

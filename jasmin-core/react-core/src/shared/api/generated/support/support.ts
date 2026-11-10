@@ -26,7 +26,7 @@ import type {
 
 import type {
   ErrorResponse,
-  SupportTicketCreate,
+  SupportTicketCreateRequest,
   SupportTicketDetail,
   SupportTicketList,
   SupportTicketReplyRequest
@@ -124,7 +124,7 @@ export function useSupportTicketsList<TData = Awaited<ReturnType<typeof supportT
 
 
 export const supportTicketsCreate = (
-    supportTicketCreate: SupportTicketCreate,
+    supportTicketCreateRequest: SupportTicketCreateRequest,
  signal?: AbortSignal
 ) => {
       
@@ -132,7 +132,7 @@ export const supportTicketsCreate = (
       return axiosService<SupportTicketDetail>(
       {url: `/api/support/tickets/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: supportTicketCreate, signal
+      data: supportTicketCreateRequest, signal
     },
       );
     }
@@ -140,8 +140,8 @@ export const supportTicketsCreate = (
 
 
 export const getSupportTicketsCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof supportTicketsCreate>>, TError,{data: SupportTicketCreate}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof supportTicketsCreate>>, TError,{data: SupportTicketCreate}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof supportTicketsCreate>>, TError,{data: SupportTicketCreateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof supportTicketsCreate>>, TError,{data: SupportTicketCreateRequest}, TContext> => {
 
 const mutationKey = ['supportTicketsCreate'];
 const {mutation: mutationOptions} = options ?
@@ -153,7 +153,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof supportTicketsCreate>>, {data: SupportTicketCreate}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof supportTicketsCreate>>, {data: SupportTicketCreateRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  supportTicketsCreate(data,)
@@ -165,15 +165,15 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type SupportTicketsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof supportTicketsCreate>>>
-    export type SupportTicketsCreateMutationBody = SupportTicketCreate
+    export type SupportTicketsCreateMutationBody = SupportTicketCreateRequest
     export type SupportTicketsCreateMutationError = ErrorResponse
 
     export const useSupportTicketsCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof supportTicketsCreate>>, TError,{data: SupportTicketCreate}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof supportTicketsCreate>>, TError,{data: SupportTicketCreateRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof supportTicketsCreate>>,
         TError,
-        {data: SupportTicketCreate},
+        {data: SupportTicketCreateRequest},
         TContext
       > => {
 

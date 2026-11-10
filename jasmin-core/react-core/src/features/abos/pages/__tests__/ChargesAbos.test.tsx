@@ -55,6 +55,8 @@ function twoChargesEach(count: number): ChargeSchedule[] {
       id: `charge-${number}-${due}`,
       member: `member-${number}`,
       member_name: `Member ${number}`,
+      // Unnumbered, so the member column shows the name alone.
+      member_number: null,
       subscription: `sub-${number}`,
       subscription_label: "Vegetables M",
       period_start: due,
@@ -62,6 +64,9 @@ function twoChargesEach(count: number): ChargeSchedule[] {
       due_date: due,
       expected_amount: "20.00",
       status: ChargeScheduleStatusEnum.PLANNED,
+      // A planned charge is in no billing run yet.
+      billing_run: null,
+      end_to_end_id: "",
     }));
   }).flat();
 }

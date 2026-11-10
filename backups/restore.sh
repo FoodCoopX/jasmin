@@ -19,8 +19,9 @@ set -eu
 # database stays until it is dropped by hand; the script prints how, and how
 # to swap back. A restore that fails drops <db>_restore and leaves <db> as it
 # was. No other database on the server is touched, GlitchTip's included.
-# The server needs room for a second full copy of the database, and
-# /backups room for the decrypted dump while the script runs.
+# The server needs room for a second full copy of the database, and the
+# container's own filesystem ($TMPDIR, default /tmp) room for the decrypted
+# dump while the script runs.
 #
 # The whole procedure, from the repo root on the host:
 #
@@ -50,7 +51,7 @@ set -eu
 #      taken with that backup (<db>_media_<timestamp>.tar.gz.gpg), BEFORE
 #      step 4 — the erasure replay deletes the files of everyone erased since:
 #        docker compose exec -T backup sh -c \
-#            'gpg --batch --quiet --decrypt --passphrase "$BACKUP_ENCRYPTION_KEY" "/backups/$1" | gunzip' \
+#            'printf "%s\n" "$BACKUP_ENCRYPTION_KEY" | gpg --batch --quiet --decrypt --passphrase-fd 0 "/backups/$1" | gunzip' \
 #            sh <db>_media_<timestamp>.tar.gz.gpg \
 #          | docker compose run --rm --no-deps -T --user root --entrypoint tar huey \
 #              --numeric-owner -C /app/media -xf -
@@ -70,8 +71,9 @@ set -eu
 # Python/Django container, because this image has none. After losing the host,
 # fetch the off-host copy first and decrypt it into place:
 #   rclone copyto <remote>/gdpr-deletion-ledger.jsonl.gpg /backups/gdpr-deletion-ledger.jsonl.gpg
-#   gpg --batch --decrypt --passphrase "$BACKUP_ENCRYPTION_KEY" \
+#   printf '%s\n' "$BACKUP_ENCRYPTION_KEY" | gpg --batch --decrypt --passphrase-fd 0 \
 #       --output /backups/gdpr-deletion-ledger.jsonl /backups/gdpr-deletion-ledger.jsonl.gpg
+# (the passphrase goes in on a pipe: on gpg's command line ``ps`` would show it)
 # ───────────────────────────────────────────────────────────────
 
 BACKUP_FILE="${1:?Usage: sh /backups/restore.sh <backup_file.sql.gz.gpg>}"
@@ -333,19 +335,28 @@ fi
 # ── Restore into a new database ────────────────────────────────
 echo "[$(date)] Decrypting ${BACKUP_FILE}..."
 
-# ash has no ``pipefail``: piping gpg | gunzip | psql would let a failed
-# decrypt feed EMPTY input to psql, which then exits 0 and we'd swap in an
-# empty database. Stage each step as its own command so ``set -e`` catches a
-# failure at the point it happens, and make psql abort on the first SQL
-# error (``ON_ERROR_STOP=1``). The temp files live in the backup volume and
-# are removed on exit.
-TMP_GZ="${BACKUP_FILE}.dec.gz"
-TMP_SQL="${BACKUP_FILE}.dec.sql"
+# Not one pipe gpg | gunzip | psql: the dump is staged so its completion
+# trailer is checked before anything is created, and each step runs as its
+# own command so ``set -e`` catches a failure where it happens; psql aborts on
+# the first SQL error (``ON_ERROR_STOP=1``).
+# The plaintext goes into a directory only the user running this can read, in
+# the container's own filesystem: not the shared /backups, which holds
+# ciphertext only, and not a tmpfs, which would count against the container's
+# memory limit. The exit trap removes it. A run killed outright (SIGKILL: a
+# stop timeout, the OOM killer) skips every trap, so a later run removes what
+# such a run left, once it is a day old and so no longer in use; a one-off
+# container takes it along.
+WORK_PARENT="${TMPDIR:-/tmp}"
+find "$WORK_PARENT" -mindepth 1 -maxdepth 1 -type d -name 'restore.*' \
+    -mmin +1440 -exec rm -rf {} \; 2>/dev/null || true
+WORK_DIR=$(umask 077 && mktemp -d "${WORK_PARENT}/restore.XXXXXX")
+TMP_GZ="${WORK_DIR}/dump.sql.gz"
+TMP_SQL="${WORK_DIR}/dump.sql"
 # "restoring" from the creation of RESTORE_DB until the dump is in: the
 # script ending in that state, by an error or a signal, drops the copy.
 RESTORE_STATE=""
 cleanup() {
-    rm -f "$TMP_GZ" "$TMP_SQL"
+    rm -rf "$WORK_DIR"
     if [ "$RESTORE_STATE" = "restoring" ]; then
         echo "[$(date)] ERROR: the restore into ${RESTORE_DB} did not finish; dropping it." >&2
         echo "  ${DB_NAME} is unchanged." >&2
@@ -357,10 +368,9 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-gpg --batch --yes --quiet --decrypt \
-    --passphrase "$BACKUP_ENCRYPTION_KEY" \
-    --output "$TMP_GZ" \
-    "$BACKUP_FILE"
+printf '%s\n' "$BACKUP_ENCRYPTION_KEY" \
+    | gpg --batch --yes --quiet --decrypt --passphrase-fd 0 \
+        --output "$TMP_GZ" "$BACKUP_FILE"
 
 gunzip -c "$TMP_GZ" > "$TMP_SQL"
 rm -f "$TMP_GZ"

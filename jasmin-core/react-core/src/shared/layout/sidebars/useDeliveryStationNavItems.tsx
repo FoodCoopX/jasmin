@@ -1,4 +1,4 @@
-import { useCapability } from "@hooks/index";
+import { useCapability, useTenant } from "@hooks/index";
 import { useCommissioningDeliveryStationsList } from "@shared/api/generated/commissioning/commissioning";
 import { useRoles, type RoleGatedItem } from "@shared/auth";
 import { useTranslation } from "react-i18next";
@@ -6,17 +6,25 @@ import { Link } from "react-router-dom";
 
 import DirectionsBikeIcon from "@mui/icons-material/DirectionsBike";
 
+import { usePackingListVisibility } from "./usePackingListVisibility";
+
 /**
  * The commissioning sidebar's delivery-station links: the section with the
  * tour and pickup lists (and the station-fee billing), and the station and
- * tour lists for the data section. Both are empty where the host keeps its
- * pickup locations itself, as it then handles the stations, the tours and the
- * pickup lists on its side.
+ * tour lists for the data section. The members' notices come with the pickup
+ * lists, so they have an entry of their own only where those are missing: a
+ * farm that imports its share amounts has no pickup lists, and where the host
+ * keeps its pickup locations itself, it handles the stations, the tours and
+ * the pickup lists on its side — the section then holds only the notices, and
+ * the data section nothing.
  */
 export function useDeliveryStationNavItems() {
   const { t } = useTranslation();
   const flags = useRoles();
   const offersDeliveryStations = useCapability("delivery_stations");
+  const { getSetting } = useTenant();
+  const importsShareAmounts = Boolean(getSetting("uploads_weekly_share_amount"));
+  const { showTourLists } = usePackingListVisibility();
 
   // The station-fee billing is only relevant for solawis that actually charge
   // pickup-station fees. Fetch stations only for office users (the only ones who
@@ -32,11 +40,7 @@ export function useDeliveryStationNavItems() {
       Number(station.fee_per_year_net) > 0,
   );
 
-  if (!offersDeliveryStations) {
-    return { deliveryStationSection: [], deliveryStationListItems: [] };
-  }
-
-  const deliveryStationSection: RoleGatedItem[] = [
+  const section = (children: RoleGatedItem[]): RoleGatedItem[] => [
     {
       key: "commissioning-delivery-stations",
 
@@ -47,7 +51,30 @@ export function useDeliveryStationNavItems() {
           {t("commissioning.delivery_stations")}
         </div>
       ),
-      children: [
+      children,
+    },
+  ];
+
+  const stationNotices: RoleGatedItem = {
+    key: "commissioning-station-notices",
+
+    requireRole: "isStaff",
+    label: (
+      <Link to="/commissioning/station-notices">
+        {t("commissioning.station_contents.page_title")}
+      </Link>
+    ),
+  };
+
+  if (!offersDeliveryStations) {
+    return {
+      deliveryStationSection: section([stationNotices]),
+      deliveryStationListItems: [],
+    };
+  }
+
+  const tourLists: RoleGatedItem[] = showTourLists
+    ? [
         {
           key: "commissioning-delivery-stations-overview",
 
@@ -58,36 +85,39 @@ export function useDeliveryStationNavItems() {
             </Link>
           ),
         },
-        {
-          key: "commissioning-delivery-stations-details",
+      ]
+    : [];
+  const deliveryStationSection = section([
+    ...tourLists,
+    {
+      key: "commissioning-delivery-stations-details",
 
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/delivery-stations-details">
-              {t("commissioning.pickup_lists")}
-            </Link>
-          ),
-        },
-
-        // Only when at least one station actually charges a fee — most solawis
-        // don't, so hide the billing entirely for them.
-        ...(has_station_fees
-          ? [
-              {
-                key: "commissioning-delivery-station-fees",
-
-                requireRole: "isOffice" as const,
-                label: (
-                  <Link to="/commissioning/delivery-station-fees">
-                    {t("commissioning.station_fees")}
-                  </Link>
-                ),
-              },
-            ]
-          : []),
-      ],
+      requireRole: "isStaff",
+      label: (
+        <Link to="/commissioning/delivery-stations-details">
+          {t("commissioning.pickup_lists")}
+        </Link>
+      ),
     },
-  ];
+    ...(importsShareAmounts ? [stationNotices] : []),
+
+    // Only when at least one station actually charges a fee — most solawis
+    // don't, so hide the billing entirely for them.
+    ...(has_station_fees
+      ? [
+          {
+            key: "commissioning-delivery-station-fees",
+
+            requireRole: "isOffice" as const,
+            label: (
+              <Link to="/commissioning/delivery-station-fees">
+                {t("commissioning.station_fees")}
+              </Link>
+            ),
+          },
+        ]
+      : []),
+  ]);
   const deliveryStationListItems: RoleGatedItem[] = [
     {
       key: "commissioning-list-delivery-stations",

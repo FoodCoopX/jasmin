@@ -149,7 +149,7 @@ export function useHarvestingListColumns({
   // makeShareOrderChildren useCallback (which depends on them) on every render.
   const titleShareContent: ReactNode = useMemo(
     () => (
-      <span style={{ fontSize: "0.7em" }}>
+      <span className="harvesting-list-content-title">
         {t("commissioning.title_share_content")}
       </span>
     ),
@@ -158,7 +158,7 @@ export function useHarvestingListColumns({
 
   const titleOrderContent: ReactNode = useMemo(
     () => (
-      <span style={{ fontSize: "0.7em" }}>
+      <span className="harvesting-list-content-title">
         {t("commissioning.title_order_content")}
       </span>
     ),
@@ -450,10 +450,7 @@ export function useHarvestingListColumns({
         dataIndex: "harvesting_crate_name",
         key: "harvesting_crate_name",
         inputType: "select",
-        // CrateOption's union includes the null "clear" placeholder shape,
-        // which SelectOption can't express — same widening as
-        // useShareArticleColumn's options.
-        options: crates as unknown as SelectOption[],
+        options: crates,
         required: false,
         width: "8em",
         className: "column-group-start",

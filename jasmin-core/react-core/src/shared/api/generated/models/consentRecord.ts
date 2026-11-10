@@ -13,20 +13,20 @@ render "you agreed to <title> v<version> on <date>" without a
 second round-trip.
  */
 export interface ConsentRecord {
-  readonly id?: string;
-  readonly member?: string;
-  readonly document?: ConsentDocumentSummary;
-  readonly consented_at?: string;
+  readonly id: string;
+  readonly member: string;
+  readonly document: ConsentDocumentSummary;
+  readonly consented_at: string;
   /** @nullable */
-  readonly ip_address?: string | null;
-  readonly user_agent?: string;
+  readonly ip_address: string | null;
+  readonly user_agent: string;
   /** @nullable */
-  readonly revoked_at?: string | null;
-  readonly revoked_reason?: string;
+  readonly revoked_at: string | null;
+  readonly revoked_reason: string;
   /**
    * Office staff revoking on the member's behalf, OR the member themselves via the self-service portal.
    * @nullable
    */
-  readonly revoked_by?: string | null;
-  readonly is_active?: boolean;
+  readonly revoked_by: string | null;
+  readonly is_active: boolean;
 }

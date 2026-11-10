@@ -4,9 +4,10 @@ import {
   useSellerColumn,
   useShareArticleColumn,
   useShareArticles,
-  useShareTypeVariations,
+  useYearShareTypeVariations,
   variationAmountKey,
 } from "@features/commissioning/hooks";
+import type { YearShareTypeVariation } from "@features/commissioning/hooks/useYearShareTypeVariations";
 import {
   getShareTypeVariationSizeLabelPure,
   useInvalidateAfterTableMutation,
@@ -42,7 +43,12 @@ import type {
   TableRecord,
 } from "@shared/tables/BasicEditableTable";
 import { ExplainerText } from "@shared/ui";
-import { activeAtDateForWeek, editableOnlyOnCreate, isYearInPast } from "@shared/utils";
+import {
+  editableOnlyOnCreate,
+  isYearInPast,
+  mondayOfIsoWeek,
+  toApiDate,
+} from "@shared/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, Space } from "antd";
 import type { FormInstance } from "antd";
@@ -51,7 +57,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
-  countDeliveryWeeks,
+  deliveryWeekNumbers,
   suggestPerShareAmounts,
   type VariationWeightCount,
 } from "../utils/planningWeightSplit";
@@ -101,16 +107,7 @@ function DeliveryWeeksTimeline({ record }: { record: TableRecord }) {
   const padding = 4;
 
   return (
-    <div
-      style={{
-        position: "relative",
-        height: "10px",
-        backgroundColor: "var(--color-bg-hover)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "2px",
-        margin: "0 auto",
-      }}
-    >
+    <div className="delivery-weeks-timeline">
       {actualWeeks.map((week) => {
         const position = (week - 1) * weekWidth + padding / 2;
         return (
@@ -154,6 +151,87 @@ interface PlanningShareContentLongTermBaseProps {
    *  complexly (``needs_complex_planning``) get the toggle; simple ones show
    *  the classic per-share view only. Defaults to off. */
   allowTotalMode?: boolean;
+}
+
+type SizeWeightCount = VariationWeightCount & {
+  validFrom: string;
+  validUntil: string | null;
+};
+
+/** A row's delivery weeks, and each size's weight-split input with the weeks of
+ *  them it runs in: a size replaced during the year shares the row's weeks
+ *  with its successor. */
+function weightCountsForRow(
+  row: Record<string, unknown>,
+  year: number,
+  sizes: SizeWeightCount[],
+): { weeks: number; sizes: (VariationWeightCount & { weeks: number })[] } {
+  const weeks = deliveryWeekNumbers(row.range_1 as number, row.range_2 as number, {
+    onlyOdd: Boolean(row.only_odd_weeks),
+    onlyEven: Boolean(row.only_even_weeks),
+    onlyEveryThree: Boolean(row.only_every_three_weeks),
+  });
+  const mondays = weeks.map((week) => toApiDate(mondayOfIsoWeek(year, week))!);
+  return {
+    weeks: weeks.length,
+    sizes: sizes.map((size) => ({
+      ...size,
+      // ISO dates compare as strings.
+      weeks: mondays.filter(
+        (monday) =>
+          size.validFrom <= monday && (!size.validUntil || size.validUntil >= monday),
+      ).length,
+    })),
+  };
+}
+
+/** One amount column per size running in the planned year, headed by the size
+ *  and, when it runs only part of the year, by its weeks. */
+function useSizeAmountColumns(
+  yearShareTypeVariations: YearShareTypeVariation[],
+): EditableColumnConfig<TableRecord>[] {
+  const { t } = useTranslation();
+  const { format } = useNumberFormat();
+  return useMemo(() => {
+    return yearShareTypeVariations.map(
+      ({ variation, weeksLabel }): EditableColumnConfig<TableRecord> => ({
+        title: (
+          <>
+            {getShareTypeVariationSizeLabelPure(variation.size, t)}
+            {/* The space keeps the size and its weeks apart in the
+                column's accessible name and its inputs' labels. */}
+            {weeksLabel && " "}
+            {weeksLabel && <div className="text-xs">{weeksLabel}</div>}
+          </>
+        ),
+        // dataIndex AND key must be the SAME wire field. The default-share
+        // backend keys amounts by variation id as `amount_<id>` (there is no
+        // day axis here).
+        dataIndex: variationAmountKey(variation.id!),
+        inputType: "positive_decimal2",
+        key: variationAmountKey(variation.id!),
+        align: "center",
+        width: "5em",
+        className: "column-group-start",
+
+        render: (value: unknown, record: TableRecord) => {
+          if (value === null || value === undefined || value === "")
+            return "";
+
+          const numValue = parseFloat(String(value));
+          if (isNaN(numValue)) return String(value);
+
+          const unit = record.unit as string;
+          const decimals =
+            unit === "PCS" || unit === "BUNCH"
+              ? pieceDecimals(numValue)
+              : 3;
+
+          return format(numValue, decimals);
+        },
+      }),
+    );
+  }, [yearShareTypeVariations, t, format]);
 }
 
 export default function PlanningShareContentLongTermBase({
@@ -275,16 +353,13 @@ export default function PlanningShareContentLongTermBase({
     return record;
   }, []);
 
-  const shareTypeVariationFilters = useMemo(() => {
-    return {
-      physical: true,
-      active_at_date: activeAtDateForWeek(selectedYear, 50),
-      share_option: shareOption,
-    };
-  }, [selectedYear, shareOption]);
-
-  const { shareTypeVariations } = useShareTypeVariations(
-    shareTypeVariationFilters,
+  const yearShareTypeVariations = useYearShareTypeVariations(
+    selectedYear,
+    shareOption,
+  );
+  const shareTypeVariations = useMemo(
+    () => yearShareTypeVariations.map(({ variation }) => variation),
+    [yearShareTypeVariations],
   );
 
   // Reverse total-amount mode
@@ -303,7 +378,7 @@ export default function PlanningShareContentLongTermBase({
   // ``average_weight`` (per size) + subscriber count (per size) — the two
   // inputs the weight-split needs. Weight rides along on every variation; the
   // count comes from the snapshot endpoint above.
-  const variationWeightCounts = useMemo<VariationWeightCount[]>(
+  const variationWeightCounts = useMemo<SizeWeightCount[]>(
     () =>
       shareTypeVariations.map((variation) => ({
         variationId: String(variation.id),
@@ -312,6 +387,8 @@ export default function PlanningShareContentLongTermBase({
             ? Number(variation.average_weight)
             : null,
         subscriberCount: Number(subscriberCounts?.[String(variation.id)] ?? 0),
+        validFrom: variation.valid_from,
+        validUntil: variation.valid_until ?? null,
       })),
     [shareTypeVariations, subscriberCounts],
   );
@@ -322,14 +399,10 @@ export default function PlanningShareContentLongTermBase({
   const recomputeSuggestion = useCallback(
     (form: FormInstance) => {
       const values = form.getFieldsValue(true) as Record<string, unknown>;
-      const weeks = countDeliveryWeeks(
-        values.range_1 as number,
-        values.range_2 as number,
-        {
-          onlyOdd: Boolean(values.only_odd_weeks),
-          onlyEven: Boolean(values.only_even_weeks),
-          onlyEveryThree: Boolean(values.only_every_three_weeks),
-        },
+      const { weeks, sizes } = weightCountsForRow(
+        values,
+        selectedYear,
+        variationWeightCounts,
       );
       const unit = values.unit as string;
       // Piece-based units can't deliver a fractional share — floor to whole.
@@ -337,7 +410,7 @@ export default function PlanningShareContentLongTermBase({
       const result = suggestPerShareAmounts(
         Number(values._target_total),
         weeks,
-        variationWeightCounts,
+        sizes,
         { floorStep },
       );
 
@@ -355,7 +428,7 @@ export default function PlanningShareContentLongTermBase({
       }
       form.setFieldsValue(patch);
     },
-    [variationWeightCounts],
+    [variationWeightCounts, selectedYear],
   );
 
   // Picking an article seeds its unit, and the unit sets the rounding step of
@@ -389,39 +462,9 @@ export default function PlanningShareContentLongTermBase({
     },
   });
 
-  const shareTypeVariationColumns: EditableColumnConfig<TableRecord>[] =
-    useMemo(() => {
-      return shareTypeVariations.map(
-        (variation): EditableColumnConfig<TableRecord> => ({
-          title: getShareTypeVariationSizeLabelPure(variation.size, t),
-          // dataIndex AND key must be the SAME wire field. The default-share
-          // backend keys amounts by variation id as `amount_<id>` (there is no
-          // day axis here).
-          dataIndex: variationAmountKey(variation.id!),
-          inputType: "positive_decimal2",
-          key: variationAmountKey(variation.id!),
-          align: "center",
-          width: "5em",
-          className: "column-group-start",
-
-          render: (value: unknown, record: TableRecord) => {
-            if (value === null || value === undefined || value === "")
-              return "";
-
-            const numValue = parseFloat(String(value));
-            if (isNaN(numValue)) return String(value);
-
-            const unit = record.unit as string;
-            const decimals =
-              unit === "PCS" || unit === "BUNCH"
-                ? pieceDecimals(numValue)
-                : 3;
-
-            return format(numValue, decimals);
-          },
-        }),
-      );
-    }, [shareTypeVariations, t, format]);
+  const shareTypeVariationColumns = useSizeAmountColumns(
+    yearShareTypeVariations,
+  );
 
   const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
     () => [
@@ -456,7 +499,7 @@ export default function PlanningShareContentLongTermBase({
                 return undefined;
               },
             },
-          ] as EditableColumnConfig<TableRecord>[])
+          ] satisfies EditableColumnConfig<TableRecord>[])
         : []),
       {
         title: <>{t("commissioning.KW")}</>,
@@ -621,22 +664,16 @@ export default function PlanningShareContentLongTermBase({
             rec._target_total != null &&
             rec._target_total !== "";
           if (isEditingTotal) {
-            const weeks = countDeliveryWeeks(
-              rec.range_1 as number,
-              rec.range_2 as number,
-              {
-                onlyOdd: Boolean(rec.only_odd_weeks),
-                onlyEven: Boolean(rec.only_even_weeks),
-                onlyEveryThree: Boolean(rec.only_every_three_weeks),
-              },
+            const { sizes } = weightCountsForRow(
+              rec,
+              selectedYear,
+              variationWeightCounts,
             );
             let total = 0;
-            for (const variation of variationWeightCounts) {
-              const amount = Number(
-                rec[variationAmountKey(variation.variationId)] ?? 0,
-              );
+            for (const size of sizes) {
+              const amount = Number(rec[variationAmountKey(size.variationId)] ?? 0);
               if (Number.isFinite(amount)) {
-                total += variation.subscriberCount * amount * weeks;
+                total += size.subscriberCount * amount * size.weeks;
               }
             }
             if (total <= 0) return "";
@@ -687,6 +724,7 @@ export default function PlanningShareContentLongTermBase({
       effectiveMode,
       recomputeSuggestion,
       variationWeightCounts,
+      selectedYear,
     ],
   );
 
@@ -708,7 +746,7 @@ export default function PlanningShareContentLongTermBase({
         selectedYear={selectedYear}
         setSelectedYear={setSelectedYear}
       />
-      <div style={{ marginTop: "2em" }}>
+      <div className="mt-2em">
         {allowTotalMode && (
           <Space.Compact
             aria-label={t("commissioning.planning_long_term.mode_label")}

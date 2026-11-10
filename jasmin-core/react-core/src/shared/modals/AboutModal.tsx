@@ -43,7 +43,7 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
       footer={null}
       width={620}
     >
-      <Title level={5} style={{ marginTop: 0 }}>
+      <Title level={5} className="mt-0">
         {t("about.features_title")}
       </Title>
       <List
@@ -51,12 +51,12 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
         split={false}
         dataSource={[...FEATURE_IDS]}
         renderItem={(id) => (
-          <List.Item style={{ padding: "6px 0", alignItems: "flex-start" }}>
+          <List.Item className="about-feature-item">
             <Space align="start" size={10}>
               <CheckCircleTwoTone
                 aria-hidden
                 twoToneColor={colorSuccess}
-                style={{ marginTop: 4, fontSize: 16 }}
+                className="about-feature-icon"
               />
               <span>
                 <Text strong>{t(`about.feature_${id}_title`)}</Text>

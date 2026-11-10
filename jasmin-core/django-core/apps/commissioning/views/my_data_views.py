@@ -126,12 +126,6 @@ class MyMemberDataView(APIView):
         return perms
 
     def _serialize(self, member: Member) -> Response:
-        # Hand-roll a "prefetch" so the read serializer doesn't run an
-        # extra query per request. (Real prefetch_related needs a
-        # queryset entry-point we don't have here.)
-        member._prefetched_coop_shares = list(  # type: ignore[attr-defined]
-            CoopShare.objects.filter(member=member)
-        )
         return Response(MyMemberDataReadSerializer(member).data)
 
     def _resolve(self, request: Request) -> Member:
@@ -604,7 +598,7 @@ class MyMembershipCancelView(APIView):
 
         # Restraint: a member may only self-cancel once they hold no active
         # subscriptions (admin-confirmed, not cancelled, not past their term).
-        today = timezone.now().date()
+        today = timezone.localdate()
         has_active_subscription = Subscription.active_for_member(member, today).exists()
         if has_active_subscription:
             raise MemberHasActiveSubscriptions(
@@ -646,7 +640,4 @@ class MyMembershipCancelView(APIView):
         # the SELF path — an office-initiated cancel needs no self-notification.
         transaction.on_commit(lambda: _notify_office_of_self_cancel(member))
         member.refresh_from_db()
-        member._prefetched_coop_shares = list(  # type: ignore[attr-defined]
-            CoopShare.objects.filter(member=member)
-        )
         return Response(MyMemberDataReadSerializer(member).data)

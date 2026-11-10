@@ -377,9 +377,9 @@ export default function WeeklyStaffPlan() {
       <DndGrid onPlace={handlePlace} onRemove={handleRemove}>
         <div className="weekly-plan-page">
           {selectedWeek == null ? (
-            <p className="text-muted">{t("staff.select_week")}</p>
+            <p className="color-text-tertiary">{t("staff.select_week")}</p>
           ) : !grid ? null : !hasCategories ? (
-            <p className="text-muted">{t("staff.no_categories")}</p>
+            <p className="color-text-tertiary">{t("staff.no_categories")}</p>
           ) : (
             <div className="weekly-plan-layout">
               <section
@@ -391,7 +391,7 @@ export default function WeeklyStaffPlan() {
                 </h3>
                 <div className="weekly-plan-palette-box">
                   {paletteEmployees.length === 0 ? (
-                    <p className="text-muted">{t("staff.no_employees")}</p>
+                    <p className="color-text-tertiary">{t("staff.no_employees")}</p>
                   ) : (
                     paletteEmployees.map((employee) => {
                       const count = planCountByEmployee.get(employee.id) ?? 0;
@@ -528,7 +528,7 @@ export default function WeeklyStaffPlan() {
           )}
 
           {isFetching && !grid && (
-            <p className="text-muted">{t("common.loading")}</p>
+            <p className="color-text-tertiary">{t("common.loading")}</p>
           )}
         </div>
       </DndGrid>

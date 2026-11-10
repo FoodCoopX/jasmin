@@ -114,6 +114,12 @@ class TestBootstrap:
         with schema_context("public"):
             SuperAdmin.objects.all().delete()
 
+    @pytest.fixture(autouse=True)
+    def _no_password_in_the_environment(self, monkeypatch):
+        # The boot path reads it there; one set where the suite runs would
+        # fill every case that passes none.
+        monkeypatch.delenv("DJANGO_SUPERUSER_PASSWORD", raising=False)
+
     def test_creates_the_first_login(self):
         output = _run(email=EMAIL, password=PASSWORD, bootstrap=True)
 
@@ -121,6 +127,13 @@ class TestBootstrap:
         assert admin.is_active
         assert admin.check_password(PASSWORD)
         assert f"Created SuperAdmin {EMAIL}" in output
+
+    def test_takes_the_password_from_the_environment(self, monkeypatch):
+        monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", PASSWORD)
+
+        _run(email=EMAIL, bootstrap=True)
+
+        assert _admin().check_password(PASSWORD)
 
     def test_an_existing_login_keeps_its_password_and_deactivation(self):
         _run(email=EMAIL, password=PASSWORD, first_name="Ops")

@@ -108,7 +108,7 @@ export function useSharedAboColumns({
       width: "9em",
       sortable: true,
       render: (value: unknown) => (
-        <span style={{ fontSize: "0.7em" }}>{value as string}</span>
+        <span className="subscription-display-id">{value as string}</span>
       ),
     }),
     [],

@@ -24,11 +24,15 @@ user with that single role — and the expected category is one of:
 We use ``force_authenticate`` (not real JWT) because the JWT layer is
 already covered by ``apps/shared/tenants/tests/test_viewset_isolation_matrix.py``.
 
+A path may carry a query string (``"/api/…/?year=2025"``) for a read that
+needs parameters to answer 200.
+
 Two cautions when adding rows:
 
-``"4xx"`` is the weakest assertion here — a mistyped path 404s straight into
-it, so a row meant to prove "this role is no longer denied" can pass while
-testing nothing. Check the path resolves before trusting a green ``"4xx"``.
+``"4xx"`` is the weakest assertion here. ``check_route`` fails a row whose path
+resolves to no view, so a mistyped path cannot 404 into it, but a path that
+resolves to the wrong view still can — a row meant to prove "this role is no
+longer denied" then passes while testing nothing.
 
 Each persona holds one role only. An ``office`` persona that also held ``admin``
 would pass every admin-only gate as "office ok".
@@ -36,12 +40,18 @@ would pass every admin-only gate as "office ok".
 Rows for ``staff`` / ``gardener`` earn their keep. Neither role existed in this
 matrix for a long time, and that blind spot is why read-only GET ``@action``
 endpoints could sit behind ``write_permission`` — refusing exactly those two
-roles on pages they are allowed to open — without any test noticing.
+roles on pages they are allowed to open — without any test noticing. The crew
+rows for every other viewset whose read and write gates differ live in
+``test_route_permission_matrix_crew.py``, which runs them through
+``check_route`` as well.
 """
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 import pytest
+from django.urls import Resolver404, resolve
 from rest_framework.test import APIClient
 
 from apps.commissioning.tests.factories import JasminUserFactory
@@ -76,6 +86,11 @@ MATRIX: list[tuple[str, str, str, str]] = [
     # create-path identity floor, so this lands in "4xx" like the other POSTs
     # the harness sends no valid body for. It still proves office is not denied.
     ("/api/commissioning/members/", "post", "office", "4xx"),
+    # The crew tier is in neither gate.
+    ("/api/commissioning/members/", "get", "staff", "deny"),
+    ("/api/commissioning/members/", "get", "gardener", "deny"),
+    ("/api/commissioning/members/", "post", "staff", "deny"),
+    ("/api/commissioning/members/", "post", "gardener", "deny"),
     # ------- Subscriptions / Abos (StaffOrMember read, Office write) -------
     ("/api/commissioning/abos/", "get", "anon", "deny"),
     # Members CAN list abos — the queryset is row-scoped to their own
@@ -84,19 +99,38 @@ MATRIX: list[tuple[str, str, str, str]] = [
     ("/api/commissioning/abos/", "get", "office", "ok"),
     ("/api/commissioning/abos/", "get", "management", "ok"),
     ("/api/commissioning/abos/", "get", "customer", "deny"),
+    # The crew tier passes the read gate but is outside the owner bypass of
+    # ``apps.authz.scoping``, so its 200 carries no one's subscriptions.
+    ("/api/commissioning/abos/", "get", "staff", "ok"),
+    ("/api/commissioning/abos/", "get", "gardener", "ok"),
+    ("/api/commissioning/abos/", "post", "staff", "deny"),
+    ("/api/commissioning/abos/", "post", "gardener", "deny"),
+    ("/api/commissioning/abos/", "post", "office", "4xx"),
     # ------- Billing profiles (StaffOrMember read, Office write) -------
     ("/api/payments/billing_profiles/", "get", "anon", "deny"),
     ("/api/payments/billing_profiles/", "get", "member", "ok"),
     ("/api/payments/billing_profiles/", "get", "office", "ok"),
     ("/api/payments/billing_profiles/", "post", "member", "deny"),
     ("/api/payments/billing_profiles/", "post", "office", "4xx"),
+    # Scoped like the subscriptions above: the crew tier's 200 lists no
+    # member's billing profile.
+    ("/api/payments/billing_profiles/", "get", "staff", "ok"),
+    ("/api/payments/billing_profiles/", "get", "gardener", "ok"),
+    ("/api/payments/billing_profiles/", "post", "staff", "deny"),
+    ("/api/payments/billing_profiles/", "post", "gardener", "deny"),
     # ------- Charge schedules (StaffOrMember read; ReadOnlyModelViewSet) -------
     ("/api/payments/charge_schedules/", "get", "anon", "deny"),
     ("/api/payments/charge_schedules/", "get", "member", "ok"),
     ("/api/payments/charge_schedules/", "get", "office", "ok"),
-    # POST is method-not-allowed (405) — categorised as "4xx" because
-    # the failure is not a permission denial.
+    ("/api/payments/charge_schedules/", "get", "staff", "ok"),
+    ("/api/payments/charge_schedules/", "get", "gardener", "ok"),
+    # POST on the list is method-not-allowed (405) — categorised as "4xx"
+    # because the failure is not a permission denial.
     ("/api/payments/charge_schedules/", "post", "office", "4xx"),
+    # ``regenerate`` is the viewset's one write, behind the Office gate.
+    ("/api/payments/charge_schedules/regenerate/", "post", "staff", "deny"),
+    ("/api/payments/charge_schedules/regenerate/", "post", "gardener", "deny"),
+    ("/api/payments/charge_schedules/regenerate/", "post", "office", "ok"),
     # ------- Billing runs (Office read+write) -------
     # Office-only on purpose: the serializer hands out a signed link to the
     # SEPA file with every debited member's IBAN (see BillingRunViewSet).
@@ -124,6 +158,7 @@ MATRIX: list[tuple[str, str, str, str]] = [
     # after the permission layer let it through.
     ("/api/commissioning/crate_contents/", "post", "customer", "deny"),
     ("/api/commissioning/crate_contents/", "post", "staff", "deny"),
+    ("/api/commissioning/crate_contents/", "post", "gardener", "deny"),
     ("/api/commissioning/crate_contents/", "post", "office", "4xx"),
     # ------- Finalized share contents (Staff read, Office write) -------
     # The office plans and finalizes the share contents members get in their
@@ -224,8 +259,13 @@ def _user_for_role(role: str):
     raise ValueError(f"unknown role: {role}")
 
 
-@pytest.mark.parametrize("path,method,role,expected", MATRIX)
-def test_route_permission_matrix(tenant, path, method, role, expected):
+def check_route(path: str, method: str, role: str, expected: str) -> None:
+    """Send ``method`` to ``path`` as ``role`` and assert the outcome category."""
+    try:
+        resolve(urlsplit(path).path)
+    except Resolver404:
+        pytest.fail(f"{path} resolves to no view; its 404 would pass as '4xx'.")
+
     user = _user_for_role(role)
     client = APIClient()
     if user is not None:
@@ -248,3 +288,8 @@ def test_route_permission_matrix(tenant, path, method, role, expected):
         f"({actual!r}), expected category {expected!r}. "
         f"Body head: {resp.content[:200]!r}"
     )
+
+
+@pytest.mark.parametrize("path,method,role,expected", MATRIX)
+def test_route_permission_matrix(tenant, path, method, role, expected):
+    check_route(path, method, role, expected)

@@ -2,7 +2,9 @@ import type { TFunction } from "i18next";
 
 /**
  * Returns the translated suffix appended to share-article names
- * that are marked as purchased (DE: "Zukauf", EN: "purchase", …).
+ * that are marked as purchased (DE: "Zukauf", EN: "purchased", …). The suffix
+ * is stored in the name, so every caller passes a ``t`` in the farm's
+ * language (``useTenantLanguageT``), never the reader's.
  */
 const getPurchasedSuffix = (t: TFunction): string =>
   t("commissioning.purchased_name_suffix");

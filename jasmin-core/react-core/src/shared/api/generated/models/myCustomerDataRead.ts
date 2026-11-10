@@ -15,33 +15,33 @@ without forcing the client to make a second call.
  */
 export interface MyCustomerDataRead {
   /** @nullable */
-  readonly company_name?: string | null;
+  readonly company_name: string | null;
   /** @nullable */
-  readonly first_name?: string | null;
+  readonly first_name: string | null;
   /** @nullable */
-  readonly last_name?: string | null;
-  readonly address?: string;
-  readonly zip_code?: string;
-  readonly city?: string;
+  readonly last_name: string | null;
+  readonly address: string;
+  readonly zip_code: string;
+  readonly city: string;
   /** @nullable */
-  readonly country?: string | null;
+  readonly country: string | null;
   /** @nullable */
-  readonly email?: string | null;
+  readonly email: string | null;
   /** @nullable */
-  readonly email_2?: string | null;
+  readonly email_2: string | null;
   /** @nullable */
-  readonly email_3?: string | null;
+  readonly email_3: string | null;
   /** @nullable */
-  readonly order_email?: string | null;
+  readonly order_email: string | null;
   /** @nullable */
-  readonly phone?: string | null;
+  readonly phone: string | null;
   /** @nullable */
-  readonly phone_2?: string | null;
+  readonly phone_2: string | null;
   /** @nullable */
-  readonly phone_3?: string | null;
+  readonly phone_3: string | null;
   /** @nullable */
-  readonly uid?: string | null;
-  readonly iban_stored?: boolean;
+  readonly uid: string | null;
+  readonly iban_stored: boolean;
   /** @nullable */
-  readonly customer_number?: number | null;
+  readonly customer_number: number | null;
 }

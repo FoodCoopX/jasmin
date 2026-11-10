@@ -22,6 +22,7 @@ from ..models import (
 from ..models.choices import UnitOptions, VegetableSizeOptions
 from ..utils.sort_order import share_type_ranks, size_order_annotation
 from ..utils.weight import mean_weight, quantize_weight, taken_weights
+from .packing_mode import current_packing_mode, flag_for_mode
 
 # The ShareArticle factor that turns a piece or a bunch of each size into kg,
 # named as the ``.values()`` key the averages' scan reads.
@@ -325,13 +326,17 @@ def calculate_member_growth_statistics(
 def _box_shares(start_date: date, end_date: date) -> QuerySet[Share]:
     """The shares of the ISO weeks the dates touch, a mid-week start's whole
     week included, that are packed in boxes. Only a box is weighed: a virtual
-    variation is made of physical ones, and a variation packed in bulk is never
-    a box."""
-    return Share.objects.filter(
+    variation is made of physical ones, and a variation packed loose is never
+    a box — every one in the "bulk" packing mode, the flagged ones in "mixed",
+    none in "boxes", whatever flag a size kept from an earlier mode."""
+    shares = Share.objects.filter(
         iso_week_window_for_dates(start_date, end_date),
         share_type_variation__variation_type=ShareTypeVariation.VariationType.PHYSICAL,
-        share_type_variation__is_packed_bulk=False,
     )
+    loose = flag_for_mode(current_packing_mode())
+    if loose is None:
+        return shares.filter(share_type_variation__is_packed_bulk=False)
+    return shares.none() if loose else shares
 
 
 def _ranked_variations(

@@ -21,34 +21,10 @@ silently dropped, leaving the fields neither at runtime nor in the
 schema.
  */
 export interface OrderContent {
-  readonly id?: string;
-  year: number;
-  delivery_week: number;
-  day_number: number;
-  reseller: string;
-  /** @nullable */
-  harvesting_day?: number | null;
-  /** @nullable */
-  packing_day?: number | null;
-  /** @nullable */
-  washing_day?: number | null;
-  /** @nullable */
-  cleaning_day?: number | null;
-  /** @nullable */
-  last_possible_ordering_day?: number | null;
-  readonly order_id?: string;
-  readonly order_number?: string;
-  readonly order_number_prefix?: string;
-  readonly order_is_finalized?: boolean;
-  readonly delivery_note_is_finalized?: boolean;
-  readonly delivery_note_id?: string;
-  readonly delivery_note_number?: string;
-  readonly delivery_note_prefix?: string;
-  readonly invoice_id?: string;
-  readonly invoice_number?: string;
-  readonly invoice_prefix?: string;
-  readonly has_invoice?: boolean;
-  readonly has_finalized_invoice?: boolean;
+  readonly id: string;
+  readonly order_id: string;
+  readonly order_number: string;
+  readonly order_number_prefix: string;
   is_finalized?: boolean;
   /** @nullable */
   finalized_at?: string | null;
@@ -102,10 +78,10 @@ export interface OrderContent {
   offer?: string | null;
   /** @nullable */
   share_article?: string | null;
-  readonly order?: string;
+  readonly order: string;
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly line_netto?: string;
+  readonly line_netto: string;
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly line_brutto?: string;
-  readonly share_article_name?: string;
+  readonly line_brutto: string;
+  readonly share_article_name: string;
 }

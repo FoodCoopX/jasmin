@@ -58,8 +58,8 @@ interface ColumnLike {
    * (record → options) are kept in the type to stay compatible with
    * EditableColumnConfig, but fall back to "string" in the template. */
   options?:
-    | Array<{ value: string | number; label?: unknown }>
-    | ((record: never) => Array<{ value: string | number; label?: unknown }>);
+    | Array<{ value: string | number | null; label?: unknown }>
+    | ((record: never) => Array<{ value: string | number | null; label?: unknown }>);
 }
 
 interface DownloadCsvTemplateButtonProps {
@@ -149,14 +149,14 @@ function typeHintKeyFor(col: ColumnLike): string {
 
 function selectValuesHint(col: ColumnLike): string | undefined {
   // A select with a static option list lists its values, so the user can
-  // copy them verbatim into the cell. Per-row option functions have no record
-  // to evaluate against at download time and fall back to the text hint.
-  if (
-    col.inputType === "select" &&
-    Array.isArray(col.options) &&
-    col.options.length > 0
-  ) {
-    return col.options.map((opt) => String(opt.value)).join("|");
+  // copy them verbatim into the cell; a "none" option (a null value) is an
+  // empty cell and isn't listed. Per-row option functions have no record to
+  // evaluate against at download time and fall back to the text hint.
+  const values = Array.isArray(col.options)
+    ? col.options.flatMap((opt) => (opt.value == null ? [] : [String(opt.value)]))
+    : [];
+  if (col.inputType === "select" && values.length > 0) {
+    return values.join("|");
   }
   return undefined;
 }

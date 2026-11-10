@@ -14,13 +14,13 @@ import type { CarryoverBlock } from './carryoverBlock';
 around.
  */
 export interface CultivationPlanSolutionWithDetails {
-  readonly id?: string;
-  readonly year?: number;
-  readonly version?: number;
-  readonly chosen?: boolean;
-  readonly cells_per_bed?: number;
-  readonly placement_count?: number;
-  readonly metrics?: SolutionMetrics;
-  readonly details?: readonly CultivationPlanSolutionDetail[];
-  readonly carryover?: readonly CarryoverBlock[];
+  readonly id: string;
+  readonly year: number;
+  readonly version: number;
+  readonly chosen: boolean;
+  readonly cells_per_bed: number;
+  readonly placement_count: number;
+  readonly metrics: SolutionMetrics;
+  readonly details: readonly CultivationPlanSolutionDetail[];
+  readonly carryover: readonly CarryoverBlock[];
 }

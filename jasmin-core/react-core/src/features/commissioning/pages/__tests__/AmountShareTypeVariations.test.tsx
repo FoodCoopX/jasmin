@@ -26,6 +26,7 @@ import type {
   WeeklyComboMatrixResponse,
   WeeklyComboMatrixRow,
 } from "@shared/api/generated/models";
+import { makeSharesDeliveryDay } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 const NOW = vi.hoisted(() => {
@@ -116,12 +117,14 @@ const SCHOOL: Stop = { id: "ds-school", name: "School", tour: 1 };
 const LIBRARY: Stop = { id: "ds-library", name: "Library", tour: 2 };
 
 /** A delivery day running all year, with the stations it serves. */
-const deliveryDay = (dayNumber: number, tours: number, stops: Stop[]): SharesDeliveryDay => ({
+const deliveryDay = (dayNumber: number, tours: number, stops: Stop[]): SharesDeliveryDay => makeSharesDeliveryDay({
   id: `day-${dayNumber}`,
   day_number: dayNumber as SharesDeliveryDay["day_number"],
   valid_from: "2026-01-05",
   valid_until: null,
   number_of_tours: tours,
+  // The tours its stations sit on, as the backend derives them.
+  used_tours: [...new Set(stops.map((each) => each.tour))].sort((a, b) => a - b),
   delivery_stations: stops.map((each, index) => ({
     id: each.id, short_name: each.name, tour_number: each.tour, stop_order: index + 1,
   })),
@@ -130,7 +133,7 @@ const deliveryDay = (dayNumber: number, tours: number, stops: Stop[]): SharesDel
 // Tuesday is served by one tour; Friday by two.
 const TUESDAY_ONE_TOUR = deliveryDay(TUESDAY, 1, [FARM_SHOP, MARKET]);
 const FRIDAY_TWO_TOURS = deliveryDay(FRIDAY, 2, [SCHOOL, LIBRARY]);
-const FRIDAY_ONE_TOUR = deliveryDay(FRIDAY, 1, [SCHOOL, LIBRARY]);
+const FRIDAY_ONE_TOUR = deliveryDay(FRIDAY, 1, [SCHOOL, { ...LIBRARY, tour: 1 }]);
 
 const HONEY_SMALL: PackingBoxesMatrixAddOn = {
   variation_id: "var-honey-S",
@@ -139,6 +142,7 @@ const HONEY_SMALL: PackingBoxesMatrixAddOn = {
   share_type_id: "st-honey",
   share_type_short_name: "Honey",
   share_type_sort_index: 1,
+  is_packed_bulk: false,
 };
 
 /** A kind of box: a vegetable share of one size (or none) and the add-ons packed in. */
@@ -158,6 +162,7 @@ const box = (
     base_share_type_short_name: base ? "Veg" : "",
     // Boxes without a base share come after every share type.
     base_share_type_sort_index: base ? 0 : 99,
+    base_is_packed_bulk: false,
     add_ons: addOns,
     count,
   };
@@ -448,6 +453,7 @@ describe("AmountShareTypeVariations counts", () => {
         base_share_type_name: shortName,
         base_share_type_short_name: shortName,
         base_share_type_sort_index: sortIndex,
+        base_is_packed_bulk: false,
       }) satisfies PackingBoxesMatrixColumn;
     const vegetablesS = shareSize("veg", "Veg", "S", 1, 0);
     const vegetablesM = shareSize("veg", "Veg", "M", 2, 0);
@@ -481,6 +487,18 @@ describe("AmountShareTypeVariations splitting the days", () => {
     expect(toursSwitch()).not.toBeChecked();
     expect(stationsSwitch()).toBeInTheDocument();
     expect(stationsSwitch()).not.toBeChecked();
+  });
+
+  it.each([
+    ["offers", "a count of one with stations on two tours", 1, [SCHOOL, LIBRARY], true],
+    ["offers no", "a count of two with every station on tour 1", 2, [SCHOOL, { ...LIBRARY, tour: 1 }], false],
+  ])("%s tours for a day with %s: the stations' tours decide", async (_offers, _case, count, stops, offered) => {
+    farm.deliveryDays = [TUESDAY_ONE_TOUR, deliveryDay(FRIDAY, count, stops)];
+    renderPage();
+    await waitFor(() => expect(api.deliveryDays).toHaveBeenCalled());
+    await waitFor(() => expect(rows()).toHaveLength(2));
+
+    expect(Boolean(toursSwitch())).toBe(offered);
   });
 
   it("offers no tours when every delivery day of the week has a single tour", async () => {

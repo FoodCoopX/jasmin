@@ -226,14 +226,14 @@ class TestSnapshotPropagation:
 
     @pytest.mark.django_db
     def test_order_content_keeps_explicit_tax_rate(self, tenant):
-        """A tax_rate set on the OrderContent survives `_serialize_order_content`."""
-        from apps.commissioning.services.order_content_service import (
-            OrderContentService,
+        """A tax_rate set on the OrderContent survives `serialize_order_content`."""
+        from apps.commissioning.services.order_content_rows import (
+            serialize_order_content,
         )
 
         oc = OrderContentFactory(tax_rate=Decimal("12.50"))
 
-        row = OrderContentService._serialize_order_content(oc)
+        row = serialize_order_content(oc)
         assert row["tax_rate"] == Decimal("12.50")
 
     # NOTE: No share_article-pricing fallback test here: `tax_rate` is NOT NULL

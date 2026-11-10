@@ -49,7 +49,7 @@ export default function CustomerDocumentsCard({ orderContents }: Props) {
   const invoiceRef = orderContents.find((i) => i.invoice_id);
 
   return (
-    <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+    <Row gutter={[24, 24]} className="mt-24">
       <Col xs={24}>
         <Card title={t("customer.documents")} className="dark-green-border">
           <Space size="middle">
@@ -89,7 +89,7 @@ export default function CustomerDocumentsCard({ orderContents }: Props) {
             </Button>
             {invoiceIsCancelled && (
               <Space size="small">
-                <Text type="danger" style={{ fontSize: 12 }}>
+                <Text type="danger" className="text-12">
                   {t("customer.invoice_cancelled")}
                 </Text>
                 <Button
@@ -103,7 +103,7 @@ export default function CustomerDocumentsCard({ orderContents }: Props) {
                   {storno?.invoice_number && (
                     <Text
                       type="secondary"
-                      style={{ marginLeft: 4, fontSize: 12 }}
+                      className="cancellation-invoice-number"
                     >
                       #{String(storno.prefix ?? "")}
                       {String(storno.invoice_number ?? "")}

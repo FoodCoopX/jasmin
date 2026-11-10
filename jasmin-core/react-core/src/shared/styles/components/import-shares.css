@@ -1,0 +1,19 @@
+/* Import shares page: the CSV explainer under the import history. */
+
+/* The example CSV. It sits in the explainer's AntD text, whose own
+   ``.ant-typography pre`` rule (0,1,1) sets a pre's margin, padding and
+   background, hence the doubled selector. */
+.explainer-text__body .import-shares__csv-example {
+  background: var(--color-bg-subtle);
+  padding: 8px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+/* The link to the code mappings, inline in the explainer's sentence. */
+.ant-btn.import-shares__codes-link {
+  padding: 0;
+  height: auto;
+}

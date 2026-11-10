@@ -143,7 +143,13 @@ export default function InvoiceModal({
   // Invoices include both regular and extra share articles.
   const { shareArticleColumn, handleUnitChange, handleAmountChange } =
     useShareArticleColumn({
-      filters: { get_price_info: true, include_extra: true },
+      // The prices of the invoice's date: an invoice may bill several
+      // weeks' deliveries.
+      filters: {
+        get_price_info: true,
+        include_extra: true,
+        price_date: invoiceData?.invoice_date ?? undefined,
+      },
       autofillContext: "reseller",
       finalTiers,
     });
@@ -230,7 +236,7 @@ export default function InvoiceModal({
   );
 
   const customEdit = useMemo(
-    () => makeContentCustomEdit(defaultTaxRateArticles),
+    () => makeContentCustomEdit<InvoiceContentRecord>(defaultTaxRateArticles),
     [defaultTaxRateArticles],
   );
 
@@ -269,6 +275,7 @@ export default function InvoiceModal({
       apiFunctions: apiFunctionsCrates,
       refetchDocument: invalidateInvoice,
       repeatedTypeMessage: t("validation.unique.invoice_modal_crate"),
+      priceDate: invoiceData?.invoice_date,
     });
 
   const columns = useMemo<EditableColumnConfig<InvoiceContentRecord>[]>(
@@ -411,9 +418,9 @@ export default function InvoiceModal({
             />
           )}
 
-          <EditableTable
+          <EditableTable<InvoiceContentRecord>
             key={invoiceId!}
-            columns={columns as EditableColumnConfig[]}
+            columns={columns}
             apiFunctions={apiFunctionsContents}
             initialData={lineItems}
             permissions={permissions}
@@ -430,16 +437,8 @@ export default function InvoiceModal({
           />
           {(showCratesOnDocuments || !!invoiceData.crate_items?.length) && (
             <>
-              <div
-                style={{
-                  marginTop: "4em",
-                  marginBottom: "-1em",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5em",
-                }}
-              >
-                <h5 style={{ margin: 0 }}>
+              <div className="document-crates-title flex-center-y gap-0-5em">
+                <h5 className="m-0">
                   {t("commissioning.crates_invoicemodal")}
                 </h5>
                 <ToolTipIcon title={t("tooltip.crates_used_in_invoice")} />
@@ -452,20 +451,14 @@ export default function InvoiceModal({
             </>
           )}
 
-          <div
-            style={{
-              marginTop: "1em",
-              textAlign: "right",
-              fontSize: "0.95em",
-            }}
-          >
+          <div className="invoice-modal__tax-breakdown">
             {taxBreakdown.map((item) => (
-              <div key={item.rate} style={{ marginBottom: "0.3em" }}>
-                <span style={{ fontWeight: "normal" }}>
+              <div key={item.rate} className="invoice-modal__tax-rate">
+                <span className="font-normal">
                   {t("commissioning.netto")} ({item.rate}%):{" "}
                   {formatCurrency(item.netto)}
                 </span>
-                <span style={{ marginLeft: "1.5em", fontWeight: "normal" }}>
+                <span className="invoice-modal__tax-amount">
                   {t("commissioning.ust")} ({item.rate}%):{" "}
                   {formatCurrency(item.tax)}
                 </span>
@@ -473,38 +466,16 @@ export default function InvoiceModal({
             ))}
           </div>
 
-          <div
-            style={{
-              marginTop: "1em",
-              paddingTop: "0.5em",
-              borderTop: "1px solid var(--color-border)",
-              textAlign: "right",
-              fontSize: "1em",
-              fontWeight: "bold",
-            }}
-          >
+          <div className="invoice-modal__total-net">
             {t("commissioning.total_sum_netto_invoice_details")}{" "}
             {formatCurrency(totalNetto)}
           </div>
-          <div
-            style={{
-              paddingTop: "0.5em",
-              textAlign: "right",
-              fontSize: "1em",
-            }}
-          >
+          <div className="invoice-modal__total-tax">
             {t("commissioning.total_sum_ust_invoice_details")}{" "}
             {formatCurrency(totalBrutto - totalNetto)}
           </div>
 
-          <div
-            style={{
-              marginTop: "0.5em",
-              textAlign: "right",
-              fontSize: "1.1em",
-              fontWeight: "bold",
-            }}
-          >
+          <div className="invoice-modal__total-gross">
             {t("commissioning.total_sum_brutto_invoice_details")}{" "}
             {formatCurrency(totalBrutto)}
           </div>

@@ -17,6 +17,7 @@ the matching section of Part 1.
   - [Errors](#errors)
   - [API design & query params](#api-design--query-params)
   - [ORM & data hygiene](#orm--data-hygiene)
+  - [Django coding style](#django-coding-style)
   - [Migrations](#migrations)
   - [Typing (mypy)](#typing-mypy)
   - [Hygiene gates](#hygiene-gates)
@@ -330,6 +331,53 @@ That module is domain-free and explicitly safe to import from any app,
 from the shared one, which additionally treats `None` as zero and passes a
 `Decimal` through unchanged.
 
+### Django coding style
+
+Backend code follows Django's coding style. Black and ruff's import-order and
+naming rules cover most of it; these parts have their own checks.
+
+**Model member order.** A model's body runs in this order:
+
+1. class constants, choices classes and other class attributes
+   (`DOCUMENT_TYPE`, `class WaitingListReason(models.TextChoices)`,
+   `overlap_unique_fields`);
+2. database fields;
+3. managers;
+4. `class Meta`;
+5. `__str__()` and the other magic methods;
+6. `save()`;
+7. `get_absolute_url()`;
+8. every other method, `clean()` and `delete()` included since Django's list
+   leaves them out — properties, class and static methods too.
+
+Each group keeps its own order when members move: the fields' order is
+`_meta.fields` (and with it every `fields = "__all__"` serializer and the
+schema), and the first manager declared is the default one.
+`apps/shared/tests/test_model_member_order.py` holds every model to the order,
+abstract ones included; ruff's DJ012 checks the models it can see.
+
+**Named choices.** A model field's `choices` is a `TextChoices` /
+`IntegerChoices` class or an upper-case class constant, never a list written
+into the field.
+
+**No settings read at import time.** A module- or class-level `settings.X`, a
+default argument or a decorator reads the setting once, when the module is
+imported, and `override_settings` never reaches it. Read it where it is used —
+a small function such as `mass_delete_threshold()` when several places need it.
+`settings.AUTH_USER_MODEL` is exempt — Django's own pattern for pointing at the
+user model. `apps/shared/tests/test_django_style_rules.py` holds this rule
+across `apps/` and `core/`, test files included, and the choices rule over every
+model module.
+
+**Today is `timezone.localdate()`.** `timezone.now()` is the UTC instant, so
+its `.date()`, `.year` or `.isocalendar()` is still yesterday between midnight
+and 01:00 (02:00 in summer) in `TIME_ZONE`. The same guard holds it.
+
+**Ruff holds the rest:** no trailing whitespace or whitespace-only lines
+(W291, W293, inside strings too — an API description is published as written),
+no f-string in a logging call (G004; pass the values as arguments), and
+`[*a, b]` unpacking instead of concatenating collections (RUF005).
+
 ### Migrations
 
 **Migrations are forward-only in prod.** Once a migration ships to prod, never
@@ -525,7 +573,7 @@ equivalent exists is a defect, not a shortcut.
 | Table | `EditableTable` for anything editable; `CrudListPage` / `useCrudListPage` for a standard CRUD list page; `ReadOnlyReportTable` for read-only, server-paginated or custom-action tables (`READ_ONLY_PERMISSION` gates an EditableTable read-only) |
 | Column defs | the `use*Column(s)` hooks — `useTimeBoundColumns`, `useActiveStatusColumn`, `useSellerColumn`, `useShareArticleColumn`, `useNoteColumn`, … |
 | Date-range picker | AntD `RangePicker` + `useDateRangePresets` |
-| Date display/format | `useDateFormat` — `dateFormat` (picker), `formatDate` (cells), `formatDateForAPI` (`YYYY-MM-DD` payloads). Never hardcode a date format. It is a hook (it reads tenant settings through `useTenant`), so it cannot be called from a plain service — format in the component and pass the string down, or hand the formatter in. Wire dates outside a component come from `@shared/utils/apiDate`: `toApiDate`, `formatApiDate`, and `todayApiDate` for today's local date (never `toISOString().slice(0, 10)`, which is the UTC date). |
+| Date display/format | `useDateFormat` — `dateFormat` (picker), `formatDate` (cells), `formatDateForAPI` (`YYYY-MM-DD` payloads), `monthFormat` / `shortMonthFormat` (a month in full, or on a chart axis; they don't depend on the tenant, so plain code imports them as `MONTH_FORMAT` / `SHORT_MONTH_FORMAT` from `@shared/utils`); `useTimeFormat` — `formatTime`, `formatDateTime` for a timestamp. Never hardcode a date format. It is a hook (it reads tenant settings through `useTenant`), so it cannot be called from a plain service — format in the component and pass the string down, or hand the formatter in. Wire dates outside a component come from `@shared/utils/apiDate`: `toApiDate`, `formatApiDate`, and `todayApiDate` for today's local date (never `toISOString().slice(0, 10)`, which is the UTC date). |
 | CSV | `buildCsvString` + `downloadCsvBlob` (`src/shared/utils/csv.ts`), or `ExportCsvDateRangeModal` for a date-range export honoring the tenant `csv_format`. The export-modal shells live in `src/features/commissioning/modals/csv/`, not `shared`. |
 | Money / currency | `useCurrency` |
 | Selectors | `src/shared/selectors/*` — Year/Week/Month/Day/Member/Reseller/ShareType |
@@ -682,7 +730,12 @@ Fixing copy changes the value; the key never changes.
 building-block rules above are for app code; in test code they are optional,
 and an audit or review leaves them out. The rules below still hold in tests,
 because breaking one hides a failure: discovery, frozen clocks, random order,
-the fixtures that make a gate actually run.
+the fixtures that make a gate actually run. So does the part of
+[Django coding style](#django-coding-style) a check holds — the ruff rules and
+the import-time settings guard scan test files too — plus its one rule for
+tests: a test's or a test class's docstring states the behaviour, without a
+"Tests that …", "Ensures that …" or "Verify …" preamble
+(`apps/shared/tests/test_django_style_rules.py`).
 
 ### Backend testing
 
@@ -924,8 +977,8 @@ Located in `jasmin-core/django-core/apps/`:
 from `commissioning`): `auth_cookies.py`, `csp_report.py`, `csv_safety.py`,
 `deferred_email.py`, `iban_validator.py`, `image_upload.py`, `invitations.py`,
 `iso_week_filters.py`, `languages.py`, `model_fields.py`, `money.py`,
-`openapi_params.py`, `pii_logging.py`, `pii_masking.py`, `query_params.py`,
-`request_utils.py`, `retention.py`, `sepa_mandate_hooks.py`,
+`openapi_params.py`, `packing_mode_hooks.py`, `pii_logging.py`, `pii_masking.py`,
+`query_params.py`, `request_utils.py`, `retention.py`, `sepa_mandate_hooks.py`,
 `smtp_host_validator.py`, `subscription_hooks.py`, `tenant_urls.py`.
 
 **Key Django patterns:**
@@ -1201,8 +1254,10 @@ poetry run python scripts/mypy_baseline.py freeze   # Re-freeze after fixing fin
 ```
 
 Ruff config lives in `pyproject.toml` (`[tool.ruff]` and `[tool.ruff.lint]`). The
-selected rule set is `E,F,B,BLE,UP,I` plus the hygiene rules `N,C901,PLR0913,
-PLR0915` (gated against `ruff-baseline.txt`, see [Hygiene gates](#hygiene-gates)),
+selected rule set is `E,F,B,BLE,UP,I`, the Django-style rules
+`W291,W293,G004,RUF005,DJ012` (see [Django coding style](#django-coding-style)),
+plus the hygiene rules `N,C901,PLR0913,PLR0915` (gated against
+`ruff-baseline.txt`, see [Hygiene gates](#hygiene-gates)),
 with `__init__.py` re-exports, conftest
 fixtures, Django settings star-imports, generated migrations, and the
 `apps/cultivation/optimizer/**` solver code allow-listed.

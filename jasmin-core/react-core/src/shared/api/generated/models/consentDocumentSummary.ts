@@ -12,11 +12,11 @@ import type { ConsentKindEnum } from './consentKindEnum';
 body to keep list payloads bounded.
  */
 export interface ConsentDocumentSummary {
-  readonly id?: string;
-  readonly kind?: ConsentKindEnum;
+  readonly id: string;
+  readonly kind: ConsentKindEnum;
   /** Stable identifier. ISO date like '2026-05-20' or semver-style '3.1' both work; pick one convention per tenant. */
-  readonly version?: string;
-  readonly locale?: string;
-  readonly title?: string;
-  readonly valid_from?: string;
+  readonly version: string;
+  readonly locale: string;
+  readonly title: string;
+  readonly valid_from: string;
 }

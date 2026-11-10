@@ -30,6 +30,7 @@ from django.utils import timezone
 from isoweek import Week
 
 from ..models import DeliveryExceptionPeriod, Share, ShareDelivery, Subscription
+from ..utils.iso_week_utils import previous_monday
 from .recompute import recompute_shares
 
 # An ISO ``(year, week)`` tuple.
@@ -77,6 +78,32 @@ def notes_by_week_in_periods(
     }
 
 
+def first_unpaused_monday(
+    monday: datetime.date, periods: Iterable[tuple]
+) -> datetime.date:
+    """The first Monday on or after ``monday`` (a Monday) whose week none of
+    ``periods`` pauses (each a ``(valid_from, valid_until, …)`` tuple). Pauses
+    can abut, so the week after one can open the next."""
+    period_list = list(periods)
+    while True:
+        year, week, _weekday = monday.isocalendar()
+        paused = next(_weeks_matching_periods([(year, week)], period_list), None)
+        if paused is None:
+            return monday
+        _year_week, (_valid_from, valid_until, *_rest) = paused
+        monday = previous_monday(valid_until) + datetime.timedelta(days=7)
+
+
+def pause_periods_for_variation(share_type_variation_id) -> list[tuple]:
+    """The variation's DeliveryExceptionPeriods as ``(valid_from, valid_until)``
+    tuples, the shape the resolvers above take. One query."""
+    return list(
+        DeliveryExceptionPeriod.objects.filter(
+            share_type_variation_id=share_type_variation_id
+        ).values_list("valid_from", "valid_until")
+    )
+
+
 def paused_weeks_for_variation(
     share_type_variation_id, candidate_weeks: Iterable[YearWeek]
 ) -> set[YearWeek]:
@@ -85,10 +112,9 @@ def paused_weeks_for_variation(
     candidate = set(candidate_weeks)
     if not candidate:
         return set()
-    periods = DeliveryExceptionPeriod.objects.filter(
-        share_type_variation_id=share_type_variation_id
-    ).values_list("valid_from", "valid_until")
-    return weeks_in_periods(candidate, periods)
+    return weeks_in_periods(
+        candidate, pause_periods_for_variation(share_type_variation_id)
+    )
 
 
 def paused_weeks_by_variation(

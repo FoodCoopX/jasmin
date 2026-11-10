@@ -245,7 +245,7 @@ export default function CommissioningListResellers() {
           />
         ) : resellers.length === 0 ? (
           <PastWarningMessage>
-            <div style={{ textAlign: "center", padding: "0em" }}>
+            <div className="text-center p-0">
               {t("commissioning.no_orders_title")}
             </div>
           </PastWarningMessage>
@@ -253,7 +253,7 @@ export default function CommissioningListResellers() {
           resellers.map((reseller) => (
             <Card
               key={reseller.id}
-              style={{ width: "60%", marginBottom: 16 }}
+              className="reseller-order-card"
               // Trim Ant Design's Card chrome on both slots so the
               // pink reseller-card-header chip starts at the same
               // left edge as the table below it. Without this, the

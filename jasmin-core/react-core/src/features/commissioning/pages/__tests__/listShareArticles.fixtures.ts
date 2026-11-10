@@ -3,6 +3,7 @@
  * crates, and the articles the server holds at the start of each test.
  */
 import type { ActiveShareOptions, Crate, ShareArticle, ShareOptionItem } from "@shared/api/generated/models";
+import { makeCrate } from "@/test/modelFixtures";
 
 type Row = Record<string, unknown>;
 
@@ -16,9 +17,9 @@ export const ACTIVE_SHARE_OPTIONS: ActiveShareOptions = {
   OIL_SHARE: false, GRAIN_SHARE: false, BREAD_SHARE: false, fruit_and_veg_shares_are_separate: false,
 };
 
-export const EURO_CRATE: Crate = { id: "crate-e2", name: "Euro crate E2", short_name: "E2", is_active: true };
+export const EURO_CRATE: Crate = makeCrate({ id: "crate-e2", name: "Euro crate E2", short_name: "E2", is_active: true });
 // Without a short name, so it goes by its full name.
-export const HARVEST_BIN: Crate = { id: "crate-bin", name: "Harvest bin", short_name: null, is_active: true };
+export const HARVEST_BIN: Crate = makeCrate({ id: "crate-bin", name: "Harvest bin", short_name: null, is_active: true });
 export const CRATES = [EURO_CRATE, HARVEST_BIN];
 
 export const optionFields = (options: string[]) => ({

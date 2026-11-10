@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { BulkCopyOffersResponse, BulkFinalizeResponse } from "@shared/api/generated/models";
 import type { useOffersData } from "@features/commissioning/hooks/useOffersData";
+import { makeOfferGroup } from "@/test/modelFixtures";
 
 // Shows the values a label is interpolated with after its key, so each
 // offer group's button and message can be told apart.
@@ -60,8 +61,11 @@ type OfferGroups = ReturnType<typeof useOffersData>["otherOfferGroups"];
 
 // Shaped as useOfferGroups hands them over: each row carries its id as the
 // option ``value`` too.
-const MARKET = { id: "group-market", value: "group-market", label: "Market stall", number: 2, name: "Market stall" };
-const SHOP = { id: "group-shop", value: "group-shop", label: "Farm shop", number: 3, name: "Farm shop" };
+const offerGroupOption = (id: string, number: number, name: string) => ({
+  ...makeOfferGroup({ id, number, name }), value: id, label: name,
+});
+const MARKET = offerGroupOption("group-market", 2, "Market stall");
+const SHOP = offerGroupOption("group-shop", 3, "Farm shop");
 const OTHER_GROUPS: OfferGroups = [MARKET, SHOP];
 
 const SELECTED = ["offer-carrots", "offer-lemons"];

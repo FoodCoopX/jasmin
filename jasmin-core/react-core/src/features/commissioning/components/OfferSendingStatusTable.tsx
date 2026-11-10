@@ -47,20 +47,18 @@ export default function OfferSendingStatusTable({
         // aria-hidden and a visible text label (the date carries a sr-only
         // "sent" prefix; the not-sent state shows its label) makes it readable.
         record.sent_at ? (
-          <div style={{ fontSize: "0.85em", marginTop: "4px" }}>
+          <div className="text-label-sm mt-4">
             <CheckCircleOutlined
-              className="text-success"
-              style={{ fontSize: "18px" }}
+              className="text-success text-18"
               aria-hidden="true"
             />
             <span className="sr-only">{t("commissioning.offer_sent")}: </span>
             {formatDate(record.sent_at as string)}
           </div>
         ) : (
-          <div style={{ fontSize: "0.85em", marginTop: "4px" }}>
+          <div className="text-label-sm mt-4">
             <CloseCircleOutlined
-              className="text-error"
-              style={{ fontSize: "18px" }}
+              className="text-error text-18"
               aria-hidden="true"
             />
             {t("commissioning.offer_not_sent")}
@@ -70,13 +68,13 @@ export default function OfferSendingStatusTable({
   ];
 
   return (
-    <div style={{ marginTop: "2em", marginBottom: "2em" }}>
+    <div className="mt-2em mb-2em">
       <EditableTable
         columns={columns}
         initialData={rows}
         loading={loading}
         permissions={READ_ONLY_PERMISSION}
-        style={{ width: "46em" }}
+        className="custom-jasmin-table offer-sending-status-table"
       />
     </div>
   );

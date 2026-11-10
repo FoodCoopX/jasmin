@@ -197,7 +197,7 @@ export function useDeliveryStationPicker({
         popup: (
           <div>
             <strong>{station.name}</strong>
-            <Flex vertical gap={4} style={{ marginTop: 8 }}>
+            <Flex vertical gap={4} className="mt-8">
               {station.days.map((day) => (
                 <Button
                   key={day.value}

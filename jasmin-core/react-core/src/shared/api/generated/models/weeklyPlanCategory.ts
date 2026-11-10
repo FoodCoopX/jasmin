@@ -16,7 +16,7 @@ queries (one per reverse relation) instead of N*R — see
 ``apps/payments/tests/test_query_count_locks.py`` for the lock.
  */
 export interface WeeklyPlanCategory {
-  readonly id?: string;
+  readonly id: string;
   is_active?: boolean;
   /** @maxLength 200 */
   name: string;
@@ -31,5 +31,5 @@ export interface WeeklyPlanCategory {
    * @nullable
    */
   sort_order?: number | null;
-  readonly can_be_deleted?: boolean;
+  readonly can_be_deleted: boolean;
 }

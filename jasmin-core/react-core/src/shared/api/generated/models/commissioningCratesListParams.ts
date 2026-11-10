@@ -15,4 +15,8 @@ get_price_info?: boolean;
  * Filter by active status
  */
 is_active?: boolean;
+/**
+ * The date the price and VAT rate apply on, e.g. a document's delivery day; today when omitted.
+ */
+price_date?: string;
 };

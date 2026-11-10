@@ -34,7 +34,7 @@ import type {
   DeletionConfirmed,
   DeletionLogList,
   DeletionPreview,
-  DeletionRejectBody,
+  DeletionRejectBodyRequest,
   DeletionRejected,
   DeletionRequestAccepted,
   ErrorResponse,
@@ -690,7 +690,7 @@ captures it.
  */
 export const gdprAdminRejectDeletionCreate = (
     requestId: string,
-    deletionRejectBody: DeletionRejectBody,
+    deletionRejectBodyRequest: DeletionRejectBodyRequest,
  signal?: AbortSignal
 ) => {
       
@@ -698,7 +698,7 @@ export const gdprAdminRejectDeletionCreate = (
       return axiosService<DeletionRejected>(
       {url: `/api/gdpr/admin/reject-deletion/${requestId}/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: deletionRejectBody, signal
+      data: deletionRejectBodyRequest, signal
     },
       );
     }
@@ -706,8 +706,8 @@ export const gdprAdminRejectDeletionCreate = (
 
 
 export const getGdprAdminRejectDeletionCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>, TError,{requestId: string;data: DeletionRejectBody}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>, TError,{requestId: string;data: DeletionRejectBody}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>, TError,{requestId: string;data: DeletionRejectBodyRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>, TError,{requestId: string;data: DeletionRejectBodyRequest}, TContext> => {
 
 const mutationKey = ['gdprAdminRejectDeletionCreate'];
 const {mutation: mutationOptions} = options ?
@@ -719,7 +719,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>, {requestId: string;data: DeletionRejectBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>, {requestId: string;data: DeletionRejectBodyRequest}> = (props) => {
           const {requestId,data} = props ?? {};
 
           return  gdprAdminRejectDeletionCreate(requestId,data,)
@@ -731,18 +731,18 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type GdprAdminRejectDeletionCreateMutationResult = NonNullable<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>>
-    export type GdprAdminRejectDeletionCreateMutationBody = DeletionRejectBody
+    export type GdprAdminRejectDeletionCreateMutationBody = DeletionRejectBodyRequest
     export type GdprAdminRejectDeletionCreateMutationError = ErrorResponse
 
     /**
  * @summary Admin: reject a pending deletion request
  */
 export const useGdprAdminRejectDeletionCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>, TError,{requestId: string;data: DeletionRejectBody}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>, TError,{requestId: string;data: DeletionRejectBodyRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof gdprAdminRejectDeletionCreate>>,
         TError,
-        {requestId: string;data: DeletionRejectBody},
+        {requestId: string;data: DeletionRejectBodyRequest},
         TContext
       > => {
 

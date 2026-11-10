@@ -69,6 +69,7 @@ const api = vi.hoisted(() => ({
   cratesCreate: vi.fn(),
   cratesPartialUpdate: vi.fn(),
   cratesDestroy: vi.fn(),
+  lists: vi.fn(),
 }));
 
 const CRATE_TYPES = [
@@ -99,13 +100,13 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   commissioningCrateContentsInvoiceDestroy: (...args: unknown[]) =>
     api.cratesDestroy(...args),
   // Option sources of the real crate / share-article column hooks.
-  useCommissioningCratesList: () => ({
+  useCommissioningCratesList: (params: unknown) => (api.lists("crates", params), {
     data: CRATE_TYPES,
     isLoading: false,
     error: null,
     refetch: vi.fn(),
   }),
-  useCommissioningShareArticlesList: () => ({
+  useCommissioningShareArticlesList: (params: unknown) => (api.lists("articles", params), {
     data: SHARE_ARTICLES,
     isLoading: false,
     error: null,
@@ -134,11 +135,8 @@ const grids = vi.hoisted(() => ({
   realCrates: false,
 }));
 
-vi.mock("@shared/tables", async () => {
-  const { gatedByPermission } = await import("@shared/tables/tablePermissions");
-  const { wrapApiFunctions } = await import(
-    "@shared/tables/BasicEditableTable/wrapApiFunctions"
-  );
+vi.mock("@shared/tables", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/tables")>();
   const { default: RealEditableTable } = await import(
     "@shared/tables/BasicEditableTable"
   );
@@ -149,8 +147,7 @@ vi.mock("@shared/tables", async () => {
       column.children ? leafColumns(column.children) : [column],
     );
   return {
-    gatedByPermission,
-    wrapApiFunctions,
+    ...actual,
     EditableTable: (props: EditableTableProps) => {
       const name: GridName = props.columns.some(
         (column) => column.key === "crate_type_name",
@@ -396,7 +393,7 @@ describe("InvoiceModal header", () => {
     expect(screen.queryByTestId("lines-grid")).not.toBeInTheDocument();
   });
 
-  it("shows the invoice number, the reseller, the tenant-formatted date and the delivery notes it covers", () => {
+  it("shows the invoice number, the reseller, the tenant-formatted date and the delivery notes it covers, and prices new lines at its date", () => {
     renderModal();
 
     expect(api.retrieve).toHaveBeenCalledWith("inv-1", {
@@ -411,6 +408,9 @@ describe("InvoiceModal header", () => {
     expect(
       within(dialog).getByText("LS-2026-011, LS-2026-012"),
     ).toBeInTheDocument();
+    const pricedAt = expect.objectContaining({ price_date: "2026-09-28" });
+    expect(api.lists).toHaveBeenCalledWith("crates", pricedAt);
+    expect(api.lists).toHaveBeenCalledWith("articles", pricedAt);
   });
 
   it("calls onClose from the footer button", async () => {

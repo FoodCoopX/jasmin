@@ -73,7 +73,7 @@ export const AdminRejectionModal: FC<AdminRejectionModalProps> = ({
       destroyOnHidden
     >
       <Space direction="vertical" size="middle" className="w-full">
-        <Title level={5} style={{ margin: 0 }}>
+        <Title level={5} className="m-0">
           {heading}
         </Title>
 
@@ -85,7 +85,7 @@ export const AdminRejectionModal: FC<AdminRejectionModalProps> = ({
         />
 
         <div>
-          <Paragraph style={{ marginBottom: 4 }}>
+          <Paragraph className="mb-4">
             {reasonLabel ?? t("members.reject_reason_label")}
           </Paragraph>
           <Input.TextArea

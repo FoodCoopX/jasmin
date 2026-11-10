@@ -40,16 +40,7 @@ function PrimaryNavigation() {
         position: "relative",
       }}
     >
-      <div
-        className="logo"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          position: "absolute",
-          left: "50%",
-          transform: "translateX(-50%)",
-        }}
-      >
+      <div className="logo top-navigation-logo">
         {logoUrl && (
           <img
             src={logoUrl}
@@ -65,28 +56,19 @@ function PrimaryNavigation() {
           />
         )}
       </div>
-      <div style={{ marginLeft: "auto" }} />
+      <div className="top-navigation-spacer" />
       <Space size={isMobile ? "small" : "middle"}>
         {!isMobile && <SidebarToggle />}
         {!isMobile && (
-          <Divider
-            type="vertical"
-            style={{ height: "24px", margin: "0 0px" }}
-          />
+          <Divider type="vertical" className="top-navigation-divider" />
         )}
         {!isMobile && <ModalToggle />}
         {!isMobile && (
-          <Divider
-            type="vertical"
-            style={{ height: "24px", margin: "0 0px" }}
-          />
+          <Divider type="vertical" className="top-navigation-divider" />
         )}
         {offersSupportTickets && <HelpButton />}
         {offersSupportTickets && !isMobile && (
-          <Divider
-            type="vertical"
-            style={{ height: "24px", margin: "0 0px" }}
-          />
+          <Divider type="vertical" className="top-navigation-divider" />
         )}
         <UserMenu />
       </Space>
@@ -206,20 +188,12 @@ function SecondaryNavigation() {
   }, [navigationSettings, t, flags, NAVIGATION_SECTIONS]);
 
   return (
-    <Header
-      className="flex-between"
-      style={{
-        padding: "0 24px",
-        background: "var(--color-bg-base)",
-        borderBottom: "solid 1px var(--color-brand)",
-        overflow: "visible",
-      }}
-    >
+    <Header className="flex-between secondary-navigation">
       <div className="flex-1"></div> {/* Left spacer */}
       {/* Semantic landmark for the section navigation. display:contents so the
           <nav> generates no box — the Menu stays the flex child between the
           spacers and the layout is unchanged. */}
-      <nav aria-label={t("nav.main")} style={{ display: "contents" }}>
+      <nav aria-label={t("nav.main")} className="secondary-navigation-landmark">
         {/* ``disabledOverflow``: every section stays visible instead of
             folding into a "…" menu when the bar is narrow. */}
         <Menu
@@ -228,11 +202,7 @@ function SecondaryNavigation() {
           selectedKeys={[activeSection]}
           items={topMenuItems}
           onSelect={({ key }) => switchSection(key as typeof activeSection)}
-          style={{
-            borderBottom: "none",
-            minWidth: "max-content",
-            whiteSpace: "nowrap",
-          }}
+          className="secondary-navigation-menu"
         />
       </nav>
       <div className="flex-1"></div> {/* Right spacer */}

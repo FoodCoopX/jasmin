@@ -8,10 +8,11 @@ from django.db.models import F, QuerySet
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
+from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.authz.permissions import IsStaff, RolePermissionsMixin
+from apps.authz.permissions import IsOffice, IsStaff, RolePermissionsMixin
 from apps.shared.iso_week_filters import iso_week_window
 from apps.shared.request_utils import auth_user
 from core.pagination import OptionalLimitOffsetPagination
@@ -34,8 +35,8 @@ class _TheoreticalBaseViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
     """Base viewset for theoretical amount models filtered by year and share article."""
 
-    read_permission = IsStaff
-    write_permission = IsStaff
+    read_permission: type[BasePermission] = IsStaff
+    write_permission: type[BasePermission] = IsStaff
 
     def get_queryset(self) -> QuerySet:
         queryset = serializer_model(self.serializer_class).objects.all()
@@ -140,6 +141,8 @@ class TheoreticalHarvestViewSet(_TheoreticalBaseViewSet):
 
 class TheoreticalCleanAmountViewSet(_TheoreticalBaseViewSet):
     serializer_class = TheoreticalCleanAmountSerializer
+    # The crew reads cleaning amounts; only office and admin plan them.
+    write_permission = IsOffice
 
 
 class TheoreticalPurchaseViewSet(_TheoreticalBaseViewSet):
@@ -148,3 +151,5 @@ class TheoreticalPurchaseViewSet(_TheoreticalBaseViewSet):
 
 class TheoreticalWashAmountViewSet(_TheoreticalBaseViewSet):
     serializer_class = TheoreticalWashAmountSerializer
+    # The crew reads washing amounts; only office and admin plan them.
+    write_permission = IsOffice

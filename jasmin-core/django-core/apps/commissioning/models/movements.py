@@ -119,8 +119,7 @@ class MovementShareArticleManager(models.Manager):
 
 
 class MovementShareArticle(JasminModel):
-    objects = MovementShareArticleManager()
-    active = DateActiveOnlyManager(archive_months=2)
+    _SOURCE_FK_FIELDS: list[str] = list(_SOURCE_TO_TYPE.keys())
 
     date = models.DateTimeField(db_index=True)
     # movement_type is a sort of doubling, but it makes querying much faster than via foreignkey
@@ -236,7 +235,8 @@ class MovementShareArticle(JasminModel):
         "Used to recalculate the correction delta when theoretical movements change.",
     )
 
-    _SOURCE_FK_FIELDS: list[str] = list(_SOURCE_TO_TYPE.keys())
+    objects = MovementShareArticleManager()
+    active = DateActiveOnlyManager(archive_months=2)
 
     class Meta:
         constraints = [
@@ -270,6 +270,11 @@ class MovementShareArticle(JasminModel):
     def __str__(self) -> str:
         return f"{self.movement_type} {self.share_article} {self.amount} ({self.date:%Y-%m-%d})"
 
+    def save(self, *args, **kwargs) -> None:
+        self.derive_movement_type(self)
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         super().clean()
 
@@ -296,11 +301,6 @@ class MovementShareArticle(JasminModel):
                 f"movement_type must be '{expected_type}' when {field_name} is set, "
                 f"but got '{self.movement_type}'"
             )
-
-    def save(self, *args, **kwargs) -> None:
-        self.derive_movement_type(self)
-        self.full_clean()
-        super().save(*args, **kwargs)
 
     @staticmethod
     def derive_movement_type(instance: MovementShareArticle) -> None:

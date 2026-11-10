@@ -95,7 +95,7 @@ const ResetPasswordPage = () => {
       <Card className="auth-card">
         <Space direction="vertical" size="large" className="w-full">
           <div className="text-center">
-            <Title level={3} style={{ marginBottom: 4 }}>
+            <Title level={3} className="mb-4">
               {t("auth.reset_password.title")}
             </Title>
           </div>
@@ -145,7 +145,7 @@ const ResetPasswordPage = () => {
                 name="password_confirm"
                 label={t("auth.reset_password.confirm_password")}
                 dependencies={["password"]}
-                style={{ marginTop: 16 }}
+                className="mt-16"
                 rules={[
                   {
                     required: true,
@@ -166,7 +166,7 @@ const ResetPasswordPage = () => {
                 onSolution={setCaptchaSolution}
               />
 
-              <Form.Item style={{ marginBottom: 0 }}>
+              <Form.Item className="mb-0">
                 <Button
                   type="primary"
                   htmlType="submit"

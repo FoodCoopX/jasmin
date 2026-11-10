@@ -17,13 +17,21 @@ import { useDeliveryStations } from "./useDeliveryStations";
  */
 export function useDeliveryStationOfDay(
   deliveryDayId: string | null,
-  { selectFirst = true }: { selectFirst?: boolean } = {},
+  {
+    selectFirst = true,
+    activeAtDate,
+  }: {
+    selectFirst?: boolean;
+    /** A date of the week whose stations count. */
+    activeAtDate?: string;
+  } = {},
 ) {
   const [selectedDeliveryStation, setSelectedDeliveryStation] = useState<
     string | null
   >(null);
   const { deliveryStations, loading } = useDeliveryStations({
     delivery_day: deliveryDayId ?? undefined,
+    active_at_date: activeAtDate,
   });
 
   useEffect(() => {

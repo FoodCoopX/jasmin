@@ -16,7 +16,6 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningResellersListParams,
-  PatchedReseller,
   Reseller,
 } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
@@ -58,14 +57,12 @@ const RESELLER_LIST_PARAMS: CommissioningResellersListParams = {
   is_reseller: true,
 };
 
-// Typed on TableRecord (not Reseller & TableRecord): this page's columns +
-// customEdit are TableRecord-typed. The create/update/delete casts sit here.
-const resellersResource: CrudResource<TableRecord> = {
+type ResellerRow = Reseller & TableRecord;
+
+const resellersResource: CrudResource<ResellerRow> = {
   useList: useCommissioningResellersList,
-  create: (payload) =>
-    commissioningResellersCreate(payload as unknown as Reseller),
-  update: (id, payload) =>
-    commissioningResellersPartialUpdate(id, payload as PatchedReseller),
+  create: commissioningResellersCreate,
+  update: commissioningResellersPartialUpdate,
   delete: (id) =>
     commissioningResellersDestroy(id, { delete_context: "resellers" }),
   getListQueryKey: getCommissioningResellersListQueryKey,
@@ -128,7 +125,7 @@ export default function ListResellers() {
     "early_payment_discount_days",
   ) as number | null | undefined;
 
-  const list = useCrudListPage<TableRecord>({
+  const list = useCrudListPage<ResellerRow>({
     resource: resellersResource,
     permissions,
     activeField: "is_active_reseller",
@@ -247,7 +244,7 @@ export default function ListResellers() {
 
   const customEdit = useCallback(
     (
-      record: TableRecord,
+      record: ResellerRow,
       form: { setFieldsValue: (values: Record<string, unknown>) => void },
     ) => {
       if (record.key === -1) {
@@ -277,7 +274,7 @@ export default function ListResellers() {
     ],
   );
 
-  const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
+  const columns = useMemo<EditableColumnConfig<ResellerRow>[]>(
     () => [
       {
         title: <div className="checkbox-column-title">Link</div>,
@@ -363,7 +360,7 @@ export default function ListResellers() {
                 !!record.is_also_delivery_station &&
                 record.linked_delivery_station_can_be_deleted === false,
             },
-          ] as EditableColumnConfig<TableRecord>[])
+          ] satisfies EditableColumnConfig<ResellerRow>[])
         : []),
       {
         title: <>{t("resellers.is_seller")}</>,
@@ -398,7 +395,7 @@ export default function ListResellers() {
                 displayField: "offer_group_name",
               },
             },
-          ] as EditableColumnConfig<TableRecord>[])
+          ] satisfies EditableColumnConfig<ResellerRow>[])
         : []),
       {
         title: <>{t("resellers.offer_via_email")}</>,
@@ -453,7 +450,7 @@ export default function ListResellers() {
         onChange={list.setHideInactive}
       />
 
-      <EditableTable
+      <EditableTable<ResellerRow>
         columns={columns}
         apiFunctions={list.apiFunctions}
         initialData={list.filteredData}

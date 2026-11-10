@@ -9,12 +9,12 @@ import type { TicketStatusEnum } from './ticketStatusEnum';
 import type { TicketPriorityEnum } from './ticketPriorityEnum';
 
 export interface SupportTicketList {
-  readonly id?: string;
-  readonly subject?: string;
-  readonly status?: TicketStatusEnum;
-  readonly priority?: TicketPriorityEnum;
-  readonly creator_id?: string;
-  readonly creator_name?: string;
-  readonly created_at?: string;
-  readonly updated_at?: string;
+  readonly id: string;
+  readonly subject: string;
+  readonly status: TicketStatusEnum;
+  readonly priority: TicketPriorityEnum;
+  readonly creator_id: string;
+  readonly creator_name: string;
+  readonly created_at: string;
+  readonly updated_at: string;
 }

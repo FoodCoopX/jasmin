@@ -21,6 +21,7 @@ from __future__ import annotations
 import gzip
 import os
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -153,16 +154,29 @@ fi
 exit 0
 """
 
-# Decrypts by copying the input file to --output.
+# Decrypts by copying the input file to --output, once the passphrase came in
+# on stdin (--passphrase-fd 0). The passphrase among its arguments, where ps
+# would show it, fails it.
 _GPG = """#!/bin/sh
-out="" prev="" last=""
+out="" prev="" last="" fd=""
 for arg; do
+    if [ "$arg" = "$BACKUP_ENCRYPTION_KEY" ]; then
+        echo "gpg stub: the passphrase is on the command line" >&2
+        exit 2
+    fi
     if [ "$prev" = "--output" ]; then
         out="$arg"
+    fi
+    if [ "$prev" = "--passphrase-fd" ]; then
+        fd="$arg"
     fi
     prev="$arg"
     last="$arg"
 done
+if [ "$fd" != "0" ] || ! read -r key || [ "$key" != "$BACKUP_ENCRYPTION_KEY" ]; then
+    echo "gpg stub: no passphrase on stdin" >&2
+    exit 2
+fi
 cp "$last" "$out"
 """
 
@@ -286,6 +300,9 @@ class Restore:
                 "POSTGRES_PASSWORD": "secret",
                 "BACKUP_ENCRYPTION_KEY": "key",
                 "ALLOW_MISSING_GDPR_LEDGER": "1",
+                # Where the script stages the decrypted dump; never the
+                # machine's own temp directory, which it would sweep.
+                "TMPDIR": str(self.dir / "tmp"),
                 **env,
             },
             stdin=subprocess.DEVNULL,
@@ -318,10 +335,57 @@ def restore(tmp_path: Path) -> Restore:
         script.replace(BACKUP_SH_IN_IMAGE, str(bin_dir / "backup.sh"))
     )
     (restore.stub / "calls").mkdir(parents=True)
+    (tmp_path / "tmp").mkdir()
     restore.set_databases("postgres", "glitchtip", LIVE)
     restore.dump.parent.mkdir()
     restore.dump.write_bytes(gzip.compress(b"SELECT 1;\n" + DUMP_END))
     return restore
+
+
+@pytest.mark.parametrize(
+    "script",
+    [
+        REPO_ROOT / "backups" / "backup.sh",
+        RESTORE_SH,
+        REPO_ROOT / "scripts" / "restore_drill.sh",
+    ],
+    ids=lambda path: path.name,
+)
+def test_no_script_puts_the_passphrase_on_gpgs_command_line(script):
+    # ps shows every process's arguments; --passphrase-fd reads it from a pipe.
+    assert "--passphrase " not in script.read_text()
+
+
+class TestTheDecryptedCopy:
+    """The plaintext dump stays out of the backup directory, whose readers
+    expect ciphertext, and nothing of it outlives the run."""
+
+    def test_it_stays_out_of_the_backups_and_goes_at_the_end(self, restore):
+        work = restore.dir / "work"
+        work.mkdir()
+
+        result = restore.run(CONFIRM_SWAP="1", TMPDIR=str(work))
+
+        assert result.returncode == 0, result.stderr
+        [replay] = restore.replays()
+        assert Path(replay.file).parent.parent == work
+        assert list(work.iterdir()) == []
+        assert list(restore.dump.parent.iterdir()) == [restore.dump]
+
+    def test_a_copy_a_killed_run_left_goes_once_a_day_old(self, restore):
+        work = restore.dir / "work"
+        killed = work / "restore.killed"
+        killed.mkdir(parents=True)
+        (killed / "dump.sql").write_text("plaintext")
+        day_old = time.time() - 25 * 3600
+        os.utime(killed, (day_old, day_old))
+        running = work / "restore.running"
+        running.mkdir()
+
+        restore.run(CONFIRM_SWAP="1", TMPDIR=str(work))
+
+        assert not killed.exists()
+        assert running.exists()
 
 
 class TestRestoreIntoANewDatabase:

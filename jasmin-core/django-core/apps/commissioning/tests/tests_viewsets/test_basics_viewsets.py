@@ -360,6 +360,28 @@ class TestCrateViewSet:
         names = [c["name"] for c in resp.data]
         assert "EuroBox" in names
 
+    @time_machine.travel(datetime.datetime(2026, 12, 30, 12, 0), tick=False)
+    def test_prices_at_the_given_date(self, api_client, tenant):
+        """A document of a past week takes the crate price of its own date;
+        without a date the list prices at today."""
+        from apps.commissioning.tests.factories import CrateNetPriceFactory
+
+        old_price = CrateNetPriceFactory(price=Decimal("1.50"), tax_rate=Decimal("19"))
+        CrateNetPriceFactory(
+            crate=old_price.crate,
+            price=Decimal("2.00"),
+            tax_rate=Decimal("20"),
+            valid_from=datetime.date(2026, 12, 28),
+        )
+
+        def priced(**params):
+            resp = api_client.get(self.URL, {"get_price_info": "true", **params})
+            [row] = [c for c in resp.data if c["id"] == old_price.crate_id]
+            return row["price"], row["tax_rate"]
+
+        assert priced(price_date="2026-12-17") == ("1.50", "19.00")
+        assert priced() == ("2.00", "20.00")
+
     def test_partial_update(self, api_client, tenant):
         from apps.commissioning.tests.factories import CrateFactory
 

@@ -4,6 +4,9 @@ A per-box fee bills the boxes delivered in the range. A monthly fee bills each
 month the range touches by the share of that month's days inside it, a yearly
 fee each calendar year by the share of its 365 or 366 days, so a week bills
 about a quarter of a month and a whole year exactly 12 months or one year.
+Only the days the station is served count — those with a station-day on any
+delivery day — so a station opening in September bills from September on.
+The rate is the one stored on the station.
 
 All amounts are NET (no VAT) and Decimal end-to-end, rounded to the cent once
 per station and range, and sent on the wire as 2-decimal strings per the money
@@ -15,6 +18,7 @@ from __future__ import annotations
 import calendar
 import datetime
 import math
+from collections.abc import Callable
 from decimal import ROUND_HALF_UP, Decimal
 from fractions import Fraction
 
@@ -63,6 +67,40 @@ def _prorated_years(start: datetime.date, end: datetime.date) -> Fraction:
         year_end = min(end, datetime.date(year, 12, 31))
         years += Fraction((year_end - year_start).days + 1, _days_in_year(year))
     return years
+
+
+def _served_periods(
+    station: DeliveryStation, start: datetime.date, end: datetime.date
+) -> list[tuple[datetime.date, datetime.date]]:
+    """The stretches of [start, end] in which ``station`` has a station-day on
+    any delivery day, merged so overlapping days count once."""
+    windows = sorted(
+        (max(station_day.valid_from, start), min(station_day.valid_until or end, end))
+        for station_day in station.deliverystationday_set.all()
+    )
+    periods: list[tuple[datetime.date, datetime.date]] = []
+    for begin, finish in windows:
+        if begin > finish:
+            continue
+        if periods and begin <= periods[-1][1] + datetime.timedelta(days=1):
+            periods[-1] = (periods[-1][0], max(periods[-1][1], finish))
+        else:
+            periods.append((begin, finish))
+    return periods
+
+
+def _served_quantity(
+    station: DeliveryStation,
+    start: datetime.date,
+    end: datetime.date,
+    prorate: Callable[[datetime.date, datetime.date], Fraction],
+) -> Fraction:
+    """``prorate`` summed over the stretches of [start, end] the station is
+    served in."""
+    return sum(
+        (prorate(*period) for period in _served_periods(station, start, end)),
+        Fraction(0),
+    )
 
 
 def _times(rate: Decimal, quantity: Fraction) -> Decimal:
@@ -204,10 +242,10 @@ class DeliveryStationFeeService:
             quantity = Fraction(sum(line["boxes"] for line in lines))
             fee_type, rate, unit = "per_box", box_rate, "boxes"
         elif month_rate > 0:
-            quantity = _prorated_months(start, end)
+            quantity = _served_quantity(station, start, end, _prorated_months)
             fee_type, rate, unit = "per_month", month_rate, "months"
         elif year_rate > 0:
-            quantity = _prorated_years(start, end)
+            quantity = _served_quantity(station, start, end, _prorated_years)
             fee_type, rate, unit = "per_year", year_rate, "years"
         else:
             rate, fee_type, unit = Decimal("0"), "none", ""
@@ -236,7 +274,9 @@ class DeliveryStationFeeService:
         start: datetime.date, end: datetime.date, station_id: str | None = None
     ) -> list[dict]:
         """Billing for every fee-carrying station (or a single one)."""
-        stations = DeliveryStationFeeService.stations_with_fees()
+        stations = DeliveryStationFeeService.stations_with_fees().prefetch_related(
+            "deliverystationday_set"
+        )
         if station_id:
             stations = stations.filter(id=station_id)
         return [

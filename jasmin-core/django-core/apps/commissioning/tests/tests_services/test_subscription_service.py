@@ -254,6 +254,30 @@ class TestCancelSubscription:
         # Reason was saved on the subscription.
         assert confirmed_subscription.cancellation_reason == "Member moved away."
 
+    def test_a_cancel_from_a_stale_copy_is_a_noop(self, confirmed_subscription):
+        # A second session loaded the subscription before the first cancel:
+        # its copy still reads uncancelled, with the original end. The cancel
+        # reads the stored row, so it doesn't push the end out again past the
+        # deliveries the first cancel dropped.
+        stale = Subscription.objects.get(pk=confirmed_subscription.pk)
+        SubscriptionService().cancel_subscription(
+            confirmed_subscription,
+            cancelled_by=JasminUserFactory(),
+            effective_at=datetime.date(2026, 4, 12),  # Sunday
+        )
+
+        SubscriptionService().cancel_subscription(
+            stale,
+            cancelled_by=JasminUserFactory(),
+            effective_at=datetime.date(2026, 4, 19),  # Sunday, later
+        )
+
+        confirmed_subscription.refresh_from_db()
+        assert confirmed_subscription.valid_until == datetime.date(2026, 4, 12)
+        assert confirmed_subscription.cancelled_effective_at == datetime.date(
+            2026, 4, 12
+        )
+
     def test_re_cancel_is_a_noop_preserving_audit_stamp(self, confirmed_subscription):
         # A second cancel must NOT re-truncate the term, delete more
         # deliveries, or overwrite the original cancellation audit stamp.

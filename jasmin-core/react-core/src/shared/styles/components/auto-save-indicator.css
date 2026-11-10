@@ -1,0 +1,10 @@
+/* AutoSaveIndicator keeps its line's height while it shows nothing, so what
+   sits around it doesn't shift when a status appears. */
+.auto-save-indicator {
+  min-height: 22px;
+}
+
+/* Doubled with .anticon so the colour outranks AntD's own .anticon rule. */
+.anticon.auto-save-indicator-saving-icon {
+  color: var(--color-future-blue);
+}

@@ -16,6 +16,7 @@ fields, so this serializer is intentionally permissive. New fields
 listed here are explicit so drf-spectacular / orval pick them up.
  */
 export interface PublicRegisterRequest {
+  /** @minLength 1 */
   email: string;
   /** @maxLength 255 */
   first_name?: string;

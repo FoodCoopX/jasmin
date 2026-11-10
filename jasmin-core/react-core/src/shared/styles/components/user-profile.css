@@ -1,0 +1,5 @@
+/* The user profile's "My data" tab. The city takes two thirds of the row it
+   shares with the ZIP code. */
+.profile-city-field {
+  flex: 2;
+}

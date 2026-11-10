@@ -10,7 +10,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   Purchase,
-  PurchaseBulkSetAsExpectedItem,
+  PurchaseBulkSetAsExpectedItemRequest,
 } from "@shared/api/generated/models";
 import { OrganicStatusEnum } from "@shared/api/generated/models";
 import { useRoles } from "@shared/auth";
@@ -240,7 +240,7 @@ export default function DocumentationPurchase() {
         ...shareArticleColumn,
         disabled: (record: TableRecord) => record.key != -1,
       },
-      ...(amountUnitSizeColumns as unknown as EditableColumnConfig<TableRecord>[]),
+      ...amountUnitSizeColumns,
       {
         title: <>{t("commissioning.expected_purchase")}</>,
         dataIndex: "theoretical_purchase",
@@ -355,7 +355,7 @@ export default function DocumentationPurchase() {
           <BulkActionButton
             selectedIds={selectedRowKeys}
             apiFunction={(payload) => {
-              const selectedData: PurchaseBulkSetAsExpectedItem[] = (
+              const selectedData: PurchaseBulkSetAsExpectedItemRequest[] = (
                 payload.ids as string[]
               ).map((id) => {
                 const row = data.find((item) => item.id === id);

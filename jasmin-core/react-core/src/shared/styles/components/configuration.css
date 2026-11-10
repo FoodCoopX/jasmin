@@ -1,0 +1,56 @@
+/* The configuration pages and their settings cards. */
+
+/* One setting in a settings card's grid. */
+.settings-item {
+  padding: 4px 0;
+}
+
+/* The message under a text setting whose value doesn't validate. */
+.settings-validation-error {
+  font-size: 0.85em;
+  color: var(--color-error);
+  margin-top: 2px;
+}
+
+/* The offer price tiers of the reseller settings: one row per tier. */
+.settings-tier-label {
+  min-width: 60px;
+}
+
+.ant-input-number.settings-tier-input {
+  width: 100px;
+}
+
+.settings-tier-add {
+  width: fit-content;
+}
+
+/* The card with the reseller documents' sample PDFs. */
+.reseller-doc-preview-card {
+  width: 100%;
+  max-width: 900px;
+}
+
+/* The heading over the order days' table on the delivery days page. */
+.order-days-heading {
+  margin-top: 3em;
+}
+
+.delivery-exceptions-table {
+  width: 70%;
+}
+
+/* The tag beside the email configuration's active switch. */
+.email-verified-tag {
+  margin-left: 12px;
+}
+
+/* The tag on an active share option's section header. */
+.ant-tag.share-option-active-tag {
+  border-radius: 12px;
+}
+
+/* A group of users (staff, customers) and its table on the users page. */
+.users-section {
+  margin-bottom: 32px;
+}

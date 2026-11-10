@@ -79,27 +79,27 @@ export function RemittanceTemplateInput({ setting, value, onChange }: Props) {
         onChange={(e) => onChange(e.target.value)}
         placeholder={DEFAULT_TEMPLATE}
         maxLength={setting.maxLength}
-        style={{ marginTop: 4 }}
+        className="mt-4"
       />
-      <Space size={4} wrap style={{ marginTop: 8 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
+      <Space size={4} wrap className="mt-8">
+        <Text type="secondary" className="text-12">
           {t("tenant.sepa.remittance_insert")}
         </Text>
         {PLACEHOLDERS.map((token) => (
           <Tag
             key={token}
             onClick={() => onChange(`${current}${token}`)}
-            style={{ cursor: "pointer", margin: 0 }}
+            className="cursor-pointer m-0"
           >
             {token}
           </Tag>
         ))}
       </Space>
-      <div style={{ marginTop: 8 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
+      <div className="mt-8">
+        <Text type="secondary" className="text-12">
           {t("tenant.sepa.remittance_preview")}:{" "}
         </Text>
-        <Text code style={{ fontSize: 12 }}>
+        <Text code className="text-12">
           {renderPreview(current, dateFormat)}
         </Text>
       </div>

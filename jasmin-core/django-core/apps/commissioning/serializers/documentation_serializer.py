@@ -174,10 +174,6 @@ class PurchaseSerializer(
         ),
     }
 
-    seller_first_name = serializers.CharField(read_only=True)
-    seller_last_name = serializers.CharField(read_only=True)
-    seller_company_name = serializers.CharField(read_only=True)
-
     class Meta:
         model = Purchase
         fields = "__all__"

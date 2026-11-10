@@ -25,6 +25,7 @@ from apps.commissioning.models import (
 )
 from apps.commissioning.serializers import DeliveryExceptionPeriodSerializer
 from apps.commissioning.services.delivery_exceptions import (
+    first_unpaused_monday,
     paused_weeks_for_variation,
     resync_delivery_exception,
 )
@@ -112,6 +113,24 @@ class TestWeeksHelpers:
 
     def test_weeks_in_range_empty_when_open_ended(self):
         assert weeks_in_range(_PAUSE_FROM, None) == set()
+
+    def test_first_unpaused_monday_skips_abutting_pauses(self):
+        first = (datetime.date(2026, 8, 3), datetime.date(2026, 8, 16))
+        second = (datetime.date(2026, 8, 17), datetime.date(2026, 8, 23))
+        later = (datetime.date(2026, 9, 7), datetime.date(2026, 9, 13))
+        pauses = [later, second, first]
+
+        assert first_unpaused_monday(datetime.date(2026, 7, 27), pauses) == (
+            datetime.date(2026, 7, 27)
+        )
+        assert first_unpaused_monday(datetime.date(2026, 8, 10), pauses) == (
+            datetime.date(2026, 8, 24)
+        )
+
+    def test_first_unpaused_monday_ignores_an_open_ended_pause(self):
+        monday = datetime.date(2026, 8, 3)
+
+        assert first_unpaused_monday(monday, [(monday, None)]) == monday
 
     @pytest.mark.django_db
     def test_paused_weeks_for_variation_matches_only_covered_weeks(self, tenant):

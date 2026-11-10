@@ -22,6 +22,7 @@ from ..models import (
     ShareTypeVariationGrossPrice,
     Subscription,
 )
+from ..services.packing_mode import apply_packing_mode
 from ..services.shares_day_change_service import SHARE_DAY_FIELDS
 from ..utils.capacity_window import build_capacity_by_week, parse_capacity_window
 from ..utils.dynamic_keys import AMOUNT_KEY_PREFIX, DAY_VARIATION_RE
@@ -115,10 +116,10 @@ class ShareTypeVariationSerializer(
     NAME_FIELDS = ["share_type_name"]
 
     active_price_per_delivery = serializers.DecimalField(
-        max_digits=8, decimal_places=2, read_only=True
+        max_digits=8, decimal_places=2, read_only=True, allow_null=True
     )
     active_price_sum_articles = serializers.DecimalField(
-        max_digits=8, decimal_places=2, read_only=True
+        max_digits=8, decimal_places=2, read_only=True, allow_null=True
     )
     # Active solidarity floor (null when none set) — drives the editable price
     # field's min in the abos table + new-subscription modal.
@@ -279,7 +280,7 @@ class ShareTypeVariationSerializer(
 
         peak = VariationCapacityService.peak_occupied_from_week(
             variation_id=self.instance.pk,
-            from_date=timezone.now().date(),
+            from_date=timezone.localdate(),
         )
         if value < peak:
             raise ShareTypeVariationCapacityBelowOccupancy(capacity=value, peak=peak)
@@ -308,7 +309,7 @@ class ShareTypeVariationSerializer(
                     share_type_from=share_type.valid_from,
                     share_type_until=share_type.valid_until,
                 )
-        return attrs
+        return apply_packing_mode(attrs, creating=self.instance is None)
 
 
 class ShareContentNestedSerializer(serializers.ModelSerializer):
@@ -407,7 +408,7 @@ class ShareDeliverySerializer(ReadOnlyOnUpdateMixin, serializers.ModelSerializer
         source="share.share_type_variation.requires_optin", read_only=True
     )
     is_opted_in = serializers.BooleanField(read_only=True)
-    optin_decided_at = serializers.DateTimeField(read_only=True)
+    optin_decided_at = serializers.DateTimeField(read_only=True, allow_null=True)
     optin_deadline = serializers.SerializerMethodField()
     optin_locked = serializers.SerializerMethodField()
 
@@ -579,7 +580,7 @@ class ShareSerializer(serializers.ModelSerializer):
     share_type_name = serializers.CharField(read_only=True)
     share_type_variation_size = serializers.CharField(read_only=True)
     share_type_variation_average_weight = serializers.DecimalField(
-        max_digits=5, decimal_places=3, read_only=True
+        max_digits=5, decimal_places=3, read_only=True, allow_null=True
     )
 
     class Meta:

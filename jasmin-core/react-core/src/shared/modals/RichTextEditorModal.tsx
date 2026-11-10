@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
+import "@shared/quill/SanitizingClipboard";
 
 const modules = {
   toolbar: [
@@ -238,7 +239,7 @@ export default function RichTextEditorModal({
         </Space>
       }
     >
-      <div style={{ minHeight: "300px" }}>
+      <div className="rich-text-editor-body">
         {validation.warnings.length > 0 && (
           <Alert
             message={
@@ -247,7 +248,7 @@ export default function RichTextEditorModal({
                 : t("common.error")
             }
             description={
-              <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "12px" }}>
+              <ul className="m-0 pl-20 text-12">
                 {validation.warnings.map((warning, idx) => (
                   <li key={idx}>{warning}</li>
                 ))}
@@ -256,30 +257,19 @@ export default function RichTextEditorModal({
             type={validation.valid ? "warning" : "error"}
             showIcon
             banner
-            style={{
-              marginBottom: "12px",
-              padding: "8px 12px",
-              fontSize: "12px",
-              borderRadius: "4px",
-            }}
+            className="rich-text-editor-warnings"
           />
         )}
 
-        <div
-          style={{
-            marginBottom: "8px",
-            fontSize: "12px",
-            color: "var(--color-text-secondary)",
-          }}
-        >
+        <div className="mb-8 text-12 color-text-secondary">
           {maxLines && (
-            <span style={{ marginRight: "16px" }}>
+            <span className="rich-text-editor-counter">
               {t("common.lines")}: {validation.lines}
               {maxLines && ` / ${maxLines}`}
             </span>
           )}
           {maxCharacters && (
-            <span style={{ marginRight: "16px" }}>
+            <span className="rich-text-editor-counter">
               {t("common.characters")}: {validation.chars}
               {maxCharacters && ` / ${maxCharacters}`}
             </span>
@@ -302,7 +292,7 @@ export default function RichTextEditorModal({
             placeholder ||
             t("common.enter_description")
           }
-          style={{ height: "250px", marginBottom: "50px" }}
+          className="rich-text-editor-quill"
         />
       </div>
     </Modal>

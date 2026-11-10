@@ -157,7 +157,9 @@ class ResellerSerializer(
     # flag the service uses to auto-create / unlink a ``DeliveryStation``.
     # The actual FK lives on ``DeliveryStation.linked_reseller``.
     is_also_delivery_station = serializers.BooleanField(required=False)
-    linked_delivery_station = serializers.PrimaryKeyRelatedField(read_only=True)
+    linked_delivery_station = serializers.PrimaryKeyRelatedField(
+        read_only=True, allow_null=True
+    )
     # Tells the frontend whether the ``is_also_delivery_station`` checkbox
     # may be unticked. False when the linked DS still has dependants and
     # would be orphaned by an unlink.
@@ -313,18 +315,6 @@ class OrderContentSerializer(
     order_id = serializers.CharField(read_only=True)
     order_number = serializers.CharField(read_only=True)
     order_number_prefix = serializers.CharField(read_only=True)
-    order_is_finalized = serializers.BooleanField(read_only=True)
-    delivery_note_is_finalized = serializers.BooleanField(read_only=True)
-
-    delivery_note_id = serializers.CharField(read_only=True)
-    delivery_note_number = serializers.CharField(read_only=True)
-    delivery_note_prefix = serializers.CharField(read_only=True)
-
-    invoice_id = serializers.CharField(read_only=True)
-    invoice_number = serializers.CharField(read_only=True)
-    invoice_prefix = serializers.CharField(read_only=True)
-    has_invoice = serializers.BooleanField(read_only=True)
-    has_finalized_invoice = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = OrderContent
@@ -340,7 +330,7 @@ class OrderContentSerializer(
 
 
 class OfferGroupSerializer(DeletableMixin, serializers.ModelSerializer):
-    reseller_names = serializers.CharField(read_only=True)
+    reseller_names = serializers.CharField(read_only=True, allow_null=True)
 
     class Meta:
         model = OfferGroup
@@ -414,7 +404,7 @@ class InvoiceResellerContentSerializer(
 
 class OrderContentItemSerializer(serializers.Serializer):
     """One order-content row as returned by create / update / partial_update
-    (``OrderContentService._serialize_order_content``) — the flat per-row dict
+    (``serialize_order_content``) — the flat per-row dict
     WITHOUT the delivery-note / invoice document block. The list endpoint
     augments each row with that block: see ``OrderContentListItemSerializer``.
     """
@@ -648,7 +638,7 @@ class InvoiceResellerSerializer(
     )
 
     invoice_number = serializers.CharField(source="display_number", read_only=True)
-    invoice_date = serializers.DateField(source="date", read_only=True)
+    invoice_date = serializers.DateField(source="date", read_only=True, allow_null=True)
     corresponding_delivery_notes = serializers.SerializerMethodField()
     cancels_invoice_number = serializers.SerializerMethodField()
     # ``created_by_name`` comes from ``CreatedByNameMixin``.
@@ -833,7 +823,9 @@ class DeliveryNoteResellerSerializer(
     delivery_note_number = serializers.CharField(
         source="display_number", read_only=True
     )
-    delivery_note_date = serializers.DateField(source="date", read_only=True)
+    delivery_note_date = serializers.DateField(
+        source="date", read_only=True, allow_null=True
+    )
     order_number = serializers.CharField(
         source="order.display_number",
         read_only=True,

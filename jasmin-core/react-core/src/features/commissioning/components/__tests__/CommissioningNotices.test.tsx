@@ -43,7 +43,8 @@ beforeEach(() => {
 });
 
 describe("ImportSharesModeBanner", () => {
-  const renderBanner = (messageKey?: string) =>
+  const messageKey = "commissioning.pickup_lists_import_unavailable";
+  const renderBanner = () =>
     render(
       <MemoryRouter>
         <ImportSharesModeBanner messageKey={messageKey} />
@@ -56,31 +57,18 @@ describe("ImportSharesModeBanner", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("explains the import mode and links to the share import", () => {
+  it("shows the page's message and links to the share import", () => {
     tenantSettings.values = { uploads_weekly_share_amount: true };
 
     renderBanner();
 
-    expect(screen.getByRole("alert")).toHaveTextContent("common.import_shares_mode_banner");
+    expect(screen.getByRole("alert")).toHaveTextContent(messageKey);
     expect(
       screen.getByRole("link", { name: "common.import_shares_mode_banner_link" }),
     ).toHaveAttribute("href", "/commissioning/import-shares");
   });
 
-  it("shows the page's own message when it passes one", () => {
-    tenantSettings.values = { uploads_weekly_share_amount: true };
-
-    renderBanner("commissioning.pickup_list_unavailable_in_import_mode");
-
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "commissioning.pickup_list_unavailable_in_import_mode",
-    );
-    expect(screen.getByRole("alert")).not.toHaveTextContent(
-      /common\.import_shares_mode_banner(?!_link)/,
-    );
-  });
-
-  it("explains the mode without a link where a host imports the amounts itself", () => {
+  it("shows the message without a link where a host imports the amounts itself", () => {
     tenantSettings.values = { uploads_weekly_share_amount: true };
     const value = {
       tenant: { capabilities: { manual_share_import: false } },
@@ -89,14 +77,12 @@ describe("ImportSharesModeBanner", () => {
     render(
       <MemoryRouter>
         <TenantContext.Provider value={value}>
-          <ImportSharesModeBanner />
+          <ImportSharesModeBanner messageKey={messageKey} />
         </TenantContext.Provider>
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "common.import_shares_mode_banner",
-    );
+    expect(screen.getByRole("alert")).toHaveTextContent(messageKey);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });

@@ -3,7 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { getWeekdayChoices } from "@shared/utils/weekdayChoices";
+import {
+  getWeekdayChoices,
+  type WeekdayChoice,
+} from "@shared/utils/weekdayChoices";
 import {
   commissioningOrdersDeliveryDaysCreate,
   commissioningOrdersDeliveryDaysDestroy,
@@ -24,7 +27,9 @@ import type {
 import { useRoles } from "@shared/auth";
 import {
   EditableTable,
+  gatedByPermissionOnlyEdit,
   permissionsWithDeletable,
+  withNewRowDefaults,
   wrapApiFunctions,
 } from "@shared/tables";
 import type {
@@ -40,7 +45,9 @@ import {
 } from "@shared/ui";
 import {
   useActiveStatusColumn,
+  useCapability,
   useEarlierStartWindow,
+  useWashingCleaningVisibility,
   useInvalidateAfterTableMutation,
   useTimeBoundColumns,
 } from "@hooks/index";
@@ -54,6 +61,134 @@ const sameWeekday = (a: SharesDeliveryDayRecord, b: SharesDeliveryDayRecord) =>
   a.day_number === b.day_number;
 // A later start would strand what is already on a delivery day in use.
 const notInUse = (row: SharesDeliveryDayRecord) => row.can_be_deleted !== false;
+// A new delivery day starts with one tour.
+const startWithOneTour = withNewRowDefaults({ number_of_tours: 1 });
+
+/** The order delivery days' columns: the weekday, its work days and the
+ * ordering deadline. */
+function useOrderDayColumns(
+  weekdayChoices: WeekdayChoice[],
+  renderWeekday: (value: unknown) => string | number,
+  isShownColumn: (column: EditableColumnConfig<TableRecord>) => boolean,
+): EditableColumnConfig<TableRecord>[] {
+  const { t } = useTranslation();
+  return useMemo<EditableColumnConfig<TableRecord>[]>(
+    () =>
+      (
+        [
+          {
+            title: t("configuration.delivery_day"),
+            dataIndex: "day_number",
+            key: "day_number",
+            inputType: "select",
+            required: true,
+            align: "center",
+            width: "8em",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+
+          {
+            title: t("configuration.default_get_current_stock_day"),
+            dataIndex: "default_get_current_stock_day",
+            key: "default_get_current_stock_day",
+            inputType: "select",
+            required: false,
+            align: "center",
+            width: "8em",
+            options: weekdayChoices,
+            render: (value: unknown) => {
+              if (typeof value !== "number") return "-";
+              const day = weekdayChoices.find((d) => d.value === value);
+              return day ? day.label : value;
+            },
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_washing_day"),
+            dataIndex: "default_washing_day",
+            key: "default_washing_day",
+            inputType: "select",
+            required: false,
+            width: "8em",
+            align: "center",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_cleaning_day"),
+            dataIndex: "default_cleaning_day",
+            key: "default_cleaning_day",
+            inputType: "select",
+            required: false,
+            align: "center",
+            width: "8em",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_harvesting_day"),
+            dataIndex: "default_harvesting_day",
+            key: "default_harvesting_day",
+            inputType: "select",
+            required: false,
+            width: "8em",
+            align: "center",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_packing_day"),
+            dataIndex: "default_packing_day",
+            key: "default_packing_day",
+            inputType: "select",
+            required: false,
+            width: "8em",
+            align: "center",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_last_possible_ordering_day"),
+            key: "ordering_day",
+            dataIndex: "ordering_day",
+            align: "center",
+            width: "16em",
+            children: [
+              {
+                title: t("configuration.day"),
+                dataIndex: "default_last_possible_ordering_day",
+                key: "default_last_possible_ordering_day",
+                inputType: "select",
+                required: false,
+                align: "center",
+                width: "8em",
+                options: weekdayChoices,
+                render: renderWeekday,
+                disabled: isFieldDisabled,
+              },
+              {
+                title: t("configuration.time"),
+                dataIndex: "default_last_possible_ordering_time",
+                key: "default_last_possible_ordering_time",
+                inputType: "time",
+                required: false,
+                align: "center",
+                width: "8em",
+                disabled: isFieldDisabled,
+              },
+            ],
+          },
+        ] satisfies EditableColumnConfig<TableRecord>[]
+      ).filter(isShownColumn),
+    [t, weekdayChoices, renderWeekday, isShownColumn],
+  );
+}
 
 export default function ConfigurationDeliveryDays() {
   const [showAll, setShowAll] = useState(true);
@@ -63,6 +198,23 @@ export default function ConfigurationDeliveryDays() {
   const permissions = useMemo(
     () => permissionsWithDeletable(isOffice),
     [isOffice],
+  );
+  // A host that keeps its pickup locations itself brings the share delivery
+  // days with their weekday and validity; only their work days and tours are
+  // set here.
+  const offersDeliveryStations = useCapability("delivery_stations");
+  // A farm that hides washing or cleaning sets no days for them.
+  const { showsWashing, showsCleaning } = useWashingCleaningVisibility();
+  const isShownColumn = useCallback(
+    (column: EditableColumnConfig<TableRecord>) =>
+      (showsWashing || column.dataIndex !== "default_washing_day") &&
+      (showsCleaning || column.dataIndex !== "default_cleaning_day"),
+    [showsWashing, showsCleaning],
+  );
+  const sharesPermissions = useMemo(
+    () =>
+      offersDeliveryStations ? permissions : gatedByPermissionOnlyEdit(isOffice),
+    [offersDeliveryStations, permissions, isOffice],
   );
   const queryClient = useQueryClient();
 
@@ -164,121 +316,127 @@ export default function ConfigurationDeliveryDays() {
     EditableColumnConfig<TableRecord>[]
   >(
     () =>
-      [
-        activeStatusColumn,
-        {
-          title: (
-            <div className="checkbox-column-title">
-              {t("configuration.in_use")}
-            </div>
-          ),
-          dataIndex: "can_be_deleted",
-          key: "can_be_deleted",
-          required: false,
-          align: "center",
-          disabled: true,
-          width: "4em",
-          readOnly: true,
-          render: (_: unknown, record: TableRecord) => {
-            return record.can_be_deleted === false ? (
-              <CheckOutlined className="icon-check-success" />
-            ) : null;
+      (
+        [
+          activeStatusColumn,
+          {
+            title: (
+              <div className="checkbox-column-title">
+                {t("configuration.in_use")}
+              </div>
+            ),
+            dataIndex: "can_be_deleted",
+            key: "can_be_deleted",
+            required: false,
+            align: "center",
+            disabled: true,
+            width: "4em",
+            readOnly: true,
+            render: (_: unknown, record: TableRecord) => {
+              return record.can_be_deleted === false ? (
+                <CheckOutlined className="icon-check-success" />
+              ) : null;
+            },
           },
-        },
-        {
-          title: t("configuration.delivery_day"),
-          dataIndex: "day_number",
-          key: "day_number",
-          inputType: "select",
-          required: true,
-          align: "center",
-          width: "8em",
-          options: weekdayChoices,
-          sortable: true,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        validFromColumn,
-        validUntilColumn,
-        {
-          title: t("configuration.default_get_current_stock_day"),
-          dataIndex: "default_get_current_stock_day",
-          key: "default_get_current_stock_day",
-          inputType: "select",
-          required: false,
-          align: "center",
-          width: "8em",
-          options: weekdayChoices,
-          render: (value: unknown) => {
-            if (typeof value !== "number") return "-";
-            const day = weekdayChoices.find((d) => d.value === value);
-            return day ? day.label : value;
+          {
+            title: t("configuration.delivery_day"),
+            dataIndex: "day_number",
+            key: "day_number",
+            inputType: "select",
+            required: true,
+            align: "center",
+            width: "8em",
+            options: weekdayChoices,
+            sortable: true,
+            render: renderWeekday,
+            disabled: offersDeliveryStations ? isFieldDisabled : true,
           },
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_washing_day"),
-          dataIndex: "default_washing_day",
-          key: "default_washing_day",
-          inputType: "select",
-          required: true,
-          width: "8em",
-          align: "center",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_cleaning_day"),
-          dataIndex: "default_cleaning_day",
-          key: "default_cleaning_day",
-          inputType: "select",
-          required: true,
-          align: "center",
-          width: "8em",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_harvesting_day"),
-          dataIndex: "default_harvesting_day",
-          key: "default_harvesting_day",
-          inputType: "select",
-          required: true,
-          width: "8em",
-          align: "center",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_packing_day"),
-          dataIndex: "default_packing_day",
-          key: "default_packing_day",
-          inputType: "select",
-          required: true,
-          width: "8em",
-          align: "center",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        {
-          title: (
-            <>
-              {t("configuration.number_of_tours")}
-              <ToolTipIcon title={t("tooltip.number_of_tours")} />
-            </>
-          ),
-          dataIndex: "number_of_tours",
-          key: "number_of_tours",
-          inputType: "positive_integer",
-          required: false,
-          width: "10em",
-          align: "center",
-        },
-      ] as EditableColumnConfig<TableRecord>[],
+          offersDeliveryStations
+            ? validFromColumn
+            : { ...validFromColumn, disabled: true },
+          offersDeliveryStations
+            ? validUntilColumn
+            : { ...validUntilColumn, disabled: true },
+          {
+            title: t("configuration.default_get_current_stock_day"),
+            dataIndex: "default_get_current_stock_day",
+            key: "default_get_current_stock_day",
+            inputType: "select",
+            required: false,
+            align: "center",
+            width: "8em",
+            options: weekdayChoices,
+            render: (value: unknown) => {
+              if (typeof value !== "number") return "-";
+              const day = weekdayChoices.find((d) => d.value === value);
+              return day ? day.label : value;
+            },
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_washing_day"),
+            dataIndex: "default_washing_day",
+            key: "default_washing_day",
+            inputType: "select",
+            required: true,
+            width: "8em",
+            align: "center",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_cleaning_day"),
+            dataIndex: "default_cleaning_day",
+            key: "default_cleaning_day",
+            inputType: "select",
+            required: true,
+            align: "center",
+            width: "8em",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_harvesting_day"),
+            dataIndex: "default_harvesting_day",
+            key: "default_harvesting_day",
+            inputType: "select",
+            required: true,
+            width: "8em",
+            align: "center",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+          {
+            title: t("configuration.default_packing_day"),
+            dataIndex: "default_packing_day",
+            key: "default_packing_day",
+            inputType: "select",
+            required: true,
+            width: "8em",
+            align: "center",
+            options: weekdayChoices,
+            render: renderWeekday,
+            disabled: isFieldDisabled,
+          },
+          {
+            title: (
+              <>
+                {t("configuration.number_of_tours")}
+                <ToolTipIcon title={t("tooltip.number_of_tours")} />
+              </>
+            ),
+            dataIndex: "number_of_tours",
+            key: "number_of_tours",
+            inputType: "positive_integer",
+            required: true,
+            width: "10em",
+            align: "center",
+          },
+        ] satisfies EditableColumnConfig<TableRecord>[]
+      ).filter(isShownColumn),
     [
       activeStatusColumn,
       t,
@@ -286,122 +444,15 @@ export default function ConfigurationDeliveryDays() {
       renderWeekday,
       validFromColumn,
       validUntilColumn,
+      offersDeliveryStations,
+      isShownColumn,
     ],
   );
 
-  const columnsOrderDays = useMemo<EditableColumnConfig<TableRecord>[]>(
-    () =>
-      [
-        {
-          title: t("configuration.delivery_day"),
-          dataIndex: "day_number",
-          key: "day_number",
-          inputType: "select",
-          required: true,
-          align: "center",
-          width: "8em",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-
-        {
-          title: t("configuration.default_get_current_stock_day"),
-          dataIndex: "default_get_current_stock_day",
-          key: "default_get_current_stock_day",
-          inputType: "select",
-          required: false,
-          align: "center",
-          width: "8em",
-          options: weekdayChoices,
-          render: (value: unknown) => {
-            if (typeof value !== "number") return "-";
-            const day = weekdayChoices.find((d) => d.value === value);
-            return day ? day.label : value;
-          },
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_washing_day"),
-          dataIndex: "default_washing_day",
-          key: "default_washing_day",
-          inputType: "select",
-          required: false,
-          width: "8em",
-          align: "center",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_cleaning_day"),
-          dataIndex: "default_cleaning_day",
-          key: "default_cleaning_day",
-          inputType: "select",
-          required: false,
-          align: "center",
-          width: "8em",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_harvesting_day"),
-          dataIndex: "default_harvesting_day",
-          key: "default_harvesting_day",
-          inputType: "select",
-          required: false,
-          width: "8em",
-          align: "center",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_packing_day"),
-          dataIndex: "default_packing_day",
-          key: "default_packing_day",
-          inputType: "select",
-          required: false,
-          width: "8em",
-          align: "center",
-          options: weekdayChoices,
-          render: renderWeekday,
-          disabled: isFieldDisabled,
-        },
-        {
-          title: t("configuration.default_last_possible_ordering_day"),
-          key: "ordering_day",
-          dataIndex: "ordering_day",
-          align: "center",
-          width: "16em",
-          children: [
-            {
-              title: t("configuration.day"),
-              dataIndex: "default_last_possible_ordering_day",
-              key: "default_last_possible_ordering_day",
-              inputType: "select",
-              required: false,
-              align: "center",
-              width: "8em",
-              options: weekdayChoices,
-              render: renderWeekday,
-              disabled: isFieldDisabled,
-            },
-            {
-              title: t("configuration.time"),
-              dataIndex: "default_last_possible_ordering_time",
-              key: "default_last_possible_ordering_time",
-              inputType: "time",
-              required: false,
-              align: "center",
-              width: "8em",
-              disabled: isFieldDisabled,
-            },
-          ],
-        },
-      ] as EditableColumnConfig<TableRecord>[],
-    [t, weekdayChoices, renderWeekday],
+  const columnsOrderDays = useOrderDayColumns(
+    weekdayChoices,
+    renderWeekday,
+    isShownColumn,
   );
 
   return (
@@ -426,11 +477,12 @@ export default function ConfigurationDeliveryDays() {
         loading={sharesLoading}
         onSaveSuccess={onSharesSaveSuccess}
         onDeleteSuccess={onSharesDeleteSuccess}
-        permissions={permissions}
+        customEdit={startWithOneTour}
+        permissions={sharesPermissions}
         className="custom-jasmin-table mb-1em"
       />
       <DateRangeStatusLegend />
-      <h4 style={{ marginTop: "3em" }}>
+      <h4 className="order-days-heading">
         {t("configuration.time_manamagent_for_orders")}
       </h4>
 
@@ -447,7 +499,7 @@ export default function ConfigurationDeliveryDays() {
         onSaveSuccess={onOrdersSaveSuccess}
         onDeleteSuccess={onOrdersDeleteSuccess}
       />
-      <ExplainerText title={t("common.info")} style={{ marginTop: "2em" }}>
+      <ExplainerText title={t("common.info")}>
         {t("explainers.configuration_time_management")}
       </ExplainerText>
     </div>

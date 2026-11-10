@@ -271,7 +271,7 @@ export default function SepaSetupModal({
           is_active: true,
           ...paperFields,
           ...referenceField,
-        } as BillingProfile,
+        },
       });
     }
   };
@@ -368,7 +368,7 @@ export default function SepaSetupModal({
               {t("sepa.existing_profile_notice")}
             </Paragraph>
             {(existing.iban_masked || existing.account_holder_masked) && (
-              <Text type="secondary" style={{ fontSize: 12 }}>
+              <Text type="secondary" className="text-12">
                 {t("sepa.current_mandate")}: {existing.account_holder_masked}
                 {existing.account_holder_masked && existing.iban_masked
                   ? " · "
@@ -500,7 +500,7 @@ export default function SepaSetupModal({
                 format={dateFormat}
                 allowClear={false}
                 aria-label={t("sepa.signed_at")}
-                style={{ display: "block", marginTop: 4 }}
+                className="sepa-signed-at-picker"
               />
             </div>
             {requiresPaperSignature && (

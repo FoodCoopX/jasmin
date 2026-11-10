@@ -236,9 +236,9 @@ export default function TenantDetail() {
           </div>
 
           {usersLoading ? (
-            <div className="text-muted">Loading users...</div>
+            <div className="color-text-tertiary">Loading users...</div>
           ) : usersQuery.isError ? (
-            <div className="text-muted" role="alert">
+            <div className="color-text-tertiary" role="alert">
               {getErrorMessage(usersQuery.error, "Failed to load the users")}{" "}
               <button onClick={refetchUsers} className="sa-btn sa-btn--info">
                 Retry

@@ -8,6 +8,8 @@ interface DeliveryStationSelectorProps {
   setSelectedDeliveryStation: (value: string | null) => void;
   onDeliveryStationChange?: ((value: string | null) => void) | null;
   delivery_day?: string | null;
+  /** A date of the week whose stations to offer; the active ones without. */
+  active_at_date?: string | null;
   include_null_option?: boolean;
   /**
    * Reconcile the current pick against the freshly-loaded options when they
@@ -32,6 +34,7 @@ const DeliveryStationSelector = ({
   setSelectedDeliveryStation,
   onDeliveryStationChange = null,
   delivery_day = null,
+  active_at_date = null,
   include_null_option = false,
   preserveSelection = false,
   allStations = false,
@@ -40,7 +43,10 @@ const DeliveryStationSelector = ({
 
   const listEnabled = allStations || delivery_day != null;
   const { deliveryStations, loading } = useDeliveryStations(
-    { delivery_day: delivery_day ?? undefined },
+    {
+      delivery_day: delivery_day ?? undefined,
+      active_at_date: active_at_date ?? undefined,
+    },
     { enabled: listEnabled },
   );
 

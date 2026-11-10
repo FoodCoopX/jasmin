@@ -36,7 +36,7 @@ export default function OfflineBanner() {
       banner
       showIcon
       message={t("common.offline_banner")}
-      style={{ position: "sticky", top: 0, zIndex: 1100 }}
+      className="offline-banner"
     />
   );
 }

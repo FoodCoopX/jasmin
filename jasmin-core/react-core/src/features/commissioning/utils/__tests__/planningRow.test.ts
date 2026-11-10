@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ShareArticle } from "@shared/api/generated/models";
+import { makeShareArticle } from "@/test/modelFixtures";
 
 import {
   articlePriceField,
@@ -145,14 +146,17 @@ describe("articleWeightField", () => {
 });
 
 describe("pricePerRowUnit", () => {
-  const pricedArticle: ShareArticle = {
+  const pricedArticle: ShareArticle = makeShareArticle({
+    id: "article-carrots",
     name: "Carrots",
     default_movement_unit: "KG",
     net_price_for_boxes_kg: "2.50",
     net_price_for_boxes_pieces: "0.80",
     net_price_for_boxes_bunch: "1.20",
-  };
-  const unpricedArticle: ShareArticle = { name: "Dill", default_movement_unit: "BUNCH" };
+  });
+  const unpricedArticle: ShareArticle = makeShareArticle({
+    id: "article-dill", name: "Dill", default_movement_unit: "BUNCH",
+  });
 
   it.each([
     ["KG", 2.5],

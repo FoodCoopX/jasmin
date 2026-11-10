@@ -14,11 +14,11 @@ import type { VegetableSizeEnum } from './vegetableSizeEnum';
 example: storage_xkdiealkyi
  */
 export interface Harvest {
-  readonly id?: string;
-  readonly created_at?: string;
-  readonly is_finalized?: boolean;
+  readonly id: string;
+  readonly created_at: string;
+  readonly is_finalized: boolean;
   /** @nullable */
-  readonly finalized_at?: string | null;
+  readonly finalized_at: string | null;
   /**
    * @minimum 0
    * @maximum 32767
@@ -52,9 +52,9 @@ export interface Harvest {
   washing?: boolean;
   cleaning?: boolean;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   /** @nullable */
-  readonly finalized_by?: string | null;
+  readonly finalized_by: string | null;
   share_article: string;
   storage: string;
   /** @nullable */

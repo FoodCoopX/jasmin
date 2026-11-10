@@ -88,11 +88,11 @@ export default function StepConsents({ data, update, next, back }: StepProps) {
           type="error"
           showIcon
           message={error}
-          style={{ marginTop: 12 }}
+          className="mt-12"
         />
       )}
 
-      <Flex justify="space-between" style={{ marginTop: 16 }}>
+      <Flex justify="space-between" className="mt-16">
         <Button onClick={back}>{t("auth.registration.actions.back")}</Button>
         <Button
           type="primary"

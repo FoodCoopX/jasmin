@@ -24,11 +24,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   StaffWeeklyPlanGridRetrieveParams,
-  WeeklyPlanAssignment,
-  WeeklyPlanCopy,
+  WeeklyPlanAssignmentRequest,
+  WeeklyPlanCopyRequest,
   WeeklyPlanEmployee,
   WeeklyPlanGrid,
-  WeeklyPlanReplace,
+  WeeklyPlanReplaceRequest,
 } from "@shared/api/generated/models";
 import deErrors from "@shared/i18n/locales/de/errors.json";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
@@ -84,24 +84,24 @@ vi.mock("@shared/api/generated/staff/staff", async (importOriginal) => {
       mutation?: UseMutationOptions<
         WeeklyPlanGrid,
         unknown,
-        { data: WeeklyPlanReplace }
+        { data: WeeklyPlanReplaceRequest }
       >;
     }) =>
       useMutation({
         ...options?.mutation,
-        mutationFn: ({ data }: { data: WeeklyPlanReplace }) =>
+        mutationFn: ({ data }: { data: WeeklyPlanReplaceRequest }) =>
           staffApi.replaceWeek(data) as Promise<WeeklyPlanGrid>,
       }),
     useStaffWeeklyPlanCopyCreate: (options?: {
       mutation?: UseMutationOptions<
         WeeklyPlanGrid,
         unknown,
-        { data: WeeklyPlanCopy }
+        { data: WeeklyPlanCopyRequest }
       >;
     }) =>
       useMutation({
         ...options?.mutation,
-        mutationFn: ({ data }: { data: WeeklyPlanCopy }) =>
+        mutationFn: ({ data }: { data: WeeklyPlanCopyRequest }) =>
           staffApi.copyWeek(data) as Promise<WeeklyPlanGrid>,
       }),
   };
@@ -143,7 +143,7 @@ const WEDNESDAY = 2;
 const FRIDAY = 4;
 
 /** Anna on Monday and Ben on Wednesday, both on the first Harvest line. */
-const PLANNED: WeeklyPlanAssignment[] = [
+const PLANNED: WeeklyPlanAssignmentRequest[] = [
   { category_id: HARVEST.id, row_index: 0, day: MONDAY, employee_id: ANNA.id },
   { category_id: HARVEST.id, row_index: 0, day: WEDNESDAY, employee_id: BEN.id },
 ];
@@ -153,7 +153,7 @@ const PLANNED: WeeklyPlanAssignment[] = [
 function weekGrid({
   year = 2026,
   week = 41,
-  assignments = [] as WeeklyPlanAssignment[],
+  assignments = [] as WeeklyPlanAssignmentRequest[],
   categories = [HARVEST, PACKING],
   employees = [ANNA, BEN],
 } = {}): WeeklyPlanGrid {
@@ -248,20 +248,20 @@ async function pickEarlierSourceWeek(user: ReturnType<typeof userEvent.setup>) {
   fireEvent.keyDown(sourcePicker, { key: "Enter", keyCode: 13, which: 13 });
 }
 
-const byCell = (a: WeeklyPlanAssignment, b: WeeklyPlanAssignment) =>
+const byCell = (a: WeeklyPlanAssignmentRequest, b: WeeklyPlanAssignmentRequest) =>
   a.category_id.localeCompare(b.category_id) ||
   a.row_index - b.row_index ||
   a.day - b.day;
 
 /** The week the page saved last, its assignments in a stable order. */
-function lastSavedWeek(): WeeklyPlanReplace {
+function lastSavedWeek(): WeeklyPlanReplaceRequest {
   const calls = staffApi.replaceWeek.mock.calls;
   if (calls.length === 0) throw new Error("The week was never saved");
-  const saved = calls[calls.length - 1][0] as WeeklyPlanReplace;
+  const saved = calls[calls.length - 1][0] as WeeklyPlanReplaceRequest;
   return { ...saved, assignments: [...saved.assignments].sort(byCell) };
 }
 
-function sortedAssignments(...assignments: WeeklyPlanAssignment[]) {
+function sortedAssignments(...assignments: WeeklyPlanAssignmentRequest[]) {
   return [...assignments].sort(byCell);
 }
 
@@ -285,7 +285,7 @@ beforeEach(() => {
     );
   staffApi.replaceWeek
     .mockReset()
-    .mockImplementation(async (data: WeeklyPlanReplace) =>
+    .mockImplementation(async (data: WeeklyPlanReplaceRequest) =>
       weekGrid({ ...data }),
     );
   staffApi.copyWeek.mockReset().mockResolvedValue(weekGrid());
@@ -698,7 +698,7 @@ describe("WeeklyStaffPlan editing by the office", () => {
   it("shows that the week is being saved until the server confirms it", async () => {
     let confirm: () => void = () => {};
     staffApi.replaceWeek.mockImplementation(
-      (data: WeeklyPlanReplace) =>
+      (data: WeeklyPlanReplaceRequest) =>
         new Promise<WeeklyPlanGrid>((resolve) => {
           confirm = () => resolve(weekGrid({ ...data }));
         }),
@@ -773,7 +773,7 @@ describe("WeeklyStaffPlan editing by the office", () => {
 
 describe("WeeklyStaffPlan copying a week", () => {
   // The server's plan for the visible week; a copy fills it.
-  let served: WeeklyPlanAssignment[] = [];
+  let served: WeeklyPlanAssignmentRequest[] = [];
 
   beforeEach(() => {
     served = [];
@@ -781,7 +781,7 @@ describe("WeeklyStaffPlan copying a week", () => {
       async (params: StaffWeeklyPlanGridRetrieveParams) =>
         weekGrid({ ...params, assignments: served }),
     );
-    staffApi.copyWeek.mockImplementation(async (data: WeeklyPlanCopy) => {
+    staffApi.copyWeek.mockImplementation(async (data: WeeklyPlanCopyRequest) => {
       served = PLANNED;
       return weekGrid({
         year: data.year,

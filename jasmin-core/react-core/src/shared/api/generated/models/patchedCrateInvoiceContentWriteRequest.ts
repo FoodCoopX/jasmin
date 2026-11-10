@@ -14,7 +14,9 @@ date. On update, an omitted ``price_per_unit`` / ``rabatt`` / ``tax_rate``
 / ``note`` keeps the stored value.
  */
 export interface PatchedCrateInvoiceContentWriteRequest {
+  /** @minLength 1 */
   invoice_id?: string;
+  /** @minLength 1 */
   crate_type?: string;
   amount?: number;
   /**

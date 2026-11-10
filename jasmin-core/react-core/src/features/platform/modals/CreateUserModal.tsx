@@ -139,13 +139,13 @@ export default function CreateUserModal({
           </div>
 
           {error && (
-            <div className="alert-error" style={{ marginBottom: 20 }}>
+            <div className="alert-error mb-20">
               {error}
             </div>
           )}
 
           {successMessage && (
-            <div className="alert-success" style={{ marginBottom: 20 }}>
+            <div className="alert-success mb-20">
               {successMessage}
             </div>
           )}
@@ -161,13 +161,7 @@ export default function CreateUserModal({
             <button
               type="submit"
               disabled={loading}
-              className="sa-btn sa-btn--detail"
-              style={{
-                padding: "10px 20px",
-                fontSize: "14px",
-                fontWeight: 500,
-                borderRadius: "6px",
-              }}
+              className="sa-btn sa-btn--create"
             >
               {loading ? "Creating..." : "Create User"}
             </button>

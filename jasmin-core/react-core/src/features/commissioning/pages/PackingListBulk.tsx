@@ -8,10 +8,7 @@ import {
   useShareDeliveryDays,
 } from "@features/commissioning/hooks";
 import type { ShareDeliveryDayOption } from "@features/commissioning/hooks/useShareDeliveryDays";
-import {
-  PackingBoxesMatrixPDFGenerator,
-  PackingListBulkPDFGenerator,
-} from "@features/commissioning/pdfs";
+import { PackingListBulkPDFGenerator } from "@features/commissioning/pdfs";
 import { DeliveryStationSelector } from "@features/commissioning/selectors";
 import {
   useDateFormat,
@@ -28,11 +25,9 @@ import {
 import {
   getCommissioningPackingListBulkListQueryKey,
   useCommissioningPackingListBulkList,
-  useCommissioningPackingListMemberAmountsRetrieve,
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   CommissioningPackingListBulkListParams,
-  CommissioningPackingListMemberAmountsRetrieveParams,
   CommissioningSharesDeliveryDaysListParams,
   PackingListBulkRow,
 } from "@shared/api/generated/models";
@@ -51,7 +46,6 @@ import { ExplainerText, MobileStack, PastWarningMessage } from "@shared/ui";
 import {
   activeAtDateForWeek,
   dateForWeekDayNumber,
-  amountCellText,
   formatAmountForUnit,
   formatDayLabel,
   formatWeekLabel,
@@ -107,7 +101,7 @@ export default function PackingListBulk() {
   const { getUnitLabel } = useUnitOptions();
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { noteColumn } = useNoteColumn();
-  const { getSetting, tenantName, logoUrl, tenant } = useTenant();
+  const { getSetting } = useTenant();
   const packing_mode = getSetting("packing_mode", "BOXES") as
     | "BOXES"
     | "BULK"
@@ -216,8 +210,10 @@ export default function PackingListBulk() {
     [deliveryDayLabel, selectedYear, selectedWeek],
   );
 
+  // The stations the day served in the selected week.
+  const weekDate = activeAtDateForWeek(selectedYear, selectedWeek);
   const [selectedDeliveryStation, setSelectedDeliveryStation] =
-    useDeliveryStationOfDay(getDeliveryDayId);
+    useDeliveryStationOfDay(getDeliveryDayId, { activeAtDate: weekDate });
 
   const generateFilename = useCallback(
     (prefix: string) =>
@@ -374,54 +370,6 @@ export default function PackingListBulk() {
     [generateFilename, t],
   );
 
-  // ----- "Was ihr nehmen könnt" (member per-share amounts) ---------------
-  // Same scope as the bulk list, but the matrix keeps amounts PER share size
-  // (share_type_variation) instead of summing them — the sheet a member reads
-  // at the distribution. ShareContent-based, so it works for import tenants too.
-  const { data: memberMatrix } = useCommissioningPackingListMemberAmountsRetrieve(
-    listParams as unknown as CommissioningPackingListMemberAmountsRetrieveParams,
-    { query: { enabled: queryEnabled } },
-  );
-
-  const memberColumns = useMemo(
-    () => memberMatrix?.columns ?? [],
-    [memberMatrix],
-  );
-
-  const memberRows = useMemo(
-    () =>
-      (memberMatrix?.rows ?? []).map((row) => ({
-        ...row,
-        unit_label: row.unit ? getUnitLabel(row.unit) : "",
-        size_label: row.size ? getVegetableSizeLabel(row.size) : "",
-      })),
-    [memberMatrix, getUnitLabel, getVegetableSizeLabel],
-  );
-
-  // A member's amount per share size, often a fraction: at its unit's
-  // precision in the tenant's number format, as the box list prints it.
-  const memberAmountText = useCallback(
-    (value: unknown, item: Record<string, unknown>) =>
-      amountCellText(value, item.unit as string | undefined, format),
-    [format],
-  );
-
-  // Branded strip for the member-facing PDF (logo + tenant name).
-  const tenantInfo = useMemo(
-    () => ({
-      name: tenantName,
-      logoUrl,
-      email: (tenant?.email as string) || "",
-      phone: (tenant?.phone_number as string) || "",
-    }),
-    [tenantName, logoUrl, tenant],
-  );
-
-  const memberFilename = useMemo(
-    () => generateFilename(t("commissioning.packing_list_bulk_member")),
-    [generateFilename, t],
-  );
-
   const invalidateData = useCallback(() => {
     queryClient.invalidateQueries({
       queryKey: getCommissioningPackingListBulkListQueryKey(
@@ -467,13 +415,12 @@ export default function PackingListBulk() {
         </div>
       )}
 
-      <div
-        style={{ marginTop: "1em", marginLeft: "-2em", marginBottom: "1em" }}
-      >
+      <div className="packing-list-bulk__station-selector">
         <DeliveryStationSelector
           selectedDeliveryStation={selectedDeliveryStation}
           setSelectedDeliveryStation={setSelectedDeliveryStation}
           delivery_day={getDeliveryDayId}
+          active_at_date={weekDate}
         />
       </div>
 
@@ -494,35 +441,13 @@ export default function PackingListBulk() {
             buttonText={t("download.packing_list_bulk")}
             t={t}
           />
-
-          {/* "Was ihr nehmen könnt" — the member per-share sheet. Reuses the
-              packing-boxes matrix PDF (grouped columns + green group lines),
-              with the box-count row off and a member-facing branded header. */}
-          <PackingBoxesMatrixPDFGenerator
-            columns={memberColumns.length ? memberColumns : null}
-            data={memberRows.length ? memberRows : null}
-            week={selectedWeek}
-            dayName={
-              selectedDeliveryDay !== null
-                ? getDayName(selectedDeliveryDay, t)
-                : ""
-            }
-            showSize={showSize}
-            tenant={tenantInfo}
-            pillKey="commissioning.packing_list_bulk_member"
-            showCountRow={false}
-            cellText={memberAmountText}
-            filename={memberFilename}
-            buttonText={t("download.packing_list_bulk_member")}
-            t={t}
-          />
         </div>
       )}
 
       {queryEnabled ? (
         <EditableTable
           key={`${selectedYear}-${selectedWeek}-${selectedDeliveryDay}-${selectedDeliveryStation}`}
-          columns={columns as EditableColumnConfig[]}
+          columns={columns}
           apiFunctions={apiFunctions}
           initialData={data}
           loading={isFetching}

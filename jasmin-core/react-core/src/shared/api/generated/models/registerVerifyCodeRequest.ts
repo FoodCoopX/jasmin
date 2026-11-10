@@ -11,6 +11,8 @@
 that was emailed.
  */
 export interface RegisterVerifyCodeRequest {
+  /** @minLength 1 */
   email: string;
+  /** @minLength 1 */
   code: string;
 }

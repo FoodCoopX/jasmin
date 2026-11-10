@@ -24,6 +24,9 @@ class SuperAdminManager(BaseUserManager):
 class SuperAdmin(AbstractBaseUser):
     """Super admin - only stored in public schema"""
 
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
+
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=30, blank=True)
     last_name = models.CharField(max_length=30, blank=True)
@@ -33,9 +36,6 @@ class SuperAdmin(AbstractBaseUser):
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = SuperAdminManager()
-
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = []
 
     class Meta:
         db_table = "super_admin"

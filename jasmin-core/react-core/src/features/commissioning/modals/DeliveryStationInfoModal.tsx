@@ -10,7 +10,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
   DeliveryStation,
-  PatchedDeliveryStation,
+  PatchedDeliveryStationRequest,
 } from "@shared/api/generated/models";
 import { EditFormModal, useModalMutation } from "@shared/modals/shared";
 import {
@@ -125,10 +125,10 @@ export const DeliveryStationInfoModal: FC<DeliveryStationInfoModalProps> = ({
     }
   };
 
-  const handleSubmit = (values: PatchedDeliveryStation) =>
+  const handleSubmit = (values: PatchedDeliveryStationRequest) =>
     run(
       async () => {
-        const payload: PatchedDeliveryStation = { ...values };
+        const payload: PatchedDeliveryStationRequest = { ...values };
         // Empty coord strings aren't valid decimals — send null to clear.
         for (const key of ["coords_lat", "coords_lon"] as const) {
           if (payload[key] === "" || payload[key] === undefined)

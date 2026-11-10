@@ -356,11 +356,13 @@ export default function DeliveryNotes() {
                     selectedIds={[record.id]}
                     apiFunction={commissioningBulkCreateDocumentsFromOrdersCreate}
                     buttonText={t("commissioning.create_delivery_note")}
-                    buttonProps={{ type: "primary" }}
+                    buttonProps={{
+                      type: "primary",
+                      className: "bulk-action-button--flush",
+                    }}
                     disabled={!record.order_number || data.length === 0}
                     onSuccess={() => refetchOrders()}
                     payload={{ model: "delivery_note" }}
-                    style={{ marginTop: "0em" }}
                   />
                 )}
                 {!record.delivery_note_is_finalized &&
@@ -369,10 +371,12 @@ export default function DeliveryNotes() {
                       selectedIds={[record.id]}
                       apiFunction={commissioningBulkFinalizeDocumentsCreate}
                       buttonText={t("commissioning.finalize_delivery_note")}
-                      buttonProps={{ type: "primary" }}
+                      buttonProps={{
+                        type: "primary",
+                        className: "bulk-action-button--flush",
+                      }}
                       onSuccess={handleFinalizeDeliveryNotesSuccess}
                       payload={{ model: "delivery_note" }}
-                      style={{ marginTop: "0em" }}
                     />
                   )}
                 {!record.delivery_note_is_finalized &&
@@ -383,10 +387,13 @@ export default function DeliveryNotes() {
                         commissioningBulkDeleteDocumentsCreate(payload)
                       }
                       buttonText={t("commissioning.delete_delivery_note")}
-                      buttonProps={{ type: "primary", danger: true }}
+                      buttonProps={{
+                        type: "primary",
+                        danger: true,
+                        className: "bulk-action-button--flush",
+                      }}
                       onSuccess={() => refetchOrders()}
                       payload={{ model: "delivery_note" }}
-                      style={{ marginTop: "0em" }}
                     />
                   )}
               </>
@@ -435,13 +442,7 @@ export default function DeliveryNotes() {
   return (
     <div>
       <h1>{t("commissioning.delivery_notes")}</h1>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          marginBottom: "1em",
-        }}
-      >
+      <div className="flex-row items-start mb-1em">
         <WeekSelector
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
@@ -496,15 +497,7 @@ export default function DeliveryNotes() {
           payload={{ model: "delivery_note" }}
         />
       </div>
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          flexWrap: "wrap",
-          marginBottom: "16px",
-          marginTop: "-20px",
-        }}
-      >
+      <div className="delivery-notes__button-row mb-16">
         <BulkSendDocumentsButton
           model="delivery_note"
           rows={data}

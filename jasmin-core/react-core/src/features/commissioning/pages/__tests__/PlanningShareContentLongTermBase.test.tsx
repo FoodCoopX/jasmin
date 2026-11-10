@@ -38,8 +38,10 @@ import {
   HONEY,
   HONEY_SHARE_TYPE,
   KOHLRABI,
+  offeredFor,
   planRow,
   type PlanRow,
+  savedSlot,
   SELLERS,
   SUBSCRIBERS,
   VARIATIONS,
@@ -155,28 +157,9 @@ const NOW = new Date(2026, 9, 5, 12, 0);
 let serverPlans: PlanRow[] = [];
 let serverShareTypes: ShareType[] = [];
 
-/** Saves a slot the way the backend does: an update keeps the year, article,
- *  unit and size its id names. */
+/** Saves a slot the way the backend does (``savedSlot``) into the server's plans. */
 function saveSlot(id: string | null, payload: Record<string, unknown>): PlanRow {
-  const [year, shareArticle, unit, size] = id
-    ? id.split("_")
-    : [payload.year, payload.share_article, payload.unit, payload.size].map(String);
-  const amounts = Object.fromEntries(
-    Object.entries(payload)
-      .filter(([key]) => key.startsWith("amount_"))
-      .map(([key, value]) => [key, Number(value).toFixed(3)]),
-  );
-  const row = planRow({
-    ...amounts,
-    year: Number(year), share_article: shareArticle, unit, size,
-    share_option: String(payload.share_option),
-    range_1: Number(payload.range_1), range_2: Number(payload.range_2),
-    only_odd_weeks: Boolean(payload.only_odd_weeks),
-    only_even_weeks: Boolean(payload.only_even_weeks),
-    only_every_three_weeks: Boolean(payload.only_every_three_weeks),
-    note: (payload.note as string | null) || null,
-    seller: (payload.seller as string | null) ?? null,
-  });
+  const row = savedSlot(id, payload);
   serverPlans = [row, ...serverPlans.filter((stored) => stored.id !== row.id)];
   return row;
 }
@@ -339,10 +322,10 @@ beforeEach(() => {
   api.variations.mockReset().mockImplementation(async ({ share_option }: Filter) =>
     share_option === HARVEST
       ? VARIATIONS
-      : [{ id: "var-jar", size: "ONE_SIZE", share_type: "st-HONEY_SHARE", valid_from: "2026-01-05" }],
+      : [{ id: "var-jar", size: "ONE_SIZE", share_type: "st-HONEY_SHARE", valid_from: "2025-12-29" }],
   );
   api.shareArticles.mockReset().mockImplementation(async ({ share_option }: Filter) =>
-    ARTICLES.filter((item) => !share_option || item.share_option_list?.includes(share_option)),
+    ARTICLES.filter((item) => offeredFor(item, share_option)),
   );
   api.sellers.mockReset().mockResolvedValue(SELLERS);
   api.planList.mockReset().mockImplementation(async ({ year, share_option }: Filter) =>
@@ -450,12 +433,31 @@ describe("PlanningShareContentLongTermBase plan", () => {
     expect(screen.getByRole("columnheader", { name: SMALL })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: LARGE })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "commissioning.needed_amount" })).toBeInTheDocument();
-    // The sizes the share option offers late in the planned year.
+    // The sizes the share option runs in at any point of the planned year.
     expect(api.variations).toHaveBeenCalledWith({
       physical: true,
-      active_at_date: "2026-12-12",
+      active_at_date: "2025-12-29",
+      include_future: true,
       share_option: HARVEST,
     });
+  });
+
+  it("gives a size replaced during the year a column for each part, with its weeks", async () => {
+    api.variations.mockImplementation(async () => [
+      { ...VARIATIONS[0], valid_until: "2026-06-28" },
+      { ...VARIATIONS[0], id: "var-small-new", valid_from: "2026-06-29" },
+      { ...VARIATIONS[1], id: "var-large-next", valid_from: "2027-01-04" },
+    ]);
+    renderPlanner();
+    await loaded();
+
+    expect(
+      screen.getByRole("columnheader", { name: `${SMALL} commissioning.KW 1–26` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: `${SMALL} commissioning.KW 27–53` }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: LARGE })).not.toBeInTheDocument();
   });
 
   it("marks each delivery week of a row on its timeline", async () => {
@@ -623,9 +625,7 @@ describe("PlanningShareContentLongTermBase new row", () => {
     await loaded();
     const fennel = article("art-fennel", "Fennel", "KG");
     api.shareArticles.mockImplementation(async ({ share_option }: { share_option?: string }) =>
-      [...ARTICLES, fennel].filter(
-        (item) => !share_option || item.share_option_list?.includes(share_option),
-      ),
+      [...ARTICLES, fennel].filter((item) => offeredFor(item, share_option)),
     );
 
     await userEvent.click(button(ADD_ARTICLE));
@@ -891,6 +891,22 @@ describe("PlanningShareContentLongTermBase target total", () => {
     );
     expect(payload).not.toHaveProperty("_target_total");
     await rowShows("Beetroot", "970 commissioning.units.kg");
+  });
+
+  it("counts a size that ends during the row only for the weeks it runs", async () => {
+    // The small share ends after week 26, so it runs in 7 of weeks 20 to 29.
+    api.variations.mockImplementation(async () => [
+      { ...VARIATIONS[0], valid_until: "2026-06-28" },
+      VARIATIONS[1],
+    ]);
+    await targetTotalRow("Beetroot");
+
+    await typeInto(TARGET, "680");
+
+    // 20 small × 2 kg × 7 weeks + 10 large × 4 kg × 10 weeks = 680 kg.
+    expect(field(`${SMALL} commissioning.KW 1–26`)).toHaveValue("2");
+    expect(field(LARGE)).toHaveValue("4");
+    expect(within(editingRow()).getByText("680 commissioning.units.kg")).toBeInTheDocument();
   });
 
   it("splits the target again when the week pattern changes", async () => {

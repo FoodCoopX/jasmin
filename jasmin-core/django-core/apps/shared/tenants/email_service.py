@@ -484,8 +484,7 @@ class EmailService:
             # context-key mismatch, ...) — log and bail. Anything outside
             # this set is a real bug and should propagate.
             logger.error(
-                f"Failed to render email (slug={slug!r}): {exc}",
-                exc_info=True,
+                "Failed to render email (slug=%r): %s", slug, exc, exc_info=True
             )
             return None
 

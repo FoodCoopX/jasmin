@@ -8,7 +8,7 @@
 import type { ExternalCodeMappingKindEnum } from './externalCodeMappingKindEnum';
 
 export interface ExternalCodeMapping {
-  readonly id?: string;
+  readonly id: string;
   kind: ExternalCodeMappingKindEnum;
   /** @maxLength 128 */
   external_code: string;

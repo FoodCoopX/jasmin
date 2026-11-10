@@ -206,10 +206,12 @@ export default function PaymentsResellers() {
                         commissioningBulkSetToPaidDocumentsCreate(payload)
                       }
                       buttonText={t("commissioning.set_to_paid")}
-                      buttonProps={{ type: "primary" }}
+                      buttonProps={{
+                        type: "primary",
+                        className: "bulk-action-button--flush",
+                      }}
                       onSuccess={invalidateData}
                       payload={{ model: "invoice" }}
-                      style={{ marginTop: "0em" }}
                     />
                   )
                 )}
@@ -251,13 +253,7 @@ export default function PaymentsResellers() {
   return (
     <div>
       <h1>{t("commissioning.payments")}</h1>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          marginBottom: "1em",
-        }}
-      >
+      <div className="flex-row items-start mb-1em">
         <WeekSelector
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}

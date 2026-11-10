@@ -45,6 +45,7 @@ function matrixColumn(
     base_share_type_name: baseVariationId ? "Vegetables" : "",
     base_share_type_short_name: baseVariationId ? "Veg" : "",
     base_share_type_sort_index: 0,
+    base_is_packed_bulk: false,
     add_ons: [],
     count,
   };

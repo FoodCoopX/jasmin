@@ -16,6 +16,9 @@ from apps.commissioning.models import (
     ContactEntity,
     CoopShare,
     CoopShareTransfer,
+    CrateContentInvoiceReseller,
+    CrateDeliveryNoteContent,
+    CrateOrderContent,
     DeliveryNoteContent,
     DeliveryNoteReseller,
     DeliveryStation,
@@ -126,8 +129,14 @@ class AnonymizationMixin:
         # subject was built with can be stale, and ``_anonymize_member`` saves
         # the row in full: an office cancellation committed in the meantime
         # would be overwritten and replaced by one dated today. Locked before
-        # anything is written, as the cancellation path locks it too.
+        # anything is written, as the cancellation path locks it too, and after
+        # the member's subscriptions, as that path takes them.
         if subject.member is not None:
+            from apps.commissioning.services.member_cancellation import (
+                lock_open_subscriptions,
+            )
+
+            lock_open_subscriptions(subject.member.pk)
             subject = replace(
                 subject,
                 member=Member.objects.select_for_update().get(pk=subject.member.pk),
@@ -640,33 +649,55 @@ class AnonymizationMixin:
                 Order, "reseller", reseller_pks
             )
             scrub(Order, orders)
+            order_contents = pks(
+                OrderContent.objects.filter(order__reseller=reseller)
+            ) | deleted(OrderContent, "order", orders)
+            scrub(OrderContent, order_contents)
+            # A crate row of an order hangs off the order itself when the
+            # office added it, or off the order line whose offer brought it.
             scrub(
-                OrderContent,
-                pks(OrderContent.objects.filter(order__reseller=reseller))
-                | deleted(OrderContent, "order", orders),
+                CrateOrderContent,
+                pks(
+                    CrateOrderContent.objects.filter(
+                        Q(order__reseller=reseller)
+                        | Q(order_content__order__reseller=reseller)
+                    )
+                )
+                | deleted(CrateOrderContent, "order", orders)
+                | deleted(CrateOrderContent, "order_content", order_contents),
             )
             invoices = pks(InvoiceReseller.objects.filter(reseller=reseller)) | deleted(
                 InvoiceReseller, "reseller", reseller_pks
             )
             scrub(InvoiceReseller, invoices)
-            scrub(
+            for invoice_line_model in (
                 InvoiceResellerContent,
-                pks(InvoiceResellerContent.objects.filter(invoice__reseller=reseller))
-                | deleted(InvoiceResellerContent, "invoice", invoices),
-            )
+                CrateContentInvoiceReseller,
+            ):
+                scrub(
+                    invoice_line_model,
+                    pks(invoice_line_model.objects.filter(invoice__reseller=reseller))
+                    | deleted(invoice_line_model, "invoice", invoices),
+                )
             delivery_notes = pks(
                 DeliveryNoteReseller.objects.filter(order__reseller=reseller)
             ) | deleted(DeliveryNoteReseller, "order", orders)
             scrub(DeliveryNoteReseller, delivery_notes)
-            scrub(
+            for delivery_note_line_model in (
                 DeliveryNoteContent,
-                pks(
-                    DeliveryNoteContent.objects.filter(
-                        delivery_note__order__reseller=reseller
+                CrateDeliveryNoteContent,
+            ):
+                scrub(
+                    delivery_note_line_model,
+                    pks(
+                        delivery_note_line_model.objects.filter(
+                            delivery_note__order__reseller=reseller
+                        )
                     )
+                    | deleted(
+                        delivery_note_line_model, "delivery_note", delivery_notes
+                    ),
                 )
-                | deleted(DeliveryNoteContent, "delivery_note", delivery_notes),
-            )
 
             # Mirror ``_anonymize_reseller``: a contact shared with
             # other resellers / delivery stations keeps its PII, so its audit

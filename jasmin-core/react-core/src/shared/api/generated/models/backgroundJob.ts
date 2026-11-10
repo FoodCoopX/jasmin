@@ -14,13 +14,13 @@ free-form JSON the task wrote at run-time; the frontend interprets
 them based on ``kind``.
  */
 export interface BackgroundJob {
-  readonly id?: string;
-  readonly kind?: string;
-  readonly status?: string;
-  readonly progress?: unknown;
-  readonly result?: unknown;
-  readonly error?: string;
-  readonly created_at?: string;
+  readonly id: string;
+  readonly kind: string;
+  readonly status: string;
+  readonly progress: unknown;
+  readonly result: unknown;
+  readonly error: string;
+  readonly created_at: string;
   /** @nullable */
-  readonly completed_at?: string | null;
+  readonly completed_at: string | null;
 }

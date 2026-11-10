@@ -30,7 +30,7 @@ from xml.etree import ElementTree as ET
 import pytest
 import time_machine
 
-from apps.payments.constants import ChargeStatus
+from apps.payments.constants import BillingRunStatus, ChargeStatus
 from apps.payments.errors import SepaExportInvalid
 from apps.payments.models import BillingProfile, ChargeSchedule
 from apps.payments.services import BillingRunService
@@ -396,6 +396,24 @@ class TestLoudFailures:
         run = _run_with_one_charge(member, subscription)
         with pytest.raises(SepaExportInvalid, match="sepa_creditor_bic"):
             BillingRunService.export(run)
+
+    def test_a_file_the_schema_refuses_names_the_failing_field(
+        self, tenant, tenant_settings, billing_profile, subscription, member
+    ):
+        """A value present but illegal in pain.008 fails the XSD check; the
+        error names the element and the run stays a draft without a file."""
+        tenant.sepa_creditor_bic = "NOTABIC"
+        tenant.save()
+
+        run = _run_with_one_charge(member, subscription)
+        with pytest.raises(SepaExportInvalid) as raised:
+            BillingRunService.export(run)
+
+        assert raised.value.code == "sepa.export_invalid"
+        assert raised.value.details["validation_errors"].startswith("BIC: ")
+        run.refresh_from_db()
+        assert run.status == BillingRunStatus.DRAFT
+        assert not run.sepa_xml_export
 
 
 @pytest.mark.django_db

@@ -198,18 +198,22 @@ class ShareTypeVariationShorteningStrandsSubscriptions(ConflictError):
 
 
 class SharesDeliveryDayToursReducedWhileInUse(ConflictError):
-    """The number of tours on a delivery day that is already in use (it has
-    deliveries / subscriptions, i.e. it is not deletable) may only be raised,
-    not lowered — reducing it would strand deliveries on the removed tours."""
+    """A delivery day's number of tours may not be lowered below a tour its
+    stations sit on today or later: it is the columns the tours page offers
+    them."""
 
     code = "shares_delivery_day.tours_reduced_while_in_use"
 
-    def __init__(self, *, current_tours, new_tours) -> None:
+    def __init__(self, *, current_tours, new_tours, highest_tour) -> None:
         super().__init__(
-            f"This delivery day is in use, so the number of tours can't be "
-            f"reduced from {current_tours} to {new_tours} — only increased. "
-            f"Lowering it would strand deliveries on the removed tours.",
-            details={"current_tours": current_tours, "new_tours": new_tours},
+            f"Stations of this delivery day are still on tour {highest_tour}, so "
+            f"the number of tours can't go from {current_tours} down to "
+            f"{new_tours}.",
+            details={
+                "current_tours": current_tours,
+                "new_tours": new_tours,
+                "highest_tour": highest_tour,
+            },
         )
 
 

@@ -514,10 +514,7 @@ export default function ConfigurationGeneral() {
               styles={{ body: { padding: "16px" } }}
             >
               {category.description && (
-                <Text
-                  type="secondary"
-                  style={{ display: "block", marginBottom: 12 }}
-                >
+                <Text type="secondary" className="d-block mb-12">
                   {category.description}
                 </Text>
               )}
@@ -527,7 +524,7 @@ export default function ConfigurationGeneral() {
                     span={SettingsRenderer.getColumnSpan(field)}
                     key={field.key}
                   >
-                    <div style={{ padding: "4px 0" }}>
+                    <div className="settings-item">
                       {SettingsRenderer.renderInput(
                         field,
                         getTenantFieldValue(field.key, field.defaultValue),
@@ -549,9 +546,9 @@ export default function ConfigurationGeneral() {
               >
                 <Row gutter={[12, 12]}>
                   <Col xs={24} md={8}>
-                    <div style={{ padding: "4px 0" }}>
+                    <div className="settings-item">
                       <Text strong>{t("tenant.files.current_logo")}</Text>
-                      <div style={{ marginTop: 8 }}>
+                      <div className="mt-8">
                         <PictureUploadField
                           pictureUrl={logoPreviewUrl}
                           uploading={logoUploading}
@@ -563,9 +560,9 @@ export default function ConfigurationGeneral() {
                     </div>
                   </Col>
                   <Col xs={24} md={8}>
-                    <div style={{ padding: "4px 0" }}>
+                    <div className="settings-item">
                       <Text strong>{t("tenant.files.current_bio_logo")}</Text>
-                      <div style={{ marginTop: 8 }}>
+                      <div className="mt-8">
                         <PictureUploadField
                           pictureUrl={bioLogoPreviewUrl}
                           uploading={bioLogoUploading}
@@ -578,7 +575,7 @@ export default function ConfigurationGeneral() {
                   </Col>
                   {offersWebApp && (
                     <Col xs={24} md={8}>
-                      <div style={{ padding: "4px 0" }}>
+                      <div className="settings-item">
                         <AppIconSettings
                           iconUrl={appIconPreviewUrl}
                           iconUploading={appIconUploading}

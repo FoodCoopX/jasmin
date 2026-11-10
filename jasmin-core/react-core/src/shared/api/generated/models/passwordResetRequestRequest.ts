@@ -7,6 +7,7 @@
  */
 
 export interface PasswordResetRequestRequest {
+  /** @minLength 1 */
   email: string;
   frc_captcha_solution?: string;
 }

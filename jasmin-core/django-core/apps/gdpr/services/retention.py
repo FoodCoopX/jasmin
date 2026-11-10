@@ -10,6 +10,7 @@ from django.db.models import Count, F, Q, Sum
 from django.utils import timezone
 
 from apps.commissioning.models import CoopShare, InvoiceReseller, Member, Subscription
+from apps.commissioning.models.choices import DocumentType
 from apps.payments.constants import ChargeStatus
 from apps.payments.models import ChargeSchedule
 
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 def _ongoing_subscriptions(today) -> Q:
     """Subscriptions that are still an ongoing contract: confirmed and running
     until a day still to come. A reject unconfirms, so a confirmed row is no
-    rejected application, even when it keeps an earlier ``admin_rejected_at``.
+    rejected application.
     A cancellation ends the term at ``cancelled_effective_at`` (a member exit
     force-ends it there too) while ``valid_until`` keeps the original end, so
     that date wins when set."""
@@ -57,6 +58,20 @@ def _owed_charges() -> Q:
         )
     )
     return Q(status__in=[ChargeStatus.ISSUED, ChargeStatus.PARTIAL]) | planned_and_owed
+
+
+def _owed_invoices() -> Q:
+    """Finalized invoices the reseller still owes. A storno or correction is a
+    credit note, and an invoice a storno cancelled bills nothing any more, so
+    only an unpaid plain invoice nothing has cancelled is owed. A storno of an
+    invoice already paid leaves a refund the farm owes; nothing records refunds,
+    so that one doesn't block either."""
+    return Q(
+        is_finalized=True,
+        has_been_paid=False,
+        document_type=DocumentType.INVOICE,
+        cancelled_by_invoice__isnull=True,
+    )
 
 
 class RetentionChecksMixin:
@@ -88,10 +103,10 @@ class RetentionChecksMixin:
           after the last share is paid back (handled by a
           retention cron once it's wired).
         - **HGB §257 / UStG §14b** — any **open** finalized invoice
-          (``has_been_paid=False``) on the subject's reseller
-          blocks anonymization. After payment + 10 years, retention
-          is satisfied and a future cleanup cron will handle the
-          historical rows.
+          (``has_been_paid=False``, not a credit note, not cancelled by a
+          storno) on the subject's reseller blocks anonymization. After
+          payment + 10 years, retention is satisfied and a future cleanup cron
+          will handle the historical rows.
         - **Active subscription** — a confirmed ``Subscription`` still
           running (its effective end — the cancellation date, else
           ``valid_until`` — open or to come) means
@@ -136,9 +151,7 @@ class RetentionChecksMixin:
         open_invoice_count = 0
         if subject.reseller is not None:
             open_invoice_count = InvoiceReseller.objects.filter(
-                reseller=subject.reseller,
-                has_been_paid=False,
-                is_finalized=True,
+                _owed_invoices(), reseller=subject.reseller
             ).count()
 
         return GDPRService._retention_reasons(
@@ -272,9 +285,7 @@ class RetentionChecksMixin:
 
         invoice_by_user = _grouped(
             InvoiceReseller.objects.filter(
-                reseller__linked_user_id__in=user_ids,
-                has_been_paid=False,
-                is_finalized=True,
+                _owed_invoices(), reseller__linked_user_id__in=user_ids
             ),
             "reseller__linked_user_id",
         )

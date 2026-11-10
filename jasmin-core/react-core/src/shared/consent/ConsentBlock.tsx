@@ -215,12 +215,11 @@ export default function ConsentBlock({
     >
       <div
         lang={documentLanguage}
-        className="consent-document-box"
-        style={{ maxHeight: 200, marginBottom: 12, fontSize: 12 }}
+        className="consent-document-box consent-document-block"
         // Body is office-authored HTML (Quill); sanitise before rendering.
         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(document.body) }}
       />
-      <Text type="secondary" style={{ fontSize: 11, display: "block", marginBottom: 8 }}>
+      <Text type="secondary" className="text-11 d-block mb-8">
         {t("consent.block.version_label")} {document.version}
         {document.valid_from
           ? ` · ${t("consent.block.effective_label")} ${dayjs(document.valid_from).format(dateFormat)}`
@@ -230,14 +229,14 @@ export default function ConsentBlock({
         <Alert
           type="info"
           showIcon
-          style={{ marginBottom: 12 }}
+          className="mb-12"
           message={t("consent.print.paper_required_hint")}
           description={
             <Space direction="vertical" size={6} className="w-full">
               {officeAddressLines.length > 0 && (
                 <div>
                   {officeAddressLines.map((line) => (
-                    <div key={line} style={{ fontWeight: 600 }}>
+                    <div key={line} className="font-semibold">
                       {line}
                     </div>
                   ))}

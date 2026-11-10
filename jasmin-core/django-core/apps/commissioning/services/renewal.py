@@ -478,7 +478,8 @@ def bulk_renew(
     skipped / failed item is ``{"id", "label", "reason", ...}`` — so the office
     sees exactly which selected subscriptions did NOT renew and why. Ineligible
     rows are skipped (with a reason); an eligible row whose draft can't be
-    created (no covering variation, station-day doesn't reach the new term, a key
+    created (no covering variation, no price for the new term, station-day
+    doesn't reach the new term, a key
     collision) is captured as failed (with a reason). Neither aborts the batch
     (each renewal is its own ``@transaction.atomic``). Genuine infrastructure
     errors (lost DB connection, programming bugs) are NOT swallowed — they

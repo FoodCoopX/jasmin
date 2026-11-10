@@ -1,21 +1,21 @@
 import { useQueries } from "@tanstack/react-query";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  getCommissioningPackingListMemberAmountsRetrieveQueryOptions,
   getCommissioningShareDeliveryDetailsMatrixRetrieveQueryOptions,
-  useCommissioningPackingListMemberAmountsRetrieve,
   useCommissioningShareDeliveryDetailsMatrixRetrieve,
 } from "@shared/api/generated/commissioning/commissioning";
 import type {
-  CommissioningPackingListMemberAmountsRetrieveParams,
   CommissioningShareDeliveryDetailsMatrixRetrieveParams,
-  PackingBoxesMatrix,
+  PackingModeEnum,
   PackingBoxesMatrixColumn,
   StationMemberMatrix,
 } from "@shared/api/generated/models";
-import { ImportSharesModeBanner } from "@features/commissioning/components";
+import {
+  ImportSharesModeBanner,
+  StationContentsDownloads,
+} from "@features/commissioning/components";
 import { DeliveryStationDetailsPDFGenerator } from "@features/commissioning/pdfs";
 import type { StationPageData } from "@features/commissioning/pdfs/exports/DeliveryStationDetailsPDF";
 import { DaySelector, WeekSelector } from "@shared/selectors";
@@ -23,91 +23,39 @@ import { DeliveryStationSelector } from "@features/commissioning/selectors";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText, PastWarningMessage, ToolTipIcon } from "@shared/ui";
 import { ReadOnlyReportTable } from "@shared/tables";
-import {
-  useVegetableSizeOptions,
-  useTenant,
-  useUnitOptions,
-  useYearWeekState,
-} from "@hooks/index";
+import { useTenant, useYearWeekState } from "@hooks/index";
 import {
   useBoxCombinationColumns,
   useDeliveryStations,
-  useDeliveryStationsPerDay,
   useShareDeliveryDays,
+  useStationSheetLabels,
+  useWeekStationSlots,
 } from "@features/commissioning/hooks";
 import {
   activeAtDateForWeek,
   formatDayLabel,
   formatWeekLabel,
   generatePdfFilename,
-  getDayName,
 } from "@shared/utils";
-
-/**
- * The week's delivery days, each paired with the stations IT serves — every
- * day has its own, so the week's pages pair a day only with its stations.
- * Empty until every day's stations have loaded.
- */
-function useWeekStationSlots(
-  dayNumbers: number[],
-  shareDeliveryDays: { id?: unknown; day_number?: unknown }[],
-) {
-  const weekDeliveryDays = useMemo(
-    () =>
-      dayNumbers.flatMap((dayNum) => {
-        const id = shareDeliveryDays.find((day) => day.day_number === dayNum)?.id;
-        return id ? [{ dayNum, id: String(id) }] : [];
-      }),
-    [dayNumbers, shareDeliveryDays],
-  );
-  const { stationsPerDay, loading } = useDeliveryStationsPerDay(
-    weekDeliveryDays.map((day) => day.id),
-  );
-  return useMemo(
-    () =>
-      loading
-        ? []
-        : weekDeliveryDays.flatMap(({ dayNum }, index) =>
-            (stationsPerDay[index] ?? []).map((station) => ({ dayNum, station })),
-          ),
-    [weekDeliveryDays, stationsPerDay, loading],
-  );
-}
 
 type StationQuery = { data?: unknown; isLoading: boolean };
 
 /**
- * One PDF page per named station that has pickups, the pickup matrix and the
- * take-home amounts read from the queries at the same index. Null while any
- * of them loads, or when no station has pickups.
+ * One PDF page per station and day that has pickups, the pickup matrix read
+ * from the query at the same index. Null while any of them loads, or when no
+ * station has pickups.
  */
 function buildStationPages(
-  stationNames: string[],
+  stations: { stationName: string; dateLabel: string }[],
   matrixQueries: StationQuery[],
-  memberQueries: StationQuery[],
-  buildMemberMatrix: (
-    matrix: PackingBoxesMatrix | undefined,
-  ) => Omit<StationPageData, "stationName" | "columns" | "rows">,
 ): StationPageData[] | null {
-  if (
-    stationNames.length === 0 ||
-    matrixQueries.some((query) => query.isLoading) ||
-    memberQueries.some((query) => query.isLoading)
-  )
+  if (stations.length === 0 || matrixQueries.some((query) => query.isLoading))
     return null;
-  const pages = stationNames.flatMap((stationName, index) => {
+  const pages = stations.flatMap((station, index) => {
     const matrix = matrixQueries[index]?.data as StationMemberMatrix | undefined;
     const rows = (matrix?.rows ?? []) as unknown as StationPageData["rows"];
     if (rows.length === 0) return [];
-    const member = memberQueries[index]?.data as PackingBoxesMatrix | undefined;
-    return [
-      {
-        stationName,
-        columns: matrix?.columns ?? [],
-        rows,
-        ...buildMemberMatrix(member),
-      },
-    ];
+    return [{ ...station, columns: matrix?.columns ?? [], rows }];
   });
   return pages.length > 0 ? pages : null;
 }
@@ -124,30 +72,10 @@ export default function DeliveryStationsDetails() {
 
   const { t } = useTranslation();
   const { tenantName, logoUrl, tenant, getSetting } = useTenant();
-  const { getUnitLabel } = useUnitOptions();
-  const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const usesExternalDemand = getSetting(
     "uploads_weekly_share_amount",
     false,
   ) as boolean;
-  const showSize = Boolean(getSetting("show_size_column"));
-
-  // Turn a per-station member-amounts matrix into the ``StationPageData``
-  // member-matrix fields: the "Was ihr nehmen könnt" columns + rows (with
-  // unit/size resolved to labels for the PDF). Attached to each station's page
-  // so it prints right after that station's pickup list.
-  const buildMemberMatrix = useCallback(
-    (m: PackingBoxesMatrix | undefined) => ({
-      memberColumns: m?.columns ?? [],
-      memberRows: (m?.rows ?? []).map((row) => ({
-        ...row,
-        unit_label: row.unit ? getUnitLabel(row.unit) : "",
-        size_label: row.size ? getVegetableSizeLabel(row.size) : "",
-      })),
-      showSize,
-    }),
-    [getUnitLabel, getVegetableSizeLabel, showSize],
-  );
 
   // delivery days — derived purely from the selected year/week (no effect).
   const shareDeliveryDaysFilters = useMemo(
@@ -207,25 +135,6 @@ export default function DeliveryStationsDetails() {
   // A failed load is shown as such, never as a station nobody collects at.
   const matrixFailed = isQueryEnabled && !loading && matrixError;
 
-  // "Was ihr nehmen könnt" (member per-share amounts, is_packed_bulk portion —
-  // same as PackingListBulk) for the CURRENT station. Appended after the
-  // station's pickup page in the PDF.
-  const currentMemberParams =
-    useMemo<CommissioningPackingListMemberAmountsRetrieveParams>(
-      () => ({
-        year: selectedYear,
-        delivery_week: selectedWeek,
-        day_number: selectedDeliveryDay ?? 0,
-        delivery_station: selectedDeliveryStation ?? "",
-        is_packed_bulk: true,
-      }),
-      [selectedYear, selectedWeek, selectedDeliveryDay, selectedDeliveryStation],
-    );
-  const { data: currentMemberMatrix } =
-    useCommissioningPackingListMemberAmountsRetrieve(currentMemberParams, {
-      query: { enabled: isQueryEnabled },
-    });
-
   // Compute selectedDeliveryDayId early (needed for station selector and bulk PDFs)
   const selectedDeliveryDayId = useMemo(() => {
     if (selectedDeliveryDay === null) {
@@ -237,9 +146,12 @@ export default function DeliveryStationsDetails() {
     return deliveryDay?.id ?? null;
   }, [selectedDeliveryDay, shareDeliveryDays]);
 
-  // Fetch all delivery stations for the selected day (for bulk PDFs)
+  // The stations the day served in the selected week (for the bulk PDFs).
+  const weekDate = activeAtDateForWeek(selectedYear, selectedWeek);
   const { deliveryStations } = useDeliveryStations(
-    selectedDeliveryDayId ? { delivery_day: selectedDeliveryDayId } : {},
+    selectedDeliveryDayId
+      ? { delivery_day: selectedDeliveryDayId, active_at_date: weekDate }
+      : {},
   );
 
   // Bulk fetch: the combination matrix for every station on the selected day,
@@ -260,24 +172,7 @@ export default function DeliveryStationsDetails() {
         : [],
   });
 
-  // Parallel member-amounts ("Was ihr nehmen könnt") per station on the day —
-  // mirrors allStationsDayQueries so each pickup page can carry its member page.
-  const allStationsDayMemberQueries = useQueries({
-    queries:
-      selectedDeliveryDay !== null && deliveryStations.length > 0
-        ? deliveryStations.map((station) =>
-            getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
-              year: selectedYear,
-              delivery_week: selectedWeek,
-              day_number: selectedDeliveryDay,
-              delivery_station: station.value,
-              is_packed_bulk: true,
-            }),
-          )
-        : [],
-  });
-
-  const weekSlots = useWeekStationSlots(dayNumbers, shareDeliveryDays);
+  const weekSlots = useWeekStationSlots(dayNumbers, shareDeliveryDays, weekDate);
 
   // Bulk fetch: the combination matrix for every station on every day of the
   // week it serves.
@@ -292,88 +187,70 @@ export default function DeliveryStationsDetails() {
     ),
   });
 
-  // Parallel member-amounts per station and day — mirrors allStationsWeekQueries.
-  const allStationsWeekMemberQueries = useQueries({
-    queries: weekSlots.map(({ dayNum, station }) =>
-      getCommissioningPackingListMemberAmountsRetrieveQueryOptions({
-        year: selectedYear,
-        delivery_week: selectedWeek,
-        day_number: dayNum,
-        delivery_station: station.value,
-        is_packed_bulk: true,
-      }),
-    ),
-  });
+  const selectedStation = deliveryStations.find(
+    (s) => s.value === selectedDeliveryStation,
+  );
+  const selectedStationName = selectedStation?.label ?? "";
+
+  const { tints, dateLabel } = useStationSheetLabels(selectedYear, selectedWeek);
 
   // Build PDF pages for the current station — reuses the already-fetched
-  // matrix. Waits for the take-home amounts too, so the sheet never prints
-  // without them.
+  // matrix.
   const currentStationPages = useMemo<StationPageData[] | null>(() => {
     if (
       !selectedDeliveryStation ||
-      matrixRows.length === 0 ||
-      !currentMemberMatrix
+      selectedDeliveryDay === null ||
+      matrixRows.length === 0
     )
       return null;
-    const station = deliveryStations.find(
-      (s) => s.value === selectedDeliveryStation,
-    );
     return [
       {
-        stationName: station?.label || "",
+        stationName: selectedStationName,
+        dateLabel: dateLabel(selectedDeliveryDay),
         columns: matrixColumns,
         rows: matrixRows as unknown as StationPageData["rows"],
-        ...buildMemberMatrix(currentMemberMatrix),
       },
     ];
   }, [
     selectedDeliveryStation,
+    selectedDeliveryDay,
+    selectedStationName,
+    dateLabel,
     matrixColumns,
     matrixRows,
-    deliveryStations,
-    currentMemberMatrix,
-    buildMemberMatrix,
   ]);
 
   // Build PDF pages for all stations on the selected day.
   const allStationsDayPages = useMemo(
     () =>
-      buildStationPages(
-        deliveryStations.map((station) => station.label),
-        allStationsDayQueries,
-        allStationsDayMemberQueries,
-        buildMemberMatrix,
-      ),
-    [
-      allStationsDayQueries,
-      allStationsDayMemberQueries,
-      deliveryStations,
-      buildMemberMatrix,
-    ],
+      selectedDeliveryDay === null
+        ? null
+        : buildStationPages(
+            deliveryStations.map((station) => ({
+              stationName: station.label,
+              dateLabel: dateLabel(selectedDeliveryDay),
+            })),
+            allStationsDayQueries,
+          ),
+    [allStationsDayQueries, deliveryStations, selectedDeliveryDay, dateLabel],
   );
 
   // Build PDF pages for all stations across all days in the week.
   const allStationsWeekPages = useMemo(
     () =>
       buildStationPages(
-        weekSlots.map(
-          ({ dayNum, station }) => `${station.label} — ${getDayName(dayNum, t)}`,
-        ),
+        weekSlots.map(({ dayNum, station }) => ({
+          stationName: station.label,
+          dateLabel: dateLabel(dayNum),
+        })),
         allStationsWeekQueries,
-        allStationsWeekMemberQueries,
-        buildMemberMatrix,
       ),
-    [
-      allStationsWeekQueries,
-      allStationsWeekMemberQueries,
-      weekSlots,
-      t,
-      buildMemberMatrix,
-    ],
+    [allStationsWeekQueries, weekSlots, dateLabel],
   );
 
-  const selectedDayName =
-    selectedDeliveryDay !== null ? getDayName(selectedDeliveryDay, t) : "";
+  // With one delivery day in the week, the week's PDFs would be the day's.
+  const hasSeveralDeliveryDays = dayNumbers.length > 1;
+  const packingMode = getSetting("packing_mode", "BOXES") as PackingModeEnum;
 
   // Tenant info for PDF header
   const tenantInfo = useMemo(
@@ -455,6 +332,7 @@ export default function DeliveryStationsDetails() {
           selectedDeliveryStation={selectedDeliveryStation}
           setSelectedDeliveryStation={setSelectedDeliveryStation}
           delivery_day={selectedDeliveryDayId}
+          active_at_date={weekDate}
           preserveSelection
         />
       </div>
@@ -462,18 +340,15 @@ export default function DeliveryStationsDetails() {
       <div className="delivery-stations-details__pdf-buttons">
         <DeliveryStationDetailsPDFGenerator
           pages={currentStationPages}
-          week={selectedWeek}
-          dayName={selectedDayName}
+          packingMode={packingMode}
+          tints={tints}
           tenant={tenantInfo}
           filename={generatePdfFilename([
             t("commissioning.pickup_list"),
             selectedYear,
             formatWeekLabel(selectedWeek, t),
             formatDayLabel(selectedDeliveryDay, t),
-            (
-              deliveryStations.find((s) => s.value === selectedDeliveryStation)
-                ?.label ?? ""
-            ).replace(/[^a-zA-Z0-9]/g, "_"),
+            selectedStationName.replace(/[^a-zA-Z0-9]/g, "_"),
           ])}
           buttonText={t("download.delivery_details_station")}
           t={t}
@@ -485,8 +360,8 @@ export default function DeliveryStationsDetails() {
 
         <DeliveryStationDetailsPDFGenerator
           pages={allStationsDayPages}
-          week={selectedWeek}
-          dayName={selectedDayName}
+          packingMode={packingMode}
+          tints={tints}
           tenant={tenantInfo}
           filename={generatePdfFilename([
             t("commissioning.pickup_lists"),
@@ -503,25 +378,40 @@ export default function DeliveryStationsDetails() {
           className="tooltip-icon-beside-button"
         />
 
-        <DeliveryStationDetailsPDFGenerator
-          pages={allStationsWeekPages}
-          week={selectedWeek}
-          dayName={t("commissioning.whole_week")}
-          tenant={tenantInfo}
-          filename={generatePdfFilename([
-            t("commissioning.pickup_lists"),
-            selectedYear,
-            formatWeekLabel(selectedWeek, t),
-            t("commissioning.whole_week"),
-          ])}
-          buttonText={t("download.all_pdf_for_this_week")}
-          t={t}
-        />
-        <ToolTipIcon
-          title={t("tooltip.pickup_list_whole_week")}
-          className="tooltip-icon-beside-button"
-        />
+        {hasSeveralDeliveryDays && (
+          <>
+            <DeliveryStationDetailsPDFGenerator
+              pages={allStationsWeekPages}
+              packingMode={packingMode}
+              tints={tints}
+              tenant={tenantInfo}
+              filename={generatePdfFilename([
+                t("commissioning.pickup_lists"),
+                selectedYear,
+                formatWeekLabel(selectedWeek, t),
+                t("commissioning.whole_week"),
+              ])}
+              buttonText={t("download.all_pdf_for_this_week")}
+              t={t}
+            />
+            <ToolTipIcon
+              title={t("tooltip.pickup_list_whole_week")}
+              className="tooltip-icon-beside-button"
+            />
+          </>
+        )}
       </div>
+
+      {/* The members' notices, for the same three scopes. */}
+      <StationContentsDownloads
+        year={selectedYear}
+        week={selectedWeek}
+        dayNumber={selectedDeliveryDay}
+        station={selectedStation}
+        dayStations={deliveryStations}
+        weekSlots={weekSlots}
+        showWeek={hasSeveralDeliveryDays}
+      />
 
       {isQueryEnabled &&
       !loading &&

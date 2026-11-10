@@ -2,13 +2,11 @@
 # Managed by scripts/mypy_baseline.py; do not hand-edit.
 # Regenerate after fixing findings:
 #     poetry run python scripts/mypy_baseline.py freeze
-# 301 finding(s).
+# 296 finding(s).
 
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "RefreshToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/accounts/services/auth_service.py: Argument 1 to "update_last_login" has incompatible type "None"; expected "type[JasminUser]"  [arg-type]
-apps/accounts/services/two_factor_service.py: Argument 1 to "_ChallengeToken" has incompatible type "str"; expected "Token | None"  [arg-type]
-apps/accounts/services/two_factor_service.py: Argument 1 to "_EnrolmentToken" has incompatible type "str"; expected "Token | None"  [arg-type]
 apps/commissioning/management/commands/seed_test_users.py: Argument 1 to "_seed_one" of "Command" has incompatible type "object"; expected "dict[str, Any]"  [arg-type]
 apps/commissioning/management/commands/seed_test_users.py: Incompatible types in assignment (expression has type "Reseller", variable has type "Member")  [assignment]
 apps/commissioning/management/commands/seed_user_status_demo.py: Argument 1 to "_create_invitation" of "Command" has incompatible type "JasminUser | None"; expected "JasminUser"  [arg-type]
@@ -30,7 +28,6 @@ apps/commissioning/models/members.py: Item "None" of "JasminUser | None" has no 
 apps/commissioning/models/members.py: Item "None" of "JasminUser | None" has no attribute "account_status"  [union-attr]
 apps/commissioning/models/members.py: Item "None" of "JasminUser | None" has no attribute "save"  [union-attr]
 apps/commissioning/models/members.py: Unsupported operand types for > ("datetime" and "None")  [operator]
-apps/commissioning/models/mixin.py: "ArchivableMixin" has no attribute "created_at"  [attr-defined]
 apps/commissioning/models/mixin.py: "FinalizedProtectedMixin" has no attribute "_meta"  [attr-defined]
 apps/commissioning/models/mixin.py: "FinalizedProtectedMixin" has no attribute "_state"  [attr-defined]
 apps/commissioning/models/mixin.py: "FinalizedProtectedMixin" has no attribute "is_finalized"  [attr-defined]
@@ -260,10 +257,8 @@ apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "active_at_date" o
 apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "active_at_date" of "CurrentActiveManagerMixin" has incompatible type "Any | str"; expected "date"  [arg-type]
 apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "active_at_date" of "CurrentActiveManagerMixin" has incompatible type "Any | str"; expected "date"  [arg-type]
 apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "active_at_date" of "CurrentActiveManagerMixin" has incompatible type "str"; expected "date"  [arg-type]
-apps/commissioning/viewsets/shares_viewsets.py: Argument 1 to "get_days" of "ShareViewSet" has incompatible type "Request"; expected "ShareViewSet"  [arg-type]
 apps/commissioning/viewsets/shares_viewsets.py: Incompatible return value type (got "ShareDeliveryQuerySet[Model, Any]", expected "QuerySet[ShareDelivery, ShareDelivery]")  [return-value]
 apps/commissioning/viewsets/shares_viewsets.py: Incompatible types in assignment (expression has type "Share | None", variable has type "Share")  [assignment]
-apps/commissioning/viewsets/shares_viewsets.py: Missing positional argument "request" in call to "get_days" of "ShareViewSet"  [call-arg]
 apps/commissioning/viewsets/shares_viewsets.py: No overload variant of "__setitem__" of "list" matches argument types "str", "Any"  [call-overload]
 apps/commissioning/viewsets/shares_viewsets.py: No overload variant of "__setitem__" of "list" matches argument types "str", "Any"  [call-overload]
 apps/commissioning/viewsets/shares_viewsets.py: No overload variant of "__setitem__" of "list" matches argument types "str", "Any"  [call-overload]

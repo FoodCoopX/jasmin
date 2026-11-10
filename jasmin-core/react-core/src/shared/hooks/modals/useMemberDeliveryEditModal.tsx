@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { commissioningShareDeliveryPartialUpdate } from "@shared/api/generated/commissioning/commissioning";
 import type {
-  PatchedShareDelivery,
+  PatchedShareDeliveryRequest,
   ShareDelivery,
 } from "@shared/api/generated/models";
 import { useModalMutation } from "@shared/modals/shared/useModalMutation";
@@ -53,7 +53,7 @@ export const useMemberDeliveryEditModal = () => {
       // rendered (tenant has ``uses_jokers=false``). Dropping it
       // from the payload preserves whatever the row currently has,
       // instead of silently clearing it to false.
-      const payload: PatchedShareDelivery = {
+      const payload: PatchedShareDeliveryRequest = {
         delivery_station_day: values.delivery_station_day as string | undefined,
         apply_to_future: Boolean(values.apply_to_future),
       };

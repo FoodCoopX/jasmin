@@ -76,7 +76,7 @@ def weekly_tenant_health_report() -> None:
     if not sections:
         return
 
-    today = timezone.now().date().isoformat()
+    today = timezone.localdate().isoformat()
     subject = f"[Jasmin] weekly health digest — {today}"
     body = (
         f"Weekly row-count snapshot across {len(sections)} tenant(s).\n"

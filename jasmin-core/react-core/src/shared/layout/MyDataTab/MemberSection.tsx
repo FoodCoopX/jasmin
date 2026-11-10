@@ -22,7 +22,7 @@ import {
 import type {
   MyDataCoopShare,
   MyMemberDataRead,
-  PatchedMyMemberDataUpdate,
+  PatchedMyMemberDataUpdateRequest,
 } from "@shared/api/generated/models";
 import { useDateFormat } from "@hooks/index";
 import { notify } from "@shared/utils";
@@ -31,7 +31,7 @@ import StoredOrEditField from "./StoredOrEditField";
 const { Title, Paragraph } = Typography;
 
 /** The form's values: the birth-date picker holds a dayjs instance. */
-type MemberDataFormValues = Omit<PatchedMyMemberDataUpdate, "birth_date"> & {
+type MemberDataFormValues = Omit<PatchedMyMemberDataUpdateRequest, "birth_date"> & {
   birth_date?: dayjs.Dayjs | null;
 };
 
@@ -105,7 +105,7 @@ export default function MemberSection({ onSaved }: { onSaved: () => void }) {
     // Strip empty IBAN/account_owner unless the user explicitly opened
     // the edit — prevents "save" from clearing a previously-set value
     // the user can't currently see.
-    const payload: PatchedMyMemberDataUpdate = {
+    const payload: PatchedMyMemberDataUpdateRequest = {
       ...values,
       birth_date: formatDateForAPI(values.birth_date ?? null),
     };
@@ -116,7 +116,7 @@ export default function MemberSection({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div>
-      <Title level={5} style={{ marginTop: 0 }}>
+      <Title level={5} className="mt-0">
         {t("profile.member_facts")}
       </Title>
       <Descriptions column={1} bordered size="small">
@@ -134,7 +134,7 @@ export default function MemberSection({ onSaved }: { onSaved: () => void }) {
       </Descriptions>
       <Divider />
 
-      <Title level={5} style={{ marginTop: 16 }}>
+      <Title level={5} className="mt-16">
         {t("profile.coop_shares")}
       </Title>
       <CoopSharesList shares={data.coop_shares ?? []} />

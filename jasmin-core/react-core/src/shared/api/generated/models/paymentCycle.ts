@@ -8,7 +8,7 @@
 import type { PaymentCycleEnum } from './paymentCycleEnum';
 
 export interface PaymentCycle {
-  readonly id?: string;
+  readonly id: string;
   is_active?: boolean;
   choice: PaymentCycleEnum;
 }

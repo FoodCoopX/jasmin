@@ -17,7 +17,7 @@ from nanoid import generate
 from apps.authz.roles import VALID_ROLES, Role
 from apps.shared.languages import LanguageChoices
 
-from .choices import ThemeChoices
+from .choices import EditModeChoices, ThemeChoices
 from .constants import ID_LENGTH, JASMIN_ID_ALPHABET
 
 logger = logging.getLogger(__name__)
@@ -171,6 +171,9 @@ class JasminUserManager(BaseUserManager):
 class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
     """Custom user model. Each user exists globally per tenant schema."""
 
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["first_name", "last_name"]
+
     public_id = models.UUIDField(
         db_index=True, unique=True, default=uuid.uuid4, editable=False
     )
@@ -204,8 +207,8 @@ class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
     )
     edit_mode = models.CharField(
         max_length=10,
-        choices=[("inline", "Inline Editing"), ("modal", "Modal Editing")],
-        default="inline",
+        choices=EditModeChoices.choices,
+        default=EditModeChoices.INLINE,
     )
     roles = models.JSONField(
         default=list, blank=True, null=True, help_text="List of roles this user has"
@@ -230,9 +233,6 @@ class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
     # existed before these columns were added.
     activated_at = models.DateTimeField(blank=True, null=True)
     inactivated_at = models.DateTimeField(blank=True, null=True)
-
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["first_name", "last_name"]
 
     objects = JasminUserManager()
 
@@ -267,45 +267,6 @@ class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
         # ``str()`` of every logged user as the entry's label, out of reach of
         # the field masking, for as long as the entry exists.
         return f"User {self.pk}"
-
-    # ------------------------------------------------------------------ #
-    # Invariants                                                          #
-    # ------------------------------------------------------------------ #
-
-    def clean(self):
-        super().clean()
-        _known, invalid = _clean_role_list(self.roles)
-        if invalid:
-            raise ValidationError(
-                {
-                    "roles": ValidationError(
-                        "Invalid role(s): %(invalid)s",
-                        code="invalid_roles",
-                        params={"invalid": ", ".join(invalid)},
-                    )
-                }
-            )
-
-        # Activation stamp must not predate the join date. NULL-tolerant: only
-        # enforced when both ends of the pair are set.
-        #
-        # There is intentionally no inactivated_at-vs-activated_at check: those
-        # two stamps track the most recent activation / inactivation
-        # independently, and re-activation legitimately makes activated_at the
-        # later of the two.
-        if (
-            self.activated_at is not None
-            and self.date_joined is not None
-            and self.activated_at < self.date_joined
-        ):
-            raise ValidationError(
-                {
-                    "activated_at": ValidationError(
-                        "Activation cannot be before the join date.",
-                        code="activated_before_joined",
-                    )
-                }
-            )
 
     def save(self, *args, **kwargs):
         # Single source of truth: is_active is derived from account_status.
@@ -359,6 +320,45 @@ class JasminUser(JasminModel, AbstractBaseUser, PermissionsMixin):
                 extra.update(stamped)
             kwargs["update_fields"] = list({*update_fields, *extra})
         super().save(*args, **kwargs)
+
+    # ------------------------------------------------------------------ #
+    # Invariants                                                          #
+    # ------------------------------------------------------------------ #
+
+    def clean(self):
+        super().clean()
+        _known, invalid = _clean_role_list(self.roles)
+        if invalid:
+            raise ValidationError(
+                {
+                    "roles": ValidationError(
+                        "Invalid role(s): %(invalid)s",
+                        code="invalid_roles",
+                        params={"invalid": ", ".join(invalid)},
+                    )
+                }
+            )
+
+        # Activation stamp must not predate the join date. NULL-tolerant: only
+        # enforced when both ends of the pair are set.
+        #
+        # There is intentionally no inactivated_at-vs-activated_at check: those
+        # two stamps track the most recent activation / inactivation
+        # independently, and re-activation legitimately makes activated_at the
+        # later of the two.
+        if (
+            self.activated_at is not None
+            and self.date_joined is not None
+            and self.activated_at < self.date_joined
+        ):
+            raise ValidationError(
+                {
+                    "activated_at": ValidationError(
+                        "Activation cannot be before the join date.",
+                        code="activated_before_joined",
+                    )
+                }
+            )
 
     # ------------------------------------------------------------------ #
     # Convenience accessors                                               #

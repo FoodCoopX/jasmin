@@ -23,24 +23,13 @@ export default function PrivacyPolicyPage() {
   )?.privacy_policy_html?.trim();
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        padding: "40px 24px",
-      }}
-    >
-      <Card
-        style={{
-          maxWidth: 800,
-          margin: "0 auto",
-        }}
-      >
+    <div className="public-legal-page">
+      <Card className="public-legal-card">
         <Button
           type="link"
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate(-1)}
-          style={{ padding: 0, marginBottom: 16 }}
+          className="p-0 mb-16"
         >
           {t("common.back")}
         </Button>

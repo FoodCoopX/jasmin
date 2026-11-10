@@ -3,9 +3,10 @@
  * format and named by their label. A decimal setting (a tax rate, a
  * percentage) takes "." or "," as the decimal mark; a whole-number setting
  * takes digits only. The tenant sets no number format, so numbers are written
- * the German way, with a decimal comma.
+ * the German way, with a decimal comma. A select setting's option that can't
+ * be picked says why.
  */
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -101,5 +102,34 @@ describe("SettingsRenderer number settings", () => {
     await user.type(jokers, "3.5");
     expect(jokers).toHaveValue("35");
     expect(onJokers).toHaveBeenLastCalledWith(35);
+  });
+});
+
+describe("SettingsRenderer select settings", () => {
+  const PACKING: SettingConfig = {
+    key: "packing_mode",
+    label: "Packing",
+    type: "select",
+    options: [
+      { value: "BOXES", label: "Boxes" },
+      { value: "BULK", label: "Bulk", disabled: true, disabledReason: "Sizes are boxed" },
+    ],
+  };
+
+  it("offers a disabled option greyed out, with the reason it can't be picked", async () => {
+    const user = userEvent.setup();
+    render(<Setting setting={PACKING} initial="BOXES" />);
+
+    await user.click(screen.getByRole("combobox"));
+
+    const bulk = await waitFor(() => {
+      const option = Array.from(
+        document.querySelectorAll<HTMLElement>(".ant-select-item-option"),
+      ).find((item) => item.textContent?.startsWith("Bulk"));
+      if (!option) throw new Error("No Bulk option is offered");
+      return option;
+    });
+    expect(bulk).toHaveClass("ant-select-item-option-disabled");
+    expect(within(bulk).getByText("Sizes are boxed")).toHaveClass("sr-only");
   });
 });

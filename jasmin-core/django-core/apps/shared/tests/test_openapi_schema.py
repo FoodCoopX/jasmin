@@ -155,3 +155,97 @@ def test_mutations_declare_400_error_response():
             "payload to work against.\n\n"
             f"  {lines}"
         )
+
+
+# --------------------------------------------------------------------------- #
+# Request body names
+#
+# With ``COMPONENT_SPLIT_REQUEST`` every request body is a component of its
+# own, named after its serializer plus ``Request``.
+# ``core.openapi.collapse_doubled_request_suffix`` keeps a serializer already
+# named ``…RequestSerializer`` at a single suffix.
+# --------------------------------------------------------------------------- #
+
+
+def test_a_doubled_request_suffix_collapses_and_its_references_follow():
+    from core.openapi import collapse_doubled_request_suffix
+
+    ref = "#/components/schemas/"
+    result = {
+        "paths": {
+            "/api/x/": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": ref + "LoginRequestRequest"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "components": {
+            "schemas": {
+                "LoginRequestRequest": {"type": "object"},
+                "Wrapper": {
+                    "oneOf": [{"$ref": ref + "LoginRequestRequest"}],
+                    "discriminator": {
+                        "mapping": {"login": ref + "LoginRequestRequest"}
+                    },
+                },
+                "ResetRequest": {"type": "object"},
+                "ResetRequestRequest": {"type": "object"},
+            }
+        },
+    }
+
+    collapse_doubled_request_suffix(result, None, None, True)
+
+    schemas = result["components"]["schemas"]
+    assert list(schemas) == [
+        "LoginRequest",
+        "ResetRequest",
+        "ResetRequestRequest",
+        "Wrapper",
+    ]
+    body = result["paths"]["/api/x/"]["post"]["requestBody"]
+    assert body["content"]["application/json"]["schema"]["$ref"] == (
+        ref + "LoginRequest"
+    )
+    assert schemas["Wrapper"]["oneOf"][0]["$ref"] == ref + "LoginRequest"
+    assert schemas["Wrapper"]["discriminator"]["mapping"]["login"] == (
+        ref + "LoginRequest"
+    )
+
+
+@pytest.mark.django_db
+def test_a_request_body_is_named_after_its_serializer():
+    """``AdminConfirmationRequestSerializer`` gives ``AdminConfirmationRequest``;
+    a serializer named ``…RequestRequestSerializer`` keeps its own double."""
+    from drf_spectacular.generators import SchemaGenerator
+
+    schemas = SchemaGenerator().get_schema(request=None, public=True)["components"][
+        "schemas"
+    ]
+
+    assert "AdminConfirmationRequest" in schemas
+    assert "AdminConfirmationRequestRequest" not in schemas
+    assert "PasswordResetRequestRequest" in schemas
+    assert not [name for name in schemas if name.endswith("Request" * 3)]
+
+
+@pytest.mark.django_db
+def test_a_field_a_serializer_sometimes_skips_stays_optional():
+    """``core.openapi.SOMETIMES_ABSENT_FIELDS`` keeps such a read-only field
+    out of ``required``; every other read-only field of a response is in it."""
+    from drf_spectacular.generators import SchemaGenerator
+
+    schemas = SchemaGenerator().get_schema(request=None, public=True)["components"][
+        "schemas"
+    ]
+
+    delivery_day = schemas["SharesDeliveryDay"]
+    assert "used_tours" in delivery_day["properties"]
+    assert "used_tours" not in delivery_day["required"]
+    assert "can_be_deleted" in delivery_day["required"]

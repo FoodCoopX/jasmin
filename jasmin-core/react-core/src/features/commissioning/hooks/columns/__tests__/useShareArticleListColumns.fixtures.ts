@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
-import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
+import type {
+  EditableColumnConfig,
+  TableRecord,
+} from "@shared/tables/BasicEditableTable/types";
 import type { CrateOption } from "../../useCrates";
 
 export const unitOptions = [
@@ -18,14 +21,14 @@ export const shareOptions = [
   { value: "HARVEST_SHARE_FRUIT", label: "Fruit share" },
 ];
 
-export const isActiveColumn = {
+export const isActiveColumn: EditableColumnConfig<TableRecord> = {
   title: "active",
   dataIndex: "is_active",
   key: "is_active",
   inputType: "checkbox",
 };
 
-export const priceModalColumn = {
+export const priceModalColumn: EditableColumnConfig<TableRecord> = {
   title: "prices",
   dataIndex: "prices",
   key: "prices",
@@ -33,14 +36,16 @@ export const priceModalColumn = {
 
 type NumberRenderer = (
   decimals: number,
-) => (value: number, record: TableRecord) => ReactNode;
+) => (value: unknown, record: TableRecord) => ReactNode;
 
 const passThroughNumber: NumberRenderer = (decimals) => (value) =>
-  value == null ? null : `${value}@${decimals}`;
+  value == null ? null : `${String(value)}@${decimals}`;
+
+const noPriceModalColumn: EditableColumnConfig<TableRecord> | null = null;
 
 export const baseArgs = {
   isActiveColumn,
-  priceModalColumn: null as Record<string, unknown> | null,
+  priceModalColumn: noPriceModalColumn,
   unitOptions,
   crates,
   visibleShareOptions: shareOptions,

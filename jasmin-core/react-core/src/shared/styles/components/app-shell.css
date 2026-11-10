@@ -1,0 +1,44 @@
+/* The shell around every tenant page: the main content area and the footer.
+   AntD's own layout rules (a layout with a sider sets its content's width to
+   0) and globals/antd.css set the same properties on these elements: hence
+   the AntD classes in the selectors. */
+.ant-layout > .ant-layout-content.main-content {
+  padding: 24px;
+  background: var(--color-bg-base);
+  min-height: calc(100vh - 64px);
+  flex: 1;
+  overflow: auto;
+  width: 100%;
+  border-left: 1px solid var(--color-brand);
+}
+
+.ant-layout-footer.app-footer {
+  display: flex;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  font-size: 0.8em;
+}
+
+/* The credit line that opens the about dialog. */
+.app-footer-credit {
+  margin-left: 4px;
+  cursor: pointer;
+  color: var(--color-primary);
+}
+
+/* The slim layout of a member-only or customer-only login: a header with the
+   user menu over the one page that role sees. */
+.ant-layout-header.role-layout-header {
+  align-items: center;
+  padding: 0 16px;
+  background: var(--color-bg-base);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ant-layout-content.role-layout-content {
+  padding: 24px;
+  background: var(--color-bg-base);
+  min-height: 100vh;
+}

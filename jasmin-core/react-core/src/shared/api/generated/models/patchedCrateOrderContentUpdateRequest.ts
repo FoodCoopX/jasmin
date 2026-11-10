@@ -31,6 +31,7 @@ export interface PatchedCrateOrderContentUpdateRequest {
    * @maximum 6
    */
   day_number?: number;
+  /** @minLength 1 */
   reseller?: string;
   /** @minimum 1 */
   amount?: number;

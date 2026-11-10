@@ -4,7 +4,6 @@ import { sameCellValue } from "@shared/tables/BasicEditableTable/duplicateErrors
 import { RowSaveRefused } from "@shared/tables/BasicEditableTable/RowSaveRefused";
 import type {
   ApiFunctions,
-  EditableColumnConfig,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import { useCratesColumns } from "./columns/useCratesColumns";
@@ -41,6 +40,8 @@ interface DocumentCrateTableOptions {
   /** Why a new line of a crate type the document lists is refused. */
   repeatedTypeMessage: string;
   withoutPrice?: boolean;
+  /** The date a new line's crate price and VAT rate are those of. */
+  priceDate?: string | null;
 }
 
 /**
@@ -66,9 +67,11 @@ export function useDocumentCrateTable({
   refetchDocument,
   repeatedTypeMessage,
   withoutPrice,
+  priceDate,
 }: DocumentCrateTableOptions) {
   const { cratesColumns, crates: crateOptions } = useCratesColumns({
     without_price: withoutPrice,
+    priceDate,
   });
   const lines = useMemo<(CrateItemSummary & TableRecord)[]>(
     () => (crateItems ?? []).map((item) => ({ ...item, key: item.id })),
@@ -98,7 +101,7 @@ export function useDocumentCrateTable({
         column.key === "crate_type_name"
           ? { ...column, options: unlistedCrateTypes }
           : column,
-      ) as EditableColumnConfig[],
+      ),
     [cratesColumns, unlistedCrateTypes],
   );
 

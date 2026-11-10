@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
 import time_machine
 
+from apps.commissioning.errors import ShareContentAlreadyPlanned
 from apps.commissioning.models import ShareContent
 from apps.commissioning.services.planning_slots import PlanningSlot
 from apps.commissioning.services.share_content_service import ShareContentService
@@ -253,6 +254,37 @@ class TestProcessSharePlanningData:
         assert all(isinstance(sc, ShareContent) for sc in result)
         assert result[0].share_article == article
         assert result[0].amount == Decimal("3.5")
+
+    @patch.object(
+        ShareContentService, "create_all_theoretical_objects", return_value={}
+    )
+    @patch.object(ShareContentService, "create_movements", return_value=[])
+    def test_refuses_a_slot_planned_since_the_page_was_loaded(
+        self, _mock_movements, _mock_theo, tenant
+    ):
+        """A second create of the same slot, from a page loaded before the
+        first, is refused in words instead of with a bare integrity error."""
+        article = ShareArticleFactory()
+        variation = ShareTypeVariationFactory()
+        delivery_day = SharesDeliveryDayFactory(day_number=2)
+        DeliveryStationDayFactory(delivery_day=delivery_day)
+        data = {
+            "year": 2026,
+            "delivery_week": 15,
+            "share_article": str(article.pk),
+            "unit": "KG",
+            "size": "M",
+            f"day_{delivery_day.pk}_variation_{variation.pk}": "3.5",
+        }
+        svc = ShareContentService()
+        svc.process_share_planning_data(data)
+
+        with pytest.raises(ShareContentAlreadyPlanned):
+            svc.process_share_planning_data(
+                {**data, f"day_{delivery_day.pk}_variation_{variation.pk}": "2"}
+            )
+
+        assert ShareContent.objects.filter(share_article=article).count() == 1
 
     def test_raises_for_missing_fields(self, tenant):
         svc = ShareContentService()
@@ -770,11 +802,64 @@ class TestGetShareContentAsFrontendData:
         assert tour_keys == [f"{base_key}_tour_{tour_number}"]
         assert row[f"{base_key}_tour_{tour_number}"] == "5"
 
+    @time_machine.travel(datetime(2026, 11, 4, 12, 0), tick=False)
+    @patch(
+        "apps.commissioning.services.share_content_frontend.StockService.get_theoretical_current_stock",
+        return_value={},
+    )
+    def test_carries_each_week_under_the_tour_the_station_has_that_week(
+        self, _mock_stock, tenant
+    ):
+        variation = ShareTypeVariationFactory()
+        delivery_day = SharesDeliveryDayFactory(day_number=2)
+        station = DeliveryStationFactory()
+        DeliveryStationDayFactory(
+            delivery_station=station, delivery_day=delivery_day, tour_number=3
+        )
+        DeliveryStationDayFactory(
+            delivery_station=station,
+            delivery_day=delivery_day,
+            tour_number=1,
+            valid_from=date(2026, 12, 28),
+        )
+        article = ShareArticleFactory()
+        contents = [
+            ShareContentFactory(
+                share=ShareFactory(
+                    year=year,
+                    delivery_week=week,
+                    delivery_day=delivery_day,
+                    share_type_variation=variation,
+                ),
+                share_article=article,
+                delivery_station=station,
+                amount=Decimal("5"),
+                unit="KG",
+                size="M",
+            )
+            for year, week in ((2026, 52), (2027, 1))
+        ]
+
+        rows = ShareContentService().get_share_content_as_frontend_data(contents)
+
+        base_key = f"day_{delivery_day.pk}_variation_{variation.pk}"
+        tours_by_week = {
+            row["delivery_week"]: [
+                key for key in row if key.startswith(f"{base_key}_tour_")
+            ]
+            for row in rows
+        }
+        assert tours_by_week == {
+            52: [f"{base_key}_tour_3"],
+            1: [f"{base_key}_tour_1"],
+        }
+
 
 # ---------------------------------------------------------------------------
 # get_share_content_for_week
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
+@pytest.mark.usefixtures("clock_in_factory_week")
 class TestGetShareContentForWeek:
     @patch(
         "apps.commissioning.services.share_content_frontend.StockService.get_theoretical_current_stock",

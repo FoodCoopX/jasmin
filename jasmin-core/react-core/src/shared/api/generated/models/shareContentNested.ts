@@ -9,15 +9,15 @@ import type { UnitEnum } from './unitEnum';
 import type { VegetableSizeEnum } from './vegetableSizeEnum';
 
 export interface ShareContentNested {
-  readonly id?: string;
+  readonly id: string;
   share_article: string;
-  readonly share_article_name?: string;
+  readonly share_article_name: string;
   /** @nullable */
   seller?: string | null;
   /** @nullable */
-  readonly seller_name_for_member_pages?: string | null;
+  readonly seller_name_for_member_pages: string | null;
   /** @nullable */
-  readonly organic_status?: string | null;
+  readonly organic_status: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,2}(?:\.\d{0,3})?$

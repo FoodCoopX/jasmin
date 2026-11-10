@@ -5,8 +5,8 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
-import type { HarvestBulkSetAsExpectedItem } from './harvestBulkSetAsExpectedItem';
+import type { HarvestBulkSetAsExpectedItemRequest } from './harvestBulkSetAsExpectedItemRequest';
 
 export interface HarvestBulkSetAsExpectedRequest {
-  selectedData: HarvestBulkSetAsExpectedItem[];
+  selectedData: HarvestBulkSetAsExpectedItemRequest[];
 }

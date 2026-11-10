@@ -174,3 +174,20 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+/* The phone's hamburger button that opens the sidebar drawer. */
+.mobile-sidebar-trigger {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  cursor: pointer;
+  padding: 4px;
+  background-color: var(--color-bg-base);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px var(--color-shadow);
+}
+
+.mobile-sidebar-trigger-icon {
+  font-size: 30px;
+}

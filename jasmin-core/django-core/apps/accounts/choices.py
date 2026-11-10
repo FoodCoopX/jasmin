@@ -7,3 +7,8 @@ class ThemeChoices(models.TextChoices):
     SYSTEM = "system", "System"
     LIGHT = "light", "Light"
     DARK = "dark", "Dark"
+
+
+class EditModeChoices(models.TextChoices):
+    INLINE = "inline", "Inline Editing"
+    MODAL = "modal", "Modal Editing"

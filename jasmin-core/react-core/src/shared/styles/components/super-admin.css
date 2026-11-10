@@ -45,6 +45,12 @@
   max-width: 800px;
 }
 
+.sa-card--login {
+  max-width: 400px;
+  width: 100%;
+  padding: 40px;
+}
+
 .sa-section {
   background: var(--color-bg-base);
   border-radius: 12px;
@@ -183,6 +189,12 @@
   margin: 24px 0;
 }
 
+.sa-form-section-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
 /* ---------- Buttons ---------- */
 .sa-btn {
   padding: 10px 20px;
@@ -213,6 +225,10 @@
   font-size: 13px;
   font-weight: 400;
   border-radius: 4px;
+}
+
+.sa-btn--create {
+  background: #107518;
 }
 
 .sa-btn--info {
@@ -277,6 +293,10 @@
   background: var(--color-bg-base);
   border-bottom: 1px solid var(--color-border-soft);
   padding: 16px 24px;
+}
+
+.sa-header-nav-btn {
+  margin-right: 8px;
 }
 
 .sa-hero-band {
@@ -498,6 +518,10 @@
   color: var(--color-text-secondary);
 }
 
+.sa-ticket-status-filter {
+  width: 10em;
+}
+
 /* ---- Support ticket detail ------------------------------------------------ */
 /* Compact metadata block: tight two-column label/value grid. */
 .sa-ticket-meta {
@@ -512,6 +536,10 @@
 .sa-ticket-meta-label {
   color: var(--color-text-secondary);
   font-weight: 500;
+}
+
+.sa-ticket-status-select {
+  max-width: 200px;
 }
 
 .sa-ticket-thread {
@@ -570,4 +598,42 @@
 .sa-ticket-reply {
   width: 100%;
   resize: vertical;
+}
+
+/* ---------- Login ---------- */
+.sa-login-header {
+  margin-bottom: 30px;
+}
+
+.sa-login-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+/* ---------- Ops checklist ---------- */
+.sa-ops-page {
+  padding: 24px 32px;
+}
+
+.sa-rotation-secret {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.sa-rotation-instructions {
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 12px;
+  padding: 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
 }

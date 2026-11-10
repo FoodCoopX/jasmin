@@ -7,12 +7,13 @@ from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import QuerySet
 
 from ..errors import (
     CommissioningError,
     ShareArticleNotFound,
+    ShareContentAlreadyPlanned,
     ShareContentError,
     ShareContentNotFound,
     SharesDeliveryDayNotFound,
@@ -56,6 +57,25 @@ _SLOT_LEVEL_FIELDS = (
 # switches one on must not have the other carried over from storage — the
 # rebuild would insert the pair the database refuses.
 _EXCLUSIVE_SLOT_FLAGS = {"washing": "cleaning", "cleaning": "washing"}
+
+
+def _create_unless_planned(contents: list[ShareContent]) -> list[ShareContent]:
+    """Create ``contents``, refusing in words a row whose share, article,
+    station, unit and size already have one: a page loaded before another tab
+    or user planned the slot sends such rows, and the unique constraint would
+    otherwise answer with a bare integrity error."""
+    try:
+        with transaction.atomic():
+            return ShareContent.objects.bulk_create(contents)
+    except IntegrityError as error:
+        diag = getattr(error.__cause__, "diag", None)
+        constraint = getattr(diag, "constraint_name", None)
+        if constraint != "sharecontent_unique_share_article_station_unit_size":
+            raise
+        raise ShareContentAlreadyPlanned(
+            "This article is already planned in this unit and size for a share "
+            "and station of the slot. Reload the page and change that entry."
+        ) from error
 
 
 def _merge_stored_slot_fields(
@@ -271,7 +291,7 @@ class ShareContentPlanning(ShareContentStock):
                     )
                 )
 
-        share_contents = ShareContent.objects.bulk_create(share_contents_to_create)
+        share_contents = _create_unless_planned(share_contents_to_create)
 
         # Re-fetch with select_related to avoid N+1 in theoretical/movement creation
         share_contents = list(

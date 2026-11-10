@@ -11,7 +11,10 @@
 ``day_<id>_variation_<id>`` amount cells via the shared pattern.
  */
 export interface HarvestSharePlanningBackupRequest {
-  /** @nullable */
+  /**
+   * @minLength 1
+   * @nullable
+   */
   backup_share_article?: string | null;
   /** @nullable */
   backup_unit?: string | null;

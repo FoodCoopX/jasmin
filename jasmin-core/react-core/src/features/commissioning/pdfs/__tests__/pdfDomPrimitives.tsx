@@ -7,9 +7,15 @@ import type { ReactNode } from "react";
  * factory on top of the real module (which keeps ``StyleSheet`` / ``Font``).
  *
  * A ``Text`` with a ``render`` prop prints what it returns for page
- * ``PDF_PAGE_INFO.pageNumber`` of ``PDF_PAGE_INFO.totalPages``.
+ * ``PDF_PAGE_INFO.pageNumber`` of ``PDF_PAGE_INFO.totalPages``, the page being
+ * the first of two that one ``<Page>`` runs over.
  */
-export const PDF_PAGE_INFO = { pageNumber: 2, totalPages: 5 };
+export const PDF_PAGE_INFO = {
+  pageNumber: 2,
+  totalPages: 5,
+  subPageNumber: 1,
+  subPageTotalPages: 2,
+};
 
 type StyleInput = unknown;
 
@@ -33,6 +39,7 @@ interface PrimitiveProps {
   src?: string;
   orientation?: string;
   size?: string;
+  d?: string;
 }
 
 const styleAttr = (style: StyleInput) => JSON.stringify(flattenStyle(style));
@@ -74,6 +81,10 @@ export function pdfDomPrimitives() {
     Image: ({ src }: PrimitiveProps) => (
       <img data-pdf="image" alt="" src={src} />
     ),
+    Svg: ({ children }: PrimitiveProps) => (
+      <svg data-pdf="svg">{children}</svg>
+    ),
+    Path: ({ d }: PrimitiveProps) => <path data-pdf="path" d={d} />,
     PDFViewer: ({ children }: PrimitiveProps) => (
       <div data-pdf="viewer">{children}</div>
     ),

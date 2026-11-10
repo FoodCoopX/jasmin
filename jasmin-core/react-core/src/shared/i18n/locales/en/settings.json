@@ -152,8 +152,13 @@
     "packing_mode_boxes": "Crates are pre-packed / ready-made crates are delivered to the delivery stations",
     "packing_mode_bulk": "Members pack their own crates at the delivery stations",
     "packing_mode_mixed": "Mixed (selectable per share type)",
+    "packing_mode_locked": "Not possible while running or upcoming sizes are packed otherwise: {{sizes}}. Under \"mixed\", each size is packed as entered for it.",
     "number_packing_stations": "Number of packing stations",
     "show_size_column": "Show vegetable sizes column",
+    "show_washing": "Show washing",
+    "show_washing_description": "Off hides the washing days, the washing list and the washing columns. The planning behind them stays the same.",
+    "show_cleaning": "Show cleaning",
+    "show_cleaning_description": "Off hides the cleaning days, the cleaning list and the cleaning columns. The planning behind them stays the same.",
     "distribute_forecast_by_weight": "Distribute forecast amount across sizes by weight (prefill empty cells)",
     "show_summary_in_harvest_share_planning_on_top": "Show summary rows at the top of crate planning",
     "sales": {

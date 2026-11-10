@@ -40,8 +40,11 @@ LIVE against in-edit form values (see the `editable-table-reactive-disabled` ski
   for the quick-range presets — same UX as the CSV export modals.
 - **Formatting:** **`useDateFormat()`** (`@hooks/index`) — `dateFormat` (feed the
   picker `format=`), `formatDate(value)` (cells), **`formatDateForAPI(value)`**
-  (`YYYY-MM-DD` for query params/payloads). NEVER hardcode `"YYYY-MM-DD"` for
-  display or `dayjs().format(...)` inline.
+  (`YYYY-MM-DD` for query params/payloads), `monthFormat` / `shortMonthFormat`
+  (a month in full, or on a chart axis; plain code imports them as
+  `MONTH_FORMAT` / `SHORT_MONTH_FORMAT` from `@shared/utils`). **`useTimeFormat()`** — `formatTime`,
+  and `formatDateTime` / `formatDateTimeWithFallback` for a timestamp. NEVER
+  hardcode `"YYYY-MM-DD"` for display or `dayjs().format(...)` inline.
 
 ## CSV export
 

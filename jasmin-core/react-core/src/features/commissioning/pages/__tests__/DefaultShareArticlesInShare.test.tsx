@@ -20,12 +20,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   DefaultShareArticleInShare,
-  DefaultShareArticleInShareBulkEntry,
+  DefaultShareArticleInShareBulkEntryRequest,
   DefaultShareArticleInShareBulkUpsertRequest,
   ShareTypeVariation,
   UnitEnum,
 } from "@shared/api/generated/models";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
+import { makeShareTypeVariation } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 // One ``t`` for every call, as the real hook keeps it stable across renders.
@@ -116,10 +117,10 @@ function variation(
   sortOrder: number,
   fields: Partial<ShareTypeVariation> = {},
 ): Variation {
-  return {
+  return makeShareTypeVariation({
     id, share_type: shareType, share_type_name: SHARE_TYPE_NAMES[shareType], size, sort_order: sortOrder,
     variation_type: "physical", valid_from: "2026-01-05", valid_until: null, ...fields,
-  };
+  });
 }
 
 const VEGETABLES_S = variation("variation-vegetables-s", "share-type-vegetables", "S", 1);
@@ -182,11 +183,12 @@ function stored(articleId: string, variationId: string, quantity: string): Defau
   storedCount += 1;
   const owner = ARTICLES.find((each) => each.id === articleId);
   const shareTypeVariation = VARIATIONS.find((each) => each.id === variationId);
+  if (!owner || !shareTypeVariation) throw new Error(`No article ${articleId} or size ${variationId}`);
   return {
-    id: `default-${storedCount}`, share_article: articleId, share_article_name: owner?.name,
-    share_type_variation: variationId, share_type_variation_size: shareTypeVariation?.size,
-    share_type_id: shareTypeVariation?.share_type, quantity: Number(quantity).toFixed(3),
-    unit: owner?.default_movement_unit ?? null,
+    id: `default-${storedCount}`, share_article: articleId, share_article_name: owner.name,
+    share_type_variation: variationId, share_type_variation_size: shareTypeVariation.size,
+    share_type_id: shareTypeVariation.share_type, quantity: Number(quantity).toFixed(3),
+    unit: owner.default_movement_unit,
   };
 }
 
@@ -234,7 +236,9 @@ beforeEach(() => {
   // Newest first, as the backend lists them.
   api.listVariations.mockReset().mockImplementation(async (params: Params) =>
     serverVariations
-      .filter((each) => !params?.active_at_date || runsOn(each, String(params.active_at_date)))
+      .filter((each) => !params?.active_at_date || (params.include_future
+        ? each.valid_until == null || each.valid_until >= String(params.active_at_date)
+        : runsOn(each, String(params.active_at_date))))
       .filter((each) => !params?.physical || each.variation_type === "physical")
       .sort((a, b) => b.valid_from.localeCompare(a.valid_from) || (a.sort_order ?? 0) - (b.sort_order ?? 0)),
   );
@@ -284,7 +288,9 @@ const column = (shareType: string, size: string) => `${shareType} commissioning.
 const FRUIT_S_COLUMN = column(FRUIT_SHARE, "S");
 const FRUIT_L_COLUMN = column(FRUIT_SHARE, "L");
 const VEGETABLES_S_COLUMN = column(VEGETABLE_SHARE, "S");
-const VEGETABLES_M_COLUMN = column(VEGETABLE_SHARE, "M");
+// Both M sizes run this week or later, so each names its dates.
+const VEGETABLES_M_COLUMN = `${column(VEGETABLE_SHARE, "M")} commissioning.valid_until 11.10.2026`;
+const VEGETABLES_M_NEXT_COLUMN = `${column(VEGETABLE_SHARE, "M")} commissioning.valid_from 12.10.2026`;
 const VEGETABLES_L_COLUMN = column(VEGETABLE_SHARE, "L");
 
 const bodyRows = () =>
@@ -372,7 +378,7 @@ const upsert = (articleId: string, amounts: [Variation, string | null][]) => ({
 function lastUpsert() {
   const payload = api.bulkUpsert.mock.lastCall?.[0] as DefaultShareArticleInShareBulkUpsertRequest | undefined;
   if (!payload) throw new Error("Nothing was saved");
-  const entries: DefaultShareArticleInShareBulkEntry[] = [...payload.entries].sort((a, b) =>
+  const entries: DefaultShareArticleInShareBulkEntryRequest[] = [...payload.entries].sort((a, b) =>
     a.share_type_variation.localeCompare(b.share_type_variation),
   );
   return { ...payload, entries };
@@ -392,13 +398,15 @@ function pending<T>() {
 // ── Loading and layout ──────────────────────────────────────────────────────
 
 describe("DefaultShareArticlesInShare loading and layout", () => {
-  it("asks for the active articles, today's physical variations and the stored amounts, once each", async () => {
+  it("asks for the active articles, the physical variations running today or later and the stored amounts, once each", async () => {
     await renderLoaded();
 
     expect(api.listArticles).toHaveBeenCalledTimes(1);
     expect(api.listArticles).toHaveBeenCalledWith({ is_data_list: true, is_active: true });
     expect(api.listVariations).toHaveBeenCalledTimes(1);
-    expect(api.listVariations).toHaveBeenCalledWith({ active_at_date: TODAY, physical: true });
+    expect(api.listVariations).toHaveBeenCalledWith({
+      active_at_date: TODAY, include_future: true, physical: true,
+    });
     expect(api.listDefaults).toHaveBeenCalledTimes(1);
   });
 
@@ -424,7 +432,7 @@ describe("DefaultShareArticlesInShare loading and layout", () => {
     ).toBeVisible();
     expect(columnTitles()).toEqual([
       ACTIONS, ARTICLE, UNIT, FRUIT_S_COLUMN, FRUIT_L_COLUMN, VEGETABLES_S_COLUMN, VEGETABLES_M_COLUMN,
-      VEGETABLES_L_COLUMN,
+      VEGETABLES_M_NEXT_COLUMN, VEGETABLES_L_COLUMN,
     ]);
     expect(screen.getByText("common.info")).toBeInTheDocument();
     expect(screen.getByText("explainers.default_share_articles_in_share")).toBeInTheDocument();
@@ -453,19 +461,19 @@ describe("DefaultShareArticlesInShare rows", () => {
   it("shows each stored amount under its variation in the tenant's number format and leaves the rest empty", async () => {
     await renderLoaded();
 
-    // Fruit S, fruit L, vegetables S, M and L.
-    expect(amountsOf("Apples")).toEqual(["2", "3,5", "", "", ""]);
-    expect(amountsOf("Beetroot")).toEqual(["", "", "", "", ""]);
-    expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1", "1,25"]);
-    expect(amountsOf("Parsley")).toEqual(["", "0,75", "1", "", ""]);
+    // Fruit S, fruit L, vegetables S, M, the next M and L.
+    expect(amountsOf("Apples")).toEqual(["2", "3,5", "", "", "", ""]);
+    expect(amountsOf("Beetroot")).toEqual(["", "", "", "", "", ""]);
+    expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1", "", "1,25"]);
+    expect(amountsOf("Parsley")).toEqual(["", "0,75", "1", "", "1", ""]);
   });
 
   it("writes the amounts the way the tenant's number locale does", async () => {
     tenantSettings.values = { number_locale: "en-US" };
     renderPage();
 
-    await waitFor(() => expect(amountsOf("Carrots")).toEqual(["", "", "0.5", "1", "1.25"]));
-    expect(amountsOf("Parsley")).toEqual(["", "0.75", "1", "", ""]);
+    await waitFor(() => expect(amountsOf("Carrots")).toEqual(["", "", "0.5", "1", "", "1.25"]));
+    expect(amountsOf("Parsley")).toEqual(["", "0.75", "1", "", "1", ""]);
   });
 
   it("finds the articles whose name holds what the office searches for", async () => {
@@ -480,39 +488,41 @@ describe("DefaultShareArticlesInShare rows", () => {
 // ── Variation columns ───────────────────────────────────────────────────────
 
 describe("DefaultShareArticlesInShare variations", () => {
-  it("gives each physical variation running today a column, grouped by share type in the sizes' sort order", async () => {
+  it("gives each physical variation running today or later a column, grouped by share type in the sizes' sort order", async () => {
     await renderLoaded();
 
     // The vegetable L, started this Monday, comes newest-first from the server
-    // but still goes last; the M ending this Sunday still runs, while the M
-    // after it, the XL that ended last Sunday and the mixed share don't.
+    // but still goes last; the M ending this Sunday comes before the M after
+    // it, while the XL that ended last Sunday and the mixed share don't show.
     const variationColumns = columnTitles().filter((title) => ![ACTIONS, ARTICLE, UNIT].includes(title));
     expect(variationColumns).toEqual([
-      FRUIT_S_COLUMN, FRUIT_L_COLUMN, VEGETABLES_S_COLUMN, VEGETABLES_M_COLUMN, VEGETABLES_L_COLUMN,
+      FRUIT_S_COLUMN, FRUIT_L_COLUMN, VEGETABLES_S_COLUMN, VEGETABLES_M_COLUMN, VEGETABLES_M_NEXT_COLUMN,
+      VEGETABLES_L_COLUMN,
     ]);
     expect(screen.queryByText("Mixed share")).not.toBeInTheDocument();
     expect(screen.queryByText(/commissioning\.XL/)).not.toBeInTheDocument();
   });
 
-  // Carrots have an amount for the M ending on Sunday, parsley one for the M
-  // taking over on Monday.
-  it.each([
-    ["Sunday", new Date(2026, 9, 11, 12, 0), "2026-10-11", VEGETABLES_M, { carrots: "1", parsley: "" }],
-    ["Monday", new Date(2026, 9, 12, 12, 0), "2026-10-12", VEGETABLES_M_NEXT, { carrots: "", parsley: "1" }],
-  ])("on %s, shows and saves the amounts of the M running that day", async (_day, now, date, runningM, inM) => {
-    vi.setSystemTime(now);
+  it("enters the amounts of the M taking over next Monday beside those of the one it succeeds", async () => {
     const { user } = await renderLoaded();
 
-    expect(api.listVariations).toHaveBeenCalledWith({ active_at_date: date, physical: true });
-    expect(cellOf(rowOf("Carrots"), VEGETABLES_M_COLUMN).textContent).toBe(inM.carrots);
-    expect(cellOf(rowOf("Parsley"), VEGETABLES_M_COLUMN).textContent).toBe(inM.parsley);
+    expect(cellOf(rowOf("Carrots"), VEGETABLES_M_COLUMN).textContent).toBe("1");
+    expect(cellOf(rowOf("Parsley"), VEGETABLES_M_NEXT_COLUMN).textContent).toBe("1");
 
     await editRow(user, "Beetroot");
-    await typeAmount(user, VEGETABLES_M_COLUMN, "3");
+    await typeAmount(user, VEGETABLES_M_NEXT_COLUMN, "3");
     await saveRow(user);
 
     await savedOnce();
-    expect(lastUpsert().entries).toEqual([{ share_type_variation: runningM.id, quantity: "3" }]);
+    expect(lastUpsert().entries).toEqual([{ share_type_variation: VEGETABLES_M_NEXT.id, quantity: "3" }]);
+  });
+
+  it("drops the M that ended once its successor runs, which then names no date", async () => {
+    vi.setSystemTime(new Date(2026, 9, 12, 12, 0));
+    await renderLoaded();
+
+    expect(cellOf(rowOf("Parsley"), column(VEGETABLE_SHARE, "M")).textContent).toBe("1");
+    expect(columnTitles()).not.toContain(VEGETABLES_M_COLUMN);
   });
 
   it("takes the local date as today, also just after midnight", async () => {
@@ -520,7 +530,9 @@ describe("DefaultShareArticlesInShare variations", () => {
     vi.setSystemTime(new Date(2026, 9, 12, 0, 30));
     await renderLoaded();
 
-    expect(api.listVariations).toHaveBeenCalledWith({ active_at_date: "2026-10-12", physical: true });
+    expect(api.listVariations).toHaveBeenCalledWith({
+      active_at_date: "2026-10-12", include_future: true, physical: true,
+    });
   });
 
   it("still lists the articles, without amount columns, when no variation is running today", async () => {
@@ -548,7 +560,7 @@ describe("DefaultShareArticlesInShare editing", () => {
     await savedOnce();
     expect(lastUpsert()).toEqual(upsert(BEETROOT.id, [[VEGETABLES_S, "1"], [VEGETABLES_L, "2.5"]]));
     await reloaded();
-    await waitFor(() => expect(amountsOf("Beetroot")).toEqual(["", "", "1", "", "2,5"]));
+    await waitFor(() => expect(amountsOf("Beetroot")).toEqual(["", "", "1", "", "", "2,5"]));
     expect(screen.queryByRole("button", { name: "table.save" })).not.toBeInTheDocument();
     expect(serverDefaults.filter((row) => row.share_article === BEETROOT.id)).toHaveLength(2);
   });
@@ -564,7 +576,7 @@ describe("DefaultShareArticlesInShare editing", () => {
     await savedOnce();
     expect(lastUpsert()).toEqual(upsert(CARROTS.id, [[VEGETABLES_M, "1.75"], [VEGETABLES_L, null]]));
     await reloaded();
-    await waitFor(() => expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1,75", ""]));
+    await waitFor(() => expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1,75", "", ""]));
     // The amount for the XL, which no longer runs, stays as it was.
     expect(serverDefaults).toContainEqual(
       expect.objectContaining({ share_article: CARROTS.id, share_type_variation: VEGETABLES_XL.id, quantity: "2.000" }),
@@ -582,7 +594,7 @@ describe("DefaultShareArticlesInShare editing", () => {
       expect(screen.queryByRole("button", { name: "table.save" })).not.toBeInTheDocument(),
     );
     expect(api.bulkUpsert).not.toHaveBeenCalled();
-    expect(amountsOf("Beetroot")).toEqual(["", "", "", "", ""]);
+    expect(amountsOf("Beetroot")).toEqual(["", "", "", "", "", ""]);
   });
 
   it("treats an amount of 0 as no amount", async () => {
@@ -595,7 +607,7 @@ describe("DefaultShareArticlesInShare editing", () => {
     await savedOnce();
     expect(lastUpsert().entries).toContainEqual({ share_type_variation: FRUIT_S.id, quantity: null });
     await reloaded();
-    await waitFor(() => expect(amountsOf("Apples")).toEqual(["", "3,5", "", "", ""]));
+    await waitFor(() => expect(amountsOf("Apples")).toEqual(["", "3,5", "", "", "", ""]));
   });
 
   it("opens a row by a click on one of its amounts and saves it with Enter", async () => {
@@ -615,7 +627,7 @@ describe("DefaultShareArticlesInShare editing", () => {
     await editRow(user, "Carrots");
 
     const row = editingRow();
-    expect(within(row).getAllByRole("textbox")).toHaveLength(5);
+    expect(within(row).getAllByRole("textbox")).toHaveLength(6);
     expect(within(cellOf(row, ARTICLE)).queryByRole("combobox")).not.toBeInTheDocument();
     expect(cellOf(row, ARTICLE)).toHaveTextContent("Carrots");
     expect(within(cellOf(row, UNIT)).queryByRole("combobox")).not.toBeInTheDocument();
@@ -734,7 +746,7 @@ describe("DefaultShareArticlesInShare empty and error states", () => {
 
     await user.click(screen.getByRole("button", { name: "table.retry" }));
 
-    await waitFor(() => expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1", "1,25"]));
+    await waitFor(() => expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1", "", "1,25"]));
     expect(within(rowOf("Carrots")).getByRole("button", { name: "table.edit" })).toBeEnabled();
     expect(screen.queryByText("table.load_failed_title")).not.toBeInTheDocument();
   });
@@ -772,7 +784,7 @@ describe("DefaultShareArticlesInShare roles", () => {
     const { user } = await renderLoaded();
 
     expect(columnTitles()).not.toContain(ACTIONS);
-    expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1", "1,25"]);
+    expect(amountsOf("Carrots")).toEqual(["", "", "0,5", "1", "", "1,25"]);
     expect(screen.queryByRole("button", { name: /table\.(edit|save|delete|add_record)/ })).not.toBeInTheDocument();
 
     await user.click(cellOf(rowOf("Carrots"), VEGETABLES_S_COLUMN));

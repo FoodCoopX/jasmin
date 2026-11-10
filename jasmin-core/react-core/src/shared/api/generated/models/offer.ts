@@ -9,22 +9,17 @@ import type { UnitEnum } from './unitEnum';
 import type { VegetableSizeEnum } from './vegetableSizeEnum';
 
 export interface Offer {
-  readonly id?: string;
+  readonly id: string;
   readonly share_article_name?: string;
   readonly forecast_exists?: boolean;
   /** @pattern ^-?\d{0,4}(?:\.\d{0,3})?$ */
   readonly amount_ordered?: string;
   /** @nullable */
-  readonly organic_status?: string | null;
-  readonly can_be_deleted?: boolean;
-  /**
-   * The available amount the client read, sent with an edit of ``amount``. Order lines move the stock all the time, so a changed amount is saved only while the stored one still equals this, and refused with offer.amount_changed (409) otherwise. Without it, only the stored amount itself is accepted.
-   * @pattern ^-?\d{0,6}(?:\.\d{0,3})?$
-   */
-  expected_amount?: string;
-  readonly is_finalized?: boolean;
+  readonly organic_status: string | null;
+  readonly can_be_deleted: boolean;
+  readonly is_finalized: boolean;
   /** @nullable */
-  readonly finalized_at?: string | null;
+  readonly finalized_at: string | null;
   /**
    * @minimum 0
    * @maximum 32767
@@ -75,7 +70,7 @@ export interface Offer {
   washing?: boolean;
   comes_from_long_term_storage?: boolean;
   /** @nullable */
-  readonly finalized_by?: string | null;
+  readonly finalized_by: string | null;
   share_article: string;
   /** @nullable */
   used_crate?: string | null;

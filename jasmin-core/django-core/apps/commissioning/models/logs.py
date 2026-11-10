@@ -46,17 +46,20 @@ class OfferSending(JasminModel, CreatedMixin):
 
 
 class ReminderSending(JasminModel, CreatedMixin):
-    """Idempotency + audit record: one row per ``(reseller, day)`` that received
-    a bulk invoice-payment reminder.
+    """Idempotency + audit record: one row per ``(invoice, day)`` that a bulk
+    payment reminder covered.
 
     The bulk reminder send is consolidated per reseller (one email listing
-    all their overdue invoices). Without a dedup record, a retry after a 'failed'
-    job — or a re-click — re-sends dunning to every reseller already served. The
-    composite-unique ``(reseller, sent_on)`` makes a same-day re-run SKIP those
-    resellers (the service pre-checks for a clean skip; the DB constraint catches
-    races / raw SQL). A genuinely new reminder on a later day has a different
-    ``sent_on`` and is allowed — mirrors :class:`OfferSending`'s idempotency.
+    their ticked overdue invoices). Without a dedup record, a retry after a
+    'failed' job — or a re-click — re-sends dunning for every invoice already
+    reminded. The composite-unique ``(invoice, sent_on)`` makes a same-day
+    re-run leave those invoices out (the service pre-checks for a clean skip;
+    the DB constraint catches races / raw SQL), while another invoice of the
+    same reseller is still reminded that day. A genuinely new reminder on a
+    later day has a different ``sent_on`` and is allowed.
 
+    ``invoice`` may be null: such a row records only the reseller and the day,
+    and the send counts it for every invoice of that reseller that day.
     ``sent_on`` is a DATE (not ``created_at``): a unique on the full timestamp
     would never collide and so provide no dedup at all.
     """
@@ -66,12 +69,19 @@ class ReminderSending(JasminModel, CreatedMixin):
         on_delete=models.CASCADE,
         related_name="+",
     )
+    invoice = models.ForeignKey(
+        "InvoiceReseller",
+        on_delete=models.CASCADE,
+        related_name="+",
+        blank=True,
+        null=True,
+    )
     sent_on = models.DateField()
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["reseller", "sent_on"],
-                name="remindersending_unique_reseller_day",
+                fields=["invoice", "sent_on"],
+                name="remindersending_unique_invoice_day",
             ),
         ]

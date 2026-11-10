@@ -8,9 +8,9 @@
 import type { AuthorKindEnum } from './authorKindEnum';
 
 export interface SupportTicketMessage {
-  readonly id?: string;
-  readonly author_kind?: AuthorKindEnum;
-  readonly author_name?: string;
-  readonly body?: string;
-  readonly created_at?: string;
+  readonly id: string;
+  readonly author_kind: AuthorKindEnum;
+  readonly author_name: string;
+  readonly body: string;
+  readonly created_at: string;
 }

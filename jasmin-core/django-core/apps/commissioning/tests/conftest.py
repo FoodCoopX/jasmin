@@ -12,11 +12,13 @@ Usage:
 from __future__ import annotations
 
 import copy
+import datetime
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
 import pytest
+import time_machine
 from django.db import connection, models
 from django.db.backends.postgresql.operations import (
     DatabaseOperations as PostgresDatabaseOperations,
@@ -143,6 +145,16 @@ def tenant(_tenant_schema, db):
         connection.set_tenant(_tenant_schema)
         yield _tenant_schema
         connection.set_schema_to_public()
+
+
+@pytest.fixture()
+def clock_in_factory_week():
+    """The clock on Monday of ISO week 15 of 2026, the week the factories
+    default to.
+    Lists read only delivery weeks no older than two months unless asked for
+    the past, so a test of such a list stands in its data's week."""
+    with time_machine.travel(datetime.datetime(2026, 4, 6, 12, 0), tick=False):
+        yield
 
 
 @pytest.fixture()

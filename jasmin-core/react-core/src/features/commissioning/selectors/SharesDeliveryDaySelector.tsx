@@ -200,13 +200,7 @@ const SharesDeliveryDaySelector = ({
               ) : null}
               {day.label}
               {day.datePart ? (
-                <span
-                  style={{
-                    color: "var(--color-text-muted)",
-                    fontSize: "0.85em",
-                    marginLeft: "8px",
-                  }}
-                >
+                <span className="color-text-muted text-label-sm ml-8">
                   {day.datePart}
                 </span>
               ) : null}
@@ -266,11 +260,10 @@ const SharesDeliveryDaySelector = ({
   return (
     <Select
       value={selectedSharesDeliveryDay}
-      style={{ width: "30em" }}
       size="small"
       onChange={handleSharesDeliveryDayChange}
       options={sharesDeliveryDayOptions}
-      className="bold-select week-selector-select"
+      className="bold-select week-selector-select shares-delivery-day-selector"
       placeholder={placeholder}
       aria-label={t("placeholder.shares_delivery_day_selector")}
       loading={loading}

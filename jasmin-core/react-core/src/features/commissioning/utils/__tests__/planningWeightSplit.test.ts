@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  countDeliveryWeeks,
+  deliveryWeekNumbers,
   suggestPerShareAmounts,
   type VariationWeightCount,
 } from "../planningWeightSplit";
@@ -46,6 +46,25 @@ describe("suggestPerShareAmounts", () => {
     // 200 over 2 weeks == 100 per delivery == the one-week/100 case
     expect(twoWeeks.amountsByVariation).toEqual(oneWeek.amountsByVariation);
     expect(twoWeeks.actualTotal).toBe(200);
+  });
+
+  it("counts a size only for the weeks it runs in", () => {
+    // A size replaced after three of the four weeks, and the one replacing it.
+    const r = suggestPerShareAmounts(300, 4, [
+      { variationId: "M_OLD", averageWeight: 2, subscriberCount: 10, weeks: 3 },
+      { variationId: "M_NEW", averageWeight: 2, subscriberCount: 10, weeks: 1 },
+    ]);
+    // 10 × 7.5 × 3 + 10 × 7.5 × 1 = 300
+    expect(r.amountsByVariation).toEqual({ M_OLD: 7.5, M_NEW: 7.5 });
+    expect(r.actualTotal).toBe(300);
+  });
+
+  it("suggests nothing for a size that runs in none of the weeks", () => {
+    const r = suggestPerShareAmounts(100, 1, [
+      ...smallAndMediumVariations(10, 5),
+      { variationId: "ENDED", averageWeight: 2, subscriberCount: 4, weeks: 0 },
+    ]);
+    expect(r.amountsByVariation).toEqual({ S: 5, M: 10 });
   });
 
   it("skips a size with missing average_weight", () => {
@@ -96,26 +115,26 @@ describe("suggestPerShareAmounts", () => {
   });
 });
 
-describe("countDeliveryWeeks", () => {
+describe("deliveryWeekNumbers", () => {
   it("counts an inclusive range", () => {
-    expect(countDeliveryWeeks(10, 12)).toBe(3); // 10, 11, 12
+    expect(deliveryWeekNumbers(10, 12)).toHaveLength(3); // 10, 11, 12
   });
 
   it("only odd weeks", () => {
-    expect(countDeliveryWeeks(10, 15, { onlyOdd: true })).toBe(3); // 11,13,15
+    expect(deliveryWeekNumbers(10, 15, { onlyOdd: true })).toHaveLength(3); // 11,13,15
   });
 
   it("only even weeks", () => {
-    expect(countDeliveryWeeks(10, 15, { onlyEven: true })).toBe(3); // 10,12,14
+    expect(deliveryWeekNumbers(10, 15, { onlyEven: true })).toHaveLength(3); // 10,12,14
   });
 
   it("every third week from the start", () => {
-    expect(countDeliveryWeeks(10, 20, { onlyEveryThree: true })).toBe(4); // 10,13,16,19
+    expect(deliveryWeekNumbers(10, 20, { onlyEveryThree: true })).toHaveLength(4); // 10,13,16,19
   });
 
   it("returns 0 for an inverted or invalid range", () => {
-    expect(countDeliveryWeeks(20, 10)).toBe(0);
-    expect(countDeliveryWeeks(null, 10)).toBe(0);
-    expect(countDeliveryWeeks(10, undefined)).toBe(0);
+    expect(deliveryWeekNumbers(20, 10)).toHaveLength(0);
+    expect(deliveryWeekNumbers(null, 10)).toHaveLength(0);
+    expect(deliveryWeekNumbers(10, undefined)).toHaveLength(0);
   });
 });

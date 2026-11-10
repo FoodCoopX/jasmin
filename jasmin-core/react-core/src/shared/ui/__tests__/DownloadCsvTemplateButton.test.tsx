@@ -110,6 +110,33 @@ describe("DownloadCsvTemplateButton template", () => {
     ]);
   });
 
+  it("lists a select's values in the hint, leaving out a none option", async () => {
+    render(
+      <DownloadCsvTemplateButton
+        columns={[
+          {
+            dataIndex: "unit",
+            title: "Einheit",
+            inputType: "select",
+            options: [
+              { value: null, label: "-" },
+              { value: "KG", label: "kg" },
+              { value: "BUNCH", label: "Bund" },
+            ],
+          },
+        ]}
+        filename="articles"
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /download.csv_template/ }),
+    );
+
+    const [csv] = downloadCsvBlobMock.mock.calls[0] as [string, string];
+    expect(csv.split("\n")[2]).toBe("KG|BUNCH");
+  });
+
   it("renders no empty dry-run wrapper when the dry run is off", () => {
     const { container } = render(
       <DownloadCsvTemplateButton

@@ -120,7 +120,7 @@ export default function VVTExportCard() {
       {isError && (
         <Alert
           type="error"
-          style={{ marginTop: 16 }}
+          className="mt-16"
           message={t("gdpr.vvt.error")}
           description={getErrorMessage(error, t("gdpr.vvt.error"))}
         />
@@ -149,10 +149,7 @@ export default function VVTExportCard() {
       >
         {data ? (
           <>
-            <Text
-              type="secondary"
-              style={{ display: "block", marginBottom: 8 }}
-            >
+            <Text type="secondary" className="d-block mb-8">
               {t("gdpr.vvt.doc_reference")}{" "}
               <Text code>
                 {(data as { doc_reference?: string }).doc_reference}

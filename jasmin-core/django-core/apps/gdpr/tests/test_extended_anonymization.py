@@ -239,6 +239,65 @@ class TestResellerAnonymization:
                 assert entry.changes is None
                 assert entry.object_repr == "[anonymised]"
 
+    def test_audit_entries_of_crate_rows_are_scrubbed(self, tenant):
+        """The crate rows of the reseller's orders, delivery notes and invoices
+        are found through their live rows and, once deleted, through the
+        foreign keys their audit entries store: an order's crate row through
+        its order or the order line it came with."""
+        from decimal import Decimal
+
+        from auditlog.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        from apps.commissioning.models import (
+            CrateContentInvoiceReseller,
+            CrateDeliveryNoteContent,
+            CrateOrderContent,
+        )
+        from apps.commissioning.tests.factories import (
+            CrateFactory,
+            DeliveryNoteResellerFactory,
+            InvoiceResellerFactory,
+            OrderContentFactory,
+            OrderFactory,
+        )
+
+        user = JasminUserFactory()
+        reseller = ResellerFactory(linked_user=user)
+        order = OrderFactory(reseller=reseller)
+        line = OrderContentFactory(order=order)
+        crate = CrateFactory()
+        row = {
+            "crate_type": crate,
+            "amount": 1,
+            "price_per_unit": Decimal("2.00"),
+            "tax_rate": Decimal("19.00"),
+            "note": "Hof Müller holt selbst ab",
+        }
+        added = CrateOrderContent.objects.create(order=order, **row)
+        with_line = CrateOrderContent.objects.create(order_content=line, **row)
+        on_note = CrateDeliveryNoteContent.objects.create(
+            delivery_note=DeliveryNoteResellerFactory(order=order), **row
+        )
+        on_invoice = CrateContentInvoiceReseller.objects.create(
+            invoice=InvoiceResellerFactory(reseller=reseller), **row
+        )
+        rows = [(type(r), r.pk) for r in (added, with_line, on_note, on_invoice)]
+        with_line.delete()
+        on_invoice.delete()
+
+        GDPRService.anonymize_user(user)
+
+        for model, pk in rows:
+            entries = LogEntry.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                object_pk=str(pk),
+            )
+            assert entries.exists(), model
+            for entry in entries:
+                assert entry.changes is None
+                assert entry.object_repr == "[anonymised]"
+
     def test_no_reseller_link_is_fine(self, tenant):
         """Pure staff user with no Reseller doesn't crash."""
         user = JasminUserFactory()

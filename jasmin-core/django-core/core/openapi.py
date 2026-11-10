@@ -1,6 +1,11 @@
 """drf-spectacular postprocessing hooks.
 
-Injects the canonical ``ErrorResponseSerializer`` shape (defined in
+``collapse_doubled_request_suffix`` names request bodies and
+``mark_sometimes_absent_fields_optional`` keeps a skipped field optional, see
+their docstrings.
+
+``inject_canonical_error_responses`` injects the canonical
+``ErrorResponseSerializer`` shape (defined in
 ``core.serializers``) into every operation's ``responses`` dict for the
 HTTP error codes that operation can realistically produce. This avoids
 having to litter every viewset with explicit ``responses={400: ...,
@@ -131,4 +136,105 @@ def inject_canonical_error_responses(
             "required": ["code", "message"],
         },
     )
+    return result
+
+
+_REQUEST_SUFFIX = "Request"
+_SCHEMA_REF_PREFIX = "#/components/schemas/"
+
+
+def collapse_doubled_request_suffix(
+    result: dict[str, Any],
+    generator: Any,
+    request: Any,
+    public: bool,
+) -> dict[str, Any]:
+    """Name a request body ``XRequest`` rather than ``XRequestRequest``.
+
+    With ``COMPONENT_SPLIT_REQUEST`` every request body is named after its
+    serializer plus ``Request``, which doubles the suffix of a serializer
+    already named ``…RequestSerializer``. The single suffix is used only where
+    no other component holds that name, and every reference follows.
+    """
+    schemas = result.get("components", {}).get("schemas", {})
+    doubled = _REQUEST_SUFFIX * 2
+    renames = {
+        name: name.removesuffix(_REQUEST_SUFFIX)
+        for name in schemas
+        if name.endswith(doubled) and name.removesuffix(_REQUEST_SUFFIX) not in schemas
+    }
+    if not renames:
+        return result
+    for old, new in renames.items():
+        schemas[new] = schemas.pop(old)
+    result["components"]["schemas"] = dict(sorted(schemas.items()))
+    _rewrite_refs(
+        result,
+        {
+            _SCHEMA_REF_PREFIX + old: _SCHEMA_REF_PREFIX + new
+            for old, new in renames.items()
+        },
+    )
+    return result
+
+
+def _rewrite_refs(node: Any, refs: dict[str, str]) -> None:
+    """Replace every string in ``node`` that is a key of ``refs``: a ``$ref``
+    and a discriminator mapping's value alike."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if isinstance(value, str) and value in refs:
+                node[key] = refs[value]
+            else:
+                _rewrite_refs(value, refs)
+    elif isinstance(node, list):
+        for item in node:
+            _rewrite_refs(item, refs)
+
+
+# Read-only fields a serializer leaves out of some rows (``SkipField``), by
+# component. drf-spectacular lists every read-only field of a response as
+# required.
+SOMETIMES_ABSENT_FIELDS: dict[str, tuple[str, ...]] = {
+    # Only with ``need_info_on_tours``.
+    "SharesDeliveryDay": ("used_tours",),
+    # The list's annotations, missing from a create's answer; the tour flag is
+    # also hidden from anonymous readers.
+    "DeliveryStationDay": (
+        "delivery_station_short_name",
+        "delivery_day_number",
+        "tour_assignment_missing",
+    ),
+    # The list's annotations, missing from a create's answer.
+    "Offer": ("share_article_name", "forecast_exists", "amount_ordered"),
+    # Annotated only when the list is scoped by year, week or day.
+    "Reseller": ("has_orders",),
+    # The list's annotations, missing from a create's answer.
+    "OfferGroup": ("reseller_names",),
+    "ShareTypeVariationGrossPrice": ("share_type_variation_size",),
+    "ShareDeliveryOverview": (
+        "quantity",
+        "share_type_variation_string",
+        "delivery_week",
+    ),
+}
+
+
+def mark_sometimes_absent_fields_optional(
+    result: dict[str, Any],
+    generator: Any,
+    request: Any,
+    public: bool,
+) -> dict[str, Any]:
+    """Take each field of ``SOMETIMES_ABSENT_FIELDS`` out of its component's
+    ``required``. A component missing from the schema fails the generation,
+    so the table can't outlive a rename."""
+    schemas = result["components"]["schemas"]
+    for component, fields in SOMETIMES_ABSENT_FIELDS.items():
+        schema = schemas[component]
+        required = [name for name in schema.get("required", []) if name not in fields]
+        if required:
+            schema["required"] = required
+        else:
+            schema.pop("required", None)
     return result

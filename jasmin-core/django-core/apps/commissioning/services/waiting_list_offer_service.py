@@ -46,6 +46,7 @@ from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
+from apps.shared.audit_log import update_and_log
 from apps.shared.display_formats import DisplayFormats
 from apps.shared.money import fits_decimal_column, to_decimal
 
@@ -126,7 +127,8 @@ def withdraw_from_waiting_list(subscriptions: QuerySet[Subscription]) -> list[st
     without an open offer, accepted offers among them, are left as they are.
 
     The rows are written with ``update()``: a rejection or an exit must not fail
-    on a term that the subscription's own validation has come to refuse.
+    on a term that the subscription's own validation has come to refuse. The
+    audit log records each one, the queue position it left included.
     """
     entries = list(
         subscriptions.filter(
@@ -139,7 +141,8 @@ def withdraw_from_waiting_list(subscriptions: QuerySet[Subscription]) -> list[st
     if not entries:
         return []
     withdrawn_ids = [entry.pk for entry in entries]
-    Subscription.objects.filter(pk__in=withdrawn_ids).update(
+    update_and_log(
+        entries,
         on_waiting_list=False,
         waiting_list_status=Subscription.WaitingListStatus.NOT_ON_LIST,
         waiting_list_position=None,

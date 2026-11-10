@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import datetime
 from collections import defaultdict
+from collections.abc import Callable
 from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
-from django.db.models import QuerySet, Sum
+from django.db.models import QuerySet
 from django.utils import timezone
 from isoweek import Week
 
@@ -14,6 +15,7 @@ from apps.shared.money import round_money
 
 from ..errors import (
     CommissioningError,
+    DefaultShareContentNoRunningWeek,
     RequiredFieldMissing,
     ResellerNotFound,
     ShareArticleNotFound,
@@ -28,8 +30,6 @@ from ..models import (
     ShareContent,
     SharesDeliveryDay,
     ShareTypeVariation,
-    Subscription,
-    VirtualVariationComponent,
 )
 from ..utils.composite_id_utils import compose_slot_id
 from ..utils.dynamic_keys import (
@@ -38,6 +38,9 @@ from ..utils.dynamic_keys import (
     parse_amount_cell,
 )
 from .planning_slots import in_share_option, refuse_variations_outside
+from .planning_subscriber_counts import (
+    subscriber_counts_by_variation,
+)
 
 # Share lookup key: (year, delivery_week, delivery_day_id, share_type_variation_id)
 _ShareKey = tuple[int, int, int, str]
@@ -87,37 +90,39 @@ class DefaultShareContentService:
         future_weeks: list[tuple[int, datetime.date]],
     ) -> tuple[
         dict[datetime.date, list],
-        dict[Any, list],
+        dict[tuple[datetime.date, Any], list],
     ]:
         """Prefetch delivery days and station relationships for future weeks.
 
         Returns:
-            (delivery_days_by_date, delivery_station_days)
+            (delivery_days_by_date, delivery_station_days) — the stations keyed
+            by (the week's Monday, delivery day id).
         """
-        delivery_days_by_date: dict[datetime.date, list] = {}
-        for _week, date in future_weeks:
-            active_days = SharesDeliveryDay.current.active_at_date(date)
-            if active_days.exists():
-                delivery_days_by_date[date] = list(active_days)
+        # A farm has a handful of delivery days: one query, matched per week.
+        all_days = list(SharesDeliveryDay.objects.all())
+        delivery_days_by_date: dict[datetime.date, list] = {
+            date: days
+            for _week, date in future_weeks
+            if (days := [day for day in all_days if day.is_active_at(date)])
+        }
 
-        delivery_station_days: dict[Any, list] = defaultdict(list)
-        if delivery_days_by_date:
-            all_delivery_days = [
-                delivery_day
-                for delivery_day_list in delivery_days_by_date.values()
-                for delivery_day in delivery_day_list
-            ]
-            # ``current`` (not ``objects``) so only ACTIVE station-days are
-            # used — matches how the harvest planner resolves stations
-            # (``DeliveryStationDay.current.active_at_date``). ``objects`` would
-            # pull in closed/historical station-days and materialise
-            # ShareContent for stations that no longer deliver.
-            station_relations = DeliveryStationDay.current.filter(
-                delivery_day__in=all_delivery_days
-            ).select_related("delivery_station", "delivery_day")
-
-            for rel in station_relations:
-                delivery_station_days[rel.delivery_day].append(rel.delivery_station)
+        # Each day's stations per week: the station-days running that week, of
+        # stations still delivering.
+        day_ids_by_date = {
+            date: {day.id for day in days}
+            for date, days in delivery_days_by_date.items()
+        }
+        delivery_station_days: dict[tuple[datetime.date, Any], list] = defaultdict(list)
+        for station_day in DeliveryStationDay.objects.filter(
+            delivery_day_id__in=set().union(*day_ids_by_date.values()),
+            delivery_station__is_active=True,
+        ).select_related("delivery_station"):
+            for date, day_ids in day_ids_by_date.items():
+                if station_day.delivery_day_id in day_ids and station_day.is_active_at(
+                    date
+                ):
+                    key = (date, station_day.delivery_day_id)
+                    delivery_station_days[key].append(station_day.delivery_station)
 
         return delivery_days_by_date, dict(delivery_station_days)
 
@@ -148,8 +153,8 @@ class DefaultShareContentService:
             existing[key] = share
 
         # Self-heal reused shares that an earlier bulk_create left with NULL
-        # day fields — otherwise the ShareContent we attach to them inherits
-        # the NULL packing_day and silently drops out of the packing lists.
+        # day fields — otherwise the ShareContent we attach to them would be
+        # planned without its theoretical amounts (see ``DAY_FIELD_DEFAULTS``).
         Share.heal_day_fields(existing.values())
         return existing
 
@@ -158,223 +163,34 @@ class DefaultShareContentService:
         weeks: list[int],
         range_1: int,
         range_2: int,
+        running_weeks: set[int] | None = None,
     ) -> tuple[bool, bool, bool]:
         """Detect whether weeks follow odd / even / every-three-weeks patterns.
+
+        ``running_weeks`` are the weeks a slot's sizes run in, the only ones a
+        size gets rows for; a pattern is read against them and the weeks the
+        slot already has rows in.
 
         Returns:
             (only_odd_weeks, only_even_weeks, only_every_three_weeks)
         """
         weeks_set = set(weeks)
+        allowed = None if running_weeks is None else running_weeks | weeks_set
 
-        only_odd = weeks_set == {w for w in range(range_1, range_2 + 1) if w % 2 != 0}
-        only_even = weeks_set == {w for w in range(range_1, range_2 + 1) if w % 2 == 0}
+        def expected(keep: Callable[[int], bool]) -> set[int]:
+            return {
+                week
+                for week in range(range_1, range_2 + 1)
+                if keep(week) and (allowed is None or week in allowed)
+            }
 
-        only_every_three = False
-        if len(weeks) >= 2:
-            expected = {range_1 + i for i in range(range_2 - range_1 + 1) if i % 3 == 0}
-            only_every_three = weeks_set == expected
+        only_odd = weeks_set == expected(lambda week: week % 2 != 0)
+        only_even = weeks_set == expected(lambda week: week % 2 == 0)
+        only_every_three = len(weeks) >= 2 and weeks_set == expected(
+            lambda week: (week - range_1) % 3 == 0
+        )
 
         return only_odd, only_even, only_every_three
-
-    @staticmethod
-    def _count_subscriptions_for_variation(
-        variation: ShareTypeVariation,
-        target_date: datetime.date,
-    ) -> Decimal:
-        """Active subscriptions (direct + virtual) for a physical variation at a
-        date — or, when none are active then, the next future cohort. Thin
-        wrapper over the batched ``_subscriber_counts_by_variation``."""
-        return DefaultShareContentService._subscriber_counts_by_variation(
-            {str(variation.id)}, target_date
-        ).get(str(variation.id), Decimal(0))
-
-    @staticmethod
-    def _subscriber_counts_by_variation(
-        variation_ids: set[str],
-        snapshot_date: datetime.date,
-    ) -> dict[str, Decimal]:
-        """Active-subscriber count (direct + virtual) per physical variation.
-
-        Counts subscriptions active at ``snapshot_date``. For a variation with
-        NO subscriptions active then, falls back to its next future cohort — the
-        subscribers starting on the earliest ``valid_from`` after
-        ``snapshot_date`` — so planning a season before it starts doesn't read 0
-        (``active_at_date`` otherwise excludes future-dated subscriptions).
-
-        Virtual variations are covered too: those can be subscribed to directly,
-        and a physical variation's count adds its virtual components' counts.
-        """
-        active_subs = Subscription.current.active_at_date(snapshot_date)
-
-        # ``order_by()`` clears the model's default ``-valid_from`` ordering:
-        # without it Django folds valid_from into the GROUP BY, splitting a
-        # variation into one row per valid_from and undercounting the sum.
-        direct_by_variation: dict[str, Decimal] = {}
-        for row in (
-            active_subs.values("share_type_variation_id")
-            .annotate(total=Sum("quantity"))
-            .order_by()
-        ):
-            var_id = row["share_type_variation_id"]
-            direct_by_variation[str(var_id)] = Decimal(row["total"])
-
-        components_by_physical: dict[str, list[tuple[str, Decimal]]] = {}
-        virtual_ids: set[str] = set()
-        for phys_id, virt_id, quantity in VirtualVariationComponent.objects.filter(
-            physical_variation_id__in=variation_ids
-        ).values_list("physical_variation_id", "virtual_variation_id", "quantity"):
-            components_by_physical.setdefault(str(phys_id), []).append(
-                (str(virt_id), quantity)
-            )
-            virtual_ids.add(str(virt_id))
-
-        # Forward fallback: for relevant variations with no subscribers active at
-        # snapshot_date, use the next future cohort's count — the subscriptions
-        # starting on the earliest valid_from after snapshot_date.
-        relevant = set(variation_ids) | virtual_ids
-        zero_vars = {v for v in relevant if direct_by_variation.get(v, Decimal(0)) == 0}
-        if zero_vars:
-            future_by_var: dict[str, list[tuple[datetime.date, int]]] = defaultdict(
-                list
-            )
-            for var_id, valid_from, subscribed_quantity in Subscription.current.filter(
-                share_type_variation_id__in=zero_vars,
-                valid_from__gt=snapshot_date,
-            ).values_list(
-                "share_type_variation_id",
-                "valid_from",
-                "quantity",
-            ):
-                future_by_var[str(var_id)].append((valid_from, subscribed_quantity))
-            for var_id, rows in future_by_var.items():
-                earliest = min(valid_from for valid_from, _ in rows)
-                direct_by_variation[var_id] = Decimal(
-                    sum(q for valid_from, q in rows if valid_from == earliest)
-                )
-
-        counts: dict[str, Decimal] = {}
-        for var_id in variation_ids:
-            total = direct_by_variation.get(var_id, Decimal(0))
-            for virt_id, quantity in components_by_physical.get(var_id, []):
-                total += direct_by_variation.get(virt_id, Decimal(0)) * quantity
-            counts[var_id] = total
-        return counts
-
-    @staticmethod
-    def get_subscriber_counts_for_planning(
-        year: int, share_option: str
-    ) -> dict[str, str]:
-        """Active-subscriber snapshot per physical variation of ``share_option``,
-        keyed by variation id — the exact multiplier the forward
-        ``needed_amount`` uses (``count × amount × num_weeks``).
-
-        Powers the reverse "total → per-share" planning suggestion: the frontend
-        divides the target total by the number of delivery weeks, then splits the
-        per-delivery amount across sizes by ``average_weight × count`` (mirroring
-        ``split_forecast_amount_by_weight``). Returned as ``{variation_id: str}``.
-
-        The count is a single snapshot at **today's** date (direct + virtual
-        subscriptions resolved onto the physical variation, with a next-cohort
-        fallback when none are active yet) — constant across the planned weeks,
-        exactly as ``_calculate_needed_amount`` treats it. ``year`` is taken for
-        symmetry with the forward list endpoint; like it, the snapshot date is
-        today regardless of the planned year, so the suggestion reproduces the
-        forward total.
-        """
-        variation_ids = {
-            str(variation_id)
-            for variation_id in ShareTypeVariation.objects.filter(
-                variation_type=ShareTypeVariation.VariationType.PHYSICAL,
-                share_type__share_option=share_option,
-            ).values_list("id", flat=True)
-        }
-        counts = DefaultShareContentService._subscriber_counts_by_variation(
-            variation_ids, timezone.localdate()
-        )
-        return {var_id: str(count) for var_id, count in counts.items()}
-
-    @staticmethod
-    def _calculate_needed_amount(
-        year: int,
-        range_1: int,
-        range_2: int,
-        only_odd: bool,
-        only_even: bool,
-        only_every_three: bool,
-        amounts_dict: dict[str, str],
-        subscriber_counts: dict[str, Decimal] | None = None,
-    ) -> str:
-        """Rough estimate of total amount needed for a share article over the
-        planned timespan.
-
-        Treats the current subscriber count of each share_type_variation as
-        constant for the whole period (real ShareDeliveries are intentionally
-        not summed up — they reflect past dispatch decisions that don't
-        belong in a forward-looking planning total).
-
-        Formula::
-
-            Σ_variation ( current_subscribers(variation)
-                          × amount_per_variation
-                          × num_filtered_weeks )
-
-        where ``num_filtered_weeks`` is the count of weeks in
-        ``[range_1, range_2]`` after applying the only_odd / only_even /
-        only_every_three pattern.
-        """
-        week_range = range(range_1, range_2 + 1)
-        filtered_weeks = DefaultShareContentService._filter_weeks(
-            week_range,
-            only_odd=only_odd,
-            only_even=only_even,
-            only_every_three=only_every_three,
-        )
-        num_weeks = len(filtered_weeks)
-        if num_weeks == 0:
-            return "0"
-
-        variation_amounts: dict[str, Decimal] = {}
-        for variation_id, value in extract_amounts_from_keys(amounts_dict).items():
-            variation_amounts[variation_id] = parse_amount_cell(
-                value, field=f"amount_{variation_id}"
-            )
-
-        if not variation_amounts:
-            return "0"
-
-        # Single snapshot — the spec says "assume subscribers don't change over
-        # the weeks", so one reference count is used for every week.
-        total = Decimal(0)
-        if subscriber_counts is not None:
-            # Fast path: counts precomputed once for the whole request (see
-            # ``_slot_rows``) — no per-variation query. A var_id absent from the
-            # map contributes 0, matching the other path's skip of an unknown
-            # variation.
-            for var_id, amount in variation_amounts.items():
-                current_subscribers = subscriber_counts.get(var_id, Decimal(0))
-                total += amount * current_subscribers * num_weeks
-        else:
-            # Without precomputed counts: resolve and count each variation
-            # individually.
-            snapshot_date = timezone.localdate()
-            variations = {
-                str(v.id): v
-                for v in ShareTypeVariation.objects.filter(
-                    id__in=list(variation_amounts.keys())
-                )
-            }
-            for var_id, amount in variation_amounts.items():
-                variation = variations.get(var_id)
-                if variation is None:
-                    continue
-                current_subscribers = (
-                    DefaultShareContentService._count_subscriptions_for_variation(
-                        variation, snapshot_date
-                    )
-                )
-                total += amount * current_subscribers * num_weeks
-
-        return str(round_money(total))
 
     # ──────────────────────────────────────────────
     # Public API
@@ -540,7 +356,14 @@ class DefaultShareContentService:
             if decimal_amount == 0:
                 continue
 
-            for week in filtered_weeks:
+            # A size gets plan rows only for the weeks it runs: a size
+            # replaced during the year hands its weeks to its successor.
+            running_weeks = [
+                week
+                for week in filtered_weeks
+                if variation.is_active_at(Week(year, week).monday())
+            ]
+            for week in running_weeks:
                 all_default_contents.append(
                     DefaultShareContent(
                         year=year,
@@ -579,8 +402,8 @@ class DefaultShareContentService:
                         # from the delivery day. Apply them in memory via the
                         # model's own helper (driven by ``DAY_FIELD_DEFAULTS``,
                         # the single source of truth) so none are missed — a
-                        # NULL day field silently excludes the share from that
-                        # day-filtered list.
+                        # NULL day field costs the share its theoretical
+                        # amounts (see ``DAY_FIELD_DEFAULTS``).
                         share = Share(
                             year=year,
                             delivery_week=week,
@@ -591,7 +414,9 @@ class DefaultShareContentService:
                         shares_to_create.append(share)
                         existing_shares[share_key] = share
 
-                    for station in delivery_station_days.get(delivery_day, []):
+                    for station in delivery_station_days.get(
+                        (monday, delivery_day.id), []
+                    ):
                         share_content = ShareContent(
                             share=share,
                             share_article=share_article,
@@ -701,6 +526,16 @@ class DefaultShareContentService:
             seller,
         )
 
+        if not all_default_contents and any(
+            amount not in SCAFFOLD_VALUES
+            and parse_amount_cell(amount, field=f"amount_{variation_id}") != 0
+            for variation_id, amount in amounts.items()
+        ):
+            raise DefaultShareContentNoRunningWeek(
+                "None of the sizes with an amount runs in the planned weeks.",
+                field="range_1",
+            )
+
         share_ids = DefaultShareContentService._persist_create_objects(
             validated_data["year"],
             all_default_contents,
@@ -717,6 +552,20 @@ class DefaultShareContentService:
         )
 
         return all_default_contents
+
+    @staticmethod
+    def _rows_of_running_sizes() -> list[DefaultShareContent]:
+        """The long-term plan rows whose size runs in their week; a row for a
+        week its size doesn't run in plans no delivery."""
+        return [
+            default
+            for default in DefaultShareContent.objects.select_related(
+                "share_type_variation"
+            )
+            if default.share_type_variation.is_active_at(
+                Week(default.year, default.delivery_week).monday()
+            )
+        ]
 
     @staticmethod
     @transaction.atomic
@@ -740,9 +589,7 @@ class DefaultShareContentService:
         station = station_day.delivery_station
         current_date = timezone.localdate()
 
-        defaults = list(
-            DefaultShareContent.objects.select_related("share_type_variation")
-        )
+        defaults = DefaultShareContentService._rows_of_running_sizes()
         if not defaults:
             return 0
 
@@ -886,6 +733,25 @@ class DefaultShareContentService:
         )
 
     @staticmethod
+    def _running_weeks(
+        contents: list[DefaultShareContent], year: int, range_1: int, range_2: int
+    ) -> set[int]:
+        """The weeks of ``range_1…range_2`` in which any size of ``contents``
+        runs."""
+        variations = {
+            content.share_type_variation_id: content.share_type_variation
+            for content in contents
+        }.values()
+        return {
+            week
+            for week in range(range_1, range_2 + 1)
+            if any(
+                variation.is_active_at(Week(year, week).monday())
+                for variation in variations
+            )
+        }
+
+    @staticmethod
     def _slot_rows(
         contents: QuerySet[DefaultShareContent], year: int, share_option: str | None
     ) -> list[dict[str, Any]]:
@@ -913,10 +779,9 @@ class DefaultShareContentService:
             grouped.setdefault(key, []).append(content)
             variation_ids.add(str(content.share_type_variation_id))
 
-        # Precompute active-subscriber counts ONCE for every variation on the
-        # page. ``_calculate_needed_amount`` would otherwise re-query per group
-        # per variation even though the snapshot date is identical per request.
-        subscriber_counts = DefaultShareContentService._subscriber_counts_by_variation(
+        # Active-subscriber counts once for every variation on the page; the
+        # snapshot date is the same for every group.
+        subscriber_counts = subscriber_counts_by_variation(
             variation_ids, timezone.localdate()
         )
 
@@ -931,7 +796,14 @@ class DefaultShareContentService:
                 only_odd,
                 only_even,
                 only_every_three,
-            ) = DefaultShareContentService._detect_week_pattern(weeks, range_1, range_2)
+            ) = DefaultShareContentService._detect_week_pattern(
+                weeks,
+                range_1,
+                range_2,
+                DefaultShareContentService._running_weeks(
+                    contents_list, year, range_1, range_2
+                ),
+            )
 
             amounts_dict: dict[str, str] = {}
             for content in contents_list:
@@ -939,15 +811,22 @@ class DefaultShareContentService:
                 if amount_key not in amounts_dict:
                     amounts_dict[amount_key] = str(content.amount)
 
-            needed_amount = DefaultShareContentService._calculate_needed_amount(
-                year,
-                range_1,
-                range_2,
-                only_odd,
-                only_even,
-                only_every_three,
-                amounts_dict,
-                subscriber_counts=subscriber_counts,
+            # A rough total over the planned timespan, at today's subscriber
+            # counts for every week. Each row is one week of one size, so a
+            # size counts only for the weeks it runs.
+            needed_amount = str(
+                round_money(
+                    sum(
+                        (
+                            content.amount
+                            * subscriber_counts.get(
+                                str(content.share_type_variation_id), Decimal(0)
+                            )
+                            for content in contents_list
+                        ),
+                        Decimal(0),
+                    )
+                )
             )
 
             row: dict[str, Any] = {

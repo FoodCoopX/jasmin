@@ -1,0 +1,20 @@
+/* Offers page: the sending-status table under the offers and the
+   send-offers modal. */
+.offer-sending-status-table {
+  width: 46em;
+}
+
+/* The modal's line when every reseller already got the offer. */
+.send-offers-modal__all-sent {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+/* The list of resellers that already got the offer. */
+.send-offers-modal__already-sent {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: var(--color-bg-subtle);
+  border-radius: 6px;
+}

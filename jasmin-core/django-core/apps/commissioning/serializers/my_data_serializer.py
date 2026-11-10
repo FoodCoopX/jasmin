@@ -143,10 +143,8 @@ class MyMemberDataReadSerializer(MaskedIBANFieldMixin, serializers.ModelSerializ
 
     @extend_schema_field(MyDataCoopShareSerializer(many=True))
     def get_coop_shares(self, obj: Member) -> list[dict]:
-        # Prefetched on the view so this is not N+1.
-        shares = getattr(obj, "_prefetched_coop_shares", None)
-        if shares is None:
-            shares = CoopShare.objects.filter(member=obj)
+        # One member per response, so one query.
+        shares = CoopShare.objects.filter(member=obj)
         return MyDataCoopShareSerializer(shares, many=True).data
 
 

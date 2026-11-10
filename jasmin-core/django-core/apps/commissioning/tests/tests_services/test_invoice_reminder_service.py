@@ -20,6 +20,7 @@ from decimal import Decimal
 from unittest import mock
 
 import pytest
+from django.utils import timezone
 
 from apps.commissioning.models import InvoiceReseller
 from apps.commissioning.services.invoice_reminder import (
@@ -31,6 +32,13 @@ from apps.commissioning.tests.factories import (
     OrderFactory,
     ResellerFactory,
 )
+
+CTX = {
+    "tenant_name": "Test Coop",
+    "tenant_language": "de",
+    "bank_details": "DE12 / GENODEF1XXX",
+    "frontend_base_url": "https://test.example.org",
+}
 
 
 @pytest.mark.django_db
@@ -330,22 +338,15 @@ class TestBulkSendInvoiceReminders:
         assert snapshots[0]["successful"] <= snapshots[0]["total"]
         assert snapshots[0]["failed"] >= 0
 
-    def test_dedups_same_reseller_same_day(self, tenant):
-        """A retry / re-click of the bulk reminder on the same day must
-        NOT re-send dunning to a reseller already reminded — the (reseller,
-        sent_on) ReminderSending record makes the second run skip it."""
+    def test_an_invoice_is_reminded_once_a_day(self, tenant):
+        """A retry / re-click of the bulk reminder on the same day leaves out
+        an invoice already reminded and reports it as already sent."""
         from apps.commissioning.models import ReminderSending
 
         reseller = ResellerFactory(invoice_email="reseller@example.org")
         order = OrderFactory(reseller=reseller)
         DeliveryNoteResellerFactory(order=order)
         invoice = InvoiceResellerFactory(reseller=reseller, is_finalized=True)
-        ctx = {
-            "tenant_name": "Test Coop",
-            "tenant_language": "de",
-            "bank_details": "DE12 / GENODEF1XXX",
-            "frontend_base_url": "https://test.example.org",
-        }
 
         with (
             mock.patch(
@@ -360,17 +361,89 @@ class TestBulkSendInvoiceReminders:
             ) as send_email,
         ):
             first = bulk_send_invoice_reminders(
-                order_ids=[str(order.id)], email_ctx=ctx
+                order_ids=[str(order.id)], email_ctx=CTX
             )
             second = bulk_send_invoice_reminders(
-                order_ids=[str(order.id)], email_ctx=ctx
+                order_ids=[str(order.id)], email_ctx=CTX
             )
 
-        # First run sent exactly once; the second run skipped the already-served
-        # reseller — no duplicate dunning — yet still reports it as handled.
         assert send_email.call_count == 1
-        assert first["successful"] == 1
+        assert first["results"][0].get("already_sent") is None
         assert second["successful"] == 1
         assert second["failed"] == 0
-        # Exactly one dedup record for that reseller+day.
-        assert ReminderSending.objects.filter(reseller=reseller).count() == 1
+        assert second["results"][0]["already_sent"] is True
+        assert ReminderSending.objects.filter(invoice=invoice).count() == 1
+
+    def test_another_invoice_of_the_reseller_is_reminded_the_same_day(self, tenant):
+        """A second run the same day reminds the reseller of the invoice the
+        first one didn't cover, and lists only that one."""
+        from apps.commissioning.models import ReminderSending
+
+        reseller = ResellerFactory(invoice_email="reseller@example.org")
+        order_a = OrderFactory(reseller=reseller, delivery_week=15)
+        order_b = OrderFactory(reseller=reseller, delivery_week=16)
+        DeliveryNoteResellerFactory(order=order_a)
+        DeliveryNoteResellerFactory(order=order_b)
+        invoice_a = InvoiceResellerFactory(reseller=reseller, is_finalized=True)
+        invoice_b = InvoiceResellerFactory(reseller=reseller, is_finalized=True)
+        by_dn_id = {
+            order_a.delivery_note.pk: invoice_a,
+            order_b.delivery_note.pk: invoice_b,
+        }
+
+        with (
+            mock.patch(
+                "apps.commissioning.services.invoice_service."
+                "InvoiceService.get_invoices_for_delivery_notes",
+                return_value=by_dn_id,
+            ),
+            mock.patch(
+                "apps.shared.tenants.email_service.EmailService.send_email",
+                autospec=True,
+                return_value=True,
+            ) as send_email,
+        ):
+            bulk_send_invoice_reminders(order_ids=[str(order_a.id)], email_ctx=CTX)
+            second = bulk_send_invoice_reminders(
+                order_ids=[str(order_a.id), str(order_b.id)], email_ctx=CTX
+            )
+
+        assert send_email.call_count == 2
+        invoices_table = send_email.call_args.kwargs["context"]["invoices_table"]
+        assert f"<strong>{invoice_b.full_number}</strong>" in invoices_table
+        assert f"<strong>{invoice_a.full_number}</strong>" not in invoices_table
+        outcome = {
+            row["order_id"]: row.get("already_sent") for row in second["results"]
+        }
+        assert outcome == {str(order_a.id): True, str(order_b.id): None}
+        assert ReminderSending.objects.filter(reseller=reseller).count() == 2
+
+    def test_a_row_without_an_invoice_counts_for_the_resellers_invoices(self, tenant):
+        """A reminder row that records only the reseller and the day leaves
+        every invoice of that reseller out that day."""
+        from apps.commissioning.models import ReminderSending
+
+        reseller = ResellerFactory(invoice_email="reseller@example.org")
+        order = OrderFactory(reseller=reseller)
+        DeliveryNoteResellerFactory(order=order)
+        invoice = InvoiceResellerFactory(reseller=reseller, is_finalized=True)
+        ReminderSending.objects.create(reseller=reseller, sent_on=timezone.localdate())
+
+        with (
+            mock.patch(
+                "apps.commissioning.services.invoice_service."
+                "InvoiceService.get_invoices_for_delivery_notes",
+                side_effect=lambda dn_ids: {dn_id: invoice for dn_id in dn_ids},
+            ),
+            mock.patch(
+                "apps.shared.tenants.email_service.EmailService.send_email",
+                autospec=True,
+                return_value=True,
+            ) as send_email,
+        ):
+            result = bulk_send_invoice_reminders(
+                order_ids=[str(order.id)], email_ctx=CTX
+            )
+
+        assert send_email.call_count == 0
+        assert result["results"][0]["already_sent"] is True

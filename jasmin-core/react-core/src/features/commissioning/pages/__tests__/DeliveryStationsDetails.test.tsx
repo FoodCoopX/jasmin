@@ -1,7 +1,9 @@
 /**
  * DeliveryStationsDetails, the pickup lists: for one delivery station on one
  * delivery day, which member collects which boxes, with PDF downloads for that
- * station, for every station of the day and for every station of the week.
+ * station, for every station of the day and for every station of the week —
+ * of the pickup lists and of the notices that tell members what their shares
+ * hold.
  * Rendered through its entry in the commissioning route table (role gate and
  * lazily loaded page) with the real week, day and station selectors, the
  * box-combination columns and the download buttons. The generated
@@ -24,8 +26,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   DeliveryStation,
-  PackingBoxesMatrix,
   SharesDeliveryDay,
+  StationContents,
   StationMemberMatrix,
 } from "@shared/api/generated/models";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
@@ -77,7 +79,8 @@ const api = vi.hoisted(() => ({
   deliveryDays: vi.fn(),
   stations: vi.fn(),
   pickups: vi.fn(),
-  memberAmounts: vi.fn(),
+  stationContents: vi.fn(),
+  shareTypes: vi.fn(),
 }));
 
 vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
@@ -119,26 +122,31 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
       "share_delivery_details/matrix",
       api.pickups,
     ),
-    useCommissioningPackingListMemberAmountsRetrieve: queryHook(
-      "packing_list/member_amounts",
-      api.memberAmounts,
-    ),
-    getCommissioningPackingListMemberAmountsRetrieveQueryOptions: queryOptions(
-      "packing_list/member_amounts",
-      api.memberAmounts,
+    useCommissioningShareTypesList: queryHook("share_types", api.shareTypes),
+    getCommissioningPackingListStationContentsRetrieveQueryOptions: queryOptions(
+      "packing_list/station_contents",
+      api.stationContents,
     ),
   };
 });
 
-// The page only needs its download button; the barrel would also load every
+// The page only needs its download buttons; the barrel would also load every
 // other PDF template of the app.
 vi.mock("@features/commissioning/pdfs", async () => ({
   DeliveryStationDetailsPDFGenerator: (
     await import("@features/commissioning/pdfs/exports/DeliveryStationDetailsPDFGenerator")
   ).default,
+  StationContentsPDFGenerator: (
+    await import("@features/commissioning/pdfs/exports/StationContentsPDFGenerator")
+  ).default,
 }));
 vi.mock("@features/commissioning/pdfs/exports/DeliveryStationDetailsPDF", () => ({
   default: function DeliveryStationDetailsPDF() {
+    return null;
+  },
+}));
+vi.mock("@features/commissioning/pdfs/exports/StationContentsPDF", () => ({
+  default: function StationContentsPDF() {
     return null;
   },
 }));
@@ -188,9 +196,10 @@ import {
   SCHOOL_FRIDAY,
   FARM_SHOP_FRIDAY,
   FARM_SHOP_NEXT_TUESDAY,
-  CARROTS,
-  FARM_SHOP_TAKE,
-  CARROTS_ON_THE_SHEET,
+  FARM_SHOP_CONTENTS,
+  MARKET_CONTENTS,
+  VEGETABLES_S_CARD,
+  FRUIT_CARD,
 } from "./deliveryStationsDetails.fixtures";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -200,7 +209,7 @@ type ListParams = {
   delivery_week: number;
   day_number: number;
   delivery_station: string;
-  is_packed_bulk?: boolean;
+  is_past?: boolean;
 };
 
 /** What the in-memory farm holds; the request spies answer from it. */
@@ -208,7 +217,7 @@ let farm: {
   deliveryDays: SharesDeliveryDay[];
   stationsByDeliveryDay: Record<string, DeliveryStation[]>;
   pickups: Record<string, StationMemberMatrix>;
-  memberAmounts: Record<string, PackingBoxesMatrix>;
+  contents: Record<string, StationContents>;
 };
 
 /** The week, delivery day and station a pickup list belongs to. */
@@ -253,6 +262,14 @@ const FRIDAY_LABEL = "commissioning.delivery_day Friday, 09.10.2026";
 const STATION_PDF = /download\.delivery_details_station$/;
 const DAY_PDF = /download\.all_pdf_for_this_day$/;
 const WEEK_PDF = /download\.all_pdf_for_this_week$/;
+const STATION_NOTICE = /download\.station_contents_station$/;
+const DAY_NOTICE = /download\.station_contents_day$/;
+const WEEK_NOTICE = /download\.station_contents_week$/;
+// The sheets head each page with its delivery day.
+const TUESDAY_ON_THE_SHEET = "COMMON.WEEKDAY_TUESDAY, 06.10.2026 · commissioning.KW 41";
+const FRIDAY_ON_THE_SHEET = "COMMON.WEEKDAY_FRIDAY, 09.10.2026 · commissioning.KW 41";
+// Each share type's tint: its place among the farm's share types.
+const TINTS = { "st-veg": 0, "st-fruit": 1 };
 const TENANT_ON_THE_PDF = {
   name: "Green Acres",
   logoUrl: "https://example.test/logo.png",
@@ -332,10 +349,10 @@ function pending<T>() {
 }
 
 /** The one document printed so far. */
-function printedDocument() {
+function printedDocument(template = "DeliveryStationDetailsPDF") {
   expect(printed.documents).toHaveLength(1);
   const [document] = printed.documents;
-  expect(document.template).toBe("DeliveryStationDetailsPDF");
+  expect(document.template).toBe(template);
   return document.props;
 }
 
@@ -359,7 +376,10 @@ beforeEach(() => {
       [listOf(41, FRIDAY, MARKET)]: MARKET_FRIDAY,
       [listOf(42, TUESDAY, FARM_SHOP)]: FARM_SHOP_NEXT_TUESDAY,
     },
-    memberAmounts: { [listOf(41, TUESDAY, FARM_SHOP)]: FARM_SHOP_TAKE },
+    contents: {
+      [listOf(41, TUESDAY, FARM_SHOP)]: FARM_SHOP_CONTENTS,
+      [listOf(41, TUESDAY, MARKET)]: MARKET_CONTENTS,
+    },
   };
   api.deliveryDays.mockReset().mockImplementation(async () => [...farm.deliveryDays]);
   api.stations
@@ -368,11 +388,15 @@ beforeEach(() => {
       ...(farm.stationsByDeliveryDay[params.delivery_day ?? ""] ?? []),
     ]);
   api.pickups.mockReset().mockImplementation(answerPickups);
-  api.memberAmounts
+  // Listed fruit first: the tints follow the share options' order.
+  api.shareTypes.mockReset().mockResolvedValue([
+    { id: "st-fruit", name: "Fruit", share_option: "HARVEST_SHARE_FRUIT" },
+    { id: "st-veg", name: "Vegetables", share_option: "HARVEST_SHARE" },
+  ]);
+  api.stationContents
     .mockReset()
     .mockImplementation(
-      async (params: ListParams) =>
-        farm.memberAmounts[listAskedFor(params)] ?? { columns: [], rows: [] },
+      async (params: ListParams) => farm.contents[listAskedFor(params)] ?? { shares: [] },
     );
 });
 
@@ -395,19 +419,19 @@ describe("DeliveryStationsDetails loading", () => {
     expect(selectedIn(DAY)).toBe(TUESDAY_LABEL);
     expect(selectedIn(STATION)).toBe("Farm shop");
     expect(api.deliveryDays).toHaveBeenCalledWith({ active_at_date: "2026-10-10" });
-    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-tue" });
+    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-tue", active_at_date: "2026-10-10" });
     expect(api.pickups).toHaveBeenCalledWith({
       year: 2026,
       delivery_week: 41,
       day_number: TUESDAY,
       delivery_station: FARM_SHOP.id,
     });
-    expect(api.memberAmounts).toHaveBeenCalledWith({
+    expect(api.stationContents).toHaveBeenCalledWith({
       year: 2026,
       delivery_week: 41,
       day_number: TUESDAY,
       delivery_station: FARM_SHOP.id,
-      is_packed_bulk: true,
+      is_past: false,
     });
     expect(screen.getByText("explainers.delivery_stations_details")).toBeInTheDocument();
   });
@@ -420,7 +444,7 @@ describe("DeliveryStationsDetails loading", () => {
     await waitFor(() => expect(api.stations).toHaveBeenCalled());
     expect(screen.getByText("commissioning.select_delivery_station")).toBeInTheDocument();
     expect(api.pickups).not.toHaveBeenCalled();
-    expect(api.memberAmounts).not.toHaveBeenCalled();
+    expect(api.stationContents).not.toHaveBeenCalled();
 
     stations.answer([FARM_SHOP, MARKET]);
 
@@ -485,6 +509,7 @@ describe("DeliveryStationsDetails pickup table", () => {
 
   it("says there are no deliveries and keeps every download disabled when nobody collects anything", async () => {
     farm.pickups = {};
+    farm.contents = {};
     renderPage();
 
     expect(
@@ -494,6 +519,10 @@ describe("DeliveryStationsDetails pickup table", () => {
     expect(download(STATION_PDF)).toBeDisabled();
     expect(download(DAY_PDF)).toBeDisabled();
     expect(download(WEEK_PDF)).toBeDisabled();
+    await settle();
+    expect(download(STATION_NOTICE)).toBeDisabled();
+    expect(download(DAY_NOTICE)).toBeDisabled();
+    expect(download(WEEK_NOTICE)).toBeDisabled();
   });
 });
 
@@ -520,7 +549,7 @@ describe("DeliveryStationsDetails choosing the week, day and station", () => {
     expect(await screen.findByText("Emil Probe")).toBeInTheDocument();
     expect(selectedIn(STATION)).toBe("Market");
     expect(screen.queryByText("Cleo Muster")).not.toBeInTheDocument();
-    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-fri" });
+    expect(api.stations).toHaveBeenCalledWith({ is_active: true, delivery_day: "day-fri", active_at_date: "2026-10-10" });
   });
 
   it("moves to the new day's first station when the station does not deliver that day", async () => {
@@ -568,7 +597,7 @@ describe("DeliveryStationsDetails choosing the week, day and station", () => {
 // ── Downloads ───────────────────────────────────────────────────────────────
 
 describe("DeliveryStationsDetails downloads", () => {
-  it("explains each of the three downloads in a tooltip", async () => {
+  it("explains each of the six downloads in a tooltip", async () => {
     renderPage();
     await screen.findByText("Ana Example");
 
@@ -576,17 +605,17 @@ describe("DeliveryStationsDetails downloads", () => {
       "tooltip.pickup_list_single_delivery_station",
       "tooltip.pickup_list_whole_day",
       "tooltip.pickup_list_whole_week",
+      "tooltip.station_contents_station",
+      "tooltip.station_contents_day",
+      "tooltip.station_contents_week",
     ]) {
       expect(screen.getByRole("img", { name: tooltip })).toBeInTheDocument();
     }
   });
 
-  it("prints the station's list with its take-home amounts, named after the week, day and station", async () => {
+  it("prints the station's list, named after the week, day and station", async () => {
     renderPage();
     await screen.findByText("Ana Example");
-    // The take-home amounts load beside the list; let them arrive before printing.
-    await waitFor(() => expect(api.memberAmounts).toHaveBeenCalled());
-    await settle();
 
     await userEvent.click(download(STATION_PDF));
 
@@ -597,34 +626,17 @@ describe("DeliveryStationsDetails downloads", () => {
     );
     const props = printedDocument();
     expect(props).toMatchObject({
-      week: 41,
-      dayName: "COMMON.WEEKDAY_TUESDAY",
+      packingMode: "BOXES",
+      tints: TINTS,
       tenant: TENANT_ON_THE_PDF,
     });
     expect(props.pages).toEqual([
       {
         stationName: "Farm shop",
+        dateLabel: TUESDAY_ON_THE_SHEET,
         columns: FARM_SHOP_TUESDAY.columns,
         rows: FARM_SHOP_TUESDAY.rows,
-        memberColumns: FARM_SHOP_TAKE.columns,
-        memberRows: [CARROTS_ON_THE_SHEET],
-        showSize: false,
       },
-    ]);
-  });
-
-  it("asks the take-home sheet for the size column when the farm shows sizes", async () => {
-    tenantSettings.values = { show_size_column: true };
-    renderPage();
-    await screen.findByText("Ana Example");
-    await waitFor(() => expect(api.memberAmounts).toHaveBeenCalled());
-    await settle();
-
-    await userEvent.click(download(STATION_PDF));
-
-    await waitFor(() => expect(printed.documents).toHaveLength(1));
-    expect(printedDocument().pages).toEqual([
-      expect.objectContaining({ stationName: "Farm shop", showSize: true }),
     ]);
   });
 
@@ -642,27 +654,19 @@ describe("DeliveryStationsDetails downloads", () => {
       ]),
     );
     const props = printedDocument();
-    expect(props).toMatchObject({
-      week: 41,
-      dayName: "COMMON.WEEKDAY_TUESDAY",
-      tenant: TENANT_ON_THE_PDF,
-    });
+    expect(props).toMatchObject({ tenant: TENANT_ON_THE_PDF });
     expect(props.pages).toEqual([
       {
         stationName: "Farm shop",
+        dateLabel: TUESDAY_ON_THE_SHEET,
         columns: FARM_SHOP_TUESDAY.columns,
         rows: FARM_SHOP_TUESDAY.rows,
-        memberColumns: FARM_SHOP_TAKE.columns,
-        memberRows: [CARROTS_ON_THE_SHEET],
-        showSize: false,
       },
       {
         stationName: "Market",
+        dateLabel: TUESDAY_ON_THE_SHEET,
         columns: MARKET_TUESDAY.columns,
         rows: MARKET_TUESDAY.rows,
-        memberColumns: [],
-        memberRows: [],
-        showSize: false,
       },
     ]);
   });
@@ -722,44 +726,7 @@ describe("DeliveryStationsDetails downloads", () => {
     expect(download(STATION_PDF)).toBeDisabled();
   });
 
-  it("offers the station's PDF only once its take-home amounts are in", async () => {
-    const amounts = pending<PackingBoxesMatrix>();
-    api.memberAmounts.mockImplementation((params: ListParams) =>
-      listAskedFor(params) === listOf(41, TUESDAY, FARM_SHOP)
-        ? amounts.promise
-        : Promise.resolve({ columns: [], rows: [] }),
-    );
-    renderPage();
-    await screen.findByText("Ana Example");
-    await settle();
-
-    expect(download(STATION_PDF)).toBeDisabled();
-
-    amounts.answer(FARM_SHOP_TAKE);
-
-    await waitFor(() => expect(download(STATION_PDF)).toBeEnabled());
-    await userEvent.click(download(STATION_PDF));
-    await waitFor(() => expect(printed.documents).toHaveLength(1));
-    expect(printedDocument().pages).toEqual([
-      expect.objectContaining({ memberRows: [CARROTS_ON_THE_SHEET] }),
-    ]);
-  });
-
-  it("offers no station PDF when its take-home amounts fail to load", async () => {
-    api.memberAmounts.mockImplementation((params: ListParams) =>
-      listAskedFor(params) === listOf(41, TUESDAY, FARM_SHOP)
-        ? Promise.reject(new Error("Network Error"))
-        : Promise.resolve({ columns: [], rows: [] }),
-    );
-    renderPage();
-    await screen.findByText("Ana Example");
-    await waitFor(() => expect(download(WEEK_PDF)).toBeEnabled());
-    await settle();
-
-    expect(download(STATION_PDF)).toBeDisabled();
-  });
-
-  it("prints every delivery day's stations with pickups for the whole week, each page named after its day", async () => {
+  it("prints every delivery day's stations with pickups for the whole week, each page headed by its day", async () => {
     // Both delivery days serve the same two stations; nobody collects at the
     // market on Tuesday.
     farm.stationsByDeliveryDay["day-fri"] = [FARM_SHOP, MARKET];
@@ -777,20 +744,15 @@ describe("DeliveryStationsDetails downloads", () => {
       ]),
     );
     const props = printedDocument();
-    expect(props).toMatchObject({
-      week: 41,
-      dayName: "commissioning.whole_week",
-      tenant: TENANT_ON_THE_PDF,
-    });
+    expect(props).toMatchObject({ tenant: TENANT_ON_THE_PDF });
     expect(
-      (props.pages as { stationName: string; rows: unknown[] }[]).map((page) => [
-        page.stationName,
-        page.rows,
-      ]),
+      (props.pages as { stationName: string; dateLabel: string; rows: unknown[] }[]).map(
+        (page) => [page.stationName, page.dateLabel, page.rows],
+      ),
     ).toEqual([
-      ["Farm shop — COMMON.WEEKDAY_TUESDAY", FARM_SHOP_TUESDAY.rows],
-      ["Farm shop — COMMON.WEEKDAY_FRIDAY", FARM_SHOP_FRIDAY.rows],
-      ["Market — COMMON.WEEKDAY_FRIDAY", MARKET_FRIDAY.rows],
+      ["Farm shop", TUESDAY_ON_THE_SHEET, FARM_SHOP_TUESDAY.rows],
+      ["Farm shop", FRIDAY_ON_THE_SHEET, FARM_SHOP_FRIDAY.rows],
+      ["Market", FRIDAY_ON_THE_SHEET, MARKET_FRIDAY.rows],
     ]);
   });
 
@@ -804,13 +766,103 @@ describe("DeliveryStationsDetails downloads", () => {
 
     await waitFor(() => expect(printed.files).toHaveLength(1));
     expect(
-      (printedDocument().pages as { stationName: string }[]).map((page) => page.stationName),
+      (printedDocument().pages as { stationName: string; dateLabel: string }[]).map(
+        (page) => [page.stationName, page.dateLabel],
+      ),
     ).toEqual([
-      "Farm shop — COMMON.WEEKDAY_TUESDAY",
-      "Market — COMMON.WEEKDAY_TUESDAY",
-      "School — COMMON.WEEKDAY_FRIDAY",
-      "Market — COMMON.WEEKDAY_FRIDAY",
+      ["Farm shop", TUESDAY_ON_THE_SHEET],
+      ["Market", TUESDAY_ON_THE_SHEET],
+      ["School", FRIDAY_ON_THE_SHEET],
+      ["Market", FRIDAY_ON_THE_SHEET],
     ]);
+  });
+});
+
+// ── Notices ─────────────────────────────────────────────────────────────────
+
+describe("DeliveryStationsDetails notices", () => {
+  it("prints the station's notice, a card per share collected there, named after the week, day and station", async () => {
+    renderPage();
+    await screen.findByText("Ana Example");
+    await waitFor(() => expect(download(STATION_NOTICE)).toBeEnabled());
+
+    await userEvent.click(download(STATION_NOTICE));
+
+    await waitFor(() =>
+      expect(printed.files).toEqual([
+        "commissioning.station_contents.file_name_2026_commissioning.KW41_COMMONWEEKDAYTUESDAY_Farm_shop.pdf",
+      ]),
+    );
+    const props = printedDocument("StationContentsPDF");
+    expect(props.tenant).toEqual(TENANT_ON_THE_PDF);
+    expect(props.pages).toEqual([
+      {
+        key: `${TUESDAY}-${FARM_SHOP.id}`,
+        stationName: "Farm shop",
+        dateLabel: TUESDAY_ON_THE_SHEET,
+        marksKind: false,
+        // Without a control number the farm marks nothing organic.
+        organicControlNumber: "",
+        cards: [VEGETABLES_S_CARD, FRUIT_CARD],
+      },
+    ]);
+  });
+
+  it("marks shares boxed or loose only when the farm packs both ways", async () => {
+    tenantSettings.values = { packing_mode: "MIXED" };
+    renderPage();
+    await screen.findByText("Ana Example");
+    await waitFor(() => expect(download(STATION_NOTICE)).toBeEnabled());
+
+    await userEvent.click(download(STATION_NOTICE));
+
+    await waitFor(() => expect(printed.documents).toHaveLength(1));
+    const [page] = printedDocument("StationContentsPDF").pages as {
+      marksKind: boolean;
+      cards: { key: string; loose: boolean }[];
+    }[];
+    expect(page.marksKind).toBe(true);
+    expect(page.cards.map((card) => [card.key, card.loose])).toEqual([
+      ["var-veg-s", false],
+      ["var-fruit", true],
+    ]);
+  });
+
+  it("prints the notices of every station of the day where shares are collected", async () => {
+    farm.stationsByDeliveryDay["day-tue"] = [FARM_SHOP, MARKET, CHURCH_HALL];
+    renderPage();
+    await screen.findByText("Ana Example");
+    await waitFor(() => expect(download(DAY_NOTICE)).toBeEnabled());
+
+    await userEvent.click(download(DAY_NOTICE));
+
+    await waitFor(() =>
+      expect(printed.files).toEqual([
+        "commissioning.station_contents.file_name_2026_commissioning.KW41_COMMONWEEKDAYTUESDAY_commissioning.all_day.pdf",
+      ]),
+    );
+    expect(
+      (printedDocument("StationContentsPDF").pages as { stationName: string }[]).map(
+        (page) => page.stationName,
+      ),
+    ).toEqual(["Farm shop", "Market"]);
+    expect(api.stationContents).toHaveBeenCalledWith(
+      expect.objectContaining({ delivery_station: CHURCH_HALL.id }),
+    );
+  });
+
+  it("leaves out the week's downloads when the week has one delivery day", async () => {
+    farm.deliveryDays = [deliveryDay("day-tue", TUESDAY)];
+    renderPage();
+    await screen.findByText("Ana Example");
+
+    expect(download(STATION_PDF)).toBeInTheDocument();
+    expect(download(DAY_NOTICE)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: WEEK_PDF })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: WEEK_NOTICE })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "tooltip.station_contents_week" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -864,7 +916,7 @@ describe("DeliveryStationsDetails for a farm that imports its share amounts", ()
     // Let the delivery days arrive and every request that follows go out.
     await settle();
     expect(api.pickups).not.toHaveBeenCalled();
-    expect(api.memberAmounts).not.toHaveBeenCalled();
+    expect(api.stationContents).not.toHaveBeenCalled();
   });
 });
 

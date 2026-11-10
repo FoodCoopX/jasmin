@@ -1,8 +1,8 @@
 diff --git a/CLAUDE.md b/CLAUDE.md
-index d0f00c07..f6519419 100644
+index b01ae1af..3076f1fd 100644
 --- a/CLAUDE.md
 +++ b/CLAUDE.md
-@@ -491,7 +491,9 @@ outside Huey on purpose:
+@@ -556,7 +556,9 @@ outside Huey on purpose:
  - certificate renewal, in certbot's renewal loop, with the gateway's 12-hourly
    nginx reload that picks the renewed certificate up;
  - the worker's own liveness, through the `huey` container's heartbeat
@@ -14,7 +14,7 @@ index d0f00c07..f6519419 100644
  ## Frontend rules
  
 diff --git a/backups/backup.sh b/backups/backup.sh
-index 52458d94..7d13fe6c 100644
+index 5cecf8f8..49fa9b03 100644
 --- a/backups/backup.sh
 +++ b/backups/backup.sh
 @@ -43,6 +43,13 @@ BACKUP_ENCRYPTION_KEY="${BACKUP_ENCRYPTION_KEY:?BACKUP_ENCRYPTION_KEY must be se
@@ -30,8 +30,8 @@ index 52458d94..7d13fe6c 100644
 +KUMA_PUSH_BACKUP_URL="${KUMA_PUSH_BACKUP_URL:-}"
  
  # ── Helpers ────────────────────────────────────────────────────
- # Encrypt stdin -> $1 with the shared AES256 passphrase.
-@@ -58,6 +65,7 @@ push_offsite() {
+ # The passphrase reaches gpg on a pipe, never on its command line, which ``ps``
+@@ -68,6 +75,7 @@ push_offsite() {
      [ -n "$RCLONE_REMOTE" ] || return 0
      if ! command -v rclone >/dev/null 2>&1; then
          echo "[$(date)] WARN: RCLONE_REMOTE set but rclone not installed; skipping off-host push of $(basename "$1")" >&2
@@ -39,7 +39,7 @@ index 52458d94..7d13fe6c 100644
          return 0
      fi
      echo "[$(date)] Pushing $(basename "$1") → ${RCLONE_REMOTE}"
-@@ -67,11 +75,28 @@ push_offsite() {
+@@ -77,11 +85,28 @@ push_offsite() {
      # operator go-live step.
      if [ -n "${RCLONE_CONFIG:-}" ]; then
          rclone --config "$RCLONE_CONFIG" copyto "$1" "${RCLONE_REMOTE}/$(basename "$1")" \
@@ -70,7 +70,7 @@ index 52458d94..7d13fe6c 100644
  }
  
  # ── DB backup ──────────────────────────────────────────────────
-@@ -405,6 +430,7 @@ case "${1:-scheduled}" in
+@@ -415,6 +440,7 @@ case "${1:-scheduled}" in
          do_backup
          do_media_backup
          export_gdpr_ledger || true
@@ -78,7 +78,7 @@ index 52458d94..7d13fe6c 100644
          ;;
      ledger)
          # Refresh the GDPR deletion ledger (cron, and restore.sh before it
-@@ -437,7 +463,9 @@ case "${1:-scheduled}" in
+@@ -447,7 +473,9 @@ case "${1:-scheduled}" in
              do_media_backup || ok=0
          fi
          export_gdpr_ledger || true
@@ -90,20 +90,21 @@ index 52458d94..7d13fe6c 100644
          fi
          echo "${SCHEDULE} ${SELF} now >> /var/log/backup.log 2>&1" > /etc/crontabs/root
 diff --git a/docker-compose.yml b/docker-compose.yml
-index a9683adc..038b9b6b 100644
+index 38962ae0..4022bcec 100644
 --- a/docker-compose.yml
 +++ b/docker-compose.yml
-@@ -14,7 +14,8 @@
+@@ -14,7 +14,9 @@
  #   huey      - background task worker
  #   frontend  - SPA served by nginx (built at image time)
  #   gateway   - public-facing nginx (TLS, routing)
 -#   uptime-kuma - self-hosted uptime monitor (NOT publicly exposed; SSH tunnel)
 +#   uptime-kuma - self-hosted uptime monitor (loopback port only; SSH tunnel)
-+#   glitchtip-web / glitchtip-worker - error tracking (loopback port only)
++#   glitchtip-web / -worker / -migrate - error tracking (web on a loopback
++#             port only; migrate runs once per start and exits)
  #   certbot   - Let's Encrypt renewal loop
  # =============================================================================
  
-@@ -254,6 +255,9 @@ services:
+@@ -260,6 +262,9 @@ services:
        <<: *backend-env
        SKIP_MIGRATIONS: "1"
        SKIP_COLLECTSTATIC: "1"
@@ -113,7 +114,7 @@ index a9683adc..038b9b6b 100644
      volumes:
        - media_volume:/app/media
        - logs_volume:/app/logs
-@@ -273,9 +277,13 @@ services:
+@@ -279,9 +284,13 @@ services:
        # huey_heartbeat (apps/notifications/tasks.py) rewrites this file every
        # minute while the scheduler + a worker are alive. A missing/stale file
        # means a dead OR wedged consumer (all threads blocked) — which otherwise
@@ -130,7 +131,7 @@ index a9683adc..038b9b6b 100644
        test:
          - CMD-SHELL
          - "python -c 'import os,sys,time; sys.exit(0 if os.path.exists(sys.argv[1]) and time.time()-os.path.getmtime(sys.argv[1])<180 else 1)' /tmp/huey_heartbeat"
-@@ -339,6 +347,11 @@ services:
+@@ -345,6 +354,11 @@ services:
        # so no compose edit is needed. Unset -> local-only backups.
        RCLONE_REMOTE: ${RCLONE_REMOTE:-}
        RCLONE_CONFIG: ${RCLONE_CONFIG:-}
@@ -142,7 +143,7 @@ index a9683adc..038b9b6b 100644
      volumes:
        - ./backups:/backups:rw
        # Read-only source for the media archive step in backup.sh.
-@@ -440,18 +453,22 @@ services:
+@@ -446,18 +460,22 @@ services:
        retries: 3
  
    uptime-kuma:
@@ -170,7 +171,7 @@ index a9683adc..038b9b6b 100644
      #
      # Configure monitors against the public-facing URL, NOT the
      # internal ``backend`` service, so Kuma tests what an actual user
-@@ -460,6 +477,11 @@ services:
+@@ -466,6 +484,11 @@ services:
      # while the backend also reaches the database and Redis takes writes.
      # ``/health/`` is the containers' liveness check and stays 200 through
      # an outage of either.
@@ -182,7 +183,7 @@ index a9683adc..038b9b6b 100644
      image: louislam/uptime-kuma:1
      restart: unless-stopped
      logging: *default-logging
-@@ -468,6 +490,8 @@ services:
+@@ -474,6 +497,8 @@ services:
      mem_limit: 256m
      pids_limit: 128
      cpus: 0.5
@@ -191,7 +192,7 @@ index a9683adc..038b9b6b 100644
      volumes:
        - uptime_kuma_data:/app/data
      networks: [jasmin-net]
-@@ -477,15 +501,22 @@ services:
+@@ -483,15 +508,22 @@ services:
    #   - Separate database ``glitchtip`` on the same postgres instance, owned by
    #     a DEDICATED least-privileged role (NOT the tenant-DB superuser) so a
    #     GlitchTip compromise can't yield the tenant-DB credentials. One-time
@@ -211,7 +212,7 @@ index a9683adc..038b9b6b 100644
 +  #         SQL
 +  #     scripts/deploy.sh starts both services once that database exists.
 +  #   - Redis DB index 2 (Jasmin uses 0). The index separates keys, not memory:
-+  #     both share the instance's 384 MB noeviction cap, so a Celery backlog
++  #     both share the instance's 384 MB noeviction cap, so a task backlog
 +  #     that fills it makes redis refuse Huey's enqueues and the cache writes
 +  #     as well. Watch ``redis-cli info memory``; if GlitchTip's share grows,
 +  #     give it a redis of its own.
@@ -222,7 +223,7 @@ index a9683adc..038b9b6b 100644
    #     ssh -L 8004:localhost:8004 <host>
    #     # open http://localhost:8004 to create admin + projects, copy DSN
    #
-@@ -517,12 +548,17 @@ services:
+@@ -524,11 +556,16 @@ services:
        DATABASE_URL: postgres://${GLITCHTIP_DB_USER:-glitchtip}:${GLITCHTIP_DB_PASSWORD:?GLITCHTIP_DB_PASSWORD is required (create the dedicated glitchtip DB role — see comment above)}@postgres:5432/glitchtip
        SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
        PORT: "8000"
@@ -232,7 +233,6 @@ index a9683adc..038b9b6b 100644
        EMAIL_URL: ${GLITCHTIP_EMAIL_URL:-consolemail://}
        DEFAULT_FROM_EMAIL: ${SERVER_EMAIL:-noreply@jasmin.coop}
        GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:?GLITCHTIP_DOMAIN is required}
-       CELERY_WORKER_AUTOSCALE: "1,3"
        ENABLE_USER_REGISTRATION: "false"
        REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
 +    ports:
@@ -432,10 +432,20 @@ index 00000000..d2ef02a3
 +        notification_tasks.huey_heartbeat.call_local()
 +    urlopen.assert_called_once()
 diff --git a/scripts/deploy.sh b/scripts/deploy.sh
-index df3f98e6..22a7a89c 100755
+index 1bc353b9..4336923d 100755
 --- a/scripts/deploy.sh
 +++ b/scripts/deploy.sh
-@@ -179,10 +179,10 @@ if ! docker compose build --pull; then
+@@ -10,7 +10,8 @@
+ #   3. pulls the newest build of every image tag, builds the images and tags
+ #      them as a release (scripts/rollback.sh)
+ #   4. takes an encrypted snapshot of the database before it is migrated
+-#   5. brings up the CORE stack (skips glitchtip/uptime — Phase 5)
++#   5. brings up the core stack and Uptime Kuma, and GlitchTip once its
++#      database exists
+ #   6. waits for the backend to migrate + report healthy
+ #   7. prunes untagged images and build cache unused for 30 days; the release
+ #      tags keep the images scripts/rollback.sh switches back to
+@@ -179,10 +180,10 @@ if ! docker compose build --pull; then
      log "WARN: build with --pull failed — retrying with the base images already on this host"
      docker compose build
  fi
@@ -450,7 +460,7 @@ index df3f98e6..22a7a89c 100755
  
  # Compose always runs the IMAGE_TAG tag, which every build moves. Each release
  # also keeps its images under a release tag, <UTC time>-<build id>, so
-@@ -231,15 +231,28 @@ if [ -n "$plain_dumps" ]; then
+@@ -231,15 +232,31 @@ if [ -n "$plain_dumps" ]; then
      echo "$plain_dumps" | sed 's/^/    /'
  fi
  
@@ -468,21 +478,24 @@ index df3f98e6..22a7a89c 100755
 +docker compose up -d postgres redis backend huey frontend gateway certbot backup uptime-kuma
 +
 +# GlitchTip needs its own role and database, created once by hand (see the
-+# glitchtip comment in docker-compose.yml). Until that database exists its
-+# services would only crash-loop, so they start once it is there.
++# glitchtip comment in docker-compose.yml); without it glitchtip-migrate can
++# only fail. A failed GlitchTip start, there or later, mustn't end the deploy:
++# up exits non-zero when glitchtip-migrate fails, and the gateway restart and
++# the health checks below still have to run.
 +glitchtip_db="$(docker compose exec -T postgres sh -c \
 +    'psql -U "$POSTGRES_USER" -d postgres -Atc "SELECT 1 FROM pg_database WHERE datname = '"'"'glitchtip'"'"'"' \
 +    2>/dev/null || true)"
 +if [ "$glitchtip_db" = "1" ]; then
 +    log "starting glitchtip"
-+    docker compose up -d glitchtip-web glitchtip-worker
++    docker compose up -d glitchtip-web glitchtip-worker \
++        || log "WARN: glitchtip didn't start — see docker compose logs glitchtip-migrate"
 +else
 +    log "no glitchtip database yet — glitchtip stays stopped (see docker-compose.yml)"
 +fi
  
  # nginx resolves the backend/frontend upstream hostnames ONCE, at startup.
  # `up -d` may RECREATE those containers with NEW network IPs while the
-@@ -347,6 +360,8 @@ echo "      While BUNNY_ORIGIN_SECRET is set, add each new tenant host to the Bu
+@@ -347,6 +364,8 @@ echo "      While BUNNY_ORIGIN_SECRET is set, add each new tenant host to the Bu
  echo "      pull zone first: the gateway gives a host that bypasses Bunny no answer."
  echo "   3. Configure EACH tenant's own SMTP before inviting its users."
  echo "   4. Wire off-host backups (Phase 3), then run scripts/restore_drill.sh."

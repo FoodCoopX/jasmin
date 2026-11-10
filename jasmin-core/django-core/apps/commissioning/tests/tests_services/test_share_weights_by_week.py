@@ -30,6 +30,7 @@ from apps.commissioning.tests.factories import (
     ShareTypeFactory,
     ShareTypeVariationFactory,
 )
+from apps.commissioning.tests.factories.settings import use_packing_mode
 
 # ISO week 15 of 2026 spans Mon 2026-04-06 … Sun 2026-04-12; week 16 the week
 # after.
@@ -156,6 +157,7 @@ class TestShareWeightsByWeek:
         ]
 
     def test_leaves_out_the_variations_packed_in_bulk(self, tenant, share):
+        use_packing_mode(tenant, "MIXED")
         boxed = ShareTypeVariationFactory(is_packed_bulk=False)
         bulk = ShareTypeVariationFactory(is_packed_bulk=True)
         share(boxed, Decimal("2.000"))
@@ -164,6 +166,22 @@ class TestShareWeightsByWeek:
         rows = calculate_share_weights_by_week(WEEK_15_MONDAY, WEEK_16_SUNDAY)
 
         assert [row["share_type_variation"] for row in rows] == [boxed.pk]
+
+    def test_weighs_every_size_in_the_boxes_mode(self, tenant, share):
+        """A flag a size kept from an earlier mixed time decides nothing."""
+        use_packing_mode(tenant, "BOXES")
+        flagged = ShareTypeVariationFactory(is_packed_bulk=True)
+        share(flagged, Decimal("4.000"))
+
+        rows = calculate_share_weights_by_week(WEEK_15_MONDAY, WEEK_16_SUNDAY)
+
+        assert [row["share_type_variation"] for row in rows] == [flagged.pk]
+
+    def test_weighs_nothing_in_the_bulk_mode(self, tenant, share):
+        use_packing_mode(tenant, "BULK")
+        share(ShareTypeVariationFactory(is_packed_bulk=False), Decimal("2.000"))
+
+        assert calculate_share_weights_by_week(WEEK_15_MONDAY, WEEK_16_SUNDAY) == []
 
     def test_leaves_out_virtual_variations(self, tenant, share):
         physical = ShareTypeVariationFactory()
@@ -449,6 +467,7 @@ class TestShareWeightsSummary:
         assert [row["share_type_variation"] for row in rows] == [small.pk, egg_box.pk]
 
     def test_leaves_out_the_variations_not_packed_in_boxes(self, tenant, share):
+        use_packing_mode(tenant, "MIXED")
         boxed = ShareTypeVariationFactory()
         share(boxed, Decimal("2.000"))
         share(ShareTypeVariationFactory(is_packed_bulk=True), Decimal("4.000"))

@@ -48,22 +48,10 @@ export default function SuperAdminLoginPage() {
 
   return (
     <div className="sa-fullscreen-state gradient-superadmin">
-      <div
-        className="sa-card"
-        style={{ maxWidth: 400, width: "100%", padding: 40 }}
-      >
-        <div className="text-center" style={{ marginBottom: 30 }}>
-          <h1
-            style={{
-              fontSize: "28px",
-              fontWeight: 600,
-              color: "var(--color-text-primary)",
-              marginBottom: 8,
-            }}
-          >
-            Platform Admin
-          </h1>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: "14px" }}>
+      <div className="sa-card sa-card--login">
+        <div className="text-center sa-login-header">
+          <h1 className="sa-login-title">Platform Admin</h1>
+          <p className="color-text-secondary text-14">
             Manage all tenants and platform settings
           </p>
         </div>
@@ -94,7 +82,7 @@ export default function SuperAdminLoginPage() {
           </div>
 
           {error && (
-            <div className="alert-error" style={{ marginBottom: 20 }}>
+            <div className="alert-error mb-20">
               {error}
             </div>
           )}

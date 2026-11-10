@@ -85,7 +85,7 @@ function MyTickets({
         type="primary"
         icon={<PlusOutlined />}
         onClick={onNew}
-        style={{ marginBottom: 16 }}
+        className="mb-16"
       >
         {t("support.drawer.new_ticket")}
       </Button>
@@ -93,27 +93,27 @@ function MyTickets({
       {loading ? (
         <Spin />
       ) : tickets.length === 0 ? (
-        <div className="text-muted">{t("support.thread.empty")}</div>
+        <div className="color-text-tertiary">{t("support.thread.empty")}</div>
       ) : (
         <List
           dataSource={tickets}
           renderItem={(ticket) => (
-            <List.Item key={ticket.id} style={{ padding: 0 }}>
+            <List.Item key={ticket.id} className="p-0">
               {/* A real button → keyboard-operable row (not a bare onClick div). */}
               <Button
                 type="text"
                 block
                 onClick={() => ticket.id && onSelect(ticket.id)}
-                style={{ height: "auto", padding: "8px 12px", textAlign: "left" }}
+                className="support-ticket-button"
               >
                 {/* All-span content: a <button> may only contain phrasing
                     content, so no block <div>s inside. */}
-                <span className="flex-between" style={{ width: "100%", gap: 8 }}>
-                  <span style={{ display: "block", overflow: "hidden" }}>
-                    <span className="text-ellipsis" style={{ display: "block" }}>
+                <span className="flex-between w-full gap-8">
+                  <span className="support-ticket-summary">
+                    <span className="text-ellipsis d-block">
                       {ticket.subject}
                     </span>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text type="secondary" className="text-12">
                       {ticket.created_at ? formatDate(ticket.created_at) : ""}
                     </Text>
                   </span>
@@ -149,7 +149,7 @@ function TicketDetail({ id, onBack }: { id: string; onBack: () => void }) {
         type="link"
         icon={<ArrowLeftOutlined />}
         onClick={onBack}
-        style={{ paddingLeft: 0, marginBottom: 8 }}
+        className="support-back-button mb-8"
       >
         {t("support.drawer.back")}
       </Button>
@@ -158,15 +158,15 @@ function TicketDetail({ id, onBack }: { id: string; onBack: () => void }) {
         <Spin />
       ) : (
         <>
-          <div className="flex-between" style={{ gap: 8 }}>
-            <Title level={5} style={{ margin: 0 }}>
+          <div className="flex-between gap-8">
+            <Title level={5} className="m-0">
               {ticket.subject}
             </Title>
             <Tag color={statusTagColor(ticket.status)}>
               {t(`support.status.${ticket.status}`)}
             </Tag>
           </div>
-          <div style={{ marginTop: 12 }}>
+          <div className="mt-12">
             <TicketThread messages={ticket.messages ?? []} />
           </div>
           <ReplyComposer ticketId={id} />

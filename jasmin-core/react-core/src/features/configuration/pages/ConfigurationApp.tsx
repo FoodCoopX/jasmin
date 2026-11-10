@@ -401,7 +401,7 @@ export default function ConfigurationApp() {
                   span={SettingsRenderer.getColumnSpan(setting)}
                   key={setting.key}
                 >
-                  <div style={{ padding: "4px 0" }}>
+                  <div className="settings-item">
                     {SettingsRenderer.renderInput(
                       setting,
                       getSettingValue(setting.key, setting.defaultValue),

@@ -21,6 +21,7 @@ import { paymentCycleLabel } from "@shared/utils/cycleLabels";
 import { parseDateLoose } from "@shared/utils/endOfTerm";
 import { getNextSunday } from "@shared/utils/nextSunday";
 import { variationAllowsTrial as variationRecordAllowsTrial } from "@shared/utils/trialVariations";
+import { toApiDate } from "@shared/utils";
 import { useCurrency } from "@hooks/configuration/useCurrency";
 import { useDateFormat } from "@hooks/configuration/useDateFormat";
 import { useTenant } from "@hooks/configuration/useTenant";
@@ -33,9 +34,15 @@ import { useSepaMandateColumn } from "@hooks/columns/useSepaMandateColumn";
 import { useTimeBoundColumns } from "@hooks/columns/useTimeBoundColumns";
 import type { SepaMandateStatus } from "@shared/api/generated/models";
 import { useSharedAboColumns } from "./useSharedAboColumns";
+import { useVariationReferencePrices } from "../useVariationReferencePrices";
 
 type AbosData = ReturnType<typeof useAbosData>;
 type AdminConfirmation = ReturnType<typeof useAdminConfirmationModalAbos>;
+/** The edit form of a row, as a field-change handler gets it. */
+type RowForm = {
+  setFieldsValue: (values: Record<string, unknown>) => void;
+  getFieldValue?: (name: string) => unknown;
+};
 
 // Subscriptions run side by side, so their periods may overlap.
 const SUBSCRIPTION_PERIOD_OPTIONS = {
@@ -142,6 +149,7 @@ export function useAbosColumns({
   const { currencySymbol } = useCurrency();
   const { format } = useNumberFormat();
   const { dateFormat, formatDate } = useDateFormat();
+  const { referencePricesOn, allReferencePrices } = useVariationReferencePrices();
 
   const subscriptions_are_auto_renewed = getSetting(
     "subscriptions_are_auto_renewed",
@@ -222,10 +230,7 @@ export function useAbosColumns({
     (
       validFromValue: unknown,
       record: AboRecord,
-      form: {
-        setFieldsValue: (values: Record<string, unknown>) => void;
-        getFieldValue?: (name: string) => unknown;
-      },
+      form: RowForm,
       overrideIsTrial?: boolean,
       overrideVariationId?: string,
     ) => {
@@ -278,19 +283,6 @@ export function useAbosColumns({
     },
     [dateFormat, computeValidUntil, variationDeliveryCycleById],
   );
-
-  const handleValidFromChange = useCallback(
-    (
-      value: unknown,
-      record: AboRecord,
-      form: {
-        setFieldsValue: (values: Record<string, unknown>) => void;
-        getFieldValue?: (name: string) => unknown;
-      },
-    ) => recomputeValidUntil(value, record, form),
-    [recomputeValidUntil],
-  );
-
   // Variation id → whether it may be used for a trial subscription. Default
   // TRUE for an unknown variation (don't disable on missing data); only an
   // explicit ``allowed_for_trial_subscription === false`` blocks the is_trial
@@ -312,26 +304,26 @@ export function useAbosColumns({
     [variationAllowsTrialById],
   );
 
-  // Seed ``price_per_delivery`` from the picked variation's active reference
-  // price — the trial one (``active_price_per_delivery_if_trial``) when the sub
-  // is ``is_trial`` and the variation HAS a trial price, else the regular
-  // ``active_price_per_delivery``. Both ``override*`` args mirror the
-  // ``recomputeValidUntil`` pattern (the onChange handlers pass the post-change
-  // value before AntD flushes it to the field store).
+  // Seed ``price_per_delivery`` from the picked variation's reference price at
+  // the row's start (today's, ``active_price_per_delivery``, before a start is
+  // set or without a window then) — the trial one when the sub is ``is_trial``
+  // and the variation HAS a trial price, else the regular one. The
+  // ``override*`` args mirror the ``recomputeValidUntil`` pattern (the
+  // onChange handlers pass the post-change value before AntD flushes it to the
+  // field store).
   //
   // GUARD: never clobber a manually-typed price. Only (re)fill when the field
-  // is empty or still holds one of the two SUGGESTED values (regular / trial) —
-  // so toggling ``is_trial`` swaps between the two suggestions in BOTH
-  // directions, but a custom price the office entered is left untouched.
+  // is empty or still holds one of the variation's reference prices (regular
+  // or trial, today's or any window's) — so toggling ``is_trial`` or moving the
+  // start swaps between them, but a custom price the office entered is left
+  // untouched.
   const applySuggestedPrice = useCallback(
     (
       record: AboRecord,
-      form: {
-        setFieldsValue: (values: Record<string, unknown>) => void;
-        getFieldValue?: (name: string) => unknown;
-      },
+      form: RowForm,
       overrideVariationId?: string,
       overrideIsTrial?: boolean,
+      overrideValidFrom?: unknown,
     ): Record<string, unknown> | undefined => {
       const variationId =
         overrideVariationId ??
@@ -354,8 +346,12 @@ export function useAbosColumns({
       );
       if (!variation) return undefined;
 
-      const regular = variation.active_price_per_delivery ?? null;
-      const trial = variation.active_price_per_delivery_if_trial ?? null;
+      const validFrom =
+        overrideValidFrom ?? form.getFieldValue?.("valid_from") ?? record.valid_from;
+      const { regular, trial } = referencePricesOn(
+        variation,
+        toApiDate(parseDateLoose(validFrom, dateFormat)),
+      );
 
       const isTrialNow =
         overrideIsTrial !== undefined
@@ -373,8 +369,9 @@ export function useAbosColumns({
         currentRaw == null ||
         currentRaw === "" ||
         Number.isNaN(parsePriceLoose(currentRaw));
-      const matchesSuggested =
-        pricesEqual(currentRaw, regular) || pricesEqual(currentRaw, trial);
+      const matchesSuggested = allReferencePrices(variation).some((price) =>
+        pricesEqual(currentRaw, price),
+      );
       // Custom price the office typed — leave it exactly as is.
       if (!isEmpty && !matchesSuggested) return undefined;
 
@@ -382,7 +379,23 @@ export function useAbosColumns({
       form.setFieldsValue(patch);
       return patch;
     },
-    [allShareTypeVariations],
+    [allShareTypeVariations, dateFormat, referencePricesOn, allReferencePrices],
+  );
+  // Another start can fall into another price window, so the suggested
+  // price follows it.
+  const handleValidFromChange = useCallback(
+    (
+      value: unknown,
+      record: AboRecord,
+      form: RowForm,
+    ) => {
+      const patch = {
+        ...recomputeValidUntil(value, record, form),
+        ...applySuggestedPrice(record, form, undefined, undefined, value),
+      };
+      return Object.keys(patch).length > 0 ? patch : undefined;
+    },
+    [recomputeValidUntil, applySuggestedPrice],
   );
 
   // Toggling ``is_trial`` flips the auto-fill branch in
@@ -395,10 +408,7 @@ export function useAbosColumns({
     (
       newValue: unknown,
       record: AboRecord,
-      form: {
-        setFieldsValue: (values: Record<string, unknown>) => void;
-        getFieldValue?: (name: string) => unknown;
-      },
+      form: RowForm,
     ) => {
       const validFromValue =
         form.getFieldValue?.("valid_from") ?? record.valid_from;
@@ -426,10 +436,7 @@ export function useAbosColumns({
     (
       value: unknown,
       record: AboRecord,
-      form: {
-        setFieldsValue: (values: Record<string, unknown>) => void;
-        getFieldValue?: (name: string) => unknown;
-      },
+      form: RowForm,
     ) => {
       if (!value) return undefined;
 
@@ -531,7 +538,7 @@ export function useAbosColumns({
       record.requires_optin ? (
         <span>
           {value as string}
-          <Tag color="cyan" bordered={false} style={{ marginLeft: 8 }}>
+          <Tag color="cyan" bordered={false} className="ml-8">
             {t("abos.on_off_tag")}
           </Tag>
         </span>
@@ -561,7 +568,7 @@ export function useAbosColumns({
 
   const columns: EditableColumnConfig<AboRecord>[] = useMemo(
     () => [
-      activeStatusColumn as unknown as EditableColumnConfig<AboRecord>,
+      activeStatusColumn,
       {
         title: <div className="checkbox-column-title">Link</div>,
         dataIndex: "link",
@@ -632,7 +639,7 @@ export function useAbosColumns({
       },
 
       memberColumn,
-      sepaMandateColumn as unknown as EditableColumnConfig<AboRecord>,
+      sepaMandateColumn,
       {
         ...validFromColumn,
         // Override the generic Monday-only rule with the subscription one:
@@ -680,7 +687,7 @@ export function useAbosColumns({
               //     in ``computeValidUntil``.
               onFieldChange: handleIsTrialChange,
             },
-          ] as EditableColumnConfig<AboRecord>[])
+          ] satisfies EditableColumnConfig<AboRecord>[])
         : []),
       quantityColumn,
 
@@ -765,7 +772,7 @@ export function useAbosColumns({
           if (!aboIsConfirmed(record)) {
             return (
               <div className="text-center">
-                <span className="text-muted">—</span>
+                <span className="color-text-tertiary">—</span>
               </div>
             );
           }
@@ -774,7 +781,7 @@ export function useAbosColumns({
             typeof count === "number" && Number.isFinite(count) ? count : 0;
           return (
             <div className="text-center">
-              <div style={{ fontWeight: "bold" }}>{display}x</div>
+              <div className="text-bold">{display}x</div>
             </div>
           );
         },
@@ -803,7 +810,7 @@ export function useAbosColumns({
               render: (value: unknown) =>
                 value ? formatDate(value as string) : "",
             },
-          ] as EditableColumnConfig<AboRecord>[])
+          ] satisfies EditableColumnConfig<AboRecord>[])
         : []),
       {
         title: <>{t("members.cancelled_effective_at")}</>,

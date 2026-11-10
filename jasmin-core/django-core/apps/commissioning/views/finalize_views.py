@@ -139,13 +139,13 @@ class BulkFinalizeView(APIViewRolePermissionsMixin, APIView):
         summary="Bulk Finalize Objects",
         description="""
         Finalize multiple objects at once.
-        
+
         Supports:
         - Finalizable commissioning models, by model name (case-insensitive)
         - offer, forecast and harvest need a staff role; every other model
           (orders, delivery notes, invoices, their lines, share contents)
           needs office
-        
+
         Returns counts of:
         - Successfully finalized objects
         - Already finalized objects
@@ -326,13 +326,13 @@ class BulkUnfinalizeView(APIViewRolePermissionsMixin, APIView):
         summary="Bulk Unfinalize Objects",
         description="""
         Unfinalize multiple objects at once.
-        
+
         Supports:
         - Finalizable commissioning models, by model name (case-insensitive)
         - offer, forecast and harvest need a staff role; every other model
           (orders, delivery notes, invoices, their lines, share contents)
           needs office
-        
+
         Only processes objects that are currently finalized.
         """,
         request=BulkFinalizeRequestSerializer,
@@ -586,7 +586,7 @@ class BulkUnfinalizeShareContentView(APIViewRolePermissionsMixin, APIView):
         year_week_shareArticleId_unit_size_shareOption; an id without the
         share option matches the slot in every option.
         Only processes objects that are currently finalized.
-        
+
         Returns unfinalization count and a per-ID finalization status map.
         """,
         request=BulkIdsRequestSerializer,

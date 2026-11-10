@@ -465,8 +465,10 @@ class TestCrewTierReadsResellerContext:
         customer = JasminUserFactory(roles=["customer"])
         own_group = OfferGroupFactory()
         ResellerFactory(linked_user=customer, offer_group=own_group)
-        mine = OfferFactory(**self.WEEK, offer_group=own_group)
-        theirs = OfferFactory(**self.WEEK, offer_group=OfferGroupFactory())
+        mine = OfferFactory(**self.WEEK, offer_group=own_group, is_finalized=True)
+        theirs = OfferFactory(
+            **self.WEEK, offer_group=OfferGroupFactory(), is_finalized=True
+        )
 
         resp = self._client(customer).get(self.OFFERS, self.WEEK)
 

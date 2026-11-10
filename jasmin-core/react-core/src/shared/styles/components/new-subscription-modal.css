@@ -41,3 +41,13 @@
   object-fit: cover;
   border-radius: 8px;
 }
+
+/* The chosen variation's description on the detail step. */
+.new-subscription-description {
+  overflow-wrap: break-word;
+}
+
+/* The delivery pauses listed in the warning about pauses in the term. */
+.new-subscription-pauses {
+  padding-left: 18px;
+}

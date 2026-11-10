@@ -13,7 +13,12 @@ import {
   buildMonthlyActiveByVariation,
   useSubscriptionVariationStats,
 } from "@features/abos/hooks/useSubscriptionVariationStats";
+import { useVariationReferencePrices } from "@features/abos/hooks/useVariationReferencePrices";
 import { buildMonthlyIncomeSeries } from "@features/abos/utils/incomeSeries";
+import {
+  buildSolidarityPriceRows,
+  type PriceRow,
+} from "@features/abos/utils/solidarityPriceRows";
 import {
   useCurrency,
   useDateFormat,
@@ -25,14 +30,6 @@ import {
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
-
-interface PriceRow {
-  id: string;
-  name: string;
-  reference: number;
-  avg: number | null;
-  count: number;
-}
 
 export default function DashboardAbos() {
   const { t } = useTranslation();
@@ -52,11 +49,12 @@ export default function DashboardAbos() {
 
   const { data: subscriptions, isLoading } = useCommissioningAbosList({});
   // Fetched for stable per-variation labels + colours (order taken from the
-  // catalogue, not from whichever subscriptions happen to exist).
+  // catalogue, not from whichever subscriptions happen to exist). Every
+  // physical size, ended ones too, so a past range draws the sizes it had.
   const { data: variations } = useCommissioningShareTypeVariationsList({
     physical: true,
-    include_future: true,
   });
+  const { referencePricesOn } = useVariationReferencePrices();
 
   const { variationLegendById } = useSubscriptionVariationStats(
     subscriptions,
@@ -65,7 +63,8 @@ export default function DashboardAbos() {
 
   // One line per variation: active subscription quantity per month.
   const { data: chartData, series } = useMemo(
-    () => buildMonthlyActiveByVariation(subscriptions, variationLegendById, range),
+    () =>
+      buildMonthlyActiveByVariation(subscriptions, variationLegendById, range),
     [subscriptions, variationLegendById, range],
   );
 
@@ -87,11 +86,15 @@ export default function DashboardAbos() {
   // of the per-variation palette colours.
   const income = useMemo(
     () =>
-      buildMonthlyIncomeSeries(incomeData ?? [], range, {
-        id: "income",
-        label: t("statistics.income"),
-        color: "var(--color-chart-money)",
-      }),
+      buildMonthlyIncomeSeries(
+        incomeData ?? [],
+        range,
+        {
+          id: "income",
+          label: t("statistics.income"),
+          color: "var(--color-chart-money)",
+        },
+      ),
     [incomeData, range, t],
   );
   // Solidarity: prices actually paid per variation for subs STARTED in range.
@@ -118,29 +121,38 @@ export default function DashboardAbos() {
     return map;
   }, [subscriptions, range]);
 
-  const priceRows = useMemo<PriceRow[]>(() => {
-    if (!allowsSolidarity) return [];
-    return (variations ?? []).map((v) => {
-      const prices = paidPricesByVariation.get(v.id ?? "") ?? [];
-      const avg = prices.length
-        ? prices.reduce((a, b) => a + b, 0) / prices.length
-        : null;
-      return {
-        id: v.id ?? "",
-        name: [v.share_type_name, getShareTypeVariationSizeLabel(v.size)]
-          .filter(Boolean)
-          .join(" · "),
-        reference: parseFloat(v.active_price_per_delivery ?? "0"),
-        avg,
-        count: prices.length,
-      };
-    });
-  }, [
-    allowsSolidarity,
-    variations,
-    paidPricesByVariation,
-    getShareTypeVariationSizeLabel,
-  ]);
+  const priceRows = useMemo<PriceRow[]>(
+    () =>
+      allowsSolidarity
+        ? buildSolidarityPriceRows(variations ?? [], {
+            range: range
+              ? [formatDateForAPI(range[0])!, formatDateForAPI(range[1])!]
+              : null,
+            paidPricesByVariation,
+            referencePriceOn: (variation, date) =>
+              referencePricesOn(
+                {
+                  value: variation.id ?? "",
+                  active_price_per_delivery: variation.active_price_per_delivery,
+                },
+                date,
+              ).regular,
+            nameOf: (variation) =>
+              [variation.share_type_name, getShareTypeVariationSizeLabel(variation.size)]
+                .filter(Boolean)
+                .join(" · "),
+          })
+        : [],
+    [
+      allowsSolidarity,
+      variations,
+      range,
+      formatDateForAPI,
+      referencePricesOn,
+      paidPricesByVariation,
+      getShareTypeVariationSizeLabel,
+    ],
+  );
 
   const priceColumns = useMemo(
     () => [
@@ -176,9 +188,8 @@ export default function DashboardAbos() {
           allowClear={false}
         />
         <Card
-          className="dark-green-border"
+          className="dark-green-border mt-1em"
           title={t("statistics.chart_active_subscriptions_by_variation")}
-          style={{ marginTop: "1em" }}
         >
           <Text type="secondary">
             {t("statistics.chart_active_subscriptions_by_variation")}
@@ -193,26 +204,23 @@ export default function DashboardAbos() {
 
         {allowsSolidarity && (
           <Card
-            className="dark-green-border"
+            className="dark-green-border mt-1em"
             title={t("statistics.solidarity_title")}
-            style={{ marginTop: "1em" }}
           >
             <ReadOnlyReportTable<PriceRow>
               rowKey="id"
               pagination={false}
               columns={priceColumns}
               dataSource={priceRows}
-              style={{ width: "40%" }}
-              className="custom-jasmin-table"
+              className="custom-jasmin-table solidarity-price-table"
               emptyText={t("statistics.no_subscription_data")}
             />
           </Card>
         )}
 
         <Card
-          className="dark-green-border"
+          className="dark-green-border mt-1em"
           title={t("statistics.chart_income_by_month")}
-          style={{ marginTop: "1em" }}
         >
           <Text type="secondary">{t("statistics.chart_income_by_month")}</Text>
           <StatsAreaChart
@@ -223,7 +231,7 @@ export default function DashboardAbos() {
           />
           <Typography.Paragraph
             type="secondary"
-            style={{ marginTop: "0.75em", marginBottom: 0 }}
+            className="mb-0 income-chart-hint"
           >
             {t("statistics.income_hint")}
           </Typography.Paragraph>

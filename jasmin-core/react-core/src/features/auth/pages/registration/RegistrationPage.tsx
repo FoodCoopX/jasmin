@@ -76,7 +76,7 @@ export default function RegistrationPage() {
       <div className="auth-language-switcher">
         <LanguageSwitcher />
       </div>
-      <Card style={{ width: 1000, boxShadow: "0 4px 12px var(--color-shadow)" }}>
+      <Card className="registration-card">
         <Title level={3} className="text-center">
           {t(
             isTrial
@@ -89,13 +89,13 @@ export default function RegistrationPage() {
           current={current}
           items={steps.map((s) => ({ title: t(s.titleKey) }))}
           size="small"
-          style={{ marginBottom: 24 }}
+          className="mb-24"
         />
 
         <Component data={data} update={update} next={next} back={back} />
 
-        <div style={{ textAlign: "center", marginTop: 16 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+        <div className="text-center mt-16">
+          <Text type="secondary" className="text-12">
             {t("auth.registration.already_member")}{" "}
             <Link to="/login">{t("auth.registration.sign_in")}</Link>
           </Text>

@@ -838,7 +838,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                     { label: t("abos.kind_regular"), value: "regular" },
                     { label: t("abos.kind_trial"), value: "trial" },
                   ]}
-                  style={{ marginBottom: 16 }}
+                  className="mb-16"
                   aria-label={t("abos.kind_toggle_label")}
                 />
               </ConfigProvider>
@@ -858,7 +858,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
             disabled={saving}
           >
             {selectedVariation.picture && (
-              <div style={{ textAlign: "center", marginBottom: 16 }}>
+              <div className="text-center mb-16">
                 <img
                   src={selectedVariation.picture}
                   alt={selectedVariation.label}
@@ -870,7 +870,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
             {selectedVariation.description && (
               <Paragraph
                 type="secondary"
-                style={{ marginBottom: 16, overflowWrap: "break-word" }}
+                className="mb-16 new-subscription-description"
               >
                 <span
                   dangerouslySetInnerHTML={{
@@ -895,7 +895,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                   style={{ marginBottom: sentenceTrialAbo ? 4 : undefined }}
                   extra={
                     isTrial ? (
-                      <Text type="secondary" style={{ fontSize: 12 }}>
+                      <Text type="secondary" className="text-12">
                         {trialEnd
                           ? t("abos.is_trial_hint", {
                               date: formatDate(trialEnd),
@@ -919,7 +919,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                   </Checkbox>
                 </Form.Item>
                 {sentenceTrialAbo && (
-                  <Paragraph type="secondary" style={{ fontSize: 12 }}>
+                  <Paragraph type="secondary" className="text-12">
                     {sentenceTrialAbo}
                   </Paragraph>
                 )}
@@ -958,7 +958,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                   }
                   extra={
                     validUntilHint ? (
-                      <Text type="secondary" style={{ fontSize: 12 }}>
+                      <Text type="secondary" className="text-12">
                         {validUntilHint}
                       </Text>
                     ) : undefined
@@ -978,10 +978,10 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
               <Alert
                 type="warning"
                 showIcon
-                style={{ marginBottom: 16 }}
+                className="mb-16"
                 message={t("abos.delivery_pauses_in_term")}
                 description={
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  <ul className="m-0 new-subscription-pauses">
                     {pausesInTerm.map((p) => (
                       <li key={`${p.share_type_variation}-${p.valid_from}`}>
                         {formatDate(p.valid_from)} – {formatDate(p.valid_until)}
@@ -1047,13 +1047,13 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
                       <span>
                         {option.label}
                         {isFull && (
-                          <Tag color="orange" style={{ marginLeft: 8 }}>
+                          <Tag color="orange" className="ml-8">
                             {t("abos.station_full_waiting_list")}
                           </Tag>
                         )}
                       </span>
                       {!isFull && total != null && free != null && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>
+                        <Text type="secondary" className="text-12">
                           {t("delivery.free_spots_of_total", { free, total })}
                         </Text>
                       )}
@@ -1067,7 +1067,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
               <Alert
                 type="warning"
                 showIcon
-                style={{ marginBottom: 16 }}
+                className="mb-16"
                 message={
                   !allowsWaitingList
                     ? t("abos.full_unavailable_notice")
@@ -1082,7 +1082,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
               <Alert
                 type="warning"
                 showIcon
-                style={{ marginBottom: 16 }}
+                className="mb-16"
                 message={
                   waitingListOffer === "variation"
                     ? t("abos.waiting_list_offer_text_variation")
@@ -1213,7 +1213,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
               <Alert
                 type="info"
                 showIcon
-                style={{ marginTop: 12 }}
+                className="mt-12"
                 message={t("abos.public_sepa_mandate_hint")}
               />
             )}
@@ -1221,7 +1221,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
               <Alert
                 type="warning"
                 showIcon
-                style={{ marginTop: 12 }}
+                className="mt-12"
                 message={t(
                   selfService
                     ? "abos.sepa_mandate_missing_self"
@@ -1242,7 +1242,7 @@ const NewSubscriptionModal: FC<NewSubscriptionModalProps> = ({
             {/* Subscription-contract consent — only when the tenant publishes
               one; required before the subscription can be saved (all modes). */}
             {subscriptionContractDoc && (
-              <div style={{ marginTop: 16 }}>
+              <div className="mt-16">
                 <ConsentDocumentField
                   doc={subscriptionContractDoc}
                   accepted={subscriptionContractAccepted}

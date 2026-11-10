@@ -140,8 +140,9 @@ def get_is_past_parameter(**overrides):
     return catalogue_param(
         "is_past",
         description=(
-            "When true, includes archived/historical data. "
-            "When false (default), only recent data is returned."
+            "When true, includes archived/historical data. When false "
+            "(default), delivery weeks more than about two months back are "
+            "left out."
         ),
         required=required,
         **overrides,
@@ -184,10 +185,14 @@ def get_is_active_parameter(**overrides):
 def get_active_at_date_or_future_parameter(**overrides):
     """Get is_active_at_date_or_future boolean parameter for filtering by active status at a date or in the future."""
     required = overrides.pop("required", False)
+    description = overrides.pop(
+        "description",
+        "Filter for records active at a specific date or starting in the future",
+    )
 
     return catalogue_param(
         "active_at_date_or_future",
-        description="Filter for records active at a specific date or starting in the future",
+        description=description,
         required=required,
         **overrides,
     )
@@ -197,10 +202,13 @@ def get_active_at_date_or_future_parameter(**overrides):
 def get_active_at_date_parameter(**overrides):
     """Get active_at_date date parameter for time-bound filtering."""
     required = overrides.pop("required", False)
+    description = overrides.pop(
+        "description", "Filter for records active at the given date (YYYY-MM-DD)"
+    )
 
     return catalogue_param(
         "active_at_date",
-        description="Filter for records active at the given date (YYYY-MM-DD)",
+        description=description,
         required=required,
         **overrides,
     )

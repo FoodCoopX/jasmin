@@ -20,6 +20,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.authz.roles import STAFF_ROLES, Role
+from apps.shared.audit_log import update_and_log
 
 from ..errors import (
     MemberAlreadyCancelled,
@@ -255,7 +256,8 @@ class MemberService:
           2. ``Member.reject()`` stamps ``admin_rejected_at`` +
              ``admin_rejection_reason`` and clears any stale
              ``admin_confirmed_at``, on the member row re-read under its lock;
-             a member confirmed in the meantime is refused instead.
+             a member confirmed in the meantime is refused instead, and one
+             rejected already is returned as it is, with no second mail.
           3. ``accounts.application_rejected`` email scheduled via
              on_commit. It renders in the language of the login linked to
              the member, so it is scheduled before step 4 can unlink it.
@@ -293,6 +295,8 @@ class MemberService:
                 "Confirmed members cannot be rejected — they must be "
                 "offboarded instead."
             )
+        if member.admin_rejected_at is not None:
+            return member
         member.reject(admin_user=admin_user, reason=reason, save=True)
 
         if member.email:
@@ -326,7 +330,8 @@ class MemberService:
 
         The stamps are written with ``update()``, like the waiting-list
         withdrawal's: a rejection must not fail on a term that the
-        subscription's own validation has come to refuse.
+        subscription's own validation has come to refuse. The audit log records
+        them all the same.
         """
         open_subscriptions = list(
             Subscription.objects.filter(
@@ -341,9 +346,8 @@ class MemberService:
         if open_subscriptions:
             # The stamps ``AdminConfirmableMixin.reject`` writes;
             # ``admin_confirmed`` is False already.
-            Subscription.objects.filter(
-                pk__in=[subscription.pk for subscription in open_subscriptions]
-            ).update(
+            update_and_log(
+                open_subscriptions,
                 admin_confirmed_by=admin_user,
                 admin_confirmed_at=None,
                 admin_rejected_at=timezone.now(),

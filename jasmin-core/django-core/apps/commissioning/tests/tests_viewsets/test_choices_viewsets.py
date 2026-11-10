@@ -70,22 +70,67 @@ class TestSharesDeliveryDayViewSet:
         resp = api_client.get(url)
         assert resp.status_code == status.HTTP_200_OK
 
-    def _in_use_day(self, number_of_tours, day_number):
-        # A delivery day a subscription references is "in use" (not deletable).
+    def _in_use_day(self, number_of_tours, day_number, tour_number=1):
+        # A delivery day a subscription references is "in use" (not deletable);
+        # its one station sits on ``tour_number``.
         day = SharesDeliveryDayFactory(
             number_of_tours=number_of_tours, day_number=day_number
         )
         SubscriptionFactory(
-            default_delivery_station_day=DeliveryStationDayFactory(delivery_day=day)
+            default_delivery_station_day=DeliveryStationDayFactory(
+                delivery_day=day, tour_number=tour_number
+            )
         )
         return day
 
-    def test_in_use_day_cannot_reduce_tours(self, api_client, tenant):
-        day = self._in_use_day(number_of_tours=3, day_number=1)
+    def test_tours_cannot_drop_below_a_tour_its_stations_use(self, api_client, tenant):
+        day = self._in_use_day(number_of_tours=3, day_number=1, tour_number=3)
         url = reverse("share_delivery_day-detail", kwargs={"pk": day.pk})
         resp = api_client.patch(url, {"number_of_tours": 2}, format="json")
         assert resp.status_code == status.HTTP_409_CONFLICT
         assert resp.data["code"] == "shares_delivery_day.tours_reduced_while_in_use"
+        assert resp.data["details"]["highest_tour"] == 3
+
+    def test_an_emptied_count_counts_as_one_tour(self, api_client, tenant):
+        day = self._in_use_day(number_of_tours=3, day_number=1, tour_number=3)
+        url = reverse("share_delivery_day-detail", kwargs={"pk": day.pk})
+        resp = api_client.patch(url, {"number_of_tours": None}, format="json")
+        assert resp.status_code == status.HTTP_409_CONFLICT
+        assert resp.data["details"]["new_tours"] == 1
+
+    def test_in_use_day_can_drop_tours_its_stations_dont_use(self, api_client, tenant):
+        day = self._in_use_day(number_of_tours=3, day_number=1, tour_number=2)
+        url = reverse("share_delivery_day-detail", kwargs={"pk": day.pk})
+        resp = api_client.patch(url, {"number_of_tours": 2}, format="json")
+        assert resp.status_code == status.HTTP_200_OK
+
+    def test_a_row_saved_with_its_count_passes_though_stations_use_more_tours(
+        self, api_client, tenant
+    ):
+        """A host's sync puts the stations on its tours and leaves the count;
+        the table sends the count back with every edit of the row."""
+        day = self._in_use_day(number_of_tours=1, day_number=1, tour_number=3)
+        url = reverse("share_delivery_day-detail", kwargs={"pk": day.pk})
+        resp = api_client.patch(
+            url, {"number_of_tours": 1, "default_harvesting_day": 0}, format="json"
+        )
+        assert resp.status_code == status.HTTP_200_OK
+
+    def test_an_ended_station_day_on_a_higher_tour_doesnt_hold_the_count(
+        self, api_client, tenant
+    ):
+        with time_machine.travel(datetime.datetime(2026, 6, 1, 12, 0), tick=False):
+            day = self._in_use_day(number_of_tours=3, day_number=1)
+            DeliveryStationDayFactory(
+                delivery_day=day,
+                tour_number=3,
+                valid_from=datetime.date(2026, 1, 5),
+                valid_until=datetime.date(2026, 3, 1),
+            )
+            url = reverse("share_delivery_day-detail", kwargs={"pk": day.pk})
+            resp = api_client.patch(url, {"number_of_tours": 1}, format="json")
+
+        assert resp.status_code == status.HTTP_200_OK
 
     def test_in_use_day_can_raise_tours(self, api_client, tenant):
         day = self._in_use_day(number_of_tours=3, day_number=1)

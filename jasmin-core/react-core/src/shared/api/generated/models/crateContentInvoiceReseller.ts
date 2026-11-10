@@ -30,26 +30,26 @@ impl returns ``True`` for stornos and corrections (negated/adjusted
 amounts make the comparison meaningless).
  */
 export interface CrateContentInvoiceReseller {
-  readonly id?: string;
+  readonly id: string;
   /**
    * @nullable
    * @pattern ^-?\d{0,7}(?:\.\d{0,3})?$
    */
-  readonly source_amount?: string | null;
+  readonly source_amount: string | null;
   /** @nullable */
-  readonly source_unit?: string | null;
+  readonly source_unit: string | null;
   /** @nullable */
-  readonly source_size?: string | null;
+  readonly source_size: string | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,3}(?:\.\d{0,2})?$
    */
-  readonly source_price_per_unit?: string | null;
+  readonly source_price_per_unit: string | null;
   /** @nullable */
-  readonly source_rabatt?: number | null;
-  readonly is_finalized?: boolean;
+  readonly source_rabatt: number | null;
+  readonly is_finalized: boolean;
   /** @nullable */
-  readonly finalized_at?: string | null;
+  readonly finalized_at: string | null;
   /**
    * @minimum -2147483648
    * @maximum 2147483647
@@ -74,20 +74,20 @@ export interface CrateContentInvoiceReseller {
    */
   note?: string | null;
   /** @nullable */
-  readonly finalized_by?: string | null;
+  readonly finalized_by: string | null;
   /** @nullable */
   invoice?: string | null;
   crate_type: string;
-  readonly crate_delivery_note_contents?: readonly string[];
+  readonly crate_delivery_note_contents: readonly string[];
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly line_netto?: string;
+  readonly line_netto: string;
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly line_brutto?: string;
-  readonly crate_type_name?: string;
-  readonly amount_differs?: boolean;
-  readonly original_amount?: string;
-  readonly price_per_unit_differs?: boolean;
-  readonly original_price_per_unit?: string;
-  readonly rabatt_differs?: boolean;
-  readonly original_rabatt?: string;
+  readonly line_brutto: string;
+  readonly crate_type_name: string;
+  readonly amount_differs: boolean;
+  readonly original_amount: string;
+  readonly price_per_unit_differs: boolean;
+  readonly original_price_per_unit: string;
+  readonly rabatt_differs: boolean;
+  readonly original_rabatt: string;
 }

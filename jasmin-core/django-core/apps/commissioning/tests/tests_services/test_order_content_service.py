@@ -9,17 +9,19 @@ from unittest.mock import patch
 import pytest
 from django.utils import timezone
 
-from apps.commissioning.errors import OrderDayMissing
+from apps.commissioning.errors import OrderContentOfferChangeRefused, OrderDayMissing
 from apps.commissioning.models import (
     CrateContentInvoiceReseller,
     CrateDeliveryNoteContent,
     CrateOrderContent,
+    Offer,
     Order,
     OrderContent,
 )
 from apps.commissioning.services.crate_order_content_service import (
     CrateOrderContentService,
 )
+from apps.commissioning.services.order_content_rows import serialize_order_content
 from apps.commissioning.services.order_content_service import OrderContentService
 from apps.commissioning.tests.factories import (
     CrateFactory,
@@ -440,6 +442,49 @@ class TestCreateOrderWithContentAndCrates:
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
 class TestUpdateOrderContent:
+    @patch.object(OrderContentService, "create_movements", side_effect=_noop_movements)
+    @patch.object(
+        OrderContentService,
+        "create_all_theoretical_objects",
+        side_effect=_noop_theoretical,
+    )
+    def test_a_change_of_offer_is_refused(self, _mock_theo, _mock_mv, tenant):
+        article = ShareArticleFactory()
+        offer = OfferFactory(share_article=article, amount=Decimal("90"))
+        other_offer = OfferFactory(share_article=article, amount=Decimal("50"))
+        oc = OrderContentFactory(offer=offer, share_article=None, amount=Decimal("10"))
+
+        with pytest.raises(OrderContentOfferChangeRefused):
+            OrderContentService.update_order_content(
+                order_content_id=oc.pk, amount=Decimal("10"), offer=other_offer
+            )
+
+        oc.refresh_from_db()
+        offer.refresh_from_db()
+        other_offer.refresh_from_db()
+        assert oc.offer_id == offer.pk
+        assert (offer.amount, other_offer.amount) == (Decimal("90"), Decimal("50"))
+
+    @patch.object(OrderContentService, "create_movements", side_effect=_noop_movements)
+    @patch.object(
+        OrderContentService,
+        "create_all_theoretical_objects",
+        side_effect=_noop_theoretical,
+    )
+    def test_the_grids_save_reports_the_offers_stock_after_it(
+        self, _mock_theo, _mock_mv, tenant
+    ):
+        # The grid sends the line's own offer, read before the save took stock.
+        offer = OfferFactory(amount=Decimal("90"))
+        oc = OrderContentFactory(offer=offer, share_article=None, amount=Decimal("10"))
+        stale_offer = Offer.objects.get(pk=offer.pk)
+
+        result = OrderContentService.update_order_content(
+            order_content_id=oc.pk, amount=Decimal("15"), offer=stale_offer
+        )
+
+        assert result["offer_available_amount"] == Decimal("85")
+
     @patch.object(OrderContentService, "create_movements", side_effect=_noop_movements)
     @patch.object(
         OrderContentService,
@@ -976,7 +1021,7 @@ class TestCreateWithNullAmount:
 class TestLegacyNullAmountRowIsReadable:
     """A NULL ``amount`` row must not break the LIST endpoint.
 
-    ``_serialize_order_content`` divides ``amount`` to derive
+    ``serialize_order_content`` divides ``amount`` to derive
     ``ordered_amount`` and runs once per row on the list path, so a single
     NULL row would 500 the whole orders grid for that reseller/week/day —
     not just its own line. The create path doesn't write NULL, but a row
@@ -990,7 +1035,7 @@ class TestLegacyNullAmountRowIsReadable:
         content = OrderContentFactory(order=order, amount=None)
         assert content.amount is None
 
-        data = OrderContentService._serialize_order_content(content)
+        data = serialize_order_content(content)
 
         assert data["amount"] is None, "the raw value is reported as-is"
         assert data["ordered_amount"] == Decimal("0"), "derived value degrades to 0"

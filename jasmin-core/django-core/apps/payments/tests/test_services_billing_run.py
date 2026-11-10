@@ -277,6 +277,21 @@ class TestExport:
         with pytest.raises(BillingRunNotDraft, match="cannot re-export"):
             BillingRunService.export(run)
 
+    def test_an_exported_run_is_not_deleted(
+        self, tenant, tenant_settings, billing_profile, subscription, member
+    ):
+        run = self._setup_run(member, subscription)
+        BillingRunService.export(run)
+
+        with pytest.raises(BillingRunNotDraft):
+            BillingRunService.delete_draft(run)
+
+        run.refresh_from_db()
+        assert run.status == BillingRunStatus.EXPORTED
+        assert set(run.charges.values_list("status", flat=True)) == {
+            ChargeStatus.ISSUED
+        }
+
     def test_export_rejects_non_eur_charge(
         self, tenant, tenant_settings, billing_profile, subscription, member
     ):

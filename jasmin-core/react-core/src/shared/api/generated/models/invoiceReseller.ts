@@ -18,80 +18,81 @@ DeliveryNote). Injected via ``get_fields()`` for the same metaclass reason
 as ``LinePricingFieldsMixin``.
  */
 export interface InvoiceReseller {
-  readonly id?: string;
-  readonly line_items?: readonly InvoiceResellerContent[];
-  readonly crate_items?: readonly CrateItemSummary[];
+  readonly id: string;
+  readonly line_items: readonly InvoiceResellerContent[];
+  readonly crate_items: readonly CrateItemSummary[];
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly sum_netto?: string;
+  readonly sum_netto: string;
   /** @pattern ^-?\d{0,10}(?:\.\d{0,2})?$ */
-  readonly sum_brutto?: string;
+  readonly sum_brutto: string;
   /** @nullable */
-  readonly reseller_name?: string | null;
+  readonly reseller_name: string | null;
   /** @nullable */
-  readonly reseller_name2?: string | null;
+  readonly reseller_name2: string | null;
   /** @nullable */
-  readonly reseller_address?: string | null;
+  readonly reseller_address: string | null;
   /** @nullable */
-  readonly reseller_zip?: string | null;
+  readonly reseller_zip: string | null;
   /** @nullable */
-  readonly reseller_city?: string | null;
+  readonly reseller_city: string | null;
   /** @nullable */
-  readonly reseller_country?: string | null;
+  readonly reseller_country: string | null;
   /** @nullable */
-  readonly reseller_uid?: string | null;
+  readonly reseller_uid: string | null;
   /** @nullable */
-  readonly reseller_payment_terms_in_days?: number | null;
+  readonly reseller_payment_terms_in_days: number | null;
   /**
    * @nullable
    * @pattern ^-?\d{0,3}(?:\.\d{0,2})?$
    */
-  readonly reseller_early_payment_discount_percent?: string | null;
+  readonly reseller_early_payment_discount_percent: string | null;
   /** @nullable */
-  readonly reseller_early_payment_discount_days?: number | null;
-  readonly invoice_number?: string;
-  readonly invoice_date?: string;
+  readonly reseller_early_payment_discount_days: number | null;
+  readonly invoice_number: string;
+  /** @nullable */
+  readonly invoice_date: string | null;
   /**
    * Get list of delivery notes referenced by invoice contents
    * @nullable
    */
-  readonly corresponding_delivery_notes?: string | null;
+  readonly corresponding_delivery_notes: string | null;
   /**
    * Get formatted number of the cancelled invoice (e.g. RE-1).
    * @nullable
    */
-  readonly cancels_invoice_number?: string | null;
-  readonly created_at?: string;
+  readonly cancels_invoice_number: string | null;
+  readonly created_at: string;
   /** @nullable */
   due_date?: string | null;
   /** @nullable */
   paid_at?: string | null;
-  readonly is_finalized?: boolean;
+  readonly is_finalized: boolean;
   /** @nullable */
-  readonly finalized_at?: string | null;
-  readonly prefix?: string;
+  readonly finalized_at: string | null;
+  readonly prefix: string;
   /** @nullable */
-  readonly number?: number | null;
+  readonly number: number | null;
   /** @nullable */
-  readonly date?: string | null;
+  readonly date: string | null;
   /** @nullable */
-  readonly file?: string | null;
+  readonly file: string | null;
   /** @nullable */
-  readonly xml_file?: string | null;
+  readonly xml_file: string | null;
   /** @nullable */
-  readonly document_hash?: string | null;
+  readonly document_hash: string | null;
   /** @nullable */
-  readonly recipient_snapshot?: InvoiceResellerRecipientSnapshot;
+  readonly recipient_snapshot: InvoiceResellerRecipientSnapshot;
   /** @nullable */
-  readonly has_been_sent_to_reseller_at?: string | null;
+  readonly has_been_sent_to_reseller_at: string | null;
   /** @nullable */
-  readonly has_been_sent_to_accounting_at?: string | null;
+  readonly has_been_sent_to_accounting_at: string | null;
   has_been_paid?: boolean;
-  readonly document_type?: DocumentTypeEnum;
+  readonly document_type: DocumentTypeEnum;
   /**
    * Explanation for why this correction/storno was created
    * @nullable
    */
-  readonly correction_reason?: string | null;
+  readonly correction_reason: string | null;
   items_are_grouped?: boolean;
   /**
    * @maxLength 500
@@ -99,24 +100,24 @@ export interface InvoiceReseller {
    */
   note?: string | null;
   /** @nullable */
-  readonly created_by?: string | null;
+  readonly created_by: string | null;
   /** @nullable */
-  readonly finalized_by?: string | null;
-  readonly reseller?: string;
+  readonly finalized_by: string | null;
+  readonly reseller: string;
   /**
    * If this is a storno, reference to the original invoice being cancelled
    * @nullable
    */
-  readonly cancels_invoice?: string | null;
+  readonly cancels_invoice: string | null;
   /**
    * If this invoice was cancelled, reference to the storno document
    * @nullable
    */
-  readonly cancelled_by_invoice?: string | null;
-  readonly tax_breakdown?: readonly InvoiceResellerTaxBreakdownItem[];
+  readonly cancelled_by_invoice: string | null;
+  readonly tax_breakdown: readonly InvoiceResellerTaxBreakdownItem[];
   /**
    * Return a human-readable name for ``created_by``.
    * @nullable
    */
-  readonly created_by_name?: string | null;
+  readonly created_by_name: string | null;
 }

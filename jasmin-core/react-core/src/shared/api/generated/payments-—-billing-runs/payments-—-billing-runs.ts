@@ -26,7 +26,7 @@ import type {
 
 import type {
   BillingRun,
-  CreateBillingRun,
+  CreateBillingRunRequest,
   ErrorResponse,
   PaymentsBillingRunsListParams
 } from '.././models';
@@ -135,7 +135,7 @@ export function usePaymentsBillingRunsList<TData = Awaited<ReturnType<typeof pay
  * @summary Create a billing run (Office only)
  */
 export const paymentsBillingRunsCreate = (
-    createBillingRun: CreateBillingRun,
+    createBillingRunRequest: CreateBillingRunRequest,
  signal?: AbortSignal
 ) => {
       
@@ -143,7 +143,7 @@ export const paymentsBillingRunsCreate = (
       return axiosService<BillingRun>(
       {url: `/api/payments/billing_runs/`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: createBillingRun, signal
+      data: createBillingRunRequest, signal
     },
       );
     }
@@ -151,8 +151,8 @@ export const paymentsBillingRunsCreate = (
 
 
 export const getPaymentsBillingRunsCreateMutationOptions = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>, TError,{data: CreateBillingRun}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>, TError,{data: CreateBillingRun}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>, TError,{data: CreateBillingRunRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>, TError,{data: CreateBillingRunRequest}, TContext> => {
 
 const mutationKey = ['paymentsBillingRunsCreate'];
 const {mutation: mutationOptions} = options ?
@@ -164,7 +164,7 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>, {data: CreateBillingRun}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>, {data: CreateBillingRunRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  paymentsBillingRunsCreate(data,)
@@ -176,18 +176,18 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PaymentsBillingRunsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>>
-    export type PaymentsBillingRunsCreateMutationBody = CreateBillingRun
+    export type PaymentsBillingRunsCreateMutationBody = CreateBillingRunRequest
     export type PaymentsBillingRunsCreateMutationError = ErrorResponse
 
     /**
  * @summary Create a billing run (Office only)
  */
 export const usePaymentsBillingRunsCreate = <TError = ErrorResponse,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>, TError,{data: CreateBillingRun}, TContext>, }
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof paymentsBillingRunsCreate>>, TError,{data: CreateBillingRunRequest}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof paymentsBillingRunsCreate>>,
         TError,
-        {data: CreateBillingRun},
+        {data: CreateBillingRunRequest},
         TContext
       > => {
 

@@ -1019,8 +1019,8 @@ class TestSuccessionChildMigration(_MondayHelpers):
         """Creating a successor DeliveryStationDay migrates the
         predecessor's future ShareDeliveries + CapacityReservations onto it."""
         from apps.commissioning.models import CapacityReservation
-        from apps.commissioning.viewsets.delivery_viewsets import (
-            DeliveryStationDayViewSet,
+        from apps.commissioning.services.station_day_succession import (
+            migrate_succession_children,
         )
 
         base = self._monday_n_weeks_ahead(0)
@@ -1060,7 +1060,7 @@ class TestSuccessionChildMigration(_MondayHelpers):
             expires_at=timezone.now() + timedelta(days=14),
         )
 
-        DeliveryStationDayViewSet._migrate_succession_children(new_dsd, boundary)
+        migrate_succession_children(new_dsd, boundary)
 
         sd.refresh_from_db()
         assert sd.delivery_station_day == new_dsd

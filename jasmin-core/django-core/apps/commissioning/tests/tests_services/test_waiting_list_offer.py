@@ -22,7 +22,7 @@ from apps.commissioning.errors import (
     WaitingListOfferMemberHasNoEmail,
     WaitingListOfferNotAvailable,
 )
-from apps.commissioning.models import Member, Subscription
+from apps.commissioning.models import DeliveryStationDay, Member, Subscription
 from apps.commissioning.services.variation_capacity_service import (
     VariationCapacityService,
 )
@@ -203,8 +203,7 @@ class TestWaitingListOffer:
         sub = _pending(variation, dsd)
         WaitingListOfferService.offer_spot(sub)
         # Backdate the window so the offer has lapsed.
-        # A real lapsed offer keeps sent_at <= expires_at (both in the past);
-        # backdate both so the mixin's clean() stays valid on the expiry save.
+        # A real lapsed offer keeps sent_at <= expires_at, both in the past.
         Subscription.objects.filter(pk=sub.pk).update(
             notification_sent_at=timezone.now() - datetime.timedelta(days=8),
             notification_expires_at=timezone.now() - datetime.timedelta(days=1),
@@ -225,8 +224,7 @@ class TestWaitingListOffer:
         variation = ShareTypeVariationFactory(capacity=5)
         sub = _pending(variation, dsd)
         WaitingListOfferService.offer_spot(sub)
-        # A real lapsed offer keeps sent_at <= expires_at (both in the past);
-        # backdate both so the mixin's clean() stays valid on the expiry save.
+        # A real lapsed offer keeps sent_at <= expires_at, both in the past.
         Subscription.objects.filter(pk=sub.pk).update(
             notification_sent_at=timezone.now() - datetime.timedelta(days=8),
             notification_expires_at=timezone.now() - datetime.timedelta(days=1),
@@ -234,6 +232,44 @@ class TestWaitingListOffer:
         assert WaitingListOfferService.expire_stale_offers() == 1
         sub.refresh_from_db()
         assert sub.waiting_list_status == Subscription.WaitingListStatus.EXPIRED
+
+
+@pytest.mark.django_db
+class TestAnOfferWhoseStationDayClosed:
+    """An answer to an offer, or its expiry, doesn't validate the term again, so
+    it goes through on an offer whose station day closed while it was open."""
+
+    @pytest.fixture
+    def offered(self, tenant, dsd) -> Subscription:
+        sub = _pending(ShareTypeVariationFactory(capacity=5), dsd)
+        WaitingListOfferService.offer_spot(sub)
+        DeliveryStationDay.objects.filter(pk=dsd.pk).update(
+            valid_until=datetime.date(2026, 8, 30)
+        )
+        return Subscription.objects.get(pk=sub.pk)
+
+    def test_it_can_be_accepted(self, offered):
+        WaitingListOfferService.accept_offer(offered.notification_token)
+
+        offered.refresh_from_db()
+        assert offered.waiting_list_status == Subscription.WaitingListStatus.CONFIRMED
+
+    def test_it_can_be_declined(self, offered):
+        WaitingListOfferService.decline_offer(offered.notification_token)
+
+        offered.refresh_from_db()
+        assert offered.waiting_list_status == Subscription.WaitingListStatus.DECLINED
+        assert offered.notification_token is None
+
+    def test_it_expires(self, offered):
+        Subscription.objects.filter(pk=offered.pk).update(
+            notification_sent_at=timezone.now() - datetime.timedelta(days=8),
+            notification_expires_at=timezone.now() - datetime.timedelta(days=1),
+        )
+
+        assert WaitingListOfferService.expire_stale_offers() == 1
+        offered.refresh_from_db()
+        assert offered.waiting_list_status == Subscription.WaitingListStatus.EXPIRED
 
 
 @pytest.mark.django_db

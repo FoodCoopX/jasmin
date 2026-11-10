@@ -129,15 +129,7 @@ export default function CreateTenantModal({ onClose, onSuccess }: CreateTenantMo
           </div>
 
           <hr className="sa-form-divider" />
-          <h3
-            style={{
-              margin: "0 0 16px 0",
-              fontSize: "16px",
-              fontWeight: "600",
-            }}
-          >
-            Admin User
-          </h3>
+          <h3 className="sa-form-section-title">Admin User</h3>
 
           <div className="sa-form-row">
             <div>
@@ -197,7 +189,7 @@ export default function CreateTenantModal({ onClose, onSuccess }: CreateTenantMo
 
 
           {error && (
-            <div className="alert-error" style={{ marginBottom: 20 }}>
+            <div className="alert-error mb-20">
               {error}
             </div>
           )}

@@ -10,6 +10,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Crate, Offer, Plot, ShareTypeVariation, Storage } from "@shared/api/generated/models";
+import { makePlot, makeStorage } from "@/test/modelFixtures";
 
 const i18nMock = vi.hoisted(() => ({ t: (key: string) => key }));
 vi.mock("react-i18next", () => ({
@@ -57,8 +58,8 @@ import { usePlots } from "../usePlots";
 import { useShareTypeVariations } from "../useShareTypeVariations";
 import { useStorages } from "../useStorages";
 
-const COLD_ROOM: Storage = { id: "st-cold", name: "Cold room" };
-const NORTH_FIELD: Plot = { id: "plot-north", name: "North field" };
+const COLD_ROOM: Storage = makeStorage({ id: "st-cold", name: "Cold room" });
+const NORTH_FIELD: Plot = makePlot({ id: "plot-north", name: "North field" });
 const SMALL: ShareTypeVariation = { id: "stv-s", size: "S" } as ShareTypeVariation;
 const CARROT_OFFER: Offer = {
   id: "offer-carrots",

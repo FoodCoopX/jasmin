@@ -416,7 +416,7 @@ class TestStornoMirrorsOriginal:
 # ---------------------------------------------------------------------------
 @pytest.mark.django_db
 class TestTaxComputation:
-    """Verify that tax can be correctly computed per tax rate grouping."""
+    """Tax is computed per tax-rate group."""
 
     def test_tax_amounts_per_rate(self, tenant):
         invoice = InvoiceResellerFactory()

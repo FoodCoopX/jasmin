@@ -40,12 +40,14 @@ from ..serializers.shares_serializer import (
     PackingBoxesMatrixSerializer,
     PackingListRowSerializer,
 )
+from ..serializers.station_contents_serializer import StationContentsSerializer
 from ..services import (
     PackingListBoxesMatrixService,
     PackingListService,
     ShareContentService,
 )
 from ..services.planning_slots import PlanningSlot
+from ..services.station_contents import get_station_contents
 from ..utils.query_params import validate_query_params
 
 logger = logging.getLogger(__name__)
@@ -112,6 +114,8 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
             200: HarvestSharePlanningRowSerializer,
             # DRF field validation (is_valid) / ``ShareContentError`` below.
             400: ErrorResponseSerializer,
+            # ``ShareContentAlreadyPlanned``: the slot was planned meanwhile.
+            409: ErrorResponseSerializer,
         },
         description="Create new share content from planning data.",
     )
@@ -250,8 +254,9 @@ class HarvestSharePlanningViewSet(RolePermissionsMixin, viewsets.ViewSet):
 class PackingListViewSet(RolePermissionsMixin, viewsets.ViewSet):
     read_permission = IsStaff
     write_permission = IsOffice
-    # Read-only GETs — both back the isStaff-gated packing-list pages.
-    read_actions = frozenset({"boxes_matrix", "member_amounts"})
+    # Read-only GETs — they back the isStaff-gated packing-list and pickup-list
+    # pages.
+    read_actions = frozenset({"boxes_matrix", "member_amounts", "station_contents"})
     # See HarvestSharePlanningViewSet for the rationale.
     serializer_class = inline_serializer(name="PackingListPlaceholder", fields={})
 
@@ -403,6 +408,44 @@ class PackingListViewSet(RolePermissionsMixin, viewsets.ViewSet):
         )
 
         return Response(matrix, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        parameters=[
+            get_year_parameter(required=True),
+            get_delivery_week_parameter(required=True),
+            get_day_number_parameter(required=True),
+            get_delivery_station_parameter(required=True),
+            get_is_past_parameter(),
+        ],
+        responses={200: StationContentsSerializer},
+        description=(
+            "The shares collected at a delivery station on a week + delivery "
+            "day, each with what one share holds — the notice members read at "
+            "the station. One entry per physical share type variation somebody "
+            "collects there (a virtual one counts as its physical components), "
+            "boxed and loose alike; the amounts are ShareContent.amount, not "
+            "multiplied by demand."
+        ),
+    )
+    @action(detail=False, methods=["get"], url_path="station_contents")
+    def station_contents(self, request: Request) -> Response:
+        params = validate_query_params(
+            request,
+            required=["year", "delivery_week", "day_number", "delivery_station"],
+            optional=["is_past"],
+        )
+
+        contents = get_station_contents(
+            year=params["year"],
+            delivery_week=params["delivery_week"],
+            day_number=params["day_number"],
+            delivery_station=params["delivery_station"],
+            is_past=params["is_past"],
+        )
+
+        return Response(
+            StationContentsSerializer(contents).data, status=status.HTTP_200_OK
+        )
 
 
 class PackingListBulkViewSet(RolePermissionsMixin, viewsets.ViewSet):

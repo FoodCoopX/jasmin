@@ -1,5 +1,5 @@
 import { MenuOutlined } from "@ant-design/icons";
-import { useTenant } from "@hooks/index";
+import { useTenant, useWashingCleaningVisibility } from "@hooks/index";
 import { Drawer, Menu } from "antd";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ export default function MobileSidebar() {
   const { t } = useTranslation();
   const { getSetting } = useTenant();
   const { showBoxesPackingList } = usePackingListVisibility();
+  const { showsWashing } = useWashingCleaningVisibility();
   const sells_to_resellers = getSetting("sells_to_resellers", true);
 
   const menuItemsCommissioning = [
@@ -39,14 +40,18 @@ export default function MobileSidebar() {
       ),
     },
 
-    {
-      key: "commissioning-washing-list",
-      label: (
-        <Link to="/commissioning/washing-list">
-          {t("commissioning.washing_list")}
-        </Link>
-      ),
-    },
+    ...(showsWashing
+      ? [
+          {
+            key: "commissioning-washing-list",
+            label: (
+              <Link to="/commissioning/washing-list">
+                {t("commissioning.washing_list")}
+              </Link>
+            ),
+          },
+        ]
+      : []),
     {
       key: "commissioning-harvesting-lists",
       label: (
@@ -103,21 +108,11 @@ export default function MobileSidebar() {
         role="button"
         tabIndex={0}
         aria-label={t("nav.open_menu")}
-        style={{
-          position: "fixed",
-          top: "10px",
-          left: "10px",
-          zIndex: 1000,
-          cursor: "pointer",
-          padding: "4px",
-          backgroundColor: "var(--color-bg-base)",
-          borderRadius: "4px",
-          boxShadow: "0 2px 8px var(--color-shadow)",
-        }}
+        className="mobile-sidebar-trigger"
         onClick={() => setVisible(true)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVisible(true); } }}
       >
-        <MenuOutlined style={{ fontSize: "30px" }} />
+        <MenuOutlined className="mobile-sidebar-trigger-icon" />
       </div>
 
       {/* Sidebar drawer */}

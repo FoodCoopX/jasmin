@@ -157,7 +157,7 @@ export const CancelMembershipModal: FC<CancelMembershipModalProps> = ({
     >
       <Space direction="vertical" size="middle" className="w-full">
         {!self && memberName && (
-          <Title level={5} style={{ margin: 0 }}>
+          <Title level={5} className="m-0">
             {memberName}
           </Title>
         )}
@@ -167,7 +167,7 @@ export const CancelMembershipModal: FC<CancelMembershipModalProps> = ({
           showIcon
           message={t("members.cancel_membership_warning_title")}
           description={
-            <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+            <ul className="mb-0 pl-20">
               {self ? (
                 <li>{t("members.cancel_membership_restraint")}</li>
               ) : (
@@ -191,7 +191,7 @@ export const CancelMembershipModal: FC<CancelMembershipModalProps> = ({
               aria-label={t("members.cancel_membership_effective_at")}
               aria-required
             />
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" className="text-12">
               {t("members.cancel_membership_effective_at_hint")}
             </Text>
           </Form.Item>
@@ -207,14 +207,14 @@ export const CancelMembershipModal: FC<CancelMembershipModalProps> = ({
             />
           </Form.Item>
           {!self && (
-            <Form.Item style={{ marginBottom: 0 }}>
+            <Form.Item className="mb-0">
               <Checkbox
                 checked={force}
                 onChange={(e) => setForce(e.target.checked)}
               >
                 {t("members.cancel_membership_force")}
               </Checkbox>
-              <Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+              <Text type="secondary" className="d-block text-12">
                 {t("members.cancel_membership_force_hint")}
               </Text>
             </Form.Item>
@@ -225,7 +225,7 @@ export const CancelMembershipModal: FC<CancelMembershipModalProps> = ({
             self-service page doesn't talk about it. */}
         {!self && <OnboardingNoEmailHint />}
 
-        <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
+        <Paragraph type="secondary" className="mb-0 text-12">
           {t("members.cancel_membership_footnote")}
         </Paragraph>
       </Space>

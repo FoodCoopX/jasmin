@@ -8,14 +8,14 @@
 import type { ChargeScheduleStatusEnum } from './chargeScheduleStatusEnum';
 
 export interface ChargeSchedule {
-  readonly id?: string;
+  readonly id: string;
   member: string;
-  readonly member_name?: string;
+  readonly member_name: string;
   /** @nullable */
-  readonly member_number?: number | null;
+  readonly member_number: number | null;
   subscription: string;
   /** Clean label without the (physical/virtual) variation_type suffix. */
-  readonly subscription_label?: string;
+  readonly subscription_label: string;
   period_start: string;
   period_end: string;
   due_date: string;
@@ -30,7 +30,7 @@ export interface ChargeSchedule {
   description?: string;
   status?: ChargeScheduleStatusEnum;
   /** @nullable */
-  readonly billing_run?: string | null;
+  readonly billing_run: string | null;
   /** SEPA EndToEndId; used to match incoming statement lines. */
-  readonly end_to_end_id?: string;
+  readonly end_to_end_id: string;
 }

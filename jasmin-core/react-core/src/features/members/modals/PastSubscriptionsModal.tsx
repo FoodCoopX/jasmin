@@ -52,7 +52,7 @@ export default function PastSubscriptionsModal({
                     {sub.valid_until ? ` – ${formatDate(sub.valid_until)}` : ""}
                   </Text>
                   {sub.quantity > 1 && (
-                    <Tag style={{ margin: 0 }}>{sub.quantity}×</Tag>
+                    <Tag className="m-0">{sub.quantity}×</Tag>
                   )}
                   <Text strong>
                     {sub.share_type_name}{" "}
@@ -61,7 +61,7 @@ export default function PastSubscriptionsModal({
                     )}
                   </Text>
                   {total > 0 && (
-                    <Text style={{ color: "var(--color-joker)", fontSize: 12 }}>
+                    <Text className="past-subscription-jokers">
                       (
                       {t("members.jokers_taken", {
                         taken: sub.jokers_taken ?? 0,
@@ -71,7 +71,7 @@ export default function PastSubscriptionsModal({
                     </Text>
                   )}
                   {donationTotal > 0 && (
-                    <Text style={{ color: "var(--color-joker)", fontSize: 12 }}>
+                    <Text className="past-subscription-jokers">
                       (
                       {t("members.donation_jokers_taken", {
                         taken: sub.donation_jokers_taken ?? 0,

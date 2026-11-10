@@ -372,16 +372,22 @@ _SENSITIVE_MODELS_DISPLAY: dict[str, str] = {
 }
 SENSITIVE_DELETION_MODELS = frozenset(_SENSITIVE_MODELS_DISPLAY.values())
 
-# Threshold aligned with ``AXES_FAILURE_LIMIT`` so a single number
-# describes "what's a burst" platform-wide. Bumpable via
-# ``settings.MASS_DELETE_THRESHOLD`` for tenants that legitimately
-# have higher delete volume on the sensitive set (e.g. a yearly
-# membership-cleanup batch).
-MASS_DELETE_THRESHOLD = getattr(
-    settings,
-    "MASS_DELETE_THRESHOLD",
-    getattr(settings, "AXES_FAILURE_LIMIT", 5),
-)
+
+def mass_delete_threshold() -> int:
+    """Sensitive deletes by one actor in the window that make a burst.
+
+    Aligned with ``AXES_FAILURE_LIMIT`` so a single number describes "what's
+    a burst" platform-wide. Bumpable via ``settings.MASS_DELETE_THRESHOLD``
+    for tenants that legitimately have higher delete volume on the sensitive
+    set (e.g. a yearly membership-cleanup batch).
+    """
+    return getattr(
+        settings,
+        "MASS_DELETE_THRESHOLD",
+        getattr(settings, "AXES_FAILURE_LIMIT", 5),
+    )
+
+
 MASS_DELETE_WINDOW = datetime.timedelta(hours=1)
 
 # Cooldown matches the burst alert: avoid re-emailing about the same
@@ -455,10 +461,11 @@ def alert_on_mass_deletes() -> dict[str, int]:
     )
 
     now = timezone.now()
+    threshold = mass_delete_threshold()
     fresh_bursts: list[tuple[tuple[str, str], Counter[str], int]] = []
     for key, counter in by_actor.items():
         total = sum(counter.values())
-        if total < MASS_DELETE_THRESHOLD:
+        if total < threshold:
             continue
         last = _last_mass_delete_alerted.get(key)
         if last is not None and now - last < _MASS_DELETE_ALERT_COOLDOWN:
@@ -478,11 +485,11 @@ def alert_on_mass_deletes() -> dict[str, int]:
             total,
             models_breakdown,
             int(MASS_DELETE_WINDOW.total_seconds() // 3600),
-            MASS_DELETE_THRESHOLD,
+            threshold,
         )
 
     if fresh_bursts:
-        _send_mass_delete_ops_alert(fresh_bursts)
+        _send_mass_delete_ops_alert(fresh_bursts, threshold)
 
     return {
         "tenants_scanned": counters["tenants_scanned"],
@@ -503,6 +510,7 @@ def _sql_literal(value: str) -> str:
 
 def _send_mass_delete_ops_alert(
     bursts: list[tuple[tuple[str, str], Counter[str], int]],
+    threshold: int,
 ) -> None:
     """Email ``settings.ADMINS`` about the bursts.
 
@@ -538,7 +546,7 @@ def _send_mass_delete_ops_alert(
         [
             "",
             f"Window: last {window_hours}h",
-            f"Threshold: {MASS_DELETE_THRESHOLD}",
+            f"Threshold: {threshold}",
             "",
             "Triage: run each burst's query in psql as the app's own database "
             "role, not the superuser: docker compose exec postgres sh -c "
@@ -556,31 +564,32 @@ def _send_mass_delete_ops_alert(
 # Deletion-endpoint burst alerting (lodge + confirm)
 # ---------------------------------------------------------------
 
-# Threshold for "many deletion-request lodges from one IP" — the
-# per-user throttle (5/h, ``gdpr_request_deletion``) catches single-
-# user abuse; this catches cross-user / cross-tenant patterns from
-# one IP. 5 lodges in an hour from one IP across multiple user
-# accounts is wildly above legitimate use (a normal user lodges
-# zero or one deletion in their entire membership lifetime).
-DELETION_LODGE_BURST_THRESHOLD = getattr(
-    settings,
-    "DELETION_LODGE_BURST_THRESHOLD",
-    5,
-)
 
-# Threshold for "many email-confirm clicks from one IP" — the per-IP
-# rate limit on the confirm endpoint is 10/min (``gdpr_confirm_deletion``).
-# A legitimate user clicks the confirm link ONCE per deletion request.
-# 3+ confirms from one IP in an hour means the IP is acting on
-# multiple unrelated tokens — phishing harvest, intercepted emails,
-# or a compromised inbox. Lower threshold than lodge because the
-# baseline of legitimate cross-account confirms from one IP is
-# essentially zero.
-DELETION_CONFIRM_BURST_THRESHOLD = getattr(
-    settings,
-    "DELETION_CONFIRM_BURST_THRESHOLD",
-    3,
-)
+def deletion_lodge_burst_threshold() -> int:
+    """Deletion-request lodges from one IP in the window that make a burst.
+
+    The per-user throttle (5/h, ``gdpr_request_deletion``) catches single-
+    user abuse; this catches cross-user / cross-tenant patterns from one IP.
+    5 lodges in an hour from one IP across multiple user accounts is wildly
+    above legitimate use (a normal user lodges zero or one deletion in their
+    entire membership lifetime).
+    """
+    return getattr(settings, "DELETION_LODGE_BURST_THRESHOLD", 5)
+
+
+def deletion_confirm_burst_threshold() -> int:
+    """Email-confirm clicks from one IP in the window that make a burst.
+
+    The per-IP rate limit on the confirm endpoint is 10/min
+    (``gdpr_confirm_deletion``). A legitimate user clicks the confirm link
+    ONCE per deletion request, so 3+ confirms from one IP in an hour means the
+    IP is acting on multiple unrelated tokens — phishing harvest, intercepted
+    emails, or a compromised inbox. Lower than the lodge threshold because the
+    baseline of legitimate cross-account confirms from one IP is essentially
+    zero.
+    """
+    return getattr(settings, "DELETION_CONFIRM_BURST_THRESHOLD", 3)
+
 
 DELETION_BURST_WINDOW = datetime.timedelta(hours=1)
 
@@ -600,12 +609,12 @@ def alert_on_deletion_endpoint_bursts() -> dict[str, int]:
 
       * **Lodge burst** — ``DeletionRequest`` rows created in the last
         hour, grouped by ``requested_ip``. Alerts when one IP exceeds
-        ``DELETION_LODGE_BURST_THRESHOLD`` across users. ``requested_ip``
+        ``deletion_lodge_burst_threshold()`` across users. ``requested_ip``
         is captured by the view at request time; rows without it are
         skipped.
       * **Confirm spray** — same model, grouped by
         ``email_confirmed_ip``. Alerts when one IP exceeds
-        ``DELETION_CONFIRM_BURST_THRESHOLD`` confirmations in an hour.
+        ``deletion_confirm_burst_threshold()`` confirmations in an hour.
         Each token confirms exactly once and is bound to one user, so
         cross-user confirms from one IP are a token-spray fingerprint.
 
@@ -665,15 +674,17 @@ def alert_on_deletion_endpoint_bursts() -> dict[str, int]:
     )
 
     now = timezone.now()
+    lodge_threshold = deletion_lodge_burst_threshold()
+    confirm_threshold = deletion_confirm_burst_threshold()
     lodge_bursts = _filter_fresh(
         lodge_by_ip,
-        DELETION_LODGE_BURST_THRESHOLD,
+        lodge_threshold,
         _last_lodge_burst_alerted,
         now,
     )
     confirm_bursts = _filter_fresh(
         confirm_by_ip,
-        DELETION_CONFIRM_BURST_THRESHOLD,
+        confirm_threshold,
         _last_confirm_burst_alerted,
         now,
     )
@@ -686,7 +697,7 @@ def alert_on_deletion_endpoint_bursts() -> dict[str, int]:
             ip,
             count,
             int(DELETION_BURST_WINDOW.total_seconds() // 3600),
-            DELETION_LODGE_BURST_THRESHOLD,
+            lodge_threshold,
         )
     for (tenant_schema, ip), count in confirm_bursts:
         log.warning(
@@ -696,11 +707,13 @@ def alert_on_deletion_endpoint_bursts() -> dict[str, int]:
             ip,
             count,
             int(DELETION_BURST_WINDOW.total_seconds() // 3600),
-            DELETION_CONFIRM_BURST_THRESHOLD,
+            confirm_threshold,
         )
 
     if lodge_bursts or confirm_bursts:
-        _send_deletion_burst_ops_alert(lodge_bursts, confirm_bursts)
+        _send_deletion_burst_ops_alert(
+            lodge_bursts, confirm_bursts, lodge_threshold, confirm_threshold
+        )
 
     return {
         "tenants_scanned": counters["tenants_scanned"],
@@ -738,6 +751,8 @@ def _filter_fresh(
 def _send_deletion_burst_ops_alert(
     lodge_bursts: list[tuple[tuple[str, str], int]],
     confirm_bursts: list[tuple[tuple[str, str], int]],
+    lodge_threshold: int,
+    confirm_threshold: int,
 ) -> None:
     """Email ``settings.ADMINS`` about the bursts.
 
@@ -760,8 +775,8 @@ def _send_deletion_burst_ops_alert(
     lines.extend(
         [
             f"Window: last {int(DELETION_BURST_WINDOW.total_seconds() // 3600)}h",
-            f"Lodge threshold: {DELETION_LODGE_BURST_THRESHOLD}",
-            f"Confirm threshold: {DELETION_CONFIRM_BURST_THRESHOLD}",
+            f"Lodge threshold: {lodge_threshold}",
+            f"Confirm threshold: {confirm_threshold}",
             "",
             "Triage: DeletionRequest filtered by ``requested_ip`` /",
             "``email_confirmed_ip`` + the burst window.",

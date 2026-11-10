@@ -10,7 +10,7 @@ import type { DefaultPlantingModeEnum } from './defaultPlantingModeEnum';
 import type { FertilizerRequirementEnum } from './fertilizerRequirementEnum';
 
 export interface Vegetable {
-  readonly id?: string;
+  readonly id: string;
   /** @maxLength 200 */
   name: string;
   unit: VegetableUnitEnum;

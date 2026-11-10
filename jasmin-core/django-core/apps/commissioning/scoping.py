@@ -34,6 +34,7 @@ __all__ = [
     "scope_to_reseller",
     "scope_to_offer_group",
     "scope_to_member",
+    "scope_to_finalized",
     "own_reseller_id",
     "own_member_id",
     "enforce_own_reseller",
@@ -95,6 +96,26 @@ def scope_to_offer_group(
 def scope_to_member(qs: QuerySet, request, *, path: str) -> QuerySet:
     """Restrict `qs` to the caller's member profile."""
     return scope_by_user_attr(qs, request, user_attr="member_profile", path=path)
+
+
+def scope_to_finalized(
+    qs: QuerySet,
+    request,
+    *,
+    path: str,
+    privileged_roles: Iterable[str] = DEFAULT_PRIVILEGED_ROLES,
+) -> QuerySet:
+    """Restrict `qs` to finalized documents (privileged roles bypass): a
+    reseller's offers, delivery notes and invoices reach it once the office
+    finalizes them, and a draft stays the office's until then.
+
+    `path` is the lookup from `qs.model` to the document's ``is_finalized``,
+    e.g. ``"is_finalized"`` or ``"invoice__is_finalized"``. Same
+    ``privileged_roles`` contract as :func:`scope_to_reseller`.
+    """
+    if is_privileged(request, privileged_roles=privileged_roles):
+        return qs
+    return qs.filter(**{path: True})
 
 
 # --- Per-action ownership helpers ----------------------------------------

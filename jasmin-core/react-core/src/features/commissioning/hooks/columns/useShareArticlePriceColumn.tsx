@@ -1,11 +1,15 @@
 import { Button } from "antd";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import type {
+  EditableColumnConfig,
+  TableRecord,
+} from "@shared/tables/BasicEditableTable/types";
 
-export const useShareArticlePriceColumn = (handleOpenModal: (record: Record<string, unknown>) => void) => {
+export const useShareArticlePriceColumn = (handleOpenModal: (record: TableRecord) => void) => {
   const { t } = useTranslation();
 
-  const priceModalColumn = useMemo(
+  const priceModalColumn = useMemo<EditableColumnConfig<TableRecord>>(
     () => ({
       title: "",
       dataIndex: "actions",
@@ -15,7 +19,7 @@ export const useShareArticlePriceColumn = (handleOpenModal: (record: Record<stri
       align: "center",
       readOnly: true,
       disabled: true,
-      render: (_: unknown, record: Record<string, unknown>) => (
+      render: (_: unknown, record: TableRecord) => (
         <Button
           type="primary"
           size="small"

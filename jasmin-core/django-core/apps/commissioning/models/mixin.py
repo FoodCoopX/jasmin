@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import uuid
 from collections.abc import Iterable
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -24,8 +23,8 @@ if TYPE_CHECKING:
     from apps.accounts.models import JasminUser
 
 from .managers import (
-    ActiveOnlyManager,
     CurrentActiveManager,
+    DeliveryWeekActiveOnlyManager,
 )
 
 
@@ -70,6 +69,7 @@ class AdminConfirmableMixin(models.Model):
         self.admin_confirmed_at = (
             confirmed_at if confirmed_at is not None else timezone.now()
         )
+        self.admin_rejected_at = None
         self.admin_rejection_reason = None
         if save:
             self.save()
@@ -152,23 +152,6 @@ class TimeBoundMixin(models.Model):
         # via ``time_bound_valid_range_constraint(<name>)`` in its own
         # ``Meta.constraints`` — see the helper just below this class.
 
-    def is_active_at(self, on_date: datetime.date) -> bool:
-        """Python mirror of ``active_on_date_q``: is this row's validity window
-        open on ``on_date``? ``valid_from <= on_date`` AND (``valid_until`` is
-        NULL OR ``>= on_date``). Keep the truth table in lockstep with
-        ``active_on_date_q`` (the ORM-side SSOT for the window) so a future
-        inclusive/exclusive change lands in exactly these two places."""
-        return self.valid_from <= on_date and (
-            self.valid_until is None or self.valid_until >= on_date
-        )
-
-    def clean(self) -> None:
-        super().clean()
-        self.validate_week_boundaries(self.valid_from, self.valid_until)
-        self.validate_date_range(self.valid_from, self.valid_until)
-        if self.overlap_unique_fields is not None:
-            self._validate_no_overlap()
-
     def save(self, *args, **kwargs) -> None:
         """Run ``full_clean()`` so the overlap / date-range checks always fire.
 
@@ -211,8 +194,22 @@ class TimeBoundMixin(models.Model):
             self.full_clean()
             super().save(*args, **kwargs)
 
-    # NOTE: The CheckConstraint in Meta enforces ``valid_until >= valid_from``
-    # at the DB level for the bulk paths that bypass ``save()``.
+    def is_active_at(self, on_date: datetime.date) -> bool:
+        """Python mirror of ``active_on_date_q``: is this row's validity window
+        open on ``on_date``? ``valid_from <= on_date`` AND (``valid_until`` is
+        NULL OR ``>= on_date``). Keep the truth table in lockstep with
+        ``active_on_date_q`` (the ORM-side SSOT for the window) so a future
+        inclusive/exclusive change lands in exactly these two places."""
+        return self.valid_from <= on_date and (
+            self.valid_until is None or self.valid_until >= on_date
+        )
+
+    def clean(self) -> None:
+        super().clean()
+        self.validate_week_boundaries(self.valid_from, self.valid_until)
+        self.validate_date_range(self.valid_from, self.valid_until)
+        if self.overlap_unique_fields is not None:
+            self._validate_no_overlap()
 
     @staticmethod
     def validate_week_boundaries(valid_from, valid_until) -> None:
@@ -559,27 +556,23 @@ class LinePricingMixin:
 
 
 class ArchivableMixin(models.Model):
-    """Mixin to add archive functionality to models with CreatedMixin"""
+    """Archives a record once its delivery week lies further back than the
+    cutoff: ``active`` leaves it out of the lists of current weeks."""
+
+    # The relation carrying the ``year`` / ``delivery_week``, "" for the model.
+    archive_week_of = ""
 
     objects = models.Manager()
-    active = ActiveOnlyManager(archive_months=2)
+    active = DeliveryWeekActiveOnlyManager(archive_months=2)
 
     class Meta:
         abstract = True
         # Reverse relations and refresh_from_db should always use the
-        # unfiltered manager — never the date-filtered ``active``.
+        # unfiltered manager — never the archive-filtered ``active``.
         base_manager_name = "objects"
         indexes = [
             models.Index(fields=["created_at"]),
         ]
-
-    @classmethod
-    def get_archive_cutoff_date(cls, months_back: int = 2) -> datetime.datetime:
-        return timezone.now() - timedelta(days=30 * months_back)
-
-    def is_archived(self, months_back: int = 2) -> bool:
-        cutoff_date = self.get_archive_cutoff_date(months_back)
-        return self.created_at < cutoff_date
 
 
 class CreatedMixin(models.Model):
@@ -1065,6 +1058,9 @@ class NumberedDocumentMixin(models.Model):
     Subclasses should define DOCUMENT_TYPE to specify the document type.
     """
 
+    # Subclasses must define this
+    DOCUMENT_TYPE = None  # e.g., 'order', 'delivery_note', 'invoice'
+
     # ``prefix`` must NOT be nullable: PostgreSQL treats NULL as distinct
     # in the ``UNIQUE (prefix, number)`` constraints declared on each
     # subclass, so a tenant without TenantSettings (empty prefix) would
@@ -1073,9 +1069,6 @@ class NumberedDocumentMixin(models.Model):
     # constraint can compare on.
     prefix = models.CharField(max_length=10, blank=True, default="")
     number = models.IntegerField(blank=True, null=True)
-
-    # Subclasses must define this
-    DOCUMENT_TYPE = None  # e.g., 'order', 'delivery_note', 'invoice'
 
     class Meta:
         abstract = True
@@ -1104,7 +1097,7 @@ class NumberedDocumentMixin(models.Model):
         if self.DOCUMENT_TYPE == "order":
             return {"year": self.year}
         if self.DOCUMENT_TYPE in ("delivery_note", "invoice_reseller"):
-            year = self.date.year if self.date else timezone.now().year
+            year = self.date.year if self.date else timezone.localdate().year
             return {"date__year": year}
         raise ValueError(f"Unknown DOCUMENT_TYPE: {self.DOCUMENT_TYPE}")
 
@@ -1113,7 +1106,7 @@ class NumberedDocumentMixin(models.Model):
         if self.DOCUMENT_TYPE == "order":
             return self.year
         if self.DOCUMENT_TYPE in ("delivery_note", "invoice_reseller"):
-            return self.date.year if self.date else timezone.now().year
+            return self.date.year if self.date else timezone.localdate().year
         raise ValueError(f"Unknown DOCUMENT_TYPE: {self.DOCUMENT_TYPE}")
 
     def _base_number_queryset(self) -> models.QuerySet:
@@ -1194,12 +1187,17 @@ class NumberedDocumentMixin(models.Model):
         lock ever fails (migration mismatch, manual SQL writer, etc.)
         the unique constraint still refuses duplicate numbers.
 
+        A document that has its number skips the lock: there is nothing to
+        number, and a writer holding its row must not wait for the lock that
+        ``assign_final_number`` holds while it bumps a draft's row.
+
         Despite the name there is no retry loop; the name stays because callers
         grep for it.
         """
         with transaction.atomic():
-            acquire_advisory_xact_lock(self._advisory_lock_key())
-            self.generate_number()
+            if not self.number:
+                acquire_advisory_xact_lock(self._advisory_lock_key())
+                self.generate_number()
             super().save(*args, **kwargs)
 
     def assign_final_number(self) -> None:
@@ -1293,121 +1291,3 @@ class DateDocumentMixin(models.Model):
 
     class Meta:
         abstract = True
-
-
-# this is here for future use - leave it right now
-class WaitingListMixin(models.Model):
-    """
-    Mixin that adds waiting list functionality to models.
-    """
-
-    class WaitingListStatus(models.TextChoices):
-        NOT_ON_LIST = "not_on_list", "Not on Waiting List"
-        PENDING = "pending", "Pending - Waiting for Spot"
-        SPOT_AVAILABLE = "spot_available", "Spot Available - Awaiting Confirmation"
-        CONFIRMED = "confirmed", "Confirmed - Will Take Spot"
-        DECLINED = "declined", "Declined - No Longer Interested"
-        EXPIRED = "expired", "Expired - Did Not Respond"
-
-    on_waiting_list = models.BooleanField(default=False)
-    waiting_list_status = models.CharField(
-        max_length=20,
-        choices=WaitingListStatus.choices,
-        default=WaitingListStatus.NOT_ON_LIST,
-    )
-    waiting_list_position = models.PositiveIntegerField(
-        blank=True, null=True, editable=False
-    )
-    notification_sent_at = models.DateTimeField(blank=True, null=True)
-    notification_expires_at = models.DateTimeField(blank=True, null=True)
-    response_received_at = models.DateTimeField(blank=True, null=True)
-    # Single-use magic-link token for the "a spot is available" email — the
-    # member accepts/declines their offer WITHOUT logging in (mirrors the
-    # invitation flow). Set when the offer is made; cleared on accept / decline /
-    # expiry so a stale link can't be replayed.
-    notification_token = models.UUIDField(
-        blank=True, null=True, db_index=True, editable=False
-    )
-
-    class Meta:
-        abstract = True
-
-    def clean(self) -> None:
-        super().clean()
-        # The spot-available notification cannot expire, nor can a response
-        # arrive, before the notification was sent. All three are DateTimeFields
-        # so the comparison is direct. NULL-tolerant: each pair is only enforced
-        # when both members are set. No DB CheckConstraint here — this is an
-        # abstract mixin (its Meta.constraints would not propagate to concrete
-        # subclasses).
-        if (
-            self.notification_sent_at is not None
-            and self.notification_expires_at is not None
-            and self.notification_expires_at < self.notification_sent_at
-        ):
-            raise ValidationError(
-                {
-                    "notification_expires_at": (
-                        "Notification expiry must be on or after the date the "
-                        "notification was sent."
-                    )
-                }
-            )
-        if (
-            self.notification_sent_at is not None
-            and self.response_received_at is not None
-            and self.response_received_at < self.notification_sent_at
-        ):
-            raise ValidationError(
-                {
-                    "response_received_at": (
-                        "Response date must be on or after the date the "
-                        "notification was sent."
-                    )
-                }
-            )
-
-    def add_to_waiting_list(self) -> None:
-        self.on_waiting_list = True
-        self.waiting_list_status = self.WaitingListStatus.PENDING
-        self.save()
-
-    def notify_spot_available(self, expiry_days: int = 7) -> None:
-        self.waiting_list_status = self.WaitingListStatus.SPOT_AVAILABLE
-        self.notification_sent_at = timezone.now()
-        self.notification_expires_at = timezone.now() + timedelta(days=expiry_days)
-        # Fresh single-use token per offer — a re-offer invalidates any old link.
-        self.notification_token = uuid.uuid4()
-        self.save()
-
-    def confirm_spot(self) -> None:
-        self.waiting_list_status = self.WaitingListStatus.CONFIRMED
-        self.response_received_at = timezone.now()
-        self.on_waiting_list = False
-        self.notification_token = None  # link consumed
-        self.save()
-
-    def decline_spot(self) -> None:
-        self.waiting_list_status = self.WaitingListStatus.DECLINED
-        self.response_received_at = timezone.now()
-        self.on_waiting_list = False
-        self.notification_token = None  # link consumed
-        self.save()
-
-    def mark_as_expired(self) -> None:
-        self.waiting_list_status = self.WaitingListStatus.EXPIRED
-        self.on_waiting_list = False
-        self.notification_token = None  # link dead
-        self.save()
-
-    @property
-    def is_awaiting_confirmation(self) -> bool:
-        return self.waiting_list_status == self.WaitingListStatus.SPOT_AVAILABLE
-
-    @property
-    def has_expired_notification(self) -> bool:
-        return (
-            self.notification_expires_at is not None
-            and timezone.now() > self.notification_expires_at
-            and self.waiting_list_status == self.WaitingListStatus.SPOT_AVAILABLE
-        )

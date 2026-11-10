@@ -19,6 +19,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ShareArticle, StockComparison, Storage, UnitEnum } from "@shared/api/generated/models";
+import { makeShareArticle, makeStorage } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 
 const NOW = vi.hoisted(() => {
@@ -111,10 +112,10 @@ import DocumentationCurrentStock from "../DocumentationCurrentStock";
 const TUESDAY = 1;
 const WEDNESDAY = 2;
 
-const CELLAR: Storage = { id: "st-cellar", name: "Cellar", is_active: true };
-const COLD_ROOM: Storage = { id: "st-cold-room", name: "Cold room", is_active: true };
+const CELLAR: Storage = makeStorage({ id: "st-cellar", name: "Cellar", is_active: true });
+const COLD_ROOM: Storage = makeStorage({ id: "st-cold-room", name: "Cold room", is_active: true });
 
-const article = (id: string, name: string, unit: UnitEnum): ShareArticle => ({
+const article = (id: string, name: string, unit: UnitEnum): ShareArticle => makeShareArticle({
   id, name, default_movement_unit: unit, is_active: true,
 });
 const CARROTS = article("art-carrots", "Carrots", "KG");

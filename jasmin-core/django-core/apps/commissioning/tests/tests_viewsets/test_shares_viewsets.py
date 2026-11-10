@@ -899,8 +899,8 @@ class TestShareBulkUpdateDayValidation:
         # The office grid has always sent this string for a blanked cell, so the
         # serializer has to keep taking it as "no day" instead of rejecting it.
         # A cleared day then falls back to the delivery day's default in
-        # ``Share.save`` — a NULL would drop the share out of every day-filtered
-        # list.
+        # ``Share.save`` — a NULL would cost the share its theoretical
+        # amounts.
         share = ShareFactory(year=2026, delivery_week=30)
         assert (
             self._put(api_client, {"washing_day": 4}).status_code == status.HTTP_200_OK
@@ -1879,6 +1879,45 @@ class TestVirtualComponentsViewSet:
             virtual_variation_id=virtual.id
         )
         assert component.quantity == Decimal("1.00")
+
+    @time_machine.travel(datetime.datetime(2027, 1, 1, 12, 0), tick=False)
+    def test_recomputes_the_weeks_not_yet_read_only(self, api_client, tenant):
+        """1 January 2027 lies in ISO week 53 of 2026, so week 52 is the
+        earliest one still written to; week 51's ledger is closed."""
+        virtual = ShareTypeVariationFactory(variation_type="virtual")
+        physical = ShareTypeVariationFactory(variation_type="physical")
+        day = SharesDeliveryDayFactory()
+        shares = {
+            (year, week): ShareFactory(
+                year=year,
+                delivery_week=week,
+                delivery_day=day,
+                share_type_variation=physical,
+            )
+            for year, week in ((2026, 51), (2026, 52), (2026, 53), (2027, 2))
+        }
+
+        with mock.patch(
+            "apps.commissioning.services.recompute.recompute_shares"
+        ) as recompute_shares:
+            resp = api_client.post(
+                self.URL,
+                {
+                    "virtual_variation": str(virtual.id),
+                    "components": [
+                        {"physical_variation": str(physical.id), "quantity": 2}
+                    ],
+                },
+                format="json",
+            )
+
+        assert resp.status_code == status.HTTP_201_CREATED
+        [recomputed], _ = recompute_shares.call_args
+        assert set(recomputed) == {
+            shares[(2026, 52)].id,
+            shares[(2026, 53)].id,
+            shares[(2027, 2)].id,
+        }
 
     def test_the_column_default_is_a_decimal(self):
         """The round-trip above cannot tell the defaults apart — Postgres

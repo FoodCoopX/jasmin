@@ -40,7 +40,7 @@ export default function ReplyComposer({ ticketId }: { ticketId: string }) {
   };
 
   return (
-    <Space.Compact style={{ width: "100%", marginTop: 12 }}>
+    <Space.Compact className="w-full mt-12">
       <Input.TextArea
         value={body}
         onChange={(event) => setBody(event.target.value)}

@@ -321,7 +321,8 @@ function pending<T>() {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
-  tenantSettings.values = {};
+  // The farm packs each size as its flag says, so the bread goes loose.
+  tenantSettings.values = { packing_mode: "MIXED" };
   viewport.mobile = false;
   printed.documents = [];
   printed.files = [];
@@ -460,7 +461,7 @@ describe("DeliveryStationsOverview tours", () => {
     ["de-DE", "1.250"],
     ["en-US", "1,250"],
   ])("writes the box counts in the farm's number format (%s)", async (locale, shown) => {
-    tenantSettings.values = { number_locale: locale };
+    tenantSettings.values = { packing_mode: "MIXED", number_locale: locale };
     const depot = stop("depot", 1, "Central depot", null, { [SMALL.key]: 980, [MEDIUM.key]: 1250 });
     farm.overviews[scope(TUESDAY)] = overview(TUESDAY, [tour(1, [SMALL, MEDIUM], [depot])]);
     renderPage();
@@ -479,6 +480,24 @@ describe("DeliveryStationsOverview tours", () => {
     await waitFor(() => expect(printed.documents).toHaveLength(1));
     const [firstTour] = printed.documents[0].props.tours as TourOverview[];
     expect(firstTour.columns).toEqual([MEDIUM_WITH_HONEY, SMALL, HONEY_ONLY, MEDIUM]);
+  });
+
+  it("boxes every size where the farm packs everything in boxes, whatever its flag", async () => {
+    tenantSettings.values = { packing_mode: "BOXES" };
+    renderPage();
+    await screen.findByText("Farm shop");
+
+    expect(headerRowsOf(1)[0]).toContain("Bread");
+  });
+
+  it("lists no boxes where the farm packs every share loose", async () => {
+    tenantSettings.values = { packing_mode: "BULK" };
+    renderPage();
+    await waitFor(() => expect(api.toursOverview).toHaveBeenCalled());
+    await act(() => flushMicrotasks());
+
+    expect(screen.getByText(NO_DELIVERIES)).toBeInTheDocument();
+    expect(tourHeadings()).toEqual([]);
   });
 
   it("shows the bread boxes once bread is packed into the boxes", async () => {
@@ -547,7 +566,7 @@ describe("DeliveryStationsOverview tours", () => {
 
 describe("DeliveryStationsOverview for a farm that uploads its weekly share amounts", () => {
   beforeEach(() => {
-    tenantSettings.values = { uploads_weekly_share_amount: true };
+    tenantSettings.values = { packing_mode: "MIXED", uploads_weekly_share_amount: true };
     farm.overviews[scope(TUESDAY)] = overview(TUESDAY, UPLOADED_TUESDAY_TOURS);
   });
 
@@ -622,7 +641,7 @@ describe("DeliveryStationsOverview for a farm that uploads its weekly share amou
     ["de-DE", "1.250"],
     ["en-US", "1,250"],
   ])("writes the share counts in the farm's number format (%s)", async (locale, shown) => {
-    tenantSettings.values = { uploads_weekly_share_amount: true, number_locale: locale };
+    tenantSettings.values = { packing_mode: "MIXED", uploads_weekly_share_amount: true, number_locale: locale };
     const depot = stop("depot", 1, "Central depot", null, shares(980, 1250, 0, 3));
     farm.overviews[scope(TUESDAY)] = overview(TUESDAY, [tour(1, [], [depot])]);
     renderPage();
@@ -667,7 +686,7 @@ describe("DeliveryStationsOverview choosing the day", () => {
   });
 
   it("dates the delivery days in the farm's date format", async () => {
-    tenantSettings.values = { date_format: "YYYY-MM-DD" };
+    tenantSettings.values = { packing_mode: "MIXED", date_format: "YYYY-MM-DD" };
     renderPage();
     await screen.findByText("Farm shop");
 

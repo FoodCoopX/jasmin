@@ -151,8 +151,8 @@ class ShareArticleNetPriceSerializer(
 
 class CrateSerializer(DeletableMixin, serializers.ModelSerializer):
     # ``price`` and ``tax_rate`` are NOT model columns — they are pulled from
-    # the active ``CrateNetPrice`` row by the ``?get_price_info=true`` annotation
-    # in ``CrateViewSet.get_queryset`` (``get_current_price_annotations``).
+    # the ``CrateNetPrice`` row active on ``?price_date`` (today without one)
+    # by the ``?get_price_info=true`` annotation in ``CrateViewSet.get_queryset``.
     # Without that query param the keys are absent — hence
     # ``required=False, allow_null=True``.
     price = serializers.DecimalField(

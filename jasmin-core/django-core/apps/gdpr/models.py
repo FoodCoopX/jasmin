@@ -366,6 +366,11 @@ class DeletionRequest(AdminConfirmableMixin, JasminModel):
     def __str__(self) -> str:
         return f"DeletionRequest<{self.requested_email} {self.state}>"
 
+    def save(self, *args, **kwargs):
+        if not self.token_expires_at:
+            self.token_expires_at = timezone.now() + DELETION_TOKEN_TTL
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
         """Enforce the lifecycle timestamp ordering.
 
@@ -447,11 +452,6 @@ class DeletionRequest(AdminConfirmableMixin, JasminModel):
                     "request was made."
                 }
             )
-
-    def save(self, *args, **kwargs):
-        if not self.token_expires_at:
-            self.token_expires_at = timezone.now() + DELETION_TOKEN_TTL
-        super().save(*args, **kwargs)
 
     # ------------------------------------------------------------------ #
     # Computed helpers — read-only convenience for views/serializers     #

@@ -46,7 +46,8 @@ def _settings(tenant, **kwargs) -> TenantSettings:
 
 @pytest.mark.django_db
 class TestAssertWithinMinMaxScope:
-    """Verify the new exemption logic on the existing per-share guard."""
+    """The per-share guard holds confirmed members to the bounds and exempts
+    trial members, pending applicants and departed members."""
 
     def test_trial_member_can_create_share_below_minimum(self, tenant):
         _settings(tenant, min_number_coop_shares=3, max_number_coop_shares=10)

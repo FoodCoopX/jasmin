@@ -1,7 +1,7 @@
 """Writes of one order line move its offer's stock exactly once.
 
 ``update_order_content`` and ``delete_order_content`` read the line's amount
-under the line's row lock, taken after its offer's
+under the line's row lock, taken after its offer's and its order's
 (``services/order_content_locks.lock_order_content``). Two writes of one line
 that both read it before either commits, a double save on the orders grid say,
 then see each other's result instead of both moving the offer's stock by the
@@ -31,7 +31,12 @@ from django.db import DatabaseError, connection, connections, transaction
 from django.db.transaction import TransactionManagementError
 from django.test.utils import CaptureQueriesContext
 
-from apps.commissioning.errors import OrderContentChanged, OrderContentNotFound
+from apps.commissioning.errors import (
+    FinalizedError,
+    OrderContentChanged,
+    OrderContentNotFound,
+    OrderNotFound,
+)
 from apps.commissioning.models import (
     Offer,
     OfferGroup,
@@ -40,6 +45,7 @@ from apps.commissioning.models import (
     ShareArticle,
 )
 from apps.commissioning.services import order_content_locks
+from apps.commissioning.services.delivery_note_service import DeliveryNoteService
 from apps.commissioning.services.order_content_locks import lock_order_content
 from apps.commissioning.services.order_content_service import OrderContentService
 from apps.commissioning.tests.factories import (
@@ -47,20 +53,23 @@ from apps.commissioning.tests.factories import (
     OrderContentFactory,
     OrderFactory,
 )
+from core.errors import ConflictError
 
 # The rebuild of a line's harvest and storage movements has nothing to do with
 # its offer's stock, and needs storages these tests don't set up.
 _RECOMPUTE = "apps.commissioning.services.recompute.recompute_order_contents"
-_STORED_OFFER_ID = "apps.commissioning.services.order_content_locks._stored_offer_id"
+_STORED_PARENTS = "apps.commissioning.services.order_content_locks._stored_parents"
+_LOCKED = ("commissioning_offer", "commissioning_order", "commissioning_ordercontent")
 
 
 def _locked_tables(captured: CaptureQueriesContext) -> list[str]:
-    """The offer and order-line tables, in the order their rows were locked."""
+    """The offer, order and order-line tables, in the order their rows were
+    locked."""
     tables = []
     for query in captured.captured_queries:
         if "FOR UPDATE" not in query["sql"]:
             continue
-        for table in ("commissioning_offer", "commissioning_ordercontent"):
+        for table in _LOCKED:
             if f'FROM "{table}"' in query["sql"]:
                 tables.append(table)
     return tables
@@ -68,9 +77,10 @@ def _locked_tables(captured: CaptureQueriesContext) -> list[str]:
 
 @pytest.mark.django_db
 class TestLockOrder:
-    """The offer is locked before the line, the order creating a line takes."""
+    """The offer, then the order, then the line: the order creating a line
+    takes, and finalizing an order takes the order before its lines."""
 
-    def test_a_save_locks_the_offer_before_the_line(self, tenant):
+    def test_a_save_locks_the_offer_and_the_order_before_the_line(self, tenant):
         offer = OfferFactory(amount=Decimal("90"))
         line = OrderContentFactory(
             offer=offer, share_article=None, amount=Decimal("10")
@@ -81,12 +91,9 @@ class TestLockOrder:
                 order_content_id=line.pk, amount=Decimal("15")
             )
 
-        assert _locked_tables(captured)[:2] == [
-            "commissioning_offer",
-            "commissioning_ordercontent",
-        ]
+        assert _locked_tables(captured)[:3] == list(_LOCKED)
 
-    def test_a_delete_locks_the_offer_before_the_line(self, tenant):
+    def test_a_delete_locks_the_offer_and_the_order_before_the_line(self, tenant):
         offer = OfferFactory(amount=Decimal("90"))
         line = OrderContentFactory(
             offer=offer, share_article=None, amount=Decimal("10")
@@ -95,10 +102,121 @@ class TestLockOrder:
         with CaptureQueriesContext(connection) as captured:
             OrderContentService.delete_order_content(line.pk)
 
-        assert _locked_tables(captured)[:2] == [
-            "commissioning_offer",
-            "commissioning_ordercontent",
-        ]
+        assert _locked_tables(captured)[:3] == list(_LOCKED)
+
+    def test_a_new_line_locks_the_offer_and_then_its_order(self, tenant):
+        offer = OfferFactory(amount=Decimal("90"))
+        order = OrderFactory()
+
+        with patch(_RECOMPUTE), CaptureQueriesContext(connection) as captured:
+            OrderContentService.create_order_with_content_and_crates(
+                reseller=order.reseller,
+                year=order.year,
+                delivery_week=order.delivery_week,
+                day_number=order.day_number,
+                offer=offer,
+                amount=Decimal("5"),
+            )
+
+        assert _locked_tables(captured)[:2] == list(_LOCKED[:2])
+
+    def test_a_new_line_meets_its_order_as_the_lock_finds_it(self, tenant):
+        # Another write finalizes the order after the line looked it up and
+        # before the lock: the line sees it finalized and stays out.
+        offer = OfferFactory(amount=Decimal("90"))
+        order = OrderFactory()
+        select_for_update = Order.objects.select_for_update
+        fired = []
+
+        def finalized_meanwhile(*args: Any, **kwargs: Any) -> Any:
+            if not fired:
+                fired.append(True)
+                Order.objects.filter(pk=order.pk).update(is_finalized=True)
+            return select_for_update(*args, **kwargs)
+
+        with (
+            patch(_RECOMPUTE),
+            patch.object(
+                Order.objects, "select_for_update", side_effect=finalized_meanwhile
+            ),
+            pytest.raises(FinalizedError),
+        ):
+            OrderContentService.create_order_with_content_and_crates(
+                reseller=order.reseller,
+                year=order.year,
+                delivery_week=order.delivery_week,
+                day_number=order.day_number,
+                offer=offer,
+                amount=Decimal("5"),
+            )
+
+        assert fired
+        assert not OrderContent.objects.filter(order=order).exists()
+
+    def test_a_delivery_note_locks_the_sequences_then_the_order_then_reads_lines(
+        self, tenant
+    ):
+        # A finalization holds the order sequence while it bumps a draft order's
+        # number, so the sequences come before the order's row; the row before
+        # the lines are copied.
+        line = OrderContentFactory(amount=Decimal("10"))
+
+        with CaptureQueriesContext(connection) as captured:
+            DeliveryNoteService.create_from_order(line.order)
+
+        sqls = [query["sql"] for query in captured.captured_queries]
+
+        def first(predicate) -> int:
+            return next(i for i, sql in enumerate(sqls) if predicate(sql))
+
+        note_sequence = first(lambda sql: "numbered_doc:DeliveryNoteReseller" in sql)
+        order_sequence = first(lambda sql: "numbered_doc:Order" in sql)
+        order_row = first(
+            lambda sql: "FOR UPDATE" in sql and 'FROM "commissioning_order"' in sql
+        )
+        lines_read = first(lambda sql: 'FROM "commissioning_ordercontent"' in sql)
+        assert note_sequence < order_sequence < order_row < lines_read
+
+    def test_a_delivery_note_checks_the_order_as_it_stands_under_the_lock(self, tenant):
+        # The caller loaded the order before another request gave it a
+        # delivery note (and finalized it): the check reads the locked row.
+        line = OrderContentFactory(amount=Decimal("10"))
+        stale = Order.objects.select_related("delivery_note").get(pk=line.order_id)
+        DeliveryNoteService.create_from_order(Order.objects.get(pk=line.order_id))
+
+        with pytest.raises(ConflictError) as raised:
+            DeliveryNoteService.create_from_order(stale)
+
+        assert raised.value.code == "delivery_note.already_exists"
+
+    def test_a_delivery_note_for_an_order_deleted_meanwhile_is_not_found(self, tenant):
+        order = OrderFactory()
+        stale = Order.objects.get(pk=order.pk)
+        Order.objects.filter(pk=order.pk).delete()
+
+        with pytest.raises(OrderNotFound):
+            DeliveryNoteService.create_from_order(stale)
+
+    def test_an_order_with_its_number_saves_without_the_sequence_lock(self, tenant):
+        # A line write holding the order's row may save the order (its days);
+        # waiting for the sequence then would invert a finalization's order.
+        order = OrderFactory()
+        assert order.number
+
+        with CaptureQueriesContext(connection) as captured:
+            order.save()
+
+        assert not any("pg_advisory" in q["sql"] for q in captured.captured_queries)
+
+    def test_a_new_order_takes_the_sequence_lock_for_its_number(self, tenant):
+        with CaptureQueriesContext(connection) as captured:
+            order = OrderFactory()
+
+        assert order.number
+        assert any(
+            "pg_advisory" in q["sql"] and "numbered_doc:Order" in q["sql"]
+            for q in captured.captured_queries
+        )
 
 
 @pytest.mark.django_db
@@ -118,7 +236,7 @@ class TestLockOrderContent:
         assert locked.offer.pk == offer.pk
         assert locked.offer.amount == Decimal("70")
 
-    def test_a_line_without_an_offer_locks_the_line_alone(self, tenant):
+    def test_a_line_without_an_offer_locks_its_order_and_the_line(self, tenant):
         line = OrderContentFactory(amount=Decimal("10"))
 
         with CaptureQueriesContext(connection) as captured:
@@ -126,7 +244,8 @@ class TestLockOrderContent:
 
         assert locked.pk == line.pk
         assert locked.offer is None
-        assert _locked_tables(captured) == ["commissioning_ordercontent"]
+        assert locked.order.pk == line.order_id
+        assert _locked_tables(captured) == list(_LOCKED[1:])
 
     def test_a_line_moved_to_another_offer_is_locked_with_that_offer(self, tenant):
         offer = OfferFactory(amount=Decimal("90"))
@@ -138,13 +257,14 @@ class TestLockOrderContent:
         # The first read still finds the line on ``offer``, as when another
         # write moved it after that read.
         with patch(
-            _STORED_OFFER_ID, side_effect=[offer.pk, other_offer.pk]
-        ) as stored_offer_id:
+            _STORED_PARENTS,
+            side_effect=[(offer.pk, line.order_id), (other_offer.pk, line.order_id)],
+        ) as stored_parents:
             locked = lock_order_content(line.pk)
 
         assert locked.offer is not None
         assert locked.offer.pk == other_offer.pk
-        assert stored_offer_id.call_count == 2
+        assert stored_parents.call_count == 2
 
     def test_gives_up_when_the_line_moves_on_every_attempt(self, tenant):
         offer = OfferFactory(amount=Decimal("90"))
@@ -154,12 +274,14 @@ class TestLockOrderContent:
         )
 
         with (
-            patch(_STORED_OFFER_ID, return_value=offer.pk) as stored_offer_id,
+            patch(
+                _STORED_PARENTS, return_value=(offer.pk, line.order_id)
+            ) as stored_parents,
             pytest.raises(OrderContentChanged),
         ):
             lock_order_content(line.pk)
 
-        assert stored_offer_id.call_count == order_content_locks._LOCK_ATTEMPTS
+        assert stored_parents.call_count == order_content_locks._LOCK_ATTEMPTS
 
     def test_a_missing_line_raises_does_not_exist(self, tenant):
         with pytest.raises(OrderContent.DoesNotExist):
@@ -345,7 +467,9 @@ class TestConcurrentWritesOfOneLine:
     ):
         line_pk = committed.line.pk
         other_offer = committed.other_offer
-        move_to_other_offer = _save(line_pk, "10", offer=other_offer)
+
+        def move_to_other_offer() -> None:
+            OrderContent.objects.filter(pk=line_pk).update(offer=other_offer)
 
         with _runs_before_the_first_offer_lock(tenant.schema_name, move_to_other_offer):
             _save(line_pk, "15")()
@@ -364,7 +488,11 @@ class TestConcurrentWritesOfOneLine:
         OrderContent.objects.filter(pk=committed.line.pk).update(offer=other_offer)
 
         with transaction.atomic():
-            with patch(_STORED_OFFER_ID, side_effect=[offer.pk, other_offer.pk]):
+            order_id = committed.line.order_id
+            with patch(
+                _STORED_PARENTS,
+                side_effect=[(offer.pk, order_id), (other_offer.pk, order_id)],
+            ):
                 locked = lock_order_content(committed.line.pk)
             stale_offer_free = _in_other_thread(
                 tenant.schema_name, lambda: _offer_lock_is_free(offer.pk)

@@ -2,6 +2,8 @@ import { renderHook } from "@testing-library/react";
 import type { TFunction } from "i18next";
 import { describe, expect, it } from "vitest";
 
+import { makeShareArticle } from "@/test/modelFixtures";
+
 import { usePlanningSummaryData } from "../usePlanningSummaryData";
 import type { ShareArticleOption } from "../useShareArticles";
 import { large, tuesday } from "../columns/__tests__/useDeliveryDayColumns.fixtures";
@@ -30,14 +32,16 @@ const sumsFor = (data: Record<string, unknown>[]) =>
   summaryFor(data).dayVariationSums[cell];
 
 const carrots: ShareArticleOption = {
-  id: "carrots",
+  ...makeShareArticle({
+    id: "carrots",
+    name: "Carrots",
+    default_movement_unit: "KG",
+    net_price_for_boxes_kg: "2.50",
+    net_price_for_boxes_pieces: "0.80",
+    net_price_for_boxes_bunch: "1.20",
+  }),
   value: "carrots",
   label: "Carrots",
-  name: "Carrots",
-  default_movement_unit: "KG",
-  net_price_for_boxes_kg: "2.50",
-  net_price_for_boxes_pieces: "0.80",
-  net_price_for_boxes_bunch: "1.20",
 };
 
 const pricesFor = (data: Record<string, unknown>[]) =>

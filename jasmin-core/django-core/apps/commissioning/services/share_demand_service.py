@@ -14,9 +14,6 @@ flag ``uploads_weekly_share_amount`` (already exposed in
 
 * ``False`` (default) → ``SubscriptionDemandBackend``
 * ``True``  → ``ExternalDemandBackend``
-
-Refactor downstream services (forecast, stock, packing, …) to call this
-service instead of querying ``ShareDelivery`` / ``Subscription`` directly.
 """
 
 from __future__ import annotations

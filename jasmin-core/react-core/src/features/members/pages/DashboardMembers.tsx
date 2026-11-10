@@ -77,9 +77,8 @@ export default function DashboardMembers() {
           allowClear={false}
         />
         <Card
-          className="dark-green-border"
+          className="dark-green-border mt-1em"
           title={t("statistics.chart_members_over_time")}
-          style={{ marginTop: "1em" }}
         >
           <StatsAreaChart
             data={growthSeries}

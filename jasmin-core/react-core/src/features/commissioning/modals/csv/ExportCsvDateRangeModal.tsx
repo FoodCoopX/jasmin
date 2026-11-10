@@ -121,7 +121,7 @@ export default function ExportCsvDateRangeModal({
     >
       <Space direction="vertical" size="middle" className="w-full">
         <div>
-          <div style={{ marginBottom: 8 }}>
+          <div className="mb-8">
             {t("common.select_date_range")}
           </div>
           <RangePicker

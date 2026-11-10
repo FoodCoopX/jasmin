@@ -50,6 +50,10 @@ vi.mock("@hooks/index", async () => {
     useTenant: () => tenant,
     useCapability: (name: string) => capabilities[name] ?? true,
     useShareTypes: () => ({ shareTypes: [] }),
+    useWashingCleaningVisibility: () => ({
+      showsWashing: settings.show_washing !== false,
+      showsCleaning: settings.show_cleaning !== false,
+    }),
   };
 });
 
@@ -171,6 +175,17 @@ describe("CommissioningSidebar", () => {
     expect(routes.has("/commissioning/commissioning-list-packing")).toBe(true);
   });
 
+  it("drops the washing and cleaning lists on a farm that hides them", () => {
+    settings.show_washing = false;
+    settings.show_cleaning = false;
+
+    const routes = linkedRoutes();
+
+    expect(routes.has("/commissioning/washing-list")).toBe(false);
+    expect(routes.has("/commissioning/cleaning-list")).toBe(false);
+    expect(routes.has("/commissioning/harvesting-list")).toBe(true);
+  });
+
   it("offers the share import in the import-shares mode", () => {
     settings.uploads_weekly_share_amount = true;
 
@@ -184,7 +199,7 @@ describe("CommissioningSidebar", () => {
     expect(linkedRoutes().has(shareImport)).toBe(false);
   });
 
-  it("drops the delivery-station pages where a host keeps its pickup locations", () => {
+  it("keeps only the members' notices where a host keeps its pickup locations", () => {
     capabilities.delivery_stations = false;
 
     const routes = linkedRoutes();
@@ -192,13 +207,38 @@ describe("CommissioningSidebar", () => {
     for (const route of deliveryStationPages) {
       expect(routes.has(route), route).toBe(false);
     }
+    expect(routes.has("/commissioning/station-notices")).toBe(true);
     expect(routes.has("/commissioning/list-storages")).toBe(true);
+  });
+
+  it("gives the members' notices a page of their own where the farm imports its share amounts", () => {
+    settings.uploads_weekly_share_amount = true;
+
+    const routes = linkedRoutes();
+
+    expect(routes.has("/commissioning/delivery-stations-details")).toBe(true);
+    expect(routes.has("/commissioning/station-notices")).toBe(true);
+  });
+
+  it("offers the members' notices on the pickup lists, not on a page of their own", () => {
+    const routes = linkedRoutes();
+
+    expect(routes.has("/commissioning/delivery-stations-details")).toBe(true);
+    expect(routes.has("/commissioning/station-notices")).toBe(false);
   });
 
   it("links the bulk packing list in bulk packing", () => {
     settings.packing_mode = "BULK";
 
     expect(linkedRoutes().has(bulkPackingList)).toBe(true);
+  });
+
+  it("drops the tour lists where every share is packed loose", () => {
+    settings.packing_mode = "BULK";
+    expect(linkedRoutes().has("/commissioning/delivery-stations-overview")).toBe(false);
+
+    settings.packing_mode = "MIXED";
+    expect(linkedRoutes().has("/commissioning/delivery-stations-overview")).toBe(true);
   });
 
   it("links the bulk packing list in mixed packing while a variation is packed in bulk", () => {

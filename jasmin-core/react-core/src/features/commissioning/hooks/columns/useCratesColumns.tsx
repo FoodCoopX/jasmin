@@ -39,21 +39,28 @@ interface CratesColumnOptions {
   disableCrateType?: (record: Record<string, unknown>) => boolean;
   columnsPrices?: unknown[];
   without_price?: boolean;
+  /** The date a picked crate's price and VAT rate are those of — the
+   *  document's delivery or invoice date; today when left out. */
+  priceDate?: string | null;
   [key: string]: unknown;
 }
 
 export const useCratesColumns = (options: CratesColumnOptions = { without_price: false }) => {
   const { t } = useTranslation();
-  const { crates } = useCrates({ includeNullOption: false, get_price_info: true });
-  const { currencySymbol, formatCurrency } = useCurrency();
-  const { format } = useNumberFormat();
-  const { noteColumn } = useNoteColumn({ inputType: "optional" });
-
   const {
     disableCrateType = editableOnlyOnCreate,
     without_price = false,
+    priceDate,
     ...columnOverrides
   } = options;
+  const { crates } = useCrates({
+    includeNullOption: false,
+    get_price_info: true,
+    price_date: priceDate ?? undefined,
+  });
+  const { currencySymbol, formatCurrency } = useCurrency();
+  const { format } = useNumberFormat();
+  const { noteColumn } = useNoteColumn({ inputType: "optional" });
 
   const handleCrateChange = useCallback(
     (crateValue: unknown, record: Record<string, unknown>, form: { setFieldsValue: (values: Record<string, unknown>) => void }) => {
@@ -87,10 +94,7 @@ export const useCratesColumns = (options: CratesColumnOptions = { without_price:
         required: true,
         align: "left",
         width: "16em",
-        // CrateOption's union includes the null "clear" placeholder shape,
-        // which SelectOption can't express (value: string | number) — same
-        // widening as useShareArticleColumn's options.
-        options: crates as unknown as SelectOption[],
+        options: crates,
         disabled: disableCrateType,
         onFieldChange: handleCrateChange,
         foreignKey: {

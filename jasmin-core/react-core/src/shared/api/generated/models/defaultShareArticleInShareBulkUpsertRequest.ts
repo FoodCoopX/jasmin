@@ -5,12 +5,13 @@
  * CSA Management Platform API
  * OpenAPI spec version: 1.0.0
  */
-import type { DefaultShareArticleInShareBulkEntry } from './defaultShareArticleInShareBulkEntry';
+import type { DefaultShareArticleInShareBulkEntryRequest } from './defaultShareArticleInShareBulkEntryRequest';
 
 /**
  * Payload accepted by ``DefaultShareArticleInShareViewSet.bulk_upsert``.
  */
 export interface DefaultShareArticleInShareBulkUpsertRequest {
+  /** @minLength 1 */
   share_article: string;
-  entries: DefaultShareArticleInShareBulkEntry[];
+  entries: DefaultShareArticleInShareBulkEntryRequest[];
 }

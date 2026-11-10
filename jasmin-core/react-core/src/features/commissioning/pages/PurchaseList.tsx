@@ -175,7 +175,7 @@ export default function PurchaseList() {
       return {
         year: nextWeek.year,
         delivery_week: nextWeek.week,
-        is_past: false,
+        is_past: isWeekInPast(nextWeek.year, nextWeek.week),
         model: "purchase",
         seller: selectedReseller ?? undefined,
         is_preparation_lists: true,
