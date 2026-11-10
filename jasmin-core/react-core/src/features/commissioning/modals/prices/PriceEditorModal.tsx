@@ -65,7 +65,7 @@ export interface PriceEditorModalProps<T, TCreate = T, TUpdate = TCreate> {
    *  for short time-bound lists that never overflow a page. */
   pagination?: boolean;
 
-  columns: EditableColumnConfig[];
+  columns: EditableColumnConfig<TableRecord>[];
 
   listHook: ListHook<T, Record<string, string>>;
   getListQueryKey: GetListQueryKey<Record<string, string>>;

@@ -44,6 +44,7 @@ import {
 } from "@shared/tables";
 import type {
   ApiFunctions,
+  EditableColumnConfig,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import {
@@ -374,7 +375,7 @@ export default function Forecast() {
     [fruitVariationKeys],
   );
 
-  const shareTypeVariationColumns = useMemo(() => {
+  const shareTypeVariationColumns = useMemo<EditableColumnConfig<TableRecord>[]>(() => {
     return shareTypeVariations.map((variation) => ({
       title: (
         <>
@@ -396,7 +397,7 @@ export default function Forecast() {
     getShareTypeVariationSizeLabel,
   ]);
 
-  const shareTypeVariationFruitsColumns = useMemo(() => {
+  const shareTypeVariationFruitsColumns = useMemo<EditableColumnConfig<TableRecord>[]>(() => {
     return shareTypeVariationsFruits.map((variation) => ({
       title: (
         <>
@@ -418,7 +419,7 @@ export default function Forecast() {
     getShareTypeVariationSizeLabel,
   ]);
 
-  const offerGroupColumns = useMemo(() => {
+  const offerGroupColumns = useMemo<EditableColumnConfig<TableRecord>[]>(() => {
     return offerGroups.map((group) => ({
       title: (
         <>

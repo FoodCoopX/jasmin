@@ -350,6 +350,19 @@ CREW_MATRIX: list[tuple[str, str, str, str]] = [
         "gardener",
         "ok",
     ),
+    # ======= commissioning: documentation =======
+    # ------- Washing amounts (Staff read, Office write) -------
+    ("/api/commissioning/theoretical_wash_amounts/", "get", "staff", "ok"),
+    ("/api/commissioning/theoretical_wash_amounts/", "get", "gardener", "ok"),
+    ("/api/commissioning/theoretical_wash_amounts/", "post", "staff", "deny"),
+    ("/api/commissioning/theoretical_wash_amounts/", "post", "gardener", "deny"),
+    ("/api/commissioning/theoretical_wash_amounts/", "post", "office", "4xx"),
+    # ------- Cleaning amounts (Staff read, Office write) -------
+    ("/api/commissioning/theoretical_clean_amounts/", "get", "staff", "ok"),
+    ("/api/commissioning/theoretical_clean_amounts/", "get", "gardener", "ok"),
+    ("/api/commissioning/theoretical_clean_amounts/", "post", "staff", "deny"),
+    ("/api/commissioning/theoretical_clean_amounts/", "post", "gardener", "deny"),
+    ("/api/commissioning/theoretical_clean_amounts/", "post", "office", "4xx"),
     # ======= cultivation (Staff read, CanEditCultivation write) =======
     # The write gate admits the gardener and the office but not staff.
     # ------- Bed types -------

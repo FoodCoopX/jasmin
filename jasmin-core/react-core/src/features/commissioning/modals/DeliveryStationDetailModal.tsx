@@ -429,7 +429,7 @@ const DeliveryStationDetailModal: FC<DeliveryStationDetailModalProps> = ({
             />
           ),
         },
-      ] as EditableColumnConfig[],
+      ] satisfies EditableColumnConfig<StationDayRecord>[],
     [
       t,
       activeStatusColumn,

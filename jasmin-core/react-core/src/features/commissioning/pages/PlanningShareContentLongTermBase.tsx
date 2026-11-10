@@ -499,7 +499,7 @@ export default function PlanningShareContentLongTermBase({
                 return undefined;
               },
             },
-          ] as EditableColumnConfig<TableRecord>[])
+          ] satisfies EditableColumnConfig<TableRecord>[])
         : []),
       {
         title: <>{t("commissioning.KW")}</>,

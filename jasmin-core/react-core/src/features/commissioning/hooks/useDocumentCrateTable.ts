@@ -4,7 +4,6 @@ import { sameCellValue } from "@shared/tables/BasicEditableTable/duplicateErrors
 import { RowSaveRefused } from "@shared/tables/BasicEditableTable/RowSaveRefused";
 import type {
   ApiFunctions,
-  EditableColumnConfig,
   TableRecord,
 } from "@shared/tables/BasicEditableTable/types";
 import { useCratesColumns } from "./columns/useCratesColumns";
@@ -102,7 +101,7 @@ export function useDocumentCrateTable({
         column.key === "crate_type_name"
           ? { ...column, options: unlistedCrateTypes }
           : column,
-      ) as EditableColumnConfig[],
+      ),
     [cratesColumns, unlistedCrateTypes],
   );
 

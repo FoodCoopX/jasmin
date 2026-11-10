@@ -184,7 +184,7 @@ function useOrderDayColumns(
               },
             ],
           },
-        ] as EditableColumnConfig<TableRecord>[]
+        ] satisfies EditableColumnConfig<TableRecord>[]
       ).filter(isShownColumn),
     [t, weekdayChoices, renderWeekday, isShownColumn],
   );
@@ -435,7 +435,7 @@ export default function ConfigurationDeliveryDays() {
             width: "10em",
             align: "center",
           },
-        ] as EditableColumnConfig<TableRecord>[]
+        ] satisfies EditableColumnConfig<TableRecord>[]
       ).filter(isShownColumn),
     [
       activeStatusColumn,

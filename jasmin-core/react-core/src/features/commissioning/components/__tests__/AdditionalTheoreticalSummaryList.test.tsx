@@ -304,7 +304,7 @@ const CLEANING: PageConfig = {
   additionalTooltip: "tooltip.additional_theoretical_clean_amount",
   amountHeader: "commissioning.amount_cleaning_list", download: "download.cleaning_list",
   ownArticle: CELERIAC, ownTotal: "14,0 commissioning.units.pcs", otherArticle: LEEKS,
-  editors: ["gardener", "staff", "office", "admin"], readers: ["management", "member"],
+  editors: ["office", "admin"], readers: ["gardener", "staff", "management", "member"],
 };
 
 const PAGES = [WASHING, CLEANING];

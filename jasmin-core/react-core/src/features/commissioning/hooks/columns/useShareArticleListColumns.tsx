@@ -39,9 +39,9 @@ interface UnitOptionLite {
 }
 
 interface UseShareArticleListColumnsArgs {
-  isActiveColumn: Record<string, unknown>;
+  isActiveColumn: EditableColumnConfig<TableRecord>;
   /** The prices button column; null leaves it out. */
-  priceModalColumn: Record<string, unknown> | null;
+  priceModalColumn: EditableColumnConfig<TableRecord> | null;
   unitOptions: UnitOptionLite[];
   crates: CrateOption[];
   visibleShareOptions: ShareOptionLite[];
@@ -52,10 +52,10 @@ interface UseShareArticleListColumnsArgs {
   packingBulk: boolean;
   renderHarvestNumber: (
     decimals: number,
-  ) => (value: number, record: TableRecord) => ReactNode;
+  ) => (value: unknown, record: TableRecord) => ReactNode;
   renderPurchaseNumber: (
     decimals: number,
-  ) => (value: number, record: TableRecord) => ReactNode;
+  ) => (value: unknown, record: TableRecord) => ReactNode;
 }
 
 export function useShareArticleListColumns({
@@ -121,12 +121,12 @@ export function useShareArticleListColumns({
           options: unitOptions,
           disabled: isFieldDisabled,
 
-          render: (value: string) => {
+          render: (value: unknown) => {
             const unitOption = unitOptions.find(
               (option: { value: string; label: string }) =>
                 option.value === value,
             );
-            return unitOption ? unitOption.label : value;
+            return unitOption ? unitOption.label : String(value ?? "");
           },
         },
         {
@@ -155,7 +155,7 @@ export function useShareArticleListColumns({
               (opt: { value: string }) =>
                 opt.value.toLowerCase() === activeFilter,
             )
-        ).map((opt: { value: string; label: string }, idx: number) => ({
+        ).map((opt: { value: string; label: string }, idx: number): EditableColumnConfig<TableRecord> => ({
           // A fragment, not the span itself: EditableTable sets a checkbox
           // column's title vertical only when it carries no className.
           title: (
@@ -296,7 +296,7 @@ export function useShareArticleListColumns({
           })),
         },
         ...(packingBulk
-          ? [
+          ? ([
               {
                 title: (
                   <span className="text-sm">
@@ -313,10 +313,10 @@ export function useShareArticleListColumns({
                 align: "center",
                 width: "7em",
                 className: "column-group-start",
-                render: (value: number) =>
+                render: (value: unknown) =>
                   value ? `${format(Number(value), 0)} %` : null,
               },
-            ]
+            ] satisfies EditableColumnConfig<TableRecord>[])
           : []),
         {
           title: (
@@ -338,7 +338,7 @@ export function useShareArticleListColumns({
           align: "center",
           width: "7em",
           className: "column-group-start",
-          render: (value: number) =>
+          render: (value: unknown) =>
             value ? `${format(Number(value), 0)} %` : null,
         },
         {
@@ -406,8 +406,8 @@ export function useShareArticleListColumns({
           },
           sortable: true,
           disabled: isHarvestDisabled,
-          render: (value: string, record: TableRecord) =>
-            isHarvestDisabled(record) ? null : (value ?? null),
+          render: (value: unknown, record: TableRecord) =>
+            isHarvestDisabled(record) ? null : String(value ?? ""),
         },
         {
           title: (
@@ -425,12 +425,12 @@ export function useShareArticleListColumns({
           fixed: true,
           options: unitOptions,
           className: "column-group-start",
-          render: (value: string) => {
+          render: (value: unknown) => {
             const unitOption = unitOptions.find(
               (option: { value: string; label: string }) =>
                 option.value === value,
             );
-            return unitOption ? unitOption.label : value;
+            return unitOption ? unitOption.label : String(value ?? "");
           },
         },
 
@@ -544,7 +544,7 @@ export function useShareArticleListColumns({
           disabled: isPurchaseDisabled,
           render: renderPurchaseNumber(0),
         },
-      ] as EditableColumnConfig<TableRecord>[],
+      ] satisfies EditableColumnConfig<TableRecord>[],
     [
       activeFilter,
       crates,

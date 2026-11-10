@@ -9,7 +9,7 @@ import {
   commissioningCrateNetPricesDestroy,
 } from "@shared/api/generated/commissioning/commissioning";
 import type { CrateNetPrice } from "@shared/api/generated/models/crateNetPrice";
-import type { EditableColumnConfig } from "@shared/tables/BasicEditableTable/types";
+import type { EditableColumnConfig, TableRecord } from "@shared/tables/BasicEditableTable/types";
 import PriceEditorModal, { type PriceModalApi } from "./PriceEditorModal";
 import { buildCurrencyPriceColumn, buildTaxRateColumn } from "./priceColumns";
 
@@ -51,7 +51,7 @@ export default function CratePriceModal({
 
   const { crates: defaultTaxRateCrates } = useDefaultTaxRates();
 
-  const columns = useMemo<EditableColumnConfig[]>(
+  const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
     () =>
       [
         activeStatusColumn,
@@ -66,7 +66,7 @@ export default function CratePriceModal({
           locale,
         }),
         buildTaxRateColumn(t, { locale }),
-      ] as EditableColumnConfig[],
+      ],
     [t, currencySymbol, locale, activeStatusColumn, validFromColumn, validUntilColumn],
   );
 

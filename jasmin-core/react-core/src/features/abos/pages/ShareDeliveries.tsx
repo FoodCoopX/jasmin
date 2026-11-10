@@ -367,7 +367,7 @@ export default function ShareDeliveries() {
                   donationJokerOverLimit(record),
                 ),
             },
-          ] as EditableColumnConfig<ShareDeliveryRecord>[])
+          ] satisfies EditableColumnConfig<ShareDeliveryRecord>[])
         : []),
       {
         title: <>{t("members.share_type_variation")}</>,

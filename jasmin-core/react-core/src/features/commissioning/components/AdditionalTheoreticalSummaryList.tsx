@@ -3,8 +3,8 @@
  * same documentation-summary page end-to-end — same summary endpoint
  * (``model: "washamount" | "cleanamount"``), same processed-data math,
  * same add-additional-amount mutation endpoints, same columns, toggles and
- * mobile/PDF wiring. Only the ``model``, the i18n labels, the PDF/mobile
- * components, and the edit-permission scope differ; those are config props.
+ * mobile/PDF wiring. Only the ``model``, the i18n labels and the PDF/mobile
+ * components differ; those are config props, as is who may edit.
  *
  * WashingList.tsx and CleaningList.tsx are thin shells that render this
  * with their own config. The data/state/invalidate boilerplate lives in
@@ -68,9 +68,8 @@ export interface AdditionalTheoreticalSummaryListConfig {
   /** ``washamount`` or ``cleanamount`` — drives the field names + endpoints. */
   model: "washamount" | "cleanamount";
   /**
-   * Whether the caller may add/edit rows. Computed by each shell from its
-   * OWN role hook — washing is office-only, cleaning is gardener/staff/
-   * office/admin. (Pre-existing drift, deliberately preserved per-page.)
+   * Whether the caller may add/edit rows, which each shell decides from the
+   * roles; both lists are the office's to edit.
    */
   canEdit: boolean;
   titleKey: string;

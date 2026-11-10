@@ -43,9 +43,7 @@ export default function ListPlots() {
 
   const columns = useMemo<EditableColumnConfig<PlotRow>[]>(
     () => [
-      // The shared column hook returns a loosely-typed config (inputType widened
-      // to string); cast the one hook column rather than loosen the whole array.
-      isActiveColumn as EditableColumnConfig<PlotRow>,
+      isActiveColumn,
       {
         title: <>{t("commissioning.name")}</>,
         dataIndex: "name",

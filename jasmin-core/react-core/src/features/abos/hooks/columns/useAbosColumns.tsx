@@ -568,7 +568,7 @@ export function useAbosColumns({
 
   const columns: EditableColumnConfig<AboRecord>[] = useMemo(
     () => [
-      activeStatusColumn as unknown as EditableColumnConfig<AboRecord>,
+      activeStatusColumn,
       {
         title: <div className="checkbox-column-title">Link</div>,
         dataIndex: "link",
@@ -639,7 +639,7 @@ export function useAbosColumns({
       },
 
       memberColumn,
-      sepaMandateColumn as unknown as EditableColumnConfig<AboRecord>,
+      sepaMandateColumn,
       {
         ...validFromColumn,
         // Override the generic Monday-only rule with the subscription one:
@@ -687,7 +687,7 @@ export function useAbosColumns({
               //     in ``computeValidUntil``.
               onFieldChange: handleIsTrialChange,
             },
-          ] as EditableColumnConfig<AboRecord>[])
+          ] satisfies EditableColumnConfig<AboRecord>[])
         : []),
       quantityColumn,
 
@@ -810,7 +810,7 @@ export function useAbosColumns({
               render: (value: unknown) =>
                 value ? formatDate(value as string) : "",
             },
-          ] as EditableColumnConfig<AboRecord>[])
+          ] satisfies EditableColumnConfig<AboRecord>[])
         : []),
       {
         title: <>{t("members.cancelled_effective_at")}</>,

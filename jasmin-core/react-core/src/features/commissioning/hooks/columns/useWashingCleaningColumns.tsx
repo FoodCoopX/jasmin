@@ -62,7 +62,7 @@ export const useWashingCleaningColumns = () => {
             inputType: "checkbox",
             required: false,
           },
-        ] as EditableColumnConfig<TableRecord>[]
+        ] satisfies EditableColumnConfig<TableRecord>[]
       ).filter(
         (column) =>
           (showsWashing || column.dataIndex !== "washing") &&

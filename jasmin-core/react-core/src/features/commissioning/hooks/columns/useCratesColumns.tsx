@@ -94,10 +94,7 @@ export const useCratesColumns = (options: CratesColumnOptions = { without_price:
         required: true,
         align: "left",
         width: "16em",
-        // CrateOption's union includes the null "clear" placeholder shape,
-        // which SelectOption can't express (value: string | number) — same
-        // widening as useShareArticleColumn's options.
-        options: crates as unknown as SelectOption[],
+        options: crates,
         disabled: disableCrateType,
         onFieldChange: handleCrateChange,
         foreignKey: {

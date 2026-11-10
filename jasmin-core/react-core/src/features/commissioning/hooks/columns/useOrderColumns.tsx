@@ -71,9 +71,7 @@ function orderCrateColumns(
   );
   return columns.map((col) => {
     if (col.key === "crate_type_name") {
-      // CrateOption's union includes the null "clear" placeholder shape,
-      // which SelectOption can't express — the widening useCratesColumns makes.
-      return { ...col, options: availableOptions as CrateColumn["options"] };
+      return { ...col, options: availableOptions };
     }
     if (col.key === "price_per_unit" || col.key === "rabatt") {
       return { ...col, disabled: holdsOfferBoundCrates };

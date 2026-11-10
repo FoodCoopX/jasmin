@@ -4,8 +4,7 @@ import { WashingListPDFGenerator } from "@features/commissioning/pdfs";
 import AdditionalTheoreticalSummaryList from "@features/commissioning/components/AdditionalTheoreticalSummaryList";
 
 export default function WashingList() {
-  // Washing is office-only (cleaning is broader — see CleaningList). This
-  // pre-existing permission drift is preserved deliberately per page.
+  // The crew reads the list; only office and admin plan washing amounts.
   const { isOffice } = useRoles();
 
   return (

@@ -236,7 +236,7 @@ export default function InvoiceModal({
   );
 
   const customEdit = useMemo(
-    () => makeContentCustomEdit(defaultTaxRateArticles),
+    () => makeContentCustomEdit<InvoiceContentRecord>(defaultTaxRateArticles),
     [defaultTaxRateArticles],
   );
 
@@ -418,9 +418,9 @@ export default function InvoiceModal({
             />
           )}
 
-          <EditableTable
+          <EditableTable<InvoiceContentRecord>
             key={invoiceId!}
-            columns={columns as EditableColumnConfig[]}
+            columns={columns}
             apiFunctions={apiFunctionsContents}
             initialData={lineItems}
             permissions={permissions}

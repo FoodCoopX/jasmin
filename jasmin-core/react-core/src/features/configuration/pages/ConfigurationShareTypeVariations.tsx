@@ -352,7 +352,7 @@ export default function ConfigurationShareTypeVariations() {
               value: "ALL_FOUR_WEEKS",
             },
           ],
-          render: (value: string) => {
+          render: (value: unknown) => {
             const option: Record<string, string> = {
               WEEKLY: t("commissioning.weekly"),
               ODD_WEEKS: t("commissioning.odd_weeks"),
@@ -360,7 +360,8 @@ export default function ConfigurationShareTypeVariations() {
               ALL_THREE_WEEKS: t("commissioning.all_three_weeks"),
               ALL_FOUR_WEEKS: t("commissioning.all_four_weeks"),
             };
-            return option[value] || value;
+            const cycle = String(value ?? "");
+            return option[cycle] || cycle;
           },
         },
         {
@@ -376,15 +377,15 @@ export default function ConfigurationShareTypeVariations() {
           width: "8em",
           readOnly: true,
           align: "left",
-          render: (value: string) => (
-            <>{getShareTypeVariationSizeLabel(value)}</>
+          render: (value: unknown) => (
+            <>{getShareTypeVariationSizeLabel(String(value ?? ""))}</>
           ),
         },
         // Jokers are a subscription's skipped weeks; a tenant that uploads
         // its weekly share amounts runs no subscriptions.
         ...(weeklyUpload
           ? []
-          : [
+          : ([
               {
                 title: (
                   <div className="checkbox-column-title">
@@ -399,7 +400,9 @@ export default function ConfigurationShareTypeVariations() {
                 // Always editable; the "may only increase while in use" floor
                 // is enforced in ``customSave`` (mirrors the capacity floor).
                 render: (_: unknown, record: TableRecord) =>
-                  record.amount_of_jokers == 0 ? "-" : record.amount_of_jokers,
+                  record.amount_of_jokers == 0
+                    ? "-"
+                    : String(record.amount_of_jokers ?? ""),
               },
               {
                 title: (
@@ -417,9 +420,9 @@ export default function ConfigurationShareTypeVariations() {
                 render: (_: unknown, record: TableRecord) =>
                   record.amount_of_donation_jokers == 0
                     ? "-"
-                    : record.amount_of_donation_jokers,
+                    : String(record.amount_of_donation_jokers ?? ""),
               },
-            ]),
+            ] satisfies EditableColumnConfig<TableRecord>[])),
         {
           title: (
             <>
@@ -472,7 +475,7 @@ export default function ConfigurationShareTypeVariations() {
             </Button>
           ),
         },
-      ] as EditableColumnConfig<TableRecord>[],
+      ] satisfies EditableColumnConfig<TableRecord>[],
     [
       openShareTypeVariationModal,
       activeStatusColumn,

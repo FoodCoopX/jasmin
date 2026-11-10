@@ -455,7 +455,7 @@ export default function PackingListBoxes() {
       ) : (
         <EditableTable
           key={`${selectedYear}-${selectedWeek}-${selectedDeliveryDay}-${selectedDeliveryStation}-${effectiveTour}`}
-          columns={columns as EditableColumnConfig[]}
+          columns={columns}
           apiFunctions={apiFunctions}
           initialData={rows}
           loading={isFetching}

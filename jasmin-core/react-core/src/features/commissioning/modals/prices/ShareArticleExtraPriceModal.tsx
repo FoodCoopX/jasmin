@@ -16,7 +16,7 @@ import {
   useTimeBoundColumns,
 } from "@hooks/index";
 import { useOfferTiers } from "@features/commissioning/hooks";
-import type { EditableColumnConfig } from "@shared/tables/BasicEditableTable/types";
+import type { EditableColumnConfig, TableRecord } from "@shared/tables/BasicEditableTable/types";
 import PriceEditorModal, { type PriceModalApi } from "./PriceEditorModal";
 import { buildCurrencyPriceColumn, buildTaxRateColumn } from "./priceColumns";
 
@@ -69,7 +69,7 @@ export default function ShareArticleExtraPriceModal({
   // [1, 3, 5] — that bumped non-tier tenants into multi-tier pricing.
   const offerTiers = useOfferTiers();
 
-  const columns = useMemo<EditableColumnConfig[]>(
+  const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
     () =>
       [
         activeStatusColumn,
@@ -92,7 +92,7 @@ export default function ShareArticleExtraPriceModal({
           }),
         ),
         buildTaxRateColumn(t, { locale }),
-      ] as EditableColumnConfig[],
+      ],
     [
       t,
       currencySymbol,

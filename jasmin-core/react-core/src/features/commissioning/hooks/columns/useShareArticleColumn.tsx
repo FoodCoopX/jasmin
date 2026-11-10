@@ -232,7 +232,7 @@ export const useShareArticleColumn = (config: ShareArticleColumnConfig = {}) => 
       required: true,
       width: "14em",
       align: "left" as const,
-      options: shareArticles as unknown as SelectOption[],
+      options: shareArticles,
       fixed: true,
       foreignKey: {
         valueField: "share_article",

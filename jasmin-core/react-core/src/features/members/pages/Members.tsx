@@ -380,7 +380,7 @@ export default function Members() {
                   : undefined,
               render: (value: unknown) => (value ? "✓" : ""),
             },
-          ] as EditableColumnConfig<MemberRecord>[])
+          ] satisfies EditableColumnConfig<MemberRecord>[])
         : []),
       {
         // GenG §30 Eintrittsdatum — the date the Vorstand admitted
@@ -501,7 +501,7 @@ export default function Members() {
                 );
               },
             },
-          ] as EditableColumnConfig<MemberRecord>[])
+          ] satisfies EditableColumnConfig<MemberRecord>[])
         : []),
 
       contactColumns.firstName,

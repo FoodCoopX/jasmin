@@ -14,7 +14,7 @@ import {
 } from "@shared/api/generated/commissioning/commissioning";
 import type { ShareTypeVariationGrossPrice } from "@shared/api/generated/models/shareTypeVariationGrossPrice";
 import { useTenantsSettingsUpdateCurrentSettingsUpdate } from "@shared/api/generated/tenants/tenants";
-import type { EditableColumnConfig } from "@shared/tables/BasicEditableTable/types";
+import type { EditableColumnConfig, TableRecord } from "@shared/tables/BasicEditableTable/types";
 import { ToolTipIcon } from "@shared/ui";
 import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
@@ -128,7 +128,7 @@ export default function ShareTypeVariationPriceModal({
     overlapGroup: ["share_type_variation"],
   });
 
-  const columns = useMemo<EditableColumnConfig[]>(
+  const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
     () =>
       [
         activeStatusColumn,
@@ -228,7 +228,7 @@ export default function ShareTypeVariationPriceModal({
             currencySymbol,
           }).render,
         },
-      ] as EditableColumnConfig[],
+      ],
     [
       t,
       currencySymbol,

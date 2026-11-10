@@ -203,7 +203,7 @@ export default function DeliveryNoteModal({
   // share_article (the on-change handler overrides it with the picked article's
   // own tax_rate when one is selected).
   const customEdit = useMemo(
-    () => makeContentCustomEdit(defaultTaxRateArticles),
+    () => makeContentCustomEdit<DeliveryNoteContentRecord>(defaultTaxRateArticles),
     [defaultTaxRateArticles],
   );
 
@@ -285,9 +285,9 @@ export default function DeliveryNoteModal({
             />
           )}
 
-          <EditableTable
+          <EditableTable<DeliveryNoteContentRecord>
             key={deliveryNoteId!}
-            columns={columns as EditableColumnConfig[]}
+            columns={columns}
             apiFunctions={apiFunctionsContents}
             initialData={lineItems}
             onSaveSuccess={handleSaveSuccess}

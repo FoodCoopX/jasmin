@@ -87,8 +87,8 @@ export function useOffersColumns({
     },
   });
 
-  const tierColumns = useMemo(() => {
-    const result = [
+  const tierColumns = useMemo<EditableColumnConfig<TableRecord>[]>(() => {
+    const result: EditableColumnConfig<TableRecord>[] = [
       {
         title: (
           <>
@@ -96,6 +96,8 @@ export function useOffersColumns({
             <ToolTipIcon title={t("tooltip.price_per_unit_offers")} />
           </>
         ),
+        dataIndex: "_price_group",
+        key: "price",
         children: finalTiers.map((tier, index) => {
           const column: EditableColumnConfig<TableRecord> = {
             title: t("commissioning.tier", { tier }) || `T${tier}`,
@@ -234,7 +236,7 @@ export function useOffersColumns({
   ]);
 
   const columns = useMemo<EditableColumnConfig<TableRecord>[]>(() => {
-    const baseColumns = [
+    const baseColumns: EditableColumnConfig<TableRecord>[] = [
       finalColumn,
       // A published offer lets only its available amount change.
       ...washingCleaningColumns.map((column) => ({
@@ -368,7 +370,7 @@ export function useOffersColumns({
       },
     ];
 
-    return [...baseColumns] as EditableColumnConfig<TableRecord>[];
+    return baseColumns;
   }, [
     t,
     amountUnitSizeColumns,

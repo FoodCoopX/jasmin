@@ -28,8 +28,8 @@ export type InputType =
 
 // ─── Select Option ──────────────────────────────────────────────────────────
 export interface SelectOption {
-  label: string;
-  value: string | number;
+  label: ReactNode;
+  value: string | number | null;
   // Greyed-out / non-selectable option (forwarded to AntD Select). Used e.g.
   // for full delivery-station-days in the capacity-aware pickers.
   disabled?: boolean;

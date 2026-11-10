@@ -191,7 +191,7 @@ export function usePlanningHarvestSharesColumns(
                 </div>
               ),
             },
-          ] as EditableColumnConfig<TableRecord>[])
+          ] satisfies EditableColumnConfig<TableRecord>[])
         : []),
       {
         title: (
@@ -243,7 +243,7 @@ export function usePlanningHarvestSharesColumns(
                 </div>
               ),
             },
-          ] as EditableColumnConfig<TableRecord>[])
+          ] satisfies EditableColumnConfig<TableRecord>[])
         : []),
       {
         title: (
@@ -302,7 +302,7 @@ export function usePlanningHarvestSharesColumns(
                 }),
               ),
             },
-          ] as EditableColumnConfig<TableRecord>[])
+          ] satisfies EditableColumnConfig<TableRecord>[])
         : []),
       sellerColumn,
       {

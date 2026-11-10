@@ -450,10 +450,7 @@ export function useHarvestingListColumns({
         dataIndex: "harvesting_crate_name",
         key: "harvesting_crate_name",
         inputType: "select",
-        // CrateOption's union includes the null "clear" placeholder shape,
-        // which SelectOption can't express — same widening as
-        // useShareArticleColumn's options.
-        options: crates as unknown as SelectOption[],
+        options: crates,
         required: false,
         width: "8em",
         className: "column-group-start",

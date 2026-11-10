@@ -447,7 +447,7 @@ export default function PackingListBulk() {
       {queryEnabled ? (
         <EditableTable
           key={`${selectedYear}-${selectedWeek}-${selectedDeliveryDay}-${selectedDeliveryStation}`}
-          columns={columns as EditableColumnConfig[]}
+          columns={columns}
           apiFunctions={apiFunctions}
           initialData={data}
           loading={isFetching}

@@ -240,7 +240,7 @@ export default function DocumentationPurchase() {
         ...shareArticleColumn,
         disabled: (record: TableRecord) => record.key != -1,
       },
-      ...(amountUnitSizeColumns as unknown as EditableColumnConfig<TableRecord>[]),
+      ...amountUnitSizeColumns,
       {
         title: <>{t("commissioning.expected_purchase")}</>,
         dataIndex: "theoretical_purchase",

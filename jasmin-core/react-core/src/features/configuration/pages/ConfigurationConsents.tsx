@@ -226,7 +226,7 @@ export default function ConfigurationConsents() {
             </Space>
           ),
         },
-      ] as EditableColumnConfig<TableRecord>[],
+      ] satisfies EditableColumnConfig<TableRecord>[],
     [activeStatusColumn, renderDate, t],
   );
 

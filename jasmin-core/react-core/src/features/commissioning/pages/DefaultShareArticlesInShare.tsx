@@ -255,7 +255,7 @@ export default function DefaultShareArticlesInShare() {
     };
 
     return [
-      shareArticleColumn as EditableColumnConfig<TableRecord>,
+      shareArticleColumn,
       unitColumn,
       ...variationColumns,
     ];

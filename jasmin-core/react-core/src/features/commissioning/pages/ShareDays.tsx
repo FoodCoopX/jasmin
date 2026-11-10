@@ -232,7 +232,7 @@ export default function ShareDays() {
             render: (value: unknown, record: TableRecord) =>
               weekdayCell(value, weekdayChoices, !!record.packing_day_changed),
           },
-        ] as EditableColumnConfig<TableRecord>[]
+        ] satisfies EditableColumnConfig<TableRecord>[]
       ).filter(
         (column) =>
           (showsWashing || column.dataIndex !== "washing_day") &&

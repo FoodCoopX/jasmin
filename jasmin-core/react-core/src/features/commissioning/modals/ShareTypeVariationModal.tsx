@@ -126,8 +126,8 @@ function packingColumn(t: TFunction): EditableColumnConfig<ShareTypeVariationRec
 function useSubscriptionColumns(
   onOpenPriceModal: (record: ShareTypeVariationRecord) => void,
 ): {
-  capacityColumns: EditableColumnConfig[];
-  trialColumns: EditableColumnConfig[];
+  capacityColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
+  trialColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
   priceColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
 } {
   const { t } = useTranslation();
@@ -161,7 +161,7 @@ function useSubscriptionColumns(
           width: "7em",
           align: "center",
         },
-      ] as EditableColumnConfig[],
+      ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[],
       trialColumns: allowsTrialSubscriptions
         ? ([
             {
@@ -180,7 +180,7 @@ function useSubscriptionColumns(
               width: "6em",
               align: "center",
             },
-          ] as EditableColumnConfig[])
+          ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[])
         : [],
       priceColumns: [
         {
@@ -205,7 +205,7 @@ function useSubscriptionColumns(
             </>
           ),
         },
-      ] as EditableColumnConfig<ShareTypeVariationRecord>[],
+      ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[],
     };
   }, [weeklyUpload, allowsTrialSubscriptions, onOpenPriceModal, t]);
 }
@@ -475,7 +475,7 @@ export default function ShareTypeVariationModal({
     onDeleted: handleClosePictureModal,
   });
 
-  const columns = useMemo<EditableColumnConfig<TableRecord>[]>(
+  const columns = useMemo<EditableColumnConfig<ShareTypeVariationRecord>[]>(
     () =>
       [
         activeStatusColumn,
@@ -557,7 +557,7 @@ export default function ShareTypeVariationModal({
           suffix: "kg",
           align: "center",
           render: (text: unknown) =>
-            text ? `${format(parseFloat(text as string), 2)} kg` : text,
+            text ? `${format(parseFloat(text as string), 2)} kg` : null,
         },
         ...capacityColumns,
         {
@@ -639,7 +639,7 @@ export default function ShareTypeVariationModal({
         // mirrors both with a ``ValidationError`` on ``ShareTypeVariation.clean()``
         // so admin saves can't bypass.
         ...(showOptinColumns
-          ? [
+          ? ([
               {
                 title: (
                   <div className="text-xs">
@@ -652,7 +652,7 @@ export default function ShareTypeVariationModal({
                 inputType: "checkbox",
                 required: false,
                 width: "6em",
-                align: "center" as const,
+                align: "center",
               },
               {
                 title: (
@@ -668,7 +668,7 @@ export default function ShareTypeVariationModal({
                 inputType: "positive_integer",
                 required: false,
                 width: "7em",
-                align: "center" as const,
+                align: "center",
                 render: (_: unknown, record: ShareTypeVariationRecord) => (
                   <>
                     {record.requires_optin == false
@@ -677,10 +677,10 @@ export default function ShareTypeVariationModal({
                   </>
                 ),
               },
-            ]
+            ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[])
           : []),
         ...priceColumns,
-      ] as EditableColumnConfig[],
+      ],
     [
       t,
       crates,
