@@ -208,15 +208,15 @@ export default function SaturdayShifts() {
       },
       ...Array.from({ length: weekCount }, (_, index) => {
         const week = index + 1;
+        const isCurrent = selectedYear === currentYear && week === currentWeek;
         return {
           title: t("staff.week_option", { week }),
           key: `week_${week}`,
           align: "center" as const,
           width: "6.5em",
-          className:
-            selectedYear === currentYear && week === currentWeek
-              ? "saturday-shifts-current-week"
-              : undefined,
+          className: isCurrent ? "saturday-shifts-current-week" : undefined,
+          onHeaderCell: () =>
+            isCurrent ? { "aria-current": "date" as const } : {},
           // Ascending puts whoever works that Saturday on top.
           sorter: (a: SaturdayShiftEmployee, b: SaturdayShiftEmployee) =>
             Number(b.weeks.includes(week)) - Number(a.weeks.includes(week)),

@@ -968,7 +968,7 @@ Located in `jasmin-core/django-core/apps/`:
 | `gdpr` | Data export/deletion for GDPR compliance |
 | `notifications` | Email templates, notification dispatch, background jobs (via Huey) |
 | `payments` | SEPA Direct Debit, billing runs, charge schedules, subscriptions |
-| `staff` | Employees and employments, weekly staff plan, absences. Role-gated through `apps.authz`. |
+| `staff` | Employees and employments, weekly staff plan, absences, Saturday shifts (the weekly plan's Saturday rows, set from a year view). A read-only sync pulls employees and their absences from an external HR system (`services/hr_system.py`; addresses and an encrypted API token in the tenant settings). Role-gated through `apps.authz`. |
 | `shared.tenants` | Tenant and domain models, multi-tenancy bootstrap |
 | `shared.super_admin` | Platform-wide admin endpoints (tenant CRUD, etc.) |
 | `shared.support` | Support tickets (tenant `tickets`, super-admin `support-tickets`) |
@@ -977,9 +977,10 @@ Located in `jasmin-core/django-core/apps/`:
 from `commissioning`): `auth_cookies.py`, `csp_report.py`, `csv_safety.py`,
 `deferred_email.py`, `iban_validator.py`, `image_upload.py`, `invitations.py`,
 `iso_week_filters.py`, `languages.py`, `model_fields.py`, `money.py`,
-`openapi_params.py`, `packing_mode_hooks.py`, `pii_logging.py`, `pii_masking.py`,
-`query_params.py`, `request_utils.py`, `retention.py`, `sepa_mandate_hooks.py`,
-`smtp_host_validator.py`, `subscription_hooks.py`, `tenant_urls.py`.
+`openapi_params.py`, `outbound_hosts.py`, `packing_mode_hooks.py`,
+`pii_logging.py`, `pii_masking.py`, `query_params.py`, `request_utils.py`,
+`retention.py`, `sepa_mandate_hooks.py`, `smtp_host_validator.py`,
+`subscription_hooks.py`, `tenant_urls.py`.
 
 **Key Django patterns:**
 

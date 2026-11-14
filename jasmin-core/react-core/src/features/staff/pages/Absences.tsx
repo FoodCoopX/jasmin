@@ -28,8 +28,7 @@ import { getErrorMessage } from "@shared/utils/apiError";
 import { useTenant, useYearWeekState } from "@hooks/index";
 import HrSystemSyncButton from "@features/staff/components/HrSystemSyncButton";
 import { useHrSystemSyncRefusal } from "@features/staff/hooks/useHrSystemSyncRefusal";
-
-const WEEKDAYS = [0, 1, 2, 3, 4, 5];
+import { STAFF_WEEKDAYS } from "@features/staff/utils/weekdays";
 
 const SAVE_MUTATION_KEY =
   getStaffAbsencesWeekCreateMutationOptions().mutationKey;
@@ -153,15 +152,14 @@ export default function Absences() {
               ? name
               : t("staff.inactive_employee", { employee: name })}
             {usesHrSystem && employee.comes_from_hr_system && (
-              <>
-                {" "}
-                <Tag color="magenta">{t("staff.hr_system_tag")}</Tag>
-              </>
+              <Tag color="magenta" className="hr-system-tag">
+                {t("staff.hr_system_tag")}
+              </Tag>
             )}
           </>
         ),
       },
-      ...WEEKDAYS.map((day) => ({
+      ...STAFF_WEEKDAYS.map((day) => ({
         title: t(`commissioning.weekdays.${day}`),
         key: `day_${day}`,
         align: "center" as const,
@@ -170,17 +168,29 @@ export default function Absences() {
           Number(Boolean(b.days[String(day)])) -
           Number(Boolean(a.days[String(day)])),
         showSorterTooltip: false,
-        render: (_: unknown, employee: AbsenceWeekEmployee) => (
-          <Checkbox
-            checked={Boolean(employee.days[String(day)])}
-            disabled={!editable(employee)}
-            aria-label={t("staff.absent_on_day", {
-              employee: employee.short_name_for_weekly_plan,
-              day: t(`commissioning.weekdays.${day}`),
-            })}
-            onChange={(event) => setAbsent(employee, day, event.target.checked)}
-          />
-        ),
+        render: (_: unknown, employee: AbsenceWeekEmployee) => {
+          const fromHrSystem = usesHrSystem && employee.comes_from_hr_system;
+          return (
+            <Checkbox
+              checked={Boolean(employee.days[String(day)])}
+              disabled={!editable(employee)}
+              // A cross no one may change here stays greyed out, but in red.
+              className={fromHrSystem || !isOffice ? "absence-locked" : undefined}
+              aria-label={t(
+                fromHrSystem
+                  ? "staff.absent_on_day_hr_system"
+                  : "staff.absent_on_day",
+                {
+                  employee: employee.short_name_for_weekly_plan,
+                  day: t(`commissioning.weekdays.${day}`),
+                },
+              )}
+              onChange={(event) =>
+                setAbsent(employee, day, event.target.checked)
+              }
+            />
+          );
+        },
       })),
     ];
   }, [
@@ -199,7 +209,7 @@ export default function Absences() {
     return {
       label: t("staff.sum"),
       labelColSpan: 1,
-      cells: WEEKDAYS.map((day) => ({
+      cells: STAFF_WEEKDAYS.map((day) => ({
         value: employees.filter((employee) => employee.days[String(day)])
           .length,
       })),

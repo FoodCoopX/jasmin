@@ -24,8 +24,8 @@ from ..errors import (
     EmployeeAbsent,
     EmployeeInactive,
     EmployeeNotFound,
-    InvalidWeeklyPlanAssignment,
     SaturdayShiftNoPlace,
+    StaffError,
 )
 from ..models import Absence, Employee, WeeklyPlan, WeeklyPlanCategory
 from .weekly_plan import SATURDAY, weekly_plan_lock
@@ -77,9 +77,7 @@ def set_saturday_shift(
     Setting one the employee has, or taking away one they don't, changes
     nothing."""
     if week > weeks_in_iso_year(year):
-        raise InvalidWeeklyPlanAssignment(
-            f"{year} has no ISO week {week}.", field="week"
-        )
+        raise StaffError(f"{year} has no ISO week {week}.", field="week")
     employee = Employee.objects.filter(pk=employee_id).only("is_active").first()
     if employee is None:
         raise EmployeeNotFound(f"Unknown employee: {employee_id}", field="employee_id")

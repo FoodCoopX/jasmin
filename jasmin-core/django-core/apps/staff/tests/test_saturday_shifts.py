@@ -226,7 +226,7 @@ class TestSettingAShift:
         response = _set(api_client, _employee("Anna"), week=53)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.data["code"] == "staff.invalid_weekly_plan_assignment"
+        assert response.data["code"] == "staff.invalid"
 
     def test_refuses_an_unknown_employee(self, api_client):
         body = {"year": YEAR, "week": WEEK, "employee_id": "nobody", "on_duty": True}

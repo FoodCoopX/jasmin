@@ -85,6 +85,20 @@ describe("DnD grid — click/keyboard placement", () => {
     expect(onPlace).not.toHaveBeenCalled();
   });
 
+  it("puts a picked-up chip down again on Escape", async () => {
+    const user = userEvent.setup();
+    const { onPlace } = renderGrid({ cell0: CHIP, withPalette: false });
+
+    await user.click(screen.getByRole("button", { name: "Station 1" }));
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "empty-1" }));
+
+    expect(onPlace).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Station 1" })).not.toHaveAttribute(
+      "aria-pressed",
+    );
+  });
+
   it("drops the pick-up mark once another chip sits in the source cell", async () => {
     const user = userEvent.setup();
     const other: DndChip = { id: "s2", label: "Station 2" };

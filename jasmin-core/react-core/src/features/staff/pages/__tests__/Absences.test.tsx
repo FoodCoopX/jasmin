@@ -179,7 +179,7 @@ function rowOf(name: string): HTMLElement {
 /** The cross of an employee's day; `day` counts from Monday = 0. */
 const cross = (name: string, day: number) =>
   within(rowOf(name)).getAllByRole("checkbox", {
-    name: "staff.absent_on_day",
+    name: /^staff\.absent_on_day/,
   })[day];
 
 const syncButton = () =>
@@ -422,7 +422,16 @@ describe("Absences", () => {
 
     expect(within(rowOf("Anna")).getByText("staff.hr_system_tag")).toBeVisible();
     expect(cross("Anna", TUESDAY)).toBeDisabled();
+    expect(cross("Anna", TUESDAY)).toHaveAccessibleName(
+      "staff.absent_on_day_hr_system",
+    );
+    expect(cross("Anna", TUESDAY).closest(".ant-checkbox-wrapper")).toHaveClass(
+      "absence-locked",
+    );
     expect(cross("Pia", THURSDAY)).toBeEnabled();
+    expect(
+      cross("Pia", THURSDAY).closest(".ant-checkbox-wrapper"),
+    ).not.toHaveClass("absence-locked");
   });
 
   it("lets every employee's absences be crossed without the HR system", async () => {

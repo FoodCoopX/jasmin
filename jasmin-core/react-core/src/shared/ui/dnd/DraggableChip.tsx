@@ -57,6 +57,9 @@ export default function DraggableChip({
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       toggleSelect();
+    } else if (event.key === "Escape" && selected) {
+      // Escape puts down whatever is picked up.
+      select(null);
     }
   };
 

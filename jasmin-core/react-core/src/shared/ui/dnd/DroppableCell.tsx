@@ -54,7 +54,8 @@ function cellClassName(state: CellState): string {
  * One grid cell: a drop target that, when filled, is also a drag source (to
  * move/swap) and can be cleared. Keyboard model: with nothing picked up,
  * activating a filled cell picks up its occupant; with something picked up,
- * activating any cell places it there (activating the source cell cancels).
+ * activating any cell places it there (activating the source cell, or Escape,
+ * cancels).
  */
 export default function DroppableCell({
   pos,
@@ -139,6 +140,9 @@ export default function DroppableCell({
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onActivate();
+    } else if (event.key === "Escape" && selected) {
+      // Escape puts down whatever is picked up.
+      select(null);
     }
   };
 

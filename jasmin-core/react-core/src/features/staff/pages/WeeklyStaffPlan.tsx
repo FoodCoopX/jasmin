@@ -25,10 +25,10 @@ import { getErrorMessage } from "@shared/utils/apiError";
 import WeeklyPlanCell from "@features/staff/components/WeeklyPlanCell";
 import WeeklyPlanCopyTools from "@features/staff/components/WeeklyPlanCopyTools";
 import WeeklyPlanPalette from "@features/staff/components/WeeklyPlanPalette";
+import { STAFF_WEEKDAYS } from "@features/staff/utils/weekdays";
 
 dayjs.extend(isoWeek);
 
-const WEEKDAYS = [0, 1, 2, 3, 4, 5];
 // Absent on all of them, an employee is left out of the palette.
 const WORKDAYS = [0, 1, 2, 3, 4];
 const SATURDAY = 5;
@@ -165,7 +165,7 @@ export default function WeeklyStaffPlan() {
     () =>
       Object.entries(cells).filter(([key, employeeId]) => {
         const day = Number(key.split("|")[2]);
-        return WEEKDAYS.includes(day) && isAbsent(employeeId, day);
+        return STAFF_WEEKDAYS.includes(day) && isAbsent(employeeId, day);
       }).length,
     [cells, isAbsent],
   );
@@ -393,7 +393,7 @@ export default function WeeklyStaffPlan() {
                   <thead>
                     <tr>
                       <th className="weekly-plan-th-row-label" scope="col" />
-                      {WEEKDAYS.map((day) => (
+                      {STAFF_WEEKDAYS.map((day) => (
                         <th key={day} scope="col">
                           {t(`commissioning.weekdays.${day}`)}
                         </th>
@@ -406,7 +406,7 @@ export default function WeeklyStaffPlan() {
                       className="weekly-plan-category-group"
                     >
                       <tr className="weekly-plan-category-row">
-                        <th colSpan={WEEKDAYS.length + 1} scope="colgroup">
+                        <th colSpan={STAFF_WEEKDAYS.length + 1} scope="colgroup">
                           {category.name}
                         </th>
                       </tr>
@@ -417,7 +417,7 @@ export default function WeeklyStaffPlan() {
                             <th className="weekly-plan-row-label" scope="row">
                               {rowIndex + 1}
                             </th>
-                            {WEEKDAYS.map((day) => {
+                            {STAFF_WEEKDAYS.map((day) => {
                               const employeeId =
                                 cells[cellKey(category.id, rowIndex, day)];
                               const employee = employeeId

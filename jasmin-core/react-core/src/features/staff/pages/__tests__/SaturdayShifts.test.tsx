@@ -244,7 +244,9 @@ describe("SaturdayShifts", () => {
       name: /staff\.week_option/,
     });
     expect(headers[THIS_WEEK - 1]).toHaveClass("saturday-shifts-current-week");
+    expect(headers[THIS_WEEK - 1]).toHaveAttribute("aria-current", "date");
     expect(headers[THIS_WEEK]).not.toHaveClass("saturday-shifts-current-week");
+    expect(headers[THIS_WEEK]).not.toHaveAttribute("aria-current");
   });
 
   it("opens on the current week, and stays put while crosses are set", async () => {

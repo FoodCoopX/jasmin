@@ -9,6 +9,12 @@
   background-color: var(--color-success-bg);
 }
 
+/* Not by colour alone: the current week's heading is underlined too. */
+.saturday-shifts-current-week .ant-table-column-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* The totals row's cell of the current week, over the row's own background. */
 .ant-table-wrapper .report-table-totals > td.saturday-shifts-current-week {
   background-color: var(--color-success-bg);
@@ -45,4 +51,11 @@
   .ant-checkbox-inner {
   border-color: var(--color-error);
   background-color: var(--color-error);
+}
+
+/* Not by colour alone: a dashed ring marks the conflict as well. */
+.saturday-shift-conflict .ant-checkbox-checked {
+  outline: 2px dashed var(--color-error-text);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
