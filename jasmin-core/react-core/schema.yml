@@ -36636,6 +36636,11 @@ components:
           type: string
           readOnly: true
           nullable: true
+        hours_per_week:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
         user:
           type: string
           nullable: true
@@ -36677,6 +36682,11 @@ components:
           type: string
           nullable: true
           maxLength: 50
+        hours_per_week:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
         user:
           type: string
           minLength: 1
@@ -42324,6 +42334,11 @@ components:
           type: string
           nullable: true
           maxLength: 50
+        hours_per_week:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
         user:
           type: string
           minLength: 1
@@ -53921,6 +53936,9 @@ components:
           nullable: true
         is_active:
           type: boolean
+        hours_per_week:
+          type: integer
+          nullable: true
         absent_days:
           type: array
           items:
@@ -53930,6 +53948,7 @@ components:
       required:
       - absent_days
       - first_name
+      - hours_per_week
       - id
       - is_active
       - last_name

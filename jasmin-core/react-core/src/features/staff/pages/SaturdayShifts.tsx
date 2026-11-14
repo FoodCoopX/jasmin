@@ -20,9 +20,16 @@ import { useRoles } from "@shared/auth";
 import { YearSelector } from "@shared/selectors";
 import { ReadOnlyReportTable, type TotalsRow } from "@shared/tables";
 import { AutoSaveIndicator, ExplainerText } from "@shared/ui";
-import { notify } from "@shared/utils";
+import {
+  dateForWeekDayNumber,
+  generatePdfFilename,
+  notify,
+} from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
-import { useYearWeekState } from "@hooks/index";
+import { useDateFormat, useYearWeekState } from "@hooks/index";
+import type { SaturdayShiftsPDFProps } from "@features/staff/pdfs/SaturdayShiftsPDF";
+import SaturdayShiftsPDFGenerator from "@features/staff/pdfs/SaturdayShiftsPDFGenerator";
+import { SATURDAY } from "@features/staff/utils/weekdays";
 
 const SAVE_MUTATION_KEY =
   getStaffSaturdayShiftsYearCreateMutationOptions().mutationKey;
@@ -39,6 +46,7 @@ export default function SaturdayShifts() {
   const { isOffice } = useRoles();
   const { selectedYear, setSelectedYear, currentYear, currentWeek } =
     useYearWeekState();
+  const { formatDate, mobileDateFormat } = useDateFormat();
 
   const yearParams = useMemo(() => ({ year: selectedYear }), [selectedYear]);
   const { data: saturdays, isFetching } =
@@ -131,6 +139,32 @@ export default function SaturdayShifts() {
     },
     [saveShift, selectedYear, showEmployee],
   );
+
+  // The year for the PDF: every employee the page lists, with the date of
+  // each Saturday they work.
+  const pdfProps = useMemo<SaturdayShiftsPDFProps>(() => {
+    const year = saturdays?.year ?? selectedYear;
+    return {
+      year,
+      t,
+      rows: (saturdays?.employees ?? []).map((employee) => ({
+        id: employee.id,
+        name: employee.is_active
+          ? employee.short_name_for_weekly_plan
+          : t("staff.inactive_employee", {
+              employee: employee.short_name_for_weekly_plan,
+            }),
+        saturdays: employee.weeks.map((week) => ({
+          date:
+            formatDate(
+              dateForWeekDayNumber(year, week, SATURDAY),
+              mobileDateFormat,
+            ) ?? "",
+          absent: employee.absent_weeks.includes(week),
+        })),
+      })),
+    };
+  }, [formatDate, mobileDateFormat, saturdays, selectedYear, t]);
 
   const weekCount = saturdays?.weeks ?? 0;
   // How many work each week's Saturday, under the name and count columns'
@@ -249,6 +283,17 @@ export default function SaturdayShifts() {
         selectedYear={selectedYear}
         setSelectedYear={setSelectedYear}
       />
+      <div className="mt-16">
+        <SaturdayShiftsPDFGenerator
+          documentProps={pdfProps}
+          isReady={!isFetching}
+          filename={generatePdfFilename([
+            t("staff.saturday_shifts"),
+            pdfProps.year,
+          ])}
+          buttonText={t("staff.saturday_shifts_pdf")}
+        />
+      </div>
       <div ref={tableRef} className="saturday-shifts-table mt-16">
         <ReadOnlyReportTable<SaturdayShiftEmployee>
           searchable

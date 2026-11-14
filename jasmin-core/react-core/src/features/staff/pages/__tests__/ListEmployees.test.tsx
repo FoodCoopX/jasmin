@@ -149,6 +149,9 @@ function rowOf(text: string): HTMLElement {
   return row;
 }
 
+/** The accessible name of the weekly-plan name's input. */
+const NAME = "staff.short_name_for_weekly_plan";
+
 /** The row being edited inline — the one offering a save button. */
 function editingRow(): HTMLElement {
   const row = screen
@@ -193,6 +196,17 @@ describe("ListEmployees", () => {
     await screen.findByText("Anna");
     expect(staffApi.listEmployees).toHaveBeenCalledTimes(1);
     expect(staffApi.listEmployees).toHaveBeenCalledWith(undefined);
+  });
+
+  it("shows the weekly hours where they are set", async () => {
+    serverEmployees = [{ ...ANNA, hours_per_week: 24 }, BEN];
+    renderList();
+    await screen.findByText("Anna");
+
+    expect(within(rowOf("Anna")).getByText("staff.hours_value")).toBeVisible();
+    expect(
+      within(rowOf("Ben")).queryByText("staff.hours_value"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a spinner over the table while the employees load", async () => {
@@ -251,7 +265,7 @@ describe("ListEmployees", () => {
     await screen.findByText("Anna");
 
     await user.click(screen.getByRole("button", { name: /table\.add_record/ }));
-    await user.type(within(editingRow()).getByRole("textbox"), "Dora");
+    await user.type(within(editingRow()).getByRole("textbox", { name: NAME }), "Dora");
     await user.click(screen.getByRole("button", { name: "table.save" }));
 
     await waitFor(() => expect(staffApi.createEmployee).toHaveBeenCalledTimes(1));
@@ -271,7 +285,7 @@ describe("ListEmployees", () => {
     await user.click(
       within(rowOf("Ben")).getByRole("button", { name: "table.edit" }),
     );
-    const nameInput = within(editingRow()).getByRole("textbox");
+    const nameInput = within(editingRow()).getByRole("textbox", { name: NAME });
     await user.clear(nameInput);
     await user.type(nameInput, "Benno");
     await user.click(screen.getByRole("button", { name: "table.save" }));
@@ -313,7 +327,7 @@ describe("ListEmployees", () => {
     await user.click(
       within(rowOf("Ben")).getByRole("button", { name: "table.edit" }),
     );
-    const nameInput = within(editingRow()).getByRole("textbox");
+    const nameInput = within(editingRow()).getByRole("textbox", { name: NAME });
     await user.clear(nameInput);
     await user.type(nameInput, "Anna");
     await user.click(screen.getByRole("button", { name: "table.save" }));
@@ -516,7 +530,7 @@ describe("ListEmployees with the HR system", () => {
     ).toBeEnabled();
   });
 
-  it("keeps the name and the active flag of a synced employee from edits", async () => {
+  it("keeps the name and the active flag of a synced employee from edits, not its hours", async () => {
     const { user } = renderList();
     await screen.findByText("Dora");
 
@@ -525,11 +539,16 @@ describe("ListEmployees with the HR system", () => {
     );
 
     // A locked cell shows its value instead of an input.
-    expect(within(editingRow()).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(
+      within(editingRow()).queryByRole("textbox", { name: NAME }),
+    ).not.toBeInTheDocument();
     expect(within(editingRow()).getByText("Dora")).toBeInTheDocument();
     for (const checkbox of within(editingRow()).getAllByRole("checkbox")) {
       expect(checkbox).toBeDisabled();
     }
+    expect(
+      within(editingRow()).getByRole("textbox", { name: "staff.weekly_hours" }),
+    ).toBeEnabled();
   });
 
   it("lets an employee entered here be edited, but not marked as from the HR system", async () => {
@@ -540,7 +559,7 @@ describe("ListEmployees with the HR system", () => {
       within(rowOf("Ben")).getByRole("button", { name: "table.edit" }),
     );
 
-    expect(within(editingRow()).getByRole("textbox")).toBeEnabled();
+    expect(within(editingRow()).getByRole("textbox", { name: NAME })).toBeEnabled();
     const [isActive, fromHrSystem] = within(editingRow()).getAllByRole(
       "checkbox",
     );

@@ -24,14 +24,14 @@ import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
 import WeeklyPlanCell from "@features/staff/components/WeeklyPlanCell";
 import WeeklyPlanCopyTools from "@features/staff/components/WeeklyPlanCopyTools";
+import WeeklyPlanImageButton from "@features/staff/components/WeeklyPlanImageButton";
 import WeeklyPlanPalette from "@features/staff/components/WeeklyPlanPalette";
-import { STAFF_WEEKDAYS } from "@features/staff/utils/weekdays";
+import { SATURDAY, STAFF_WEEKDAYS } from "@features/staff/utils/weekdays";
 
 dayjs.extend(isoWeek);
 
 // Absent on all of them, an employee is left out of the palette.
 const WORKDAYS = [0, 1, 2, 3, 4];
-const SATURDAY = 5;
 
 /** A flat grid row: which category + which line inside it. ``pos.row`` indexes
  *  into the flat list; ``pos.col`` is the weekday. */
@@ -322,6 +322,42 @@ export default function WeeklyStaffPlan() {
   // longer empty, so keyboard focus would otherwise be lost.
   const gridRegionRef = useRef<HTMLElement>(null);
 
+  // What a cell shows, in the grid and in the week's image alike. No tint for
+  // an inactive employee, who has no palette colour, nor on an absence, shown
+  // red.
+  const cellAt = useCallback(
+    (categoryId: string, rowIndex: number, day: number) => {
+      const employeeId = cells[cellKey(categoryId, rowIndex, day)];
+      const employee = employeeId
+        ? (employeeById.get(employeeId) ?? null)
+        : null;
+      const absent = !!employee && isAbsent(employee.id, day);
+      const inactive = employee?.is_active === false;
+      const name = employee?.short_name_for_weekly_plan ?? "";
+      return {
+        employee,
+        label: inactive ? t("staff.inactive_employee", { employee: name }) : name,
+        color:
+          employee && !inactive && !absent
+            ? colorMap.get(employee.id)
+            : undefined,
+        absent,
+      };
+    },
+    [cells, colorMap, employeeById, isAbsent, t],
+  );
+  const imageCellAt = useCallback(
+    (categoryId: string, rowIndex: number, day: number) => {
+      const { employee, label, color, absent } = cellAt(
+        categoryId,
+        rowIndex,
+        day,
+      );
+      return employee ? { label, color, absent } : null;
+    },
+    [cellAt],
+  );
+
   const hasCategories = (grid?.categories.length ?? 0) > 0;
 
   return (
@@ -338,6 +374,17 @@ export default function WeeklyStaffPlan() {
         selectedWeek={selectedWeek}
         setSelectedWeek={setSelectedWeek}
       />
+      {grid && hasCategories && (
+        <div className="mt-16">
+          <WeeklyPlanImageButton
+            year={selectedYear}
+            week={selectedWeek}
+            categories={grid.categories}
+            cellAt={imageCellAt}
+            disabled={Object.keys(cells).length === 0}
+          />
+        </div>
+      )}
       {isOffice && currentWeekIsEmpty && (
         <WeeklyPlanCopyTools
           key={`${selectedYear}-${selectedWeek}`}
@@ -418,17 +465,8 @@ export default function WeeklyStaffPlan() {
                               {rowIndex + 1}
                             </th>
                             {STAFF_WEEKDAYS.map((day) => {
-                              const employeeId =
-                                cells[cellKey(category.id, rowIndex, day)];
-                              const employee = employeeId
-                                ? (employeeById.get(employeeId) ?? null)
-                                : null;
-                              const absent =
-                                !!employee && isAbsent(employee.id, day);
-                              // No tint for an inactive employee, who has no
-                              // palette colour, nor on an absence, shown red.
-                              const tinted =
-                                employee?.is_active !== false && !absent;
+                              const { employee, label, color, absent } =
+                                cellAt(category.id, rowIndex, day);
                               return (
                                 <WeeklyPlanCell
                                   key={day}
@@ -441,11 +479,8 @@ export default function WeeklyStaffPlan() {
                                   rowIndex={rowIndex}
                                   day={day}
                                   employee={employee}
-                                  color={
-                                    employee && tinted
-                                      ? colorMap.get(employee.id)
-                                      : undefined
-                                  }
+                                  label={label}
+                                  color={color}
                                   absent={absent}
                                   canEdit={isOffice}
                                 />

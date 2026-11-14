@@ -51,6 +51,7 @@ class WeeklyPlanEmployeeSerializer(serializers.Serializer):
     first_name = serializers.CharField(allow_null=True)
     last_name = serializers.CharField(allow_null=True)
     is_active = serializers.BooleanField()
+    hours_per_week = serializers.IntegerField(allow_null=True)
     absent_days = serializers.ListField(
         child=serializers.IntegerField(),
         help_text=(

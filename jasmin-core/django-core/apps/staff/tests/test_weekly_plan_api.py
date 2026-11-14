@@ -61,6 +61,20 @@ def test_grid_is_dense(api_client, category, employees):
     }
 
 
+def test_grid_carries_each_employees_weekly_hours(api_client, category, employees):
+    alice, _ = employees
+    alice.hours_per_week = 24
+    alice.save()
+
+    response = api_client.get(reverse("weekly_plan-grid"), {"year": YEAR, "week": WEEK})
+
+    hours = {
+        employee["short_name_for_weekly_plan"]: employee["hours_per_week"]
+        for employee in response.data["employees"]
+    }
+    assert hours == {"Alice": 24, "Bob": None}
+
+
 def test_grid_lists_a_deactivated_employee_who_holds_a_shift(
     api_client, category, employees
 ):

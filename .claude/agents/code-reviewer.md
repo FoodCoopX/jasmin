@@ -50,7 +50,7 @@ You cannot run these tools, so never state what one would report or whether CI s
 - A queryset feeding a serializer that reads relations has `select_related` / `prefetch_related`; no per-row queries in loops.
 - `JasminModel` ids are CharFields: `filter(pk=obj)` / `id=obj` / `pk__in=[objs]` silently match nothing; pass `.pk`.
 - Money and stock stay `Decimal`: no `float()` on money, no `Decimal(float)`; use `_calc_line_netto/_brutto`, `sum_*`, `tax_breakdown`, or `round_money` / `to_decimal` / `CENT` from `apps.shared.money`; no local `_round_money`; money leaves the API as a 2dp string.
-- `TimeBoundMixin` windows: `valid_from` a Monday, `valid_until` a Sunday (exceptions: `ConsentDocument`, `staff.Employment`).
+- `TimeBoundMixin` windows: `valid_from` a Monday, `valid_until` a Sunday (exception: `ConsentDocument`).
 - `Share` and `CoopShare` are never conflated in names or logic (`docs/domain-glossary.md`).
 - A service mutating `ShareContent`, `ShareDelivery` or `Forecast` ends with `recompute_shares()` / `recompute_order_contents()`.
 - A bulk endpoint collecting per-item errors (HTTP 207) wraps each item in a savepoint (skill `bulk-partial-success-savepoints`).

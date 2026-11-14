@@ -11,6 +11,8 @@ interface WeeklyPlanCellProps {
   rowIndex: number;
   day: number;
   employee: WeeklyPlanEmployee | null;
+  /** The employee's name as the cell shows it, an inactive one marked so. */
+  label: string;
   color?: string;
   /** The employee is absent that day: a shift planned before the absence. */
   absent: boolean;
@@ -24,17 +26,12 @@ export default function WeeklyPlanCell({
   rowIndex,
   day,
   employee,
+  label: occupantLabel,
   color,
   absent,
   canEdit,
 }: WeeklyPlanCellProps) {
   const { t } = useTranslation();
-  const occupantLabel =
-    employee?.is_active === false
-      ? t("staff.inactive_employee", {
-          employee: employee.short_name_for_weekly_plan,
-        })
-      : employee?.short_name_for_weekly_plan ?? "";
   const place = {
     day: t(`commissioning.weekdays.${day}`),
     category: categoryName,

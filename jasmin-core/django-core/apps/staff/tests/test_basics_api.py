@@ -12,7 +12,6 @@ from apps.staff.models import (
     Absence,
     AbsenceCategory,
     Employee,
-    Employment,
     WeeklyPlan,
     WeeklyPlanCategory,
 )
@@ -172,7 +171,7 @@ def test_anonymous_cannot_read(anon_client):
 # --------------------------------------------------------------------------- #
 # Delete enforcement — DELETE honours ``can_be_deleted`` server-side. Every row
 # referencing an employee / category is ON DELETE CASCADE, so an unchecked
-# DELETE would silently wipe weekly-plan cells, absences and employments.
+# DELETE would silently wipe weekly-plan cells and absences.
 # --------------------------------------------------------------------------- #
 def _weekly_plan_cell(employee, category):
     return WeeklyPlan.objects.create(
@@ -192,9 +191,6 @@ _EMPLOYEE_REFERENCES = {
     ),
     "absence": lambda employee: _absence(
         employee, AbsenceCategory.objects.create(name="Vacation")
-    ),
-    "employment": lambda employee: Employment.objects.create(
-        employee=employee, valid_from="2026-01-05", hours_per_week="20.00"
     ),
 }
 
@@ -359,6 +355,22 @@ def test_an_employee_sharing_a_stored_name_stays_editable(api_client):
     assert response.status_code == status.HTTP_200_OK
     twin.refresh_from_db()
     assert twin.first_name == "Adelheid"
+
+
+def test_the_weekly_hours_are_set_by_hand_for_a_synced_employee_too(api_client):
+    synced = Employee.objects.create(
+        short_name_for_weekly_plan="Ada", comes_from_hr_system=True, hr_system_id="hr-1"
+    )
+
+    response = api_client.patch(
+        reverse("employees-detail", args=[synced.id]),
+        {"hours_per_week": 24},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    synced.refresh_from_db()
+    assert synced.hours_per_week == 24
 
 
 def test_a_taken_weekly_plan_category_order_is_refused(api_client):

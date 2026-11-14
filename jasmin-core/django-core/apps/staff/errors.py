@@ -93,9 +93,9 @@ class AbsenceCategoryNameTaken(BadRequestError):
 
 
 class EmployeeInUse(ConflictError):
-    """An employee cannot be deleted while weekly-plan cells, absences or
-    employments still reference them — a delete would CASCADE all of those
-    away. Deactivate the employee instead."""
+    """An employee cannot be deleted while weekly-plan cells or absences still
+    reference them — a delete would CASCADE all of those away. Deactivate the
+    employee instead."""
 
     code = "staff.employee_in_use"
 

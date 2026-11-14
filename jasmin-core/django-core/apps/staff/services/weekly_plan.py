@@ -93,7 +93,12 @@ def build_week_grid(year: int, week: int) -> dict[str, Any]:
         Employee.objects.filter(Q(is_active=True) | Q(id__in=set(placed.values())))
         .order_by("short_name_for_weekly_plan")
         .values(
-            "id", "short_name_for_weekly_plan", "first_name", "last_name", "is_active"
+            "id",
+            "short_name_for_weekly_plan",
+            "first_name",
+            "last_name",
+            "is_active",
+            "hours_per_week",
         )
     )
     # The days each employee is absent: not to be planned on, and a shift

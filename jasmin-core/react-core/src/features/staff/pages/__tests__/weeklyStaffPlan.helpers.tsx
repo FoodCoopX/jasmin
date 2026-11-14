@@ -27,6 +27,7 @@ export const ANNA: WeeklyPlanEmployee = {
   first_name: "Anna",
   last_name: "Berger",
   is_active: true,
+  hours_per_week: null,
   absent_days: [],
 };
 export const BEN: WeeklyPlanEmployee = {
@@ -35,6 +36,7 @@ export const BEN: WeeklyPlanEmployee = {
   first_name: "Ben",
   last_name: "Kraus",
   is_active: true,
+  hours_per_week: null,
   absent_days: [],
 };
 /** Deactivated, but still holding a shift in the week served with her. */
@@ -44,6 +46,7 @@ export const CLARA: WeeklyPlanEmployee = {
   first_name: "Clara",
   last_name: "Vogt",
   is_active: false,
+  hours_per_week: null,
   absent_days: [],
 };
 

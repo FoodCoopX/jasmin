@@ -19,6 +19,8 @@ export interface WeeklyPlanEmployee {
   /** @nullable */
   last_name: string | null;
   is_active: boolean;
+  /** @nullable */
+  hours_per_week: number | null;
   /** The weekdays (0 = Monday) the employee is absent: no new shift there, and one planned before shows as a conflict. */
   absent_days: number[];
 }

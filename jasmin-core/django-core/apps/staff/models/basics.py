@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 from nanoid import generate
 
@@ -112,6 +111,9 @@ class Employee(JasminModel):
     hr_system_id = models.CharField(
         max_length=64, unique=True, blank=True, null=True, editable=False
     )
+    # A guide for whoever plans the week, set by hand only: the HR-system sync
+    # leaves it alone, and an employee it adds starts without.
+    hours_per_week = models.PositiveSmallIntegerField(blank=True, null=True)
 
     class Meta:
         ordering = ["short_name_for_weekly_plan"]
@@ -120,32 +122,6 @@ class Employee(JasminModel):
         if self.user:
             return f"Employee: {self.user.get_full_name()}"
         return f"Employee: {self.short_name_for_weekly_plan or self.id}"
-
-
-class Employment(JasminModel):
-    employee = models.ForeignKey(
-        "Employee", on_delete=models.CASCADE, related_name="jobs"
-    )
-    valid_from = models.DateField()
-    valid_until = models.DateField(null=True, blank=True)
-    hours_per_week = models.DecimalField(max_digits=5, decimal_places=2)
-
-    class Meta:
-        ordering = ["-valid_from"]
-
-    def __str__(self) -> str:
-        until = self.valid_until or "open"
-        return f"{self.employee}: {self.valid_from} - {until}"
-
-    def save(self, *args, **kwargs) -> None:
-        if self.valid_from and self.valid_until and self.valid_until < self.valid_from:
-            raise ValidationError(
-                {
-                    "valid_until": "End date must be same or after start date.",
-                    "valid_from": "Start date must be same or before end date.",
-                }
-            )
-        super().save(*args, **kwargs)
 
 
 class WeeklyPlanCategory(JasminModel):

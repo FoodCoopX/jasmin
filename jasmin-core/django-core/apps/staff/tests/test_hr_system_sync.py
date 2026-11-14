@@ -310,6 +310,18 @@ class TestSync:
         assert (renamed.first_name, renamed.last_name) == ("Annika", "Berger")
         assert renamed.short_name_for_weekly_plan == "Annika"
 
+    def test_leaves_the_weekly_hours_to_the_office(self, api_client, hr_system_tenant):
+        anna = _synced("hr-1", "Anna", first_name="Anna", hours_per_week=20)
+
+        _sync(
+            api_client,
+            [_entry("hr-1", "Annika", "Berger"), _entry("hr-2", "Ben", "Kraus")],
+        )
+
+        anna.refresh_from_db()
+        assert anna.hours_per_week == 20
+        assert Employee.objects.get(hr_system_id="hr-2").hours_per_week is None
+
     def test_counts_nothing_when_nothing_changed(self, api_client, hr_system_tenant):
         _synced("hr-1", "Anna", first_name="Anna", last_name="Müller")
 

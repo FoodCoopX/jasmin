@@ -85,6 +85,17 @@ vi.mock("@shared/api/generated/staff/staff", async (importOriginal) => {
   };
 });
 
+// The PDF button as a stand-in that keeps what the page hands it.
+const pdfButton = vi.hoisted(() => ({
+  props: null as null | { documentProps: unknown; filename: string },
+}));
+vi.mock("@features/staff/pdfs/SaturdayShiftsPDFGenerator", () => ({
+  default: (props: { documentProps: unknown; filename: string }) => {
+    pdfButton.props = props;
+    return null;
+  },
+}));
+
 import SaturdayShifts from "../SaturdayShifts";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -430,6 +441,32 @@ describe("SaturdayShifts", () => {
       screen.getByRole("columnheader", { name: /staff\.saturday_shift_count/ }),
     );
     expect(totals.parentElement?.firstElementChild).toBe(totals);
+  });
+
+  it("hands the PDF every employee with the dates of their Saturdays", async () => {
+    renderPage();
+    await screen.findByText("Anna");
+
+    await waitFor(() =>
+      expect(pdfButton.props?.documentProps).toMatchObject({
+        year: 2026,
+        rows: [
+          {
+            name: "Anna",
+            saturdays: [
+              { date: "17.01.", absent: false },
+              { date: "11.04.", absent: true },
+            ],
+          },
+          { name: "Ben", saturdays: [{ date: "14.02.", absent: false }] },
+          {
+            name: "staff.inactive_employee",
+            saturdays: [{ date: "17.01.", absent: false }],
+          },
+        ],
+      }),
+    );
+    expect(pdfButton.props?.filename).toBe("staff.saturday_shifts_2026");
   });
 
   it("finds an employee by name", async () => {

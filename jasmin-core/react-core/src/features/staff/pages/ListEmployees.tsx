@@ -78,7 +78,21 @@ export default function ListEmployees() {
       align: "left",
       disabled: isSynced,
     };
-    if (!usesHrSystem) return [isActiveColumn, shortNameColumn];
+    // A guide for the weekly plan, set here only: the sync never touches it.
+    const hoursColumn: EditableColumnConfig<EmployeeRow> = {
+      title: (
+        <abbr title={t("staff.weekly_hours")}>{t("staff.hours_per_week")}</abbr>
+      ),
+      ariaLabel: t("staff.weekly_hours"),
+      dataIndex: "hours_per_week",
+      key: "hours_per_week",
+      inputType: "positive_integer",
+      width: "4em",
+      align: "center",
+      render: (hours) =>
+        hours == null ? "" : t("staff.hours_value", { hours }),
+    };
+    if (!usesHrSystem) return [isActiveColumn, shortNameColumn, hoursColumn];
     return [
       isActiveColumn,
       {
@@ -90,6 +104,7 @@ export default function ListEmployees() {
         disabled: true,
       },
       shortNameColumn,
+      hoursColumn,
     ];
   }, [isActiveColumn, isSynced, t, usesHrSystem]);
 

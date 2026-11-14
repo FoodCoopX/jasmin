@@ -33,7 +33,7 @@ from ..serializers import (
 from ..services import sync_employees_from_hr_system
 
 # All three viewsets enforce ``can_be_deleted`` on DELETE: every row that
-# references an employee / category (weekly-plan cells, absences, employments)
+# references an employee / category (weekly-plan cells, absences)
 # is ``on_delete=CASCADE``, so an unchecked delete silently wipes them.
 
 

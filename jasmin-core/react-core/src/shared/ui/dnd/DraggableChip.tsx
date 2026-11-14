@@ -1,4 +1,4 @@
-import type { CSSProperties, KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { useDrag } from "react-dnd";
 
 import { useDndGrid } from "./DndGridContext";
@@ -13,6 +13,9 @@ export interface DraggableChipProps {
   /** Optional small trailing count badge (e.g. how many times this chip is in
    *  use). Purely visual — convey its meaning to assistive tech via ``ariaHint``. */
   count?: number;
+  /** Optional small note before the count (e.g. hours planned against a
+   *  target). Purely visual too — say it in ``ariaHint``. */
+  note?: ReactNode;
 }
 
 /**
@@ -25,6 +28,7 @@ export default function DraggableChip({
   canDrag = true,
   ariaHint,
   count,
+  note,
 }: DraggableChipProps) {
   const { selected, select, itemType } = useDndGrid();
   // "Selected from the palette" = same chip, no source cell.
@@ -83,6 +87,11 @@ export default function DraggableChip({
       onKeyDown={onKeyDown}
     >
       <span className="dnd-chip-label">{chip.label}</span>
+      {note != null && (
+        <span className="dnd-chip-note" aria-hidden="true">
+          {note}
+        </span>
+      )}
       {count !== undefined && (
         <span className="dnd-chip-count" aria-hidden="true">
           {count}
