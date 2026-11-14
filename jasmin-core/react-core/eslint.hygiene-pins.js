@@ -37,7 +37,7 @@ export const complexityPins = {
   "src/features/public/pages/PublicLegalNoticePage.tsx": 59,
   "src/shared/modals/UserInfoModal.tsx": 50,
   "src/shared/services/api.ts": 29,
-  "src/shared/tables/BasicEditableTable/EditableCell.tsx": 34,
+  "src/shared/tables/BasicEditableTable/EditableCell.tsx": 32,
   "src/shared/tables/BasicEditableTable/EditableTable.tsx": 50,
   "src/shared/tables/BasicEditableTable/FormInput.tsx": 35,
   "src/shared/tables/BasicEditableTable/useEditableTable.ts": 41,

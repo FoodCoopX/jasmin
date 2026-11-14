@@ -3,7 +3,9 @@ from rest_framework.routers import DefaultRouter
 
 from .viewsets import (
     AbsenceCategoryViewSet,
+    AbsenceViewSet,
     EmployeeViewSet,
+    SaturdayShiftViewSet,
     WeeklyPlanCategoryViewSet,
     WeeklyPlanViewSet,
 )
@@ -22,6 +24,8 @@ router.register(
 )
 # Grid/aggregate endpoint (not a CRUD collection) — singular resource name.
 router.register(r"weekly_plan", WeeklyPlanViewSet, basename="weekly_plan")
+router.register(r"absences", AbsenceViewSet, basename="absences")
+router.register(r"saturday_shifts", SaturdayShiftViewSet, basename="saturday_shifts")
 
 
 urlpatterns = [

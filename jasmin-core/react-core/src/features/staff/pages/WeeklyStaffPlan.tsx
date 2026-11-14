@@ -1,13 +1,10 @@
-import { Button, Select } from "antd";
+import { Alert } from "antd";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQueryClient } from "@tanstack/react-query";
 
 import {
-  getStaffWeeklyPlanGridRetrieveQueryKey,
-  useStaffWeeklyPlanCopyCreate,
   useStaffWeeklyPlanCreate,
   useStaffWeeklyPlanGridRetrieve,
 } from "@shared/api/generated/staff/staff";
@@ -20,17 +17,21 @@ import { WeekSelector } from "@shared/selectors";
 import {
   AutoSaveIndicator,
   DndGrid,
-  DraggableChip,
-  DroppableCell,
   usePastelColorMap,
 } from "@shared/ui";
 import type { DndDragPayload, GridPos } from "@shared/ui";
 import { notify } from "@shared/utils";
 import { getErrorMessage } from "@shared/utils/apiError";
+import WeeklyPlanCell from "@features/staff/components/WeeklyPlanCell";
+import WeeklyPlanCopyTools from "@features/staff/components/WeeklyPlanCopyTools";
+import WeeklyPlanImageButton from "@features/staff/components/WeeklyPlanImageButton";
+import WeeklyPlanPalette from "@features/staff/components/WeeklyPlanPalette";
+import { SATURDAY, STAFF_WEEKDAYS } from "@features/staff/utils/weekdays";
 
 dayjs.extend(isoWeek);
 
-const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
+// Absent on all of them, an employee is left out of the palette.
+const WORKDAYS = [0, 1, 2, 3, 4];
 
 /** A flat grid row: which category + which line inside it. ``pos.row`` indexes
  *  into the flat list; ``pos.col`` is the weekday. */
@@ -49,8 +50,7 @@ function cellsFromGrid(grid: WeeklyPlanGrid): Record<string, string> {
     category.rows.forEach((row) =>
       Object.entries(row.days).forEach(([day, employeeId]) => {
         if (employeeId) {
-          filled[cellKey(category.id, row.row_index, Number(day))] =
-            employeeId;
+          filled[cellKey(category.id, row.row_index, Number(day))] = employeeId;
         }
       }),
     ),
@@ -75,7 +75,6 @@ function hasCategoryDayDuplicate(state: Record<string, string>): boolean {
 export default function WeeklyStaffPlan() {
   const { t } = useTranslation();
   const { isOffice } = useRoles();
-  const queryClient = useQueryClient();
 
   const [selectedYear, setSelectedYear] = useState<number>(() =>
     dayjs().isoWeekYear(),
@@ -83,14 +82,6 @@ export default function WeeklyStaffPlan() {
   const [selectedWeek, setSelectedWeek] = useState<number>(() =>
     dayjs().isoWeek(),
   );
-  const [copyFromWeek, setCopyFromWeek] = useState<number | null>(null);
-
-  // Reset the manual source-week choice when the target week changes so the
-  // picker always re-defaults to "previous week" for the new selection.
-  useEffect(() => {
-    setCopyFromWeek(null);
-  }, [selectedYear, selectedWeek]);
-
   const listParams = useMemo(
     () => ({ year: selectedYear, week: selectedWeek ?? 1 }),
     [selectedYear, selectedWeek],
@@ -100,12 +91,9 @@ export default function WeeklyStaffPlan() {
     data: grid,
     isFetching,
     refetch: refetchGrid,
-  } = useStaffWeeklyPlanGridRetrieve(
-    listParams,
-    {
-      query: { enabled: selectedWeek != null },
-    },
-  );
+  } = useStaffWeeklyPlanGridRetrieve(listParams, {
+    query: { enabled: selectedWeek != null },
+  });
 
   // Editable grid state: filled cells only, keyed by `${category}|${row}|${day}`.
   const [cells, setCells] = useState<Record<string, string>>({});
@@ -124,21 +112,41 @@ export default function WeeklyStaffPlan() {
   }, [grid]);
 
   // The grid lists a deactivated employee only while they hold a shift this
-  // week, so the shift shows; the palette offers the active ones alone.
+  // week, so the shift shows; the palette offers the active ones alone, and
+  // of them not those absent the whole working week.
   const employees: WeeklyPlanEmployee[] = useMemo(
     () => grid?.employees ?? [],
     [grid],
   );
-  const paletteEmployees = useMemo(
+  const activeEmployees = useMemo(
     () => employees.filter((employee) => employee.is_active !== false),
     [employees],
+  );
+  const paletteEmployees = useMemo(
+    () =>
+      activeEmployees.filter(
+        (employee) =>
+          !WORKDAYS.every((day) => employee.absent_days.includes(day)),
+      ),
+    [activeEmployees],
   );
   const employeeById = useMemo(
     () => new Map(employees.map((e) => [e.id, e])),
     [employees],
   );
+  // From the active employees, so a colour doesn't change with the week's
+  // absences.
   const colorMap = usePastelColorMap(
-    useMemo(() => paletteEmployees.map((e) => e.id), [paletteEmployees]),
+    useMemo(() => activeEmployees.map((e) => e.id), [activeEmployees]),
+  );
+  const absentDaysByEmployee = useMemo(
+    () => new Map(employees.map((e) => [e.id, new Set(e.absent_days)])),
+    [employees],
+  );
+  const isAbsent = useCallback(
+    (employeeId: string, day: number) =>
+      absentDaysByEmployee.get(employeeId)?.has(day) ?? false,
+    [absentDaysByEmployee],
   );
 
   // Live tally of how many cells each employee fills in the visible week —
@@ -150,6 +158,17 @@ export default function WeeklyStaffPlan() {
     }
     return counts;
   }, [cells]);
+
+  // Shifts that fall on an absence, planned before it was known. They stay
+  // until the office moves them; the grid marks them, on the days it shows.
+  const conflictCount = useMemo(
+    () =>
+      Object.entries(cells).filter(([key, employeeId]) => {
+        const day = Number(key.split("|")[2]);
+        return STAFF_WEEKDAYS.includes(day) && isAbsent(employeeId, day);
+      }).length,
+    [cells, isAbsent],
+  );
 
   // Flat row list (for pos.row) + its reverse (category,row → flat index).
   const flatRows = useMemo<FlatRow[]>(() => {
@@ -172,13 +191,15 @@ export default function WeeklyStaffPlan() {
   }, [flatRows]);
 
   // The page reports a refused save itself, so the app-wide mutation toast
-  // stays silent.
+  // stays silent. Each save sends the whole week, so they run one after the
+  // other: an earlier one must never land last.
   const {
     mutate: save,
     isPending: isSaving,
     isError: saveFailed,
   } = useStaffWeeklyPlanCreate({
     mutation: {
+      scope: { id: "weekly-plan-save" },
       meta: { silent: true },
       onError: (error) => {
         notify.error(getErrorMessage(error, t("staff.save_failed")));
@@ -239,7 +260,9 @@ export default function WeeklyStaffPlan() {
           payload.from.col,
         );
         const moved = next[sourceKey];
-        if (moved === undefined) return;
+        // A pick-up kept over a week switch or a refetch may point at a cell
+        // that holds someone else by now: move no one rather than them.
+        if (moved !== payload.chip.id) return;
         const displaced = next[targetKey];
         delete next[sourceKey];
         next[targetKey] = moved;
@@ -264,6 +287,20 @@ export default function WeeklyStaffPlan() {
     [t],
   );
 
+  // No one goes to a day they're absent: not the chip placed, nor, in a swap,
+  // the occupant it sends back to the chip's old day.
+  const canPlace = useCallback(
+    (payload: DndDragPayload, to: GridPos) => {
+      if (isAbsent(payload.chip.id, to.col)) return false;
+      const target = flatRowsRef.current[to.row];
+      if (!payload.from || !target) return true;
+      const displaced =
+        cellsRef.current[cellKey(target.categoryId, target.rowIndex, to.col)];
+      return !displaced || !isAbsent(displaced, payload.from.col);
+    },
+    [isAbsent],
+  );
+
   const handleRemove = useCallback((pos: GridPos) => {
     const target = flatRowsRef.current[pos.row];
     if (!target) return;
@@ -275,59 +312,51 @@ export default function WeeklyStaffPlan() {
     });
   }, []);
 
-  const currentWeekIsEmpty = Object.keys(cells).length === 0;
+  // The Saturday holds the Saturday shifts, set on their own page: a copy
+  // leaves it out, so a week planned on the Saturday alone takes one.
+  const currentWeekIsEmpty = Object.keys(cells).every(
+    (key) => Number(key.split("|")[2]) === SATURDAY,
+  );
 
-  // Focus the grid region after a copy: the Copy button gets disabled once the
-  // week is no longer empty, so keyboard focus would otherwise be lost.
+  // Focus the grid region after a copy: the copy tools go once the week is no
+  // longer empty, so keyboard focus would otherwise be lost.
   const gridRegionRef = useRef<HTMLElement>(null);
 
-  // Copy source: default to the previous week (same year); the office can pick
-  // another from the dropdown. ``effectiveFromWeek`` is what a copy uses.
-  const defaultFromWeek =
-    selectedWeek != null && selectedWeek > 1 ? selectedWeek - 1 : null;
-  const effectiveFromWeek = copyFromWeek ?? defaultFromWeek;
-
-  const weekOptions = useMemo(() => {
-    // Dec 28 always falls in the last ISO week of its year → its week number is
-    // the count of ISO weeks (52 or 53), using only the isoWeek plugin.
-    const totalWeeks = dayjs(`${selectedYear}-12-28`).isoWeek();
-    return Array.from({ length: totalWeeks }, (_, i) => i + 1)
-      .filter((week) => week !== selectedWeek)
-      .map((week) => ({
-        value: week,
-        label: t("staff.week_option", { week }),
-      }));
-  }, [selectedYear, selectedWeek, t]);
-
-  const { mutate: copyWeek, isPending: isCopying } =
-    useStaffWeeklyPlanCopyCreate({
-      mutation: {
-        meta: { silent: true },
-        onSuccess: () => {
-          notify.success(t("staff.weekly_plan_copied_success"));
-          queryClient.invalidateQueries({
-            queryKey: getStaffWeeklyPlanGridRetrieveQueryKey(listParams),
-          });
-          gridRegionRef.current?.focus();
-        },
-        onError: (error) => {
-          notify.error(
-            getErrorMessage(error, t("staff.copy_target_not_empty")),
-          );
-        },
-      },
-    });
-
-  const handleCopy = () => {
-    if (selectedWeek == null || effectiveFromWeek == null) return;
-    copyWeek({
-      data: {
-        year: selectedYear,
-        from_week: effectiveFromWeek,
-        to_week: selectedWeek,
-      },
-    });
-  };
+  // What a cell shows, in the grid and in the week's image alike. No tint for
+  // an inactive employee, who has no palette colour, nor on an absence, shown
+  // red.
+  const cellAt = useCallback(
+    (categoryId: string, rowIndex: number, day: number) => {
+      const employeeId = cells[cellKey(categoryId, rowIndex, day)];
+      const employee = employeeId
+        ? (employeeById.get(employeeId) ?? null)
+        : null;
+      const absent = !!employee && isAbsent(employee.id, day);
+      const inactive = employee?.is_active === false;
+      const name = employee?.short_name_for_weekly_plan ?? "";
+      return {
+        employee,
+        label: inactive ? t("staff.inactive_employee", { employee: name }) : name,
+        color:
+          employee && !inactive && !absent
+            ? colorMap.get(employee.id)
+            : undefined,
+        absent,
+      };
+    },
+    [cells, colorMap, employeeById, isAbsent, t],
+  );
+  const imageCellAt = useCallback(
+    (categoryId: string, rowIndex: number, day: number) => {
+      const { employee, label, color, absent } = cellAt(
+        categoryId,
+        rowIndex,
+        day,
+      );
+      return employee ? { label, color, absent } : null;
+    },
+    [cellAt],
+  );
 
   const hasCategories = (grid?.categories.length ?? 0) > 0;
 
@@ -345,36 +374,38 @@ export default function WeeklyStaffPlan() {
         selectedWeek={selectedWeek}
         setSelectedWeek={setSelectedWeek}
       />
-      {isOffice && selectedWeek != null && currentWeekIsEmpty && (
-        <div className="weekly-plan-toolbar">
-          <div className="weekly-plan-copy">
-            <label className="weekly-plan-copy-field">
-              {t("staff.copy_weekly_plan_from")}
-              <Select
-                aria-label={t("staff.copy_weekly_plan_from")}
-                size="small"
-                showSearch
-                optionFilterProp="label"
-                className="weekly-plan-copy-select"
-                placeholder={t("staff.copy_source_week")}
-                value={effectiveFromWeek ?? undefined}
-                onChange={(value) => setCopyFromWeek(value)}
-                options={weekOptions}
-              />
-            </label>
-            <Button
-              type="primary"
-              size="small"
-              onClick={handleCopy}
-              loading={isCopying}
-              disabled={effectiveFromWeek == null}
-            >
-              {t("staff.copy_into_this_week")}
-            </Button>
-          </div>
+      {grid && hasCategories && (
+        <div className="mt-16">
+          <WeeklyPlanImageButton
+            year={selectedYear}
+            week={selectedWeek}
+            categories={grid.categories}
+            cellAt={imageCellAt}
+            disabled={Object.keys(cells).length === 0}
+          />
         </div>
       )}
-      <DndGrid onPlace={handlePlace} onRemove={handleRemove}>
+      {isOffice && currentWeekIsEmpty && (
+        <WeeklyPlanCopyTools
+          key={`${selectedYear}-${selectedWeek}`}
+          year={selectedYear}
+          week={selectedWeek}
+          onCopied={() => gridRegionRef.current?.focus()}
+        />
+      )}
+      {conflictCount > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          className="mb-1em"
+          message={t("staff.absence_conflicts", { count: conflictCount })}
+        />
+      )}
+      <DndGrid
+        onPlace={handlePlace}
+        onRemove={handleRemove}
+        canPlace={canPlace}
+      >
         <div className="weekly-plan-page">
           {selectedWeek == null ? (
             <p className="color-text-tertiary">{t("staff.select_week")}</p>
@@ -382,36 +413,13 @@ export default function WeeklyStaffPlan() {
             <p className="color-text-tertiary">{t("staff.no_categories")}</p>
           ) : (
             <div className="weekly-plan-layout">
-              <section
-                className="weekly-plan-palette"
-                aria-labelledby="weekly-plan-employees-heading"
-              >
-                <h3 id="weekly-plan-employees-heading">
-                  {t("staff.employees")}
-                </h3>
-                <div className="weekly-plan-palette-box">
-                  {paletteEmployees.length === 0 ? (
-                    <p className="color-text-tertiary">{t("staff.no_employees")}</p>
-                  ) : (
-                    paletteEmployees.map((employee) => {
-                      const count = planCountByEmployee.get(employee.id) ?? 0;
-                      return (
-                        <DraggableChip
-                          key={employee.id}
-                          chip={{
-                            id: employee.id,
-                            label: employee.short_name_for_weekly_plan,
-                            color: colorMap.get(employee.id),
-                          }}
-                          canDrag={isOffice}
-                          count={count}
-                          ariaHint={t("staff.times_planned", { count })}
-                        />
-                      );
-                    })
-                  )}
-                </div>
-              </section>
+              <WeeklyPlanPalette
+                employees={paletteEmployees}
+                planCountByEmployee={planCountByEmployee}
+                colorMap={colorMap}
+                canDrag={isOffice}
+                everyoneAbsent={activeEmployees.length > 0}
+              />
 
               <section
                 className="weekly-plan-grid-wrap"
@@ -432,7 +440,7 @@ export default function WeeklyStaffPlan() {
                   <thead>
                     <tr>
                       <th className="weekly-plan-th-row-label" scope="col" />
-                      {WEEKDAYS.map((day) => (
+                      {STAFF_WEEKDAYS.map((day) => (
                         <th key={day} scope="col">
                           {t(`commissioning.weekdays.${day}`)}
                         </th>
@@ -445,7 +453,7 @@ export default function WeeklyStaffPlan() {
                       className="weekly-plan-category-group"
                     >
                       <tr className="weekly-plan-category-row">
-                        <th colSpan={WEEKDAYS.length + 1} scope="colgroup">
+                        <th colSpan={STAFF_WEEKDAYS.length + 1} scope="colgroup">
                           {category.name}
                         </th>
                       </tr>
@@ -456,65 +464,26 @@ export default function WeeklyStaffPlan() {
                             <th className="weekly-plan-row-label" scope="row">
                               {rowIndex + 1}
                             </th>
-                            {WEEKDAYS.map((day) => {
-                              const employeeId =
-                                cells[cellKey(category.id, rowIndex, day)];
-                              const employee = employeeId
-                                ? employeeById.get(employeeId)
-                                : null;
-                              const occupantLabel =
-                                employee?.is_active === false
-                                  ? t("staff.inactive_employee", {
-                                      employee:
-                                        employee.short_name_for_weekly_plan,
-                                    })
-                                  : employee?.short_name_for_weekly_plan;
-                              const flatIndex =
-                                flatIndexByCell.get(
-                                  `${category.id}|${rowIndex}`,
-                                ) ?? 0;
-                              const dayName = t(
-                                `commissioning.weekdays.${day}`,
-                              );
-                              const cellAriaLabel = employee
-                                ? t("staff.cell_filled", {
-                                    day: dayName,
-                                    category: category.name,
-                                    row: rowIndex + 1,
-                                    employee: occupantLabel,
-                                  })
-                                : t("staff.cell_empty", {
-                                    day: dayName,
-                                    category: category.name,
-                                    row: rowIndex + 1,
-                                  });
+                            {STAFF_WEEKDAYS.map((day) => {
+                              const { employee, label, color, absent } =
+                                cellAt(category.id, rowIndex, day);
                               return (
-                                <td key={day} className="weekly-plan-cell">
-                                  <DroppableCell
-                                    pos={{ row: flatIndex, col: day }}
-                                    occupant={
-                                      employee
-                                        ? {
-                                            id: employee.id,
-                                            label: occupantLabel ?? "",
-                                            // No tint: an inactive employee
-                                            // has no palette colour.
-                                            color: employee.is_active === false
-                                              ? undefined
-                                              : colorMap.get(employee.id),
-                                          }
-                                        : null
-                                    }
-                                    canEdit={isOffice}
-                                    emptyLabel={t("staff.drop_employee_here")}
-                                    ariaLabel={cellAriaLabel}
-                                    removeAriaLabelFor={(label) =>
-                                      t("staff.remove_employee", {
-                                        employee: label,
-                                      })
-                                    }
-                                  />
-                                </td>
+                                <WeeklyPlanCell
+                                  key={day}
+                                  flatIndex={
+                                    flatIndexByCell.get(
+                                      `${category.id}|${rowIndex}`,
+                                    ) ?? 0
+                                  }
+                                  categoryName={category.name}
+                                  rowIndex={rowIndex}
+                                  day={day}
+                                  employee={employee}
+                                  label={label}
+                                  color={color}
+                                  absent={absent}
+                                  canEdit={isOffice}
+                                />
                               );
                             })}
                           </tr>

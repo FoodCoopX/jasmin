@@ -161,6 +161,18 @@ function PagedPage({ rows }: { rows: Row[] }) {
   );
 }
 
+/** Picks an entry of the selection column's menu. The menu opens on hover,
+ *  after a delay; until then the one opened before is still in the document,
+ *  closing, and refuses clicks. */
+async function pickFromSelectionMenu(entry: string) {
+  const trigger = document.querySelector(
+    ".ant-table-selection-extra > span",
+  ) as HTMLElement;
+  await userEvent.hover(trigger);
+  await waitFor(() => expect(trigger).toHaveClass("ant-dropdown-open"));
+  await userEvent.click(screen.getByText(entry));
+}
+
 const PEARS: Row[] = Array.from({ length: 12 }, (_, index) => ({
   key: String(index),
   id: String(index),
@@ -174,10 +186,7 @@ describe("EditableTable row selection across pages", () => {
     await userEvent.click(selectAll());
     expect(bulkActionIds()).toBe("0,1,2,3,4,5,6,7,8,9");
 
-    await userEvent.hover(
-      document.querySelector(".ant-table-selection-extra > span") as HTMLElement,
-    );
-    await userEvent.click(await screen.findByText("table.select_all_pages"));
+    await pickFromSelectionMenu("table.select_all_pages");
 
     expect(bulkActionIds()).toBe("0,1,2,3,4,5,6,7,8,9,10");
     // The pager sits above and below the table.
@@ -185,10 +194,7 @@ describe("EditableTable row selection across pages", () => {
     expect(checkboxOf("Pear 10")).toBeChecked();
     expect(checkboxOf("Pear 11")).not.toBeChecked();
 
-    await userEvent.hover(
-      document.querySelector(".ant-table-selection-extra > span") as HTMLElement,
-    );
-    await userEvent.click(await screen.findByText("table.select_none"));
+    await pickFromSelectionMenu("table.select_none");
 
     expect(bulkActionIds()).toBe("");
   });

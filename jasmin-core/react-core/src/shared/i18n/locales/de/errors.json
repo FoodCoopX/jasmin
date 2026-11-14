@@ -183,6 +183,9 @@
     "no_context": "Diese Anfrage enthält keinen Mandanten-Kontext. Bitte die Seite über die Adresse des Mandanten erneut aufrufen.",
     "logo_invalid": "Das Logo muss ein PNG-, JPEG-, WEBP- oder GIF-Bild sein und die Größen- und Auflösungsgrenzen einhalten.",
     "feature_flags_invalid": "Die Einstellungen für Navigation und KI müssen als Objekt mit An-/Aus-Werten übermittelt werden.",
+    "hr_system_token_invalid": "Das Token enthält Zeichen, die sich nicht mitschicken lassen, etwa Leerzeichen, Zeilenumbrüche oder typografische Anführungszeichen. Bitte das Token erneut kopieren und einfügen.",
+    "hr_system_address_invalid": "Bitte eine https-Adresse eines öffentlich erreichbaren Servers angeben. Interne Adressen sind nicht erlaubt.",
+    "hr_system_addresses_apart": "Beide Adressen müssen zum selben Server führen, denn das Token geht an beide. Zum Wechsel des Systems zuerst die andere Adresse leeren.",
     "rate_limits_invalid": "Die Obergrenzen müssen bekannten Aktionen ganze Zahlen von 1 bis 100000 für „weekly“ und „per_minute“ zuordnen."
   },
   "tenant_settings": {
@@ -612,7 +615,7 @@
     "weekly_plan_category_not_found": "Wochenplan-Kategorie nicht gefunden.",
     "invalid_weekly_plan_assignment": "Ungültige Zuordnung im Wochenplan.",
     "weekly_plan_copy_target_not_empty": "Die Zielwoche enthält bereits einen Wochenplan. Kopieren ist nur in eine leere Woche möglich.",
-    "employee_in_use": "Diese MitarbeiterIn kann nicht gelöscht werden, weil noch Wochenplan-Einträge, Abwesenheiten oder Anstellungen auf sie verweisen. Stattdessen deaktivieren.",
+    "employee_in_use": "Diese MitarbeiterIn kann nicht gelöscht werden, weil noch Wochenplan-Einträge oder Abwesenheiten auf sie verweisen. Stattdessen deaktivieren.",
     "weekly_plan_category_in_use": "Diese Wochenplan-Kategorie kann nicht gelöscht werden, weil sie im Wochenplan verwendet wird. Stattdessen deaktivieren.",
     "absence_category_in_use": "Diese Abwesenheits-Kategorie kann nicht gelöscht werden, weil noch Abwesenheiten auf sie verweisen. Stattdessen deaktivieren.",
     "weekly_plan_category_shrink_blocked": "Die Zeilenzahl kann nicht verringert werden, weil in den wegfallenden Zeilen noch Einträge stehen. Bitte diese Einträge zuerst entfernen.",
@@ -620,7 +623,18 @@
     "weekly_plan_copy_source_category_inactive": "Die Quellwoche enthält Einträge in Kategorien, die deaktiviert sind. Der Wochenplan zeigt nur aktive Kategorien; kopiert würden diese Einträge unsichtbar mitwandern und beim nächsten Speichern der Zielwoche gelöscht. Bitte die Kategorie wieder aktivieren oder die betroffenen Einträge in der Quellwoche entfernen.",
     "employee_short_name_taken": "Eine andere MitarbeiterIn hat bereits diesen Namen für den Wochenplan, auch wenn sie deaktiviert ist.",
     "weekly_plan_category_sort_order_taken": "Eine andere Wochenplan-Kategorie hat bereits diese Reihenfolge, auch wenn sie deaktiviert ist.",
-    "absence_category_name_taken": "Eine andere Abwesenheits-Kategorie hat in diesem Jahr bereits diese Bezeichnung, auch wenn sie deaktiviert ist."
+    "absence_category_name_taken": "Eine andere Abwesenheits-Kategorie hat bereits diese Bezeichnung, auch wenn sie deaktiviert ist.",
+    "absence_category_default_locked": "Die Standard-Kategorie nimmt alle Abwesenheiten auf, für die es keine eigene Kategorie gibt. Sie lässt sich umbenennen, aber nicht löschen oder deaktivieren.",
+    "absence_category_not_found": "Abwesenheits-Kategorie nicht gefunden.",
+    "absences_from_hr_system": "Die Abwesenheiten dieser MitarbeiterIn kommen aus dem externen Zeiterfassungssystem und werden dort eingetragen.",
+    "employee_absent": "Diese MitarbeiterIn ist an dem Tag abwesend und kann dort nicht eingeplant werden.",
+    "employee_inactive": "Diese MitarbeiterIn ist deaktiviert und kann nicht neu eingeplant werden.",
+    "saturday_shift_no_place": "Am Samstag dieser Woche ist im Wochenplan keine Zeile mehr frei. Bitte einer Kategorie eine Zeile mehr geben oder am Samstag jemanden herausnehmen.",
+    "hr_system_not_set_up": "Der Abgleich mit dem externen Zeiterfassungssystem ist nicht eingerichtet. Bitte unter Konfiguration → App → Externes Zeiterfassungssystem einschalten und Adresse und API-Token hinterlegen.",
+    "hr_system_token_rejected": "Das externe Zeiterfassungssystem nimmt das hinterlegte API-Token nicht an. Bitte ein gültiges Token unter Konfiguration → App → Externes Zeiterfassungssystem eintragen.",
+    "hr_system_address_not_allowed": "Die Adressen des externen Zeiterfassungssystems lassen sich so nicht aufrufen: Beide müssen https-Adressen desselben öffentlichen Servers sein. Bitte unter Konfiguration → App prüfen.",
+    "hr_system_mass_deactivation": "Der Abgleich würde mehr als die Hälfte der MitarbeiterInnen aus dem externen Zeiterfassungssystem deaktivieren.",
+    "hr_system_unavailable": "Das externe Zeiterfassungssystem ist gerade nicht erreichbar oder hat keine lesbare Antwort geschickt. Bitte später erneut versuchen."
   },
   "email_config": {
     "test_recipient_missing": "Bitte eine Empfängeradresse für die Test-E-Mail angeben.",

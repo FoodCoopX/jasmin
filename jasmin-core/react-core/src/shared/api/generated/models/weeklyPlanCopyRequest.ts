@@ -7,7 +7,7 @@
  */
 
 /**
- * Copy the plan of ``from_week`` into an empty ``to_week`` (same year).
+ * Copy the plan of ``from_week`` into an empty ``to_week`` of ``year``.
  */
 export interface WeeklyPlanCopyRequest {
   /**
@@ -15,6 +15,12 @@ export interface WeeklyPlanCopyRequest {
    * @maximum 2100
    */
   year: number;
+  /**
+   * The year of ``from_week``; ``year`` when left out.
+   * @minimum 2000
+   * @maximum 2100
+   */
+  from_year?: number;
   /**
    * @minimum 1
    * @maximum 53

@@ -169,14 +169,21 @@ class TenantViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
     # The tenant's IBAN and SEPA creditor identity decide where SEPA
     # collections are paid, so changing any of them needs fresh step-up auth,
     # like every other bank-data write (member / billing-profile IBANs, the
-    # billing fields of tenant settings). ``requires_step_up_for_fields`` fires
-    # only when a value actually changes, so a configuration autosave that
-    # echoes these unchanged next to a name or address edit does not prompt.
+    # billing fields of tenant settings). The HR system's token is a
+    # credential, and its addresses decide where the backend sends it, so
+    # storing, replacing or removing any of them needs step-up too.
+    # ``requires_step_up_for_fields`` fires only when a value actually changes,
+    # so a configuration autosave that echoes these unchanged next to a name or
+    # address edit does not prompt. The token is never echoed, so any token
+    # sent counts as a change.
     _STEP_UP_SENSITIVE_FIELDS = (
         "iban",
         "sepa_creditor_id",
         "sepa_creditor_name",
         "sepa_creditor_bic",
+        "hr_system_api_token",
+        "hr_system_employees_url",
+        "hr_system_absences_url",
     )
 
     def get_permissions(self):
@@ -184,7 +191,12 @@ class TenantViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
 
         perms = super().get_permissions()
         if self.action in {"update", "partial_update"}:
-            perms.append(requires_step_up_for_fields(*self._STEP_UP_SENSITIVE_FIELDS)())
+            perms.append(
+                requires_step_up_for_fields(
+                    *self._STEP_UP_SENSITIVE_FIELDS,
+                    secret_fields=("hr_system_api_token",),
+                )()
+            )
         return perms
 
     def get_serializer_class(self):

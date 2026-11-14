@@ -18,12 +18,8 @@ queries (one per reverse relation) instead of N*R — see
 export interface AbsenceCategory {
   readonly id: string;
   is_active?: boolean;
-  /**
-   * @minimum 0
-   * @maximum 32767
-   */
-  year: number;
   /** @maxLength 200 */
   name: string;
+  readonly is_default: boolean;
   readonly can_be_deleted: boolean;
 }

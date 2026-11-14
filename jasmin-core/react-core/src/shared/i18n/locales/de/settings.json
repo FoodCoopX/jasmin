@@ -8,6 +8,21 @@
   "save_success": "Einstellungen erfolgreich gespeichert",
   "unsaved_changes_warning": "Es gibt ungespeicherte Änderungen. Beim Verlassen der Seite gehen sie verloren.",
   "unsaved_changes_title": "Ungespeicherte Änderungen",
+  "secret_stored": "Gespeichert – zum Ersetzen ein neues eintragen",
+  "secret_missing": "Noch nicht hinterlegt",
+  "secret_saving": "Wird gespeichert …",
+  "secret_remove": "Entfernen",
+  "hr_system": {
+    "title": "Externes Zeiterfassungssystem",
+    "uses_hr_system": "MitarbeiterInnen aus dem externen Zeiterfassungssystem übernehmen",
+    "uses_hr_system_desc": "Die MitarbeiterInnen-Liste und die Abwesenheiten bekommen je einen Knopf, der sie mit dem externen Zeiterfassungssystem abgleicht.",
+    "hr_system_employees_url": "Adresse der MitarbeiterInnen",
+    "hr_system_absences_url": "Adresse der Abwesenheiten",
+    "hr_system_employees_url_placeholder": "z. B. https://…/api/v2/employees",
+    "hr_system_absences_url_placeholder": "z. B. https://…/api/v2/absence-requests/team",
+    "api_token": "API-Token",
+    "format": "Jasmin ruft die Adressen per https auf und schickt das Token als „Authorization: Bearer …“ mit; es wird verschlüsselt gespeichert und nie wieder angezeigt. Es gehört zum Server der Adressen: Beide Adressen müssen zum selben Server führen, und zieht eine Adresse auf einen anderen Server um oder wird geleert, löscht Jasmin das Token, also die Adressen vor dem Token eintragen. Das Token muss alle MitarbeiterInnen sehen, etwa das eines Admin-Kontos, sonst fehlen Abwesenheiten. Erwartet wird JSON: für die MitarbeiterInnen eine Liste mit id, firstName, lastName und active, für die Abwesenheiten eine mit employeeId, startDate, endDate und status. Jasmin liest nur, an welchen Tagen jemand fehlt, nicht die Art der Abwesenheit, so kommen keine Krankheitsdaten an."
+  },
   "operating_mode": {
     "title": "Betriebsmodus"
   },

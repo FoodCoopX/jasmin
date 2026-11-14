@@ -8,7 +8,13 @@
 
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 
 const stable = vi.hoisted(() => ({
   // Mutated per test. ``undefined`` models the key being ABSENT from the
@@ -71,6 +77,8 @@ vi.mock("@hooks/index", async () => {
 vi.mock("@shared/api/generated/tenants/tenants", () => ({
   tenantsTenantsPartialUpdate: vi.fn(),
   tenantsSettingsUpdateCurrentSettingsUpdate: vi.fn(),
+  // The HR-system card's own save; its tests live with the card.
+  useTenantsTenantsPartialUpdate: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@shared/ui", () => ({
@@ -239,6 +247,74 @@ describe("ConfigurationApp weekly-upload tenants", () => {
     expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
       settings: { uploads_weekly_share_amount: false },
     });
+  });
+});
+
+describe("ConfigurationApp HR-system card", () => {
+  beforeEach(() => {
+    stable.weeklyUpload = undefined;
+    stable.save = null;
+    stable.capabilities = {};
+    stable.tenantRow.navigation = { show_members: true, show_abos: true };
+    delete stable.tenantRow.uses_hr_system;
+    delete stable.tenantRow.hr_system_employees_url;
+    delete stable.tenantRow.has_hr_system_api_token;
+    vi.mocked(tenantsTenantsPartialUpdate).mockClear();
+  });
+
+  it("follows the modules and the interfaces, under the general settings", () => {
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()).toEqual([
+      "settings.operating_mode.title",
+      "settings.general.title",
+      "settings.navigation.title",
+      "settings.commissioning.planning.title",
+      "settings.hr_system.title",
+    ]);
+  });
+
+  it("is left out while the staff module is off", () => {
+    stable.tenantRow.navigation = {
+      show_members: true,
+      show_abos: true,
+      show_staff: false,
+    };
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()).not.toContain("settings.hr_system.title");
+  });
+
+  it("comes and goes with the staff module's toggle", () => {
+    render(<ConfigurationApp />);
+
+    fireEvent.click(moduleToggle(STAFF));
+    expect(cardTitles()).not.toContain("settings.hr_system.title");
+
+    fireEvent.click(moduleToggle(STAFF));
+    expect(cardTitles()).toContain("settings.hr_system.title");
+  });
+
+  it("leaves the card's fields out of the page's own save", async () => {
+    stable.tenantRow.uses_hr_system = true;
+    stable.tenantRow.hr_system_employees_url = "https://hr.example.com/staff";
+    stable.tenantRow.has_hr_system_api_token = true;
+    render(<ConfigurationApp />);
+
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    const body = vi.mocked(tenantsTenantsPartialUpdate).mock.calls[0][1];
+    for (const field of [
+      "uses_hr_system",
+      "hr_system_employees_url",
+      "hr_system_absences_url",
+      "has_hr_system_api_token",
+      "hr_system_api_token",
+    ]) {
+      expect(body).not.toHaveProperty(field);
+    }
   });
 });
 

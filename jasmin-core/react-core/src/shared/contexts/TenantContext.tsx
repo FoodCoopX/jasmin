@@ -78,6 +78,7 @@ type TenantSettingMap = Pick<
   | "navigation"
   | "ai"
   | "allow_upload_for_data_lists"
+  | "uses_hr_system"
 > &
   TenantOverlaySettings;
 

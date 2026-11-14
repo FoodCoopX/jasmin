@@ -8,6 +8,21 @@
   "save_success": "Settings saved successfully",
   "unsaved_changes_warning": "You have unsaved changes. Are you sure you want to leave this page? Your changes will be lost.",
   "unsaved_changes_title": "Unsaved changes",
+  "secret_stored": "Stored – enter a new one to replace it",
+  "secret_missing": "Not stored yet",
+  "secret_saving": "Saving …",
+  "secret_remove": "Remove",
+  "hr_system": {
+    "title": "External time-tracking system",
+    "uses_hr_system": "Take staff members from the external time-tracking system",
+    "uses_hr_system_desc": "The staff list and the absences each get a button that syncs them with the external time-tracking system.",
+    "hr_system_employees_url": "Staff address",
+    "hr_system_absences_url": "Absences address",
+    "hr_system_employees_url_placeholder": "e.g. https://…/api/v2/employees",
+    "hr_system_absences_url_placeholder": "e.g. https://…/api/v2/absence-requests/team",
+    "api_token": "API token",
+    "format": "Jasmin calls the addresses over https and sends the token as \"Authorization: Bearer …\"; it is stored encrypted and never shown again. It belongs to the addresses' server: both addresses must lead to the same server, and when an address moves to another server or is cleared, Jasmin deletes the token, so enter the addresses before the token. The token has to see every staff member, an admin account's, say, or absences go missing. It expects JSON: for the staff a list with id, firstName, lastName and active, for the absences one with employeeId, startDate, endDate and status. Jasmin reads only on which days someone is away, not the type of absence, so no sickness data arrives."
+  },
   "operating_mode": {
     "title": "Operating mode"
   },

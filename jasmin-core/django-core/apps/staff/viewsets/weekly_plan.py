@@ -64,6 +64,11 @@ class WeeklyPlanViewSet(RolePermissionsMixin, viewsets.ViewSet):
         serializer = WeeklyPlanCopySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        copy_week(data["year"], data["from_week"], data["to_week"])
+        copy_week(
+            data["year"],
+            data["from_week"],
+            data["to_week"],
+            from_year=data.get("from_year", data["year"]),
+        )
         grid = build_week_grid(data["year"], data["to_week"])
         return Response(WeeklyPlanGridSerializer(grid).data, status=status.HTTP_200_OK)

@@ -5,20 +5,9 @@
 // drag-and-drop kit stays real; its click "pick up, then place" path stands in
 // for a mouse drag.
 
-import {
-  MutationCache,
-  QueryClient,
-  QueryClientProvider,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { UseMutationOptions } from "@tanstack/react-query";
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { message } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,7 +15,6 @@ import type {
   StaffWeeklyPlanGridRetrieveParams,
   WeeklyPlanAssignmentRequest,
   WeeklyPlanCopyRequest,
-  WeeklyPlanEmployee,
   WeeklyPlanGrid,
   WeeklyPlanReplaceRequest,
 } from "@shared/api/generated/models";
@@ -108,169 +96,40 @@ vi.mock("@shared/api/generated/staff/staff", async (importOriginal) => {
 });
 
 import WeeklyStaffPlan from "../WeeklyStaffPlan";
-
-// ── Fixtures ────────────────────────────────────────────────────────────────
-
-const ANNA: WeeklyPlanEmployee = {
-  id: "emp-anna",
-  short_name_for_weekly_plan: "Anna",
-  first_name: "Anna",
-  last_name: "Berger",
-  is_active: true,
-};
-const BEN: WeeklyPlanEmployee = {
-  id: "emp-ben",
-  short_name_for_weekly_plan: "Ben",
-  first_name: "Ben",
-  last_name: "Kraus",
-  is_active: true,
-};
-/** Deactivated, but still holding a shift in the week served with her. */
-const CLARA: WeeklyPlanEmployee = {
-  id: "emp-clara",
-  short_name_for_weekly_plan: "Clara",
-  first_name: "Clara",
-  last_name: "Vogt",
-  is_active: false,
-};
-
-const HARVEST = { id: "cat-harvest", name: "Harvest", max_lines: 2 };
-const PACKING = { id: "cat-packing", name: "Packing", max_lines: 1 };
-
-const MONDAY = 0;
-const TUESDAY = 1;
-const WEDNESDAY = 2;
-const FRIDAY = 4;
-
-/** Anna on Monday and Ben on Wednesday, both on the first Harvest line. */
-const PLANNED: WeeklyPlanAssignmentRequest[] = [
-  { category_id: HARVEST.id, row_index: 0, day: MONDAY, employee_id: ANNA.id },
-  { category_id: HARVEST.id, row_index: 0, day: WEDNESDAY, employee_id: BEN.id },
-];
-
-/** A grid as the backend serves it: every line of every active category, a
- *  cell per weekday holding an employee id or null. */
-function weekGrid({
-  year = 2026,
-  week = 41,
-  assignments = [] as WeeklyPlanAssignmentRequest[],
-  categories = [HARVEST, PACKING],
-  employees = [ANNA, BEN],
-} = {}): WeeklyPlanGrid {
-  return {
-    year,
-    week,
-    employees,
-    categories: categories.map((category) => ({
-      ...category,
-      rows: Array.from({ length: category.max_lines }, (_, rowIndex) => ({
-        row_index: rowIndex,
-        days: Object.fromEntries(
-          [0, 1, 2, 3, 4, 5, 6].map((day) => [
-            String(day),
-            assignments.find(
-              (assignment) =>
-                assignment.category_id === category.id &&
-                assignment.row_index === rowIndex &&
-                assignment.day === day,
-            )?.employee_id ?? null,
-          ]),
-        ),
-      })),
-    })),
-  };
-}
-
-function apiError(status: number, body: Record<string, unknown>) {
-  return {
-    isAxiosError: true,
-    message: `Request failed with status code ${status}`,
-    response: { status, data: body },
-  };
-}
+import {
+  ANNA,
+  apiError,
+  appToast,
+  BEN,
+  cellButton,
+  CLARA,
+  FRIDAY,
+  gridCell,
+  HARVEST,
+  MONDAY,
+  noToast,
+  PACKING,
+  paletteChip,
+  pickEarlierSourceWeek,
+  PLANNED,
+  removeButton,
+  renderPlan,
+  SATURDAY,
+  sortedAssignments,
+  TUESDAY,
+  WEDNESDAY,
+  weekGrid,
+} from "./weeklyStaffPlan.helpers";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function renderPlan() {
-  const user = userEvent.setup();
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: 0 },
-      mutations: { retry: false },
-    },
-    mutationCache: new MutationCache({
-      onError: (error, _variables, _context, mutation) => {
-        if (!mutation.meta?.silent) appToast(error);
-      },
-    }),
-  });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <WeeklyStaffPlan />
-    </QueryClientProvider>,
-  );
-  return { user };
-}
-
-/** The `<td>` of a grid cell. `line` is the 1-based line number the grid
- *  shows; `day` counts from Monday = 0. */
-function gridCell(category: string, line: number, day: number): HTMLElement {
-  const group = screen.getByText(category, { selector: "th" }).closest("tbody");
-  if (!group) throw new Error(`No grid group for category ${category}`);
-  const row = within(group).getAllByRole("row")[line];
-  return within(row).getAllByRole("cell")[day];
-}
-
-/** The cell's main button: picks up its occupant, or places what is held. */
-function cellButton(category: string, line: number, day: number) {
-  return within(gridCell(category, line, day)).getAllByRole("button")[0];
-}
-
-function removeButton(category: string, line: number, day: number) {
-  return within(gridCell(category, line, day)).getByRole("button", {
-    name: "staff.remove_employee",
-  });
-}
-
-function paletteChip(name: string) {
-  return screen.getByRole("button", { name: `${name}. staff.times_planned` });
-}
-
-/** Moves the copy source one week back from the preselected one. AntD's
- *  Select reads the legacy `which` key code, which user-event leaves unset, so
- *  the keys go in through fireEvent. */
-async function pickEarlierSourceWeek(user: ReturnType<typeof userEvent.setup>) {
-  const sourcePicker = screen.getByRole("combobox", {
-    name: "staff.copy_weekly_plan_from",
-  });
-  await user.click(sourcePicker);
-  fireEvent.keyDown(sourcePicker, { key: "ArrowUp", keyCode: 38, which: 38 });
-  fireEvent.keyDown(sourcePicker, { key: "Enter", keyCode: 13, which: 13 });
-}
-
-const byCell = (a: WeeklyPlanAssignmentRequest, b: WeeklyPlanAssignmentRequest) =>
-  a.category_id.localeCompare(b.category_id) ||
-  a.row_index - b.row_index ||
-  a.day - b.day;
 
 /** The week the page saved last, its assignments in a stable order. */
 function lastSavedWeek(): WeeklyPlanReplaceRequest {
   const calls = staffApi.replaceWeek.mock.calls;
   if (calls.length === 0) throw new Error("The week was never saved");
   const saved = calls[calls.length - 1][0] as WeeklyPlanReplaceRequest;
-  return { ...saved, assignments: [...saved.assignments].sort(byCell) };
+  return { ...saved, assignments: sortedAssignments(...saved.assignments) };
 }
-
-function sortedAssignments(...assignments: WeeklyPlanAssignmentRequest[]) {
-  return [...assignments].sort(byCell);
-}
-
-// Stands in for antd's toast functions, which would otherwise render into the
-// document body.
-const noToast = () => undefined as never;
-
-// The app's toast for a failed mutation, unless it sets `meta: { silent: true }`.
-const appToast = vi.fn();
 
 beforeEach(() => {
   // A Monday in ISO week 41 of 2026; the page opens on "now".
@@ -459,13 +318,16 @@ describe("WeeklyStaffPlan grid", () => {
     renderPlan();
     await screen.findByText("Harvest", { selector: "th" });
 
-    for (const day of [0, 1, 2, 3, 4, 5, 6]) {
+    for (const day of [0, 1, 2, 3, 4, 5]) {
       expect(
         screen.getByRole("columnheader", {
           name: `commissioning.weekdays.${day}`,
         }),
       ).toBeInTheDocument();
     }
+    expect(
+      screen.queryByRole("columnheader", { name: "commissioning.weekdays.6" }),
+    ).not.toBeInTheDocument();
     const lineNumbers = (category: string) => {
       const group = screen
         .getByText(category, { selector: "th" })
@@ -611,6 +473,29 @@ describe("WeeklyStaffPlan editing by the office", () => {
     );
     expect(cellButton("Harvest", 1, MONDAY)).toHaveTextContent("Ben");
     expect(cellButton("Harvest", 1, WEDNESDAY)).toHaveTextContent("Anna");
+  });
+
+  it("moves no one from a cell picked up before the week changed", async () => {
+    staffApi.fetchGrid.mockImplementation(
+      async (params: StaffWeeklyPlanGridRetrieveParams) =>
+        weekGrid({
+          ...params,
+          assignments:
+            params.week === 42 ? [{ ...PLANNED[0], employee_id: BEN.id }] : PLANNED,
+        }),
+    );
+    const { user } = renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+
+    await user.click(cellButton("Harvest", 1, MONDAY)); // picks up Anna
+    await user.click(screen.getByRole("button", { name: "common.next" }));
+    await waitFor(() =>
+      expect(cellButton("Harvest", 1, MONDAY)).toHaveTextContent("Ben"),
+    );
+    await user.click(cellButton("Packing", 1, FRIDAY));
+
+    expect(cellButton("Harvest", 1, MONDAY)).toHaveTextContent("Ben");
+    expect(staffApi.replaceWeek).not.toHaveBeenCalled();
   });
 
   it("refuses to plan an employee twice in one category on the same day", async () => {
@@ -803,6 +688,7 @@ describe("WeeklyStaffPlan copying a week", () => {
     await waitFor(() =>
       expect(staffApi.copyWeek).toHaveBeenCalledWith({
         year: 2026,
+        from_year: 2026,
         from_week: 40,
         to_week: 41,
       }),
@@ -836,6 +722,7 @@ describe("WeeklyStaffPlan copying a week", () => {
     await waitFor(() =>
       expect(staffApi.copyWeek).toHaveBeenCalledWith({
         year: 2026,
+        from_year: 2026,
         from_week: 39,
         to_week: 41,
       }),
@@ -856,23 +743,31 @@ describe("WeeklyStaffPlan copying a week", () => {
     await waitFor(() =>
       expect(staffApi.copyWeek).toHaveBeenCalledWith({
         year: 2026,
+        from_year: 2026,
         from_week: 41,
         to_week: 42,
       }),
     );
   });
 
-  it("offers no copy source in week 1, as the copy stays within the year", async () => {
-    // Thursday 1 January 2026 lies in ISO week 1 of 2026.
+  it("copies the last week of the year before into week 1", async () => {
+    // Thursday 1 January 2026 lies in ISO week 1 of 2026; 2025 has 52 weeks.
     vi.setSystemTime(new Date(2026, 0, 1, 12));
-    renderPlan();
+    const { user } = renderPlan();
     await screen.findByText("Harvest", { selector: "th" });
 
-    expect(staffApi.fetchGrid).toHaveBeenCalledWith({ year: 2026, week: 1 });
-    expect(screen.getByText("staff.copy_source_week")).toBeInTheDocument();
-    expect(
+    await user.click(
       screen.getByRole("button", { name: "staff.copy_into_this_week" }),
-    ).toBeDisabled();
+    );
+
+    await waitFor(() =>
+      expect(staffApi.copyWeek).toHaveBeenCalledWith({
+        year: 2026,
+        from_year: 2025,
+        from_week: 52,
+        to_week: 1,
+      }),
+    );
   });
 
   it("hides the copy tools once the week has a plan", async () => {
@@ -886,6 +781,16 @@ describe("WeeklyStaffPlan copying a week", () => {
     expect(
       screen.queryByRole("combobox", { name: "staff.copy_weekly_plan_from" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("offers the copy over a week holding Saturday shifts alone", async () => {
+    served = [{ ...PLANNED[0], day: SATURDAY }];
+    renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+
+    expect(
+      screen.getByRole("button", { name: "staff.copy_into_this_week" }),
+    ).toBeInTheDocument();
   });
 
   it("reports a refused copy and leaves the week as it is", async () => {
@@ -916,6 +821,132 @@ describe("WeeklyStaffPlan copying a week", () => {
     expect(
       screen.getByRole("button", { name: "staff.copy_into_this_week" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("WeeklyStaffPlan absences", () => {
+  /** Serves the planned week with the given absent days. */
+  function serveAbsent(absentDays: Record<string, number[]>) {
+    staffApi.fetchGrid.mockImplementation(
+      async (params: StaffWeeklyPlanGridRetrieveParams) =>
+        weekGrid({
+          ...params,
+          assignments: PLANNED,
+          employees: [ANNA, BEN].map((employee) => ({
+            ...employee,
+            absent_days: absentDays[employee.id] ?? [],
+          })),
+        }),
+    );
+  }
+
+  it("leaves someone absent the whole working week out of the palette", async () => {
+    serveAbsent({ [BEN.id]: [0, 1, 2, 3, 4] });
+    renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+
+    expect(
+      screen.queryByRole("button", { name: /^Ben\./ }),
+    ).not.toBeInTheDocument();
+    expect(paletteChip("Anna")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("tooltip.weekly_plan_absent_employees"),
+    ).toBeInTheDocument();
+  });
+
+  it("says so when everyone is away the working week", async () => {
+    const workingWeek = [0, 1, 2, 3, 4];
+    serveAbsent({ [ANNA.id]: workingWeek, [BEN.id]: workingWeek });
+    renderPlan();
+
+    expect(await screen.findByText("staff.everyone_absent")).toBeInTheDocument();
+  });
+
+  it("offers someone absent on some days, naming the days", async () => {
+    serveAbsent({ [BEN.id]: [MONDAY, TUESDAY] });
+    renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+
+    expect(
+      screen.getByRole("button", {
+        name: "Ben. staff.times_planned. staff.absent_on",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("greys out the days of absence and places no one there", async () => {
+    serveAbsent({ [BEN.id]: [MONDAY, TUESDAY] });
+    const { user } = renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+    const ben = screen.getByRole("button", { name: /^Ben\./ });
+
+    await user.click(ben);
+
+    expect(cellButton("Harvest", 2, MONDAY)).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(cellButton("Packing", 1, TUESDAY)).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(cellButton("Packing", 1, FRIDAY)).not.toHaveAttribute(
+      "aria-disabled",
+    );
+
+    await user.click(cellButton("Harvest", 2, MONDAY));
+    await flushMicrotasks();
+    expect(cellButton("Harvest", 2, MONDAY)).not.toHaveTextContent("Ben");
+    expect(staffApi.replaceWeek).not.toHaveBeenCalled();
+
+    // Still picked up, so another day takes him.
+    await user.click(cellButton("Packing", 1, FRIDAY));
+    await waitFor(() => expect(staffApi.replaceWeek).toHaveBeenCalledTimes(1));
+    expect(cellButton("Packing", 1, FRIDAY)).toHaveTextContent("Ben");
+    expect(cellButton("Harvest", 2, MONDAY)).not.toHaveAttribute(
+      "aria-disabled",
+    );
+  });
+
+  it("refuses a swap that would send the other one to a day of absence", async () => {
+    serveAbsent({ [BEN.id]: [MONDAY] });
+    const { user } = renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+
+    // Anna's Monday onto Ben's Wednesday would send Ben to Monday.
+    await user.click(cellButton("Harvest", 1, MONDAY));
+    await user.click(cellButton("Harvest", 1, WEDNESDAY));
+
+    await flushMicrotasks();
+    expect(cellButton("Harvest", 1, MONDAY)).toHaveTextContent("Anna");
+    expect(cellButton("Harvest", 1, WEDNESDAY)).toHaveTextContent("Ben");
+    expect(staffApi.replaceWeek).not.toHaveBeenCalled();
+  });
+
+  it("marks a shift on a day of absence and counts such shifts above the grid", async () => {
+    serveAbsent({ [ANNA.id]: [MONDAY] });
+    renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+
+    const conflict = gridCell("Harvest", 1, MONDAY).firstElementChild;
+    expect(conflict).toHaveClass("dnd-cell--flagged");
+    expect(cellButton("Harvest", 1, MONDAY)).toHaveAccessibleName(
+      "staff.cell_absent",
+    );
+    expect(gridCell("Harvest", 1, WEDNESDAY).firstElementChild).not.toHaveClass(
+      "dnd-cell--flagged",
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "staff.absence_conflicts",
+    );
+  });
+
+  it("shows no count while no shift falls on an absence", async () => {
+    serveAbsent({ [ANNA.id]: [TUESDAY] });
+    renderPlan();
+    await screen.findByText("Harvest", { selector: "th" });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
 

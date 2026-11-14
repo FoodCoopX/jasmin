@@ -23,9 +23,15 @@ class WeeklyPlanReplaceSerializer(serializers.Serializer):
 
 
 class WeeklyPlanCopySerializer(serializers.Serializer):
-    """Copy the plan of ``from_week`` into an empty ``to_week`` (same year)."""
+    """Copy the plan of ``from_week`` into an empty ``to_week`` of ``year``."""
 
     year = serializers.IntegerField(min_value=2000, max_value=2100)
+    from_year = serializers.IntegerField(
+        min_value=2000,
+        max_value=2100,
+        required=False,
+        help_text="The year of ``from_week``; ``year`` when left out.",
+    )
     from_week = serializers.IntegerField(min_value=1, max_value=53)
     to_week = serializers.IntegerField(min_value=1, max_value=53)
 
@@ -45,6 +51,14 @@ class WeeklyPlanEmployeeSerializer(serializers.Serializer):
     first_name = serializers.CharField(allow_null=True)
     last_name = serializers.CharField(allow_null=True)
     is_active = serializers.BooleanField()
+    hours_per_week = serializers.IntegerField(allow_null=True)
+    absent_days = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text=(
+            "The weekdays (0 = Monday) the employee is absent: no new shift "
+            "there, and one planned before shows as a conflict."
+        ),
+    )
 
 
 class WeeklyPlanRowSerializer(serializers.Serializer):

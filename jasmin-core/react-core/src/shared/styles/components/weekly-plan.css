@@ -178,6 +178,25 @@
   padding: 2px 6px;
 }
 
+/* The name takes the room, so the hours and the count sit on the right. */
+.weekly-plan-palette-box .dnd-chip-label {
+  flex: 1;
+}
+
+/* Hours planned against the employee's weekly hours: green when they match,
+   red when not; the numbers say the same. */
+.weekly-plan-hours {
+  font-weight: 600;
+}
+
+.weekly-plan-hours--met {
+  color: var(--color-on-pastel-good);
+}
+
+.weekly-plan-hours--off {
+  color: var(--color-on-pastel-bad);
+}
+
 .weekly-plan-grid-table .dnd-cell {
   min-height: 26px;
   padding: 2px 6px;

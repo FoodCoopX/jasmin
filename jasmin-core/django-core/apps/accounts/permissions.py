@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterable
 
 from django.conf import settings
 from rest_framework.permissions import BasePermission
@@ -128,7 +129,25 @@ class RequiresStepUp(BasePermission):
         return True
 
 
-def requires_step_up_for_fields(*field_names: str) -> type[BasePermission]:
+def _normalized_text(value: object) -> str:
+    return str(value).strip() if value is not None else ""
+
+
+def _submitted_value_changes(
+    submitted: object, obj: object, field: str, secret: bool
+) -> bool:
+    """Whether a value sent for ``field`` changes the stored one. A secret is
+    never compared: any non-blank one counts as a change, a blank one keeps the
+    stored secret, and null removes it."""
+    text = _normalized_text(submitted)
+    if secret:
+        return bool(text) or (submitted is None and bool(getattr(obj, field, None)))
+    return text != _normalized_text(getattr(obj, field, None))
+
+
+def requires_step_up_for_fields(
+    *field_names: str, secret_fields: Iterable[str] = ()
+) -> type[BasePermission]:
     """Factory: step-up gate that ONLY fires when sensitive fields are touched.
 
     Use this on viewsets where most writes are benign (name, address,
@@ -155,9 +174,15 @@ def requires_step_up_for_fields(*field_names: str) -> type[BasePermission]:
 
     A user editing the member's name PATCHes through unprompted; the
     same user editing the IBAN gets the step-up modal.
+
+    ``secret_fields`` are write-only credentials among ``field_names``: any
+    non-blank value sent for one counts as a change. Comparing it with the
+    stored one would answer, without step-up, whether a guess is the stored
+    secret.
     """
 
     sensitive = frozenset(field_names)
+    secrets = frozenset(secret_fields)
 
     class _ConditionalStepUp(RequiresStepUp):
         def has_permission(self, request, view) -> bool:
@@ -182,9 +207,6 @@ def requires_step_up_for_fields(*field_names: str) -> type[BasePermission]:
                 return True
             data = getattr(request, "data", None) or {}
 
-            def _normalized_text(val: object) -> str:
-                return str(val).strip() if val is not None else ""
-
             # Only trigger step-up when a sensitive field is actually
             # changing — i.e. the submitted value differs from the stored one.
             # This prevents the modal from firing when EditableTable sends
@@ -192,8 +214,7 @@ def requires_step_up_for_fields(*field_names: str) -> type[BasePermission]:
             # PATCH that only touched name/address.
             changing = any(
                 field in data
-                and _normalized_text(data[field])
-                != _normalized_text(getattr(obj, field, None))
+                and _submitted_value_changes(data[field], obj, field, field in secrets)
                 for field in sensitive
             )
             if not changing:

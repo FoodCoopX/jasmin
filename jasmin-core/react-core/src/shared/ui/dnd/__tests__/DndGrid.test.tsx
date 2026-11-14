@@ -85,6 +85,42 @@ describe("DnD grid — click/keyboard placement", () => {
     expect(onPlace).not.toHaveBeenCalled();
   });
 
+  it("puts a picked-up chip down again on Escape", async () => {
+    const user = userEvent.setup();
+    const { onPlace } = renderGrid({ cell0: CHIP, withPalette: false });
+
+    await user.click(screen.getByRole("button", { name: "Station 1" }));
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "empty-1" }));
+
+    expect(onPlace).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Station 1" })).not.toHaveAttribute(
+      "aria-pressed",
+    );
+  });
+
+  it("drops the pick-up mark once another chip sits in the source cell", async () => {
+    const user = userEvent.setup();
+    const other: DndChip = { id: "s2", label: "Station 2" };
+    const grid = (occupant: DndChip) => (
+      <DndGrid onPlace={vi.fn()}>
+        <DroppableCell pos={{ row: 0, col: 0 }} occupant={occupant} />
+      </DndGrid>
+    );
+    const { rerender } = render(grid(CHIP));
+    await user.click(screen.getByRole("button", { name: "Station 1" }));
+    expect(screen.getByRole("button", { name: "Station 1" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    rerender(grid(other));
+
+    expect(
+      screen.getByRole("button", { name: "Station 2" }),
+    ).not.toHaveAttribute("aria-pressed");
+  });
+
   it("removes an occupant via the remove button without selecting it", async () => {
     const user = userEvent.setup();
     const { onRemove, onPlace } = renderGrid({ cell0: CHIP, withPalette: false });
@@ -130,6 +166,68 @@ describe("DnD grid — click/keyboard placement", () => {
     await user.click(screen.getByRole("button", { name: "empty-0" }));
 
     expect(onPlace).not.toHaveBeenCalled();
+  });
+});
+
+describe("DnD grid — cells that refuse a chip", () => {
+  // Column 0 refuses the chip, column 1 takes it.
+  function renderRefusingGrid(onPlace = vi.fn()) {
+    render(
+      <DndGrid onPlace={onPlace} canPlace={(_payload, to) => to.col !== 0}>
+        <DraggableChip chip={CHIP} />
+        <DroppableCell pos={{ row: 0, col: 0 }} occupant={null} emptyLabel="empty-0" />
+        <DroppableCell pos={{ row: 0, col: 1 }} occupant={null} emptyLabel="empty-1" />
+      </DndGrid>,
+    );
+    return { onPlace };
+  }
+
+  it("marks the refusing cells only while a chip is picked up", async () => {
+    const user = userEvent.setup();
+    renderRefusingGrid();
+    const refusing = screen.getByRole("button", { name: "empty-0" });
+
+    expect(refusing).not.toHaveAttribute("aria-disabled");
+    expect(refusing.parentElement).not.toHaveClass("dnd-cell--refused");
+
+    await user.click(screen.getByRole("button", { name: "Station 1" }));
+
+    expect(refusing).toHaveAttribute("aria-disabled", "true");
+    expect(refusing.parentElement).toHaveClass("dnd-cell--refused");
+    expect(screen.getByRole("button", { name: "empty-1" }).parentElement).not.toHaveClass(
+      "dnd-cell--refused",
+    );
+  });
+
+  it("keeps the chip picked up on a refusing cell, so another cell takes it", async () => {
+    const user = userEvent.setup();
+    const { onPlace } = renderRefusingGrid();
+
+    await user.click(screen.getByRole("button", { name: "Station 1" }));
+    await user.click(screen.getByRole("button", { name: "empty-0" }));
+
+    expect(onPlace).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "empty-1" }));
+
+    expect(onPlace).toHaveBeenCalledTimes(1);
+    expect(onPlace.mock.calls[0][1]).toEqual({ row: 0, col: 1 });
+  });
+
+  it("flags a cell on request", () => {
+    render(
+      <DndGrid onPlace={vi.fn()}>
+        <DroppableCell pos={{ row: 0, col: 0 }} occupant={CHIP} flagged />
+        <DroppableCell pos={{ row: 0, col: 1 }} occupant={null} emptyLabel="empty-1" />
+      </DndGrid>,
+    );
+
+    expect(screen.getByRole("button", { name: "Station 1" }).parentElement).toHaveClass(
+      "dnd-cell--flagged",
+    );
+    expect(screen.getByRole("button", { name: "empty-1" }).parentElement).not.toHaveClass(
+      "dnd-cell--flagged",
+    );
   });
 });
 
