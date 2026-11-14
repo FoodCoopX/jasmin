@@ -79,12 +79,12 @@ def test_create_weekly_plan_category(api_client):
 def test_create_absence_category(api_client):
     response = api_client.post(
         reverse("absence_categories-list"),
-        {"year": 2026, "name": "Vacation"},
+        {"name": "Vacation"},
         format="json",
     )
 
     assert response.status_code == status.HTTP_201_CREATED
-    assert AbsenceCategory.objects.filter(year=2026, name="Vacation").exists()
+    assert AbsenceCategory.objects.filter(name="Vacation").exists()
 
 
 def test_blank_employee_number_persists_as_null(api_client):
@@ -191,7 +191,7 @@ _EMPLOYEE_REFERENCES = {
         employee, WeeklyPlanCategory.objects.create(name="Kitchen", max_lines=3)
     ),
     "absence": lambda employee: _absence(
-        employee, AbsenceCategory.objects.create(year=2026, name="Vacation")
+        employee, AbsenceCategory.objects.create(name="Vacation")
     ),
     "employment": lambda employee: Employment.objects.create(
         employee=employee, valid_from="2026-01-05", hours_per_week="20.00"
@@ -240,7 +240,7 @@ def test_unused_weekly_plan_category_is_deletable(api_client):
 
 
 def test_absence_category_in_use_delete_is_409_and_keeps_absences(api_client):
-    category = AbsenceCategory.objects.create(year=2026, name="Vacation")
+    category = AbsenceCategory.objects.create(name="Vacation")
     absence = _absence(
         Employee.objects.create(short_name_for_weekly_plan="Dana"), category
     )
@@ -256,7 +256,7 @@ def test_absence_category_in_use_delete_is_409_and_keeps_absences(api_client):
 
 
 def test_unused_absence_category_is_deletable(api_client):
-    category = AbsenceCategory.objects.create(year=2026, name="Unused")
+    category = AbsenceCategory.objects.create(name="Unused")
 
     response = api_client.delete(
         reverse("absence_categories-detail", args=[category.id])
@@ -388,34 +388,40 @@ def test_weekly_plan_categories_may_share_an_empty_order(api_client):
     assert response.status_code == status.HTTP_201_CREATED
 
 
-def test_an_absence_category_name_is_unique_per_year(api_client):
-    AbsenceCategory.objects.create(year=2026, name="Vacation", is_active=False)
+def test_an_absence_category_name_is_unique(api_client):
+    AbsenceCategory.objects.create(name="Vacation", is_active=False)
 
     taken = api_client.post(
         reverse("absence_categories-list"),
-        {"year": 2026, "name": "Vacation"},
-        format="json",
-    )
-    next_year = api_client.post(
-        reverse("absence_categories-list"),
-        {"year": 2027, "name": "Vacation"},
+        {"name": "Vacation"},
         format="json",
     )
 
     assert taken.status_code == status.HTTP_400_BAD_REQUEST
     assert taken.data["code"] == "staff.absence_category_name_taken"
-    assert next_year.status_code == status.HTTP_201_CREATED
 
 
-def test_moving_an_absence_category_into_a_taken_year_is_refused(api_client):
-    AbsenceCategory.objects.create(year=2026, name="Vacation")
-    later = AbsenceCategory.objects.create(year=2027, name="Vacation")
+def test_renaming_an_absence_category_to_a_taken_name_is_refused(api_client):
+    AbsenceCategory.objects.create(name="Vacation")
+    other = AbsenceCategory.objects.create(name="Training")
 
     response = api_client.patch(
-        reverse("absence_categories-detail", args=[later.id]),
-        {"year": 2026},
+        reverse("absence_categories-detail", args=[other.id]),
+        {"name": "Vacation"},
         format="json",
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["code"] == "staff.absence_category_name_taken"
+
+
+def test_an_absence_category_keeps_no_year(api_client):
+    response = api_client.post(
+        reverse("absence_categories-list"),
+        {"year": 2026, "name": "Vacation"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert "year" not in response.data
+    assert AbsenceCategory.objects.get(name="Vacation").year is None

@@ -18,11 +18,6 @@ queries (one per reverse relation) instead of N*R — see
 export interface AbsenceCategoryRequest {
   is_active?: boolean;
   /**
-   * @minimum 0
-   * @maximum 32767
-   */
-  year: number;
-  /**
    * @minLength 1
    * @maxLength 200
    */

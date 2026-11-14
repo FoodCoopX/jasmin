@@ -262,6 +262,25 @@
   border-radius: 5px;
 }
 
+/* The totals row a read-only report table shows above its data rows. The
+   longer selectors outrank the table's own cell backgrounds, a label fixed on
+   the left included. */
+.ant-table-wrapper .report-table-totals > th,
+.ant-table-wrapper .report-table-totals > td {
+  font-weight: 600;
+  background-color: var(--color-bg-elevated);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.ant-table-wrapper .report-table-totals > th {
+  left: 0;
+  text-align: start;
+}
+
+.ant-table-wrapper .report-table-totals > td {
+  text-align: center;
+}
+
 /* The search box above an editable table; full width on a phone. */
 .table-search-input {
   width: 16em;

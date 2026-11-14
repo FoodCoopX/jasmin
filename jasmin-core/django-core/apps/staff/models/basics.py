@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, transaction
 from nanoid import generate
 
 from apps.shared.model_fields import day_of_week_field, iso_week_field
@@ -101,6 +103,15 @@ class Employee(JasminModel):
         null=True,
         related_name="employee_profile",
     )
+    # Set by the HR-system sync on the employees it adds; it keeps their names
+    # and active flag from then on. ``hr_system_id`` is the HR system's own id
+    # for them.
+    comes_from_hr_system = models.BooleanField(
+        default=False, db_default=False, editable=False
+    )
+    hr_system_id = models.CharField(
+        max_length=64, unique=True, blank=True, null=True, editable=False
+    )
 
     class Meta:
         ordering = ["short_name_for_weekly_plan"]
@@ -188,16 +199,51 @@ class WeeklyPlan(JasminModel):
 
 
 class AbsenceCategory(JasminModel):
+    # The default category takes the HR system's absences and the crosses set
+    # on the absence page. It can be renamed, but not deleted or switched off.
+    DEFAULT_NAME = "Abwesenheit"
+
     is_active = models.BooleanField(default=True, db_index=True)
-    year = models.PositiveSmallIntegerField()
+    # Unused: a category holds for every year, the absence carries its own.
+    # Nullable rather than dropped, so a release that still writes it can run
+    # against this schema.
+    year = models.PositiveSmallIntegerField(null=True, blank=True, editable=False)
     name = models.CharField(max_length=200)
+    is_default = models.BooleanField(default=False, db_default=False, editable=False)
 
     class Meta:
-        ordering = ["year", "name"]
+        ordering = ["name"]
         verbose_name_plural = "absence categories"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_default"],
+                condition=models.Q(is_default=True),
+                name="absencecategory_single_default",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.year})"
+        return self.name
+
+    @classmethod
+    def default(cls) -> AbsenceCategory:
+        """The default category, made the first time it is needed."""
+        default = cls.objects.filter(is_default=True).first()
+        if default is not None:
+            return default
+        # A category the office has already named so becomes the default.
+        named = cls.objects.filter(name=cls.DEFAULT_NAME).first()
+        try:
+            with transaction.atomic():
+                if named is None:
+                    return cls.objects.create(name=cls.DEFAULT_NAME, is_default=True)
+                named.is_default = True
+                named.is_active = True
+                named.save(update_fields=["is_default", "is_active"])
+                return named
+        except IntegrityError:
+            # Another request made it at the same moment.
+            return cls.objects.get(is_default=True)
 
 
 class Absence(JasminModel):

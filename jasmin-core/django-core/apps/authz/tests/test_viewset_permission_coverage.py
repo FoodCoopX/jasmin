@@ -136,7 +136,9 @@ _EXPECTED_VIEW_MODULES = frozenset(
         "apps.shared.tenants.views",
         "apps.shared.tenants.viewsets",
         "apps.staff.viewsets",
+        "apps.staff.viewsets.absences",
         "apps.staff.viewsets.basics",
+        "apps.staff.viewsets.saturday_shifts",
         "apps.staff.viewsets.weekly_plan",
     }
 )

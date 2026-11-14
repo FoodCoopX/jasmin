@@ -28942,6 +28942,166 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Error response.
+  /api/staff/absences/sync_from_hr_system/:
+    post:
+      operationId: staff_absences_sync_from_hr_system_create
+      description: |-
+        The absences of one ISO week: an employee per row, a weekday per cell.
+        The office enters those of the employees entered in Jasmin; those of the
+        HR system's employees come from the HR system.
+      tags:
+      - staff
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HrSystemSyncRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HrSystemSyncRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HrSystemSyncRequest'
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbsenceSyncResult'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+  /api/staff/absences/week/:
+    get:
+      operationId: staff_absences_week_retrieve
+      description: |-
+        The absences of one ISO week: an employee per row, a weekday per cell.
+        The office enters those of the employees entered in Jasmin; those of the
+        HR system's employees come from the HR system.
+      parameters:
+      - in: query
+        name: week
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 53
+        description: ISO week number (1-53). Week 53 is accepted only for a year that
+          has one; sent with a 52-week year it is refused.
+        required: true
+      - in: query
+        name: year
+        schema:
+          type: integer
+          minimum: 1900
+          maximum: 2100
+        description: Calendar year
+        required: true
+      tags:
+      - staff
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbsenceWeek'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+    post:
+      operationId: staff_absences_week_create
+      description: |-
+        The absences of one ISO week: an employee per row, a weekday per cell.
+        The office enters those of the employees entered in Jasmin; those of the
+        HR system's employees come from the HR system.
+      tags:
+      - staff
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbsenceWeekReplaceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AbsenceWeekReplaceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AbsenceWeekReplaceRequest'
+        required: true
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbsenceWeek'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
   /api/staff/employees/:
     get:
       operationId: staff_employees_list
@@ -29192,6 +29352,151 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Error response.
         '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+  /api/staff/employees/sync_from_hr_system/:
+    post:
+      operationId: staff_employees_sync_from_hr_system_create
+      tags:
+      - staff
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HrSystemSyncRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HrSystemSyncRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HrSystemSyncRequest'
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HrSystemSyncResult'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+  /api/staff/saturday_shifts/year/:
+    get:
+      operationId: staff_saturday_shifts_year_retrieve
+      description: |-
+        The Saturday shifts of one year: an employee per row, an ISO week per
+        cell. A shift is the employee's Saturday row in the weekly plan.
+      parameters:
+      - in: query
+        name: year
+        schema:
+          type: integer
+          minimum: 1900
+          maximum: 2100
+        description: Calendar year
+        required: true
+      tags:
+      - staff
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaturdayShiftYear'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+    post:
+      operationId: staff_saturday_shifts_year_create
+      description: |-
+        The Saturday shifts of one year: an employee per row, an ISO week per
+        cell. A shift is the employee's Saturday row in the weekly plan.
+      tags:
+      - staff
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaturdayShiftSetRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SaturdayShiftSetRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SaturdayShiftSetRequest'
+        required: true
+      security:
+      - tenantBoundJwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaturdayShiftYear'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Error response.
+        '403':
           content:
             application/json:
               schema:
@@ -30427,21 +30732,36 @@ components:
           readOnly: true
         is_active:
           type: boolean
-        year:
-          type: integer
-          maximum: 32767
-          minimum: 0
         name:
           type: string
           maxLength: 200
+        is_default:
+          type: boolean
+          readOnly: true
         can_be_deleted:
           type: boolean
           readOnly: true
       required:
       - can_be_deleted
       - id
+      - is_default
       - name
-      - year
+    AbsenceCategoryOption:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        is_active:
+          type: boolean
+        is_default:
+          type: boolean
+      required:
+      - id
+      - is_active
+      - is_default
+      - name
     AbsenceCategoryRequest:
       type: object
       description: |-
@@ -30455,16 +30775,97 @@ components:
       properties:
         is_active:
           type: boolean
-        year:
-          type: integer
-          maximum: 32767
-          minimum: 0
         name:
           type: string
           minLength: 1
           maxLength: 200
       required:
       - name
+    AbsenceSyncResult:
+      type: object
+      description: What a sync of the absences changed, and of the employees before
+        them.
+      properties:
+        employees:
+          $ref: '#/components/schemas/HrSystemSyncResult'
+        absences:
+          $ref: '#/components/schemas/HrSystemAbsenceSyncResult'
+      required:
+      - absences
+      - employees
+    AbsenceWeek:
+      type: object
+      description: |-
+        The absences of one ISO week, with every category, inactive ones
+        included, so a day keeps showing a category since switched off.
+      properties:
+        year:
+          type: integer
+        week:
+          type: integer
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/AbsenceCategoryOption'
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/AbsenceWeekEmployee'
+      required:
+      - categories
+      - employees
+      - week
+      - year
+    AbsenceWeekEmployee:
+      type: object
+      properties:
+        id:
+          type: string
+        short_name_for_weekly_plan:
+          type: string
+        is_active:
+          type: boolean
+        comes_from_hr_system:
+          type: boolean
+        days:
+          type: object
+          additionalProperties:
+            type: string
+            nullable: true
+      required:
+      - comes_from_hr_system
+      - days
+      - id
+      - is_active
+      - short_name_for_weekly_plan
+    AbsenceWeekReplaceRequest:
+      type: object
+      description: |-
+        One employee's absences in one ISO week. ``days`` maps a weekday
+        (``"0"`` = Monday .. ``"6"``) to an absence category id; a day left out or
+        null has no absence.
+      properties:
+        year:
+          type: integer
+          maximum: 2100
+          minimum: 2000
+        week:
+          type: integer
+          maximum: 53
+          minimum: 1
+        employee_id:
+          type: string
+          minLength: 1
+        days:
+          type: object
+          additionalProperties:
+            type: string
+            nullable: true
+            minLength: 1
+      required:
+      - days
+      - employee_id
+      - week
       - year
     AccountStatusEnum:
       enum:
@@ -36228,6 +36629,13 @@ components:
           type: string
           nullable: true
           maxLength: 50
+        comes_from_hr_system:
+          type: boolean
+          readOnly: true
+        hr_system_id:
+          type: string
+          readOnly: true
+          nullable: true
         user:
           type: string
           nullable: true
@@ -36236,6 +36644,8 @@ components:
           readOnly: true
       required:
       - can_be_deleted
+      - comes_from_hr_system
+      - hr_system_id
       - id
       - short_name_for_weekly_plan
     EmployeeRequest:
@@ -37256,6 +37666,45 @@ components:
       - support_tickets
       - user_accounts
       - web_app
+    HrSystemAbsenceSyncResult:
+      type: object
+      properties:
+        created:
+          type: integer
+        updated:
+          type: integer
+        deleted:
+          type: integer
+        conflicts:
+          type: integer
+          description: Shifts planned from this week on that fall on an absence.
+      required:
+      - conflicts
+      - created
+      - deleted
+      - updated
+    HrSystemSyncRequest:
+      type: object
+      properties:
+        confirm_deactivations:
+          type: boolean
+          default: false
+          description: Deactivate the employees gone from the HR system even when
+            they are more than half of those the sync keeps.
+    HrSystemSyncResult:
+      type: object
+      description: How many employees an HR-system sync added, changed and deactivated.
+      properties:
+        created:
+          type: integer
+        updated:
+          type: integer
+        deactivated:
+          type: integer
+      required:
+      - created
+      - deactivated
+      - updated
     InventoryEntry:
       type: object
       description: Response serializer for PATCH on an INVENTORY movement.
@@ -40990,10 +41439,6 @@ components:
       properties:
         is_active:
           type: boolean
-        year:
-          type: integer
-          maximum: 32767
-          minimum: 0
         name:
           type: string
           minLength: 1
@@ -44037,6 +44482,11 @@ components:
       properties:
         tenant_language:
           $ref: '#/components/schemas/TenantLanguageEnum'
+        hr_system_api_token:
+          type: string
+          writeOnly: true
+          nullable: true
+          maxLength: 500
         name:
           type: string
           minLength: 1
@@ -44164,6 +44614,22 @@ components:
         ai: {}
         allow_upload_for_data_lists:
           type: boolean
+        uses_hr_system:
+          type: boolean
+        hr_system_employees_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        hr_system_absences_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
         logo:
           type: string
           format: binary
@@ -46791,6 +47257,72 @@ components:
       - has_token
       - id
       - status
+    SaturdayShiftEmployee:
+      type: object
+      properties:
+        id:
+          type: string
+        short_name_for_weekly_plan:
+          type: string
+        is_active:
+          type: boolean
+        weeks:
+          type: array
+          items:
+            type: integer
+          description: The ISO weeks whose Saturday the employee works.
+        absent_weeks:
+          type: array
+          items:
+            type: integer
+          description: The ISO weeks whose Saturday the employee is absent on.
+      required:
+      - absent_weeks
+      - id
+      - is_active
+      - short_name_for_weekly_plan
+      - weeks
+    SaturdayShiftSetRequest:
+      type: object
+      description: One employee's Saturday shift in one ISO week, set or taken away.
+      properties:
+        year:
+          type: integer
+          maximum: 2100
+          minimum: 2000
+        week:
+          type: integer
+          maximum: 53
+          minimum: 1
+        employee_id:
+          type: string
+          minLength: 1
+        on_duty:
+          type: boolean
+      required:
+      - employee_id
+      - on_duty
+      - week
+      - year
+    SaturdayShiftYear:
+      type: object
+      description: |-
+        The Saturday shifts of one year: those of the active employees, and of
+        inactive ones who still have one.
+      properties:
+        year:
+          type: integer
+        weeks:
+          type: integer
+          description: The year's ISO weeks, 52 or 53.
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaturdayShiftEmployee'
+      required:
+      - employees
+      - weeks
+      - year
     SavePlacementsRequest:
       type: object
       properties:
@@ -50630,6 +51162,9 @@ components:
           readOnly: true
         tenant_language:
           $ref: '#/components/schemas/TenantLanguageEnum'
+        has_hr_system_api_token:
+          type: boolean
+          readOnly: true
         schema_name:
           type: string
           readOnly: true
@@ -50764,6 +51299,22 @@ components:
         ai: {}
         allow_upload_for_data_lists:
           type: boolean
+        uses_hr_system:
+          type: boolean
+        hr_system_employees_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        hr_system_absences_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
         logo:
           type: string
           format: uri
@@ -50817,6 +51368,7 @@ components:
       - capabilities
       - created_at
       - current_settings
+      - has_hr_system_api_token
       - id
       - is_active
       - name
@@ -51192,6 +51744,11 @@ components:
       properties:
         tenant_language:
           $ref: '#/components/schemas/TenantLanguageEnum'
+        hr_system_api_token:
+          type: string
+          writeOnly: true
+          nullable: true
+          maxLength: 500
         name:
           type: string
           minLength: 1
@@ -51319,6 +51876,22 @@ components:
         ai: {}
         allow_upload_for_data_lists:
           type: boolean
+        uses_hr_system:
+          type: boolean
+        hr_system_employees_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        hr_system_absences_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
         logo:
           type: string
           format: binary
@@ -53306,13 +53879,17 @@ components:
       - name
     WeeklyPlanCopyRequest:
       type: object
-      description: Copy the plan of ``from_week`` into an empty ``to_week`` (same
-        year).
+      description: Copy the plan of ``from_week`` into an empty ``to_week`` of ``year``.
       properties:
         year:
           type: integer
           maximum: 2100
           minimum: 2000
+        from_year:
+          type: integer
+          maximum: 2100
+          minimum: 2000
+          description: The year of ``from_week``; ``year`` when left out.
         from_week:
           type: integer
           maximum: 53
@@ -53344,7 +53921,14 @@ components:
           nullable: true
         is_active:
           type: boolean
+        absent_days:
+          type: array
+          items:
+            type: integer
+          description: 'The weekdays (0 = Monday) the employee is absent: no new shift
+            there, and one planned before shows as a conflict.'
       required:
+      - absent_days
       - first_name
       - id
       - is_active

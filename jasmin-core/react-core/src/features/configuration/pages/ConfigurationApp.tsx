@@ -1,5 +1,12 @@
 import { Card, Col, Row, Space, Spin } from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { useTranslation } from "react-i18next";
 import {
@@ -9,6 +16,7 @@ import {
 import { AutoSaveIndicator } from "@shared/ui";
 import { useAutoSave, useCapability, useTenant } from "@hooks/index";
 import { notify } from "@shared/utils";
+import HrSystemSettingsCard from "@features/configuration/components/HrSystemSettingsCard";
 import {
   SettingsCategory,
   SettingsRenderer,
@@ -134,22 +142,6 @@ export default function ConfigurationApp() {
           ],
         },
         {
-          category: "planning",
-          title: t("settings.commissioning.planning.title"),
-          settings: [
-            {
-              key: "allow_upload_for_data_lists",
-              label: t("settings.commissioning.allow_upload_for_data_lists"),
-              description: t(
-                "settings.commissioning.allow_upload_for_data_lists_desc",
-              ),
-
-              type: "checkbox",
-              defaultValue: false,
-            },
-          ],
-        },
-        {
           category: "navigation",
           title: t("settings.navigation.title"),
           settings: [
@@ -200,6 +192,22 @@ export default function ConfigurationApp() {
               label: t("settings.navigation.show_cultivation"),
               type: "checkbox",
               defaultValue: true,
+            },
+          ],
+        },
+        {
+          category: "planning",
+          title: t("settings.commissioning.planning.title"),
+          settings: [
+            {
+              key: "allow_upload_for_data_lists",
+              label: t("settings.commissioning.allow_upload_for_data_lists"),
+              description: t(
+                "settings.commissioning.allow_upload_for_data_lists_desc",
+              ),
+
+              type: "checkbox",
+              defaultValue: false,
             },
           ],
         },
@@ -389,31 +397,38 @@ export default function ConfigurationApp() {
 
       <Space direction="vertical" size="middle" className="w-full">
         {settingsConfig.map((category) => (
-          <Card
-            key={category.category}
-            title={category.title}
-            className="settings-card-header page-narrow"
-            styles={{ body: { padding: "16px" } }}
-          >
-            <Row gutter={[12, 12]}>
-              {category.settings.map((setting) => (
-                <Col
-                  span={SettingsRenderer.getColumnSpan(setting)}
-                  key={setting.key}
-                >
-                  <div className="settings-item">
-                    {SettingsRenderer.renderInput(
-                      setting,
-                      getSettingValue(setting.key, setting.defaultValue),
-                      (value) =>
-                        handleSettingChange(setting.key, value, setting.type),
-                    )}
-                    {SettingsRenderer.renderDescription(setting)}
-                  </div>
-                </Col>
-              ))}
-            </Row>
-          </Card>
+          <Fragment key={category.category}>
+            <Card
+              title={category.title}
+              className="settings-card-header page-narrow"
+              styles={{ body: { padding: "16px" } }}
+            >
+              <Row gutter={[12, 12]}>
+                {category.settings.map((setting) => (
+                  <Col
+                    span={SettingsRenderer.getColumnSpan(setting)}
+                    key={setting.key}
+                  >
+                    <div className="settings-item">
+                      {SettingsRenderer.renderInput(
+                        setting,
+                        getSettingValue(setting.key, setting.defaultValue),
+                        (value) =>
+                          handleSettingChange(setting.key, value, setting.type),
+                      )}
+                      {SettingsRenderer.renderDescription(setting)}
+                    </div>
+                  </Col>
+                ))}
+              </Row>
+            </Card>
+            {/* Another interface, saved field by field rather than with the
+                page's autosave; it serves the staff module alone. */}
+            {category.category === "planning" &&
+              Boolean(getSettingValue("navigation.show_staff", true)) && (
+                <HrSystemSettingsCard />
+              )}
+          </Fragment>
         ))}
       </Space>
     </div>

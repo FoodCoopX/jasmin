@@ -136,7 +136,7 @@ class TestSmtpFieldErrorCodes:
         ser = self._serializer(tenant, {"smtp_host": "smtp.internal.test"})
 
         with patch(
-            "apps.shared.smtp_host_validator.socket.getaddrinfo",
+            "apps.shared.outbound_hosts.socket.getaddrinfo",
             return_value=[(socket.AF_INET, 1, 6, "", ("10.1.2.3", 0))],
         ):
             with pytest.raises(SmtpHostNotAllowed) as exc_info:
@@ -150,7 +150,7 @@ class TestSmtpFieldErrorCodes:
         ser = self._serializer(tenant, {"smtp_host": "smtp.example.test"})
 
         with patch(
-            "apps.shared.smtp_host_validator.socket.getaddrinfo",
+            "apps.shared.outbound_hosts.socket.getaddrinfo",
             return_value=[(socket.AF_INET, 1, 6, "", ("93.184.216.34", 0))],
         ):
             assert ser.is_valid(), ser.errors

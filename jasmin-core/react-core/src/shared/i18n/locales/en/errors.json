@@ -183,6 +183,9 @@
     "no_context": "This request carries no tenant context. Please open the page via the tenant's own address.",
     "logo_invalid": "The logo must be a PNG, JPEG, WEBP or GIF image within the size and resolution limits.",
     "feature_flags_invalid": "The navigation and AI settings must be sent as an object of on/off values.",
+    "hr_system_token_invalid": "The token holds characters that can't be sent along, such as spaces, line breaks or typographic quotes. Copy and paste the token again.",
+    "hr_system_address_invalid": "Enter an https address of a publicly reachable server. Internal addresses aren't allowed.",
+    "hr_system_addresses_apart": "Both addresses must lead to the same server, as the token goes to both. To switch systems, clear the other address first.",
     "rate_limits_invalid": "The caps must map known actions to whole numbers from 1 to 100000 for weekly and per_minute."
   },
   "tenant_settings": {
@@ -620,7 +623,18 @@
     "weekly_plan_copy_source_category_inactive": "The source week holds entries in categories that are deactivated. The weekly plan only shows active categories, so copied over, those entries would travel along invisibly and be deleted the next time the target week is saved. Please reactivate the category, or clear the affected entries in the source week.",
     "employee_short_name_taken": "Another staff member already has this weekly-plan name, even if they are deactivated.",
     "weekly_plan_category_sort_order_taken": "Another weekly plan category already has this order, even if it is deactivated.",
-    "absence_category_name_taken": "Another absence category already has this name in this year, even if it is deactivated."
+    "absence_category_name_taken": "Another absence category already has this name, even if it is deactivated.",
+    "absence_category_default_locked": "The default category takes every absence that has no category of its own. It can be renamed, but not deleted or deactivated.",
+    "absence_category_not_found": "Absence category not found.",
+    "absences_from_hr_system": "This staff member's absences come from the external time-tracking system and are entered there.",
+    "employee_absent": "This staff member is absent that day and can't be planned there.",
+    "employee_inactive": "This staff member is deactivated and can't be given a new shift.",
+    "saturday_shift_no_place": "The weekly plan has no free row left on that Saturday. Give a category another row, or take someone out on that Saturday.",
+    "hr_system_not_set_up": "The sync with the external time-tracking system isn't set up. Switch it on and store its address and API token under Configuration → App → External time-tracking system.",
+    "hr_system_token_rejected": "The external time-tracking system doesn't accept the stored API token. Enter a valid token under Configuration → App → External time-tracking system.",
+    "hr_system_address_not_allowed": "The external time-tracking system's addresses can't be called like this: both must be https addresses of the same public server. Check them under Configuration → App.",
+    "hr_system_mass_deactivation": "The sync would deactivate more than half of the staff members from the external time-tracking system.",
+    "hr_system_unavailable": "The external time-tracking system can't be reached right now or sent no readable answer. Please try again later."
   },
   "email_config": {
     "test_recipient_missing": "Please enter a recipient address for the test email.",

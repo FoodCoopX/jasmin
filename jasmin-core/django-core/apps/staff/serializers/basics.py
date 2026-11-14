@@ -3,6 +3,7 @@ from rest_framework import serializers
 from apps.commissioning.serializers.serializers_mixin import DeletableMixin
 
 from ..errors import (
+    AbsenceCategoryDefaultLocked,
     AbsenceCategoryNameTaken,
     EmployeeShortNameTaken,
     StaffError,
@@ -50,6 +51,24 @@ class EmployeeSerializer(DeletableMixin, serializers.ModelSerializer):
         # NULL (which Postgres treats as distinct) — otherwise a second employee
         # left blank would collide on an empty string.
         return value or None
+
+
+class HrSystemSyncRequestSerializer(serializers.Serializer):
+    confirm_deactivations = serializers.BooleanField(
+        default=False,
+        help_text=(
+            "Deactivate the employees gone from the HR system even when they "
+            "are more than half of those the sync keeps."
+        ),
+    )
+
+
+class HrSystemSyncResultSerializer(serializers.Serializer):
+    """How many employees an HR-system sync added, changed and deactivated."""
+
+    created = serializers.IntegerField()
+    updated = serializers.IntegerField()
+    deactivated = serializers.IntegerField()
 
 
 class WeeklyPlanCategorySerializer(DeletableMixin, serializers.ModelSerializer):
@@ -115,24 +134,28 @@ class WeeklyPlanCategorySerializer(DeletableMixin, serializers.ModelSerializer):
 class AbsenceCategorySerializer(DeletableMixin, serializers.ModelSerializer):
     class Meta:
         model = AbsenceCategory
-        fields = "__all__"
+        # The column is unused; a category holds for every year.
+        exclude = ("year",)
 
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        instance = self.instance
-        year = attrs.get("year", instance.year if instance else None)
-        name = attrs.get("name", instance.name if instance else None)
-        # Unique per year across inactive categories too; an unchanged pair
-        # passes, as for an employee's weekly-plan name.
-        unchanged = instance is not None and (year, name) == (
-            instance.year,
-            instance.name,
-        )
-        if not unchanged and _taken_elsewhere(
-            self, AbsenceCategory.objects.filter(year=year, name=name)
-        ):
-            message = "Another absence category already has this name in this year."
+    def get_can_be_deleted(self, obj) -> bool:
+        return not obj.is_default and super().get_can_be_deleted(obj)
+
+    def validate_is_active(self, value):
+        if self.instance is not None and self.instance.is_default and not value:
+            message = "The default absence category cannot be switched off."
+            raise AbsenceCategoryDefaultLocked(
+                message, field="is_active", details={"is_active": [message]}
+            )
+        return value
+
+    def validate_name(self, value):
+        # Unique across inactive categories too; an unchanged name passes, as
+        # for an employee's weekly-plan name.
+        if self.instance is not None and value == self.instance.name:
+            return value
+        if _taken_elsewhere(self, AbsenceCategory.objects.filter(name=value)):
+            message = "Another absence category already has this name."
             raise AbsenceCategoryNameTaken(
                 message, field="name", details={"name": [message]}
             )
-        return attrs
+        return value

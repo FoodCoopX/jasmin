@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { type KeyboardEvent, useCallback } from "react";
 import { useDrag, useDrop } from "react-dnd";
 
 import { useDndGrid } from "./DndGridContext";
@@ -20,6 +20,34 @@ export interface DroppableCellProps {
   /** Builds the remove button's accessible name from the occupant label.
    *  When omitted the remove button is not rendered. */
   removeAriaLabelFor?: (label: string) => string;
+  /** Marks the cell as a problem, e.g. a placement that no longer fits. The
+   *  mark is visual: say why in ``ariaLabel``. */
+  flagged?: boolean;
+}
+
+interface CellState {
+  filled: boolean;
+  tinted: boolean;
+  over: boolean;
+  dragging: boolean;
+  selected: boolean;
+  refused: boolean;
+  flagged: boolean;
+}
+
+function cellClassName(state: CellState): string {
+  return [
+    "dnd-cell",
+    state.filled ? "dnd-cell--filled" : "dnd-cell--empty",
+    state.tinted ? "dnd-cell--tinted" : "",
+    state.over ? "dnd-cell--over" : "",
+    state.dragging ? "dnd-cell--dragging" : "",
+    state.selected ? "dnd-cell--selected" : "",
+    state.refused ? "dnd-cell--refused" : "",
+    state.flagged ? "dnd-cell--flagged" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
@@ -35,17 +63,38 @@ export default function DroppableCell({
   emptyLabel,
   ariaLabel,
   removeAriaLabelFor,
+  flagged = false,
 }: DroppableCellProps) {
-  const { place, remove, selected, select, itemType } = useDndGrid();
+  const { place, remove, canPlace, selected, select, itemType } = useDndGrid();
 
-  const [{ isOver }, drop] = useDrop<DndDragPayload, void, { isOver: boolean }>(
+  const refuses = useCallback(
+    (payload: DndDragPayload) => (canPlace ? !canPlace(payload, pos) : false),
+    [canPlace, pos],
+  );
+
+  const [{ isOver, refusesDragged }, drop] = useDrop<
+    DndDragPayload,
+    void,
+    { isOver: boolean; refusesDragged: boolean }
+  >(
     () => ({
       accept: itemType,
-      canDrop: () => canEdit,
+      canDrop: (item) => canEdit && !refuses(item),
       drop: (item) => place(item, pos),
-      collect: (monitor) => ({ isOver: monitor.isOver() }),
+      collect: (monitor) => {
+        // A link, text or file dragged over the page is a drag too, carrying
+        // no chip.
+        const dragged =
+          monitor.getItemType() === itemType
+            ? monitor.getItem<DndDragPayload | null>()
+            : null;
+        return {
+          isOver: monitor.isOver() && monitor.canDrop(),
+          refusesDragged: dragged ? refuses(dragged) : false,
+        };
+      },
     }),
-    [pos, place, canEdit, itemType],
+    [pos, place, refuses, canEdit, itemType],
   );
 
   const [{ isDragging }, drag] = useDrag<
@@ -64,8 +113,12 @@ export default function DroppableCell({
     [occupant, pos, canEdit, itemType],
   );
 
+  // Once the grid changes under a pick-up, its cell may hold another chip.
   const isPickedFromHere =
-    selected?.from?.row === pos.row && selected.from.col === pos.col;
+    selected?.from?.row === pos.row &&
+    selected.from.col === pos.col &&
+    selected.chip.id === occupant?.id;
+  const isRefused = refusesDragged || (!!selected && refuses(selected));
 
   const onActivate = () => {
     if (!canEdit) return;
@@ -89,13 +142,15 @@ export default function DroppableCell({
     }
   };
 
-  const className =
-    "dnd-cell" +
-    (occupant ? " dnd-cell--filled" : " dnd-cell--empty") +
-    (occupant?.color ? " dnd-cell--tinted" : "") +
-    (isOver ? " dnd-cell--over" : "") +
-    (isDragging ? " dnd-cell--dragging" : "") +
-    (isPickedFromHere ? " dnd-cell--selected" : "");
+  const className = cellClassName({
+    filled: !!occupant,
+    tinted: !!occupant?.color,
+    over: isOver,
+    dragging: isDragging,
+    selected: isPickedFromHere,
+    refused: isRefused,
+    flagged,
+  });
 
   const accessibleName = ariaLabel ?? (occupant ? occupant.label : emptyLabel);
 
@@ -120,6 +175,7 @@ export default function DroppableCell({
         tabIndex={canEdit ? 0 : -1}
         aria-label={accessibleName}
         aria-pressed={isPickedFromHere || undefined}
+        aria-disabled={isRefused || undefined}
         onClick={onActivate}
         onKeyDown={onKeyDown}
       >

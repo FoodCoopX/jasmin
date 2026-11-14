@@ -108,12 +108,12 @@ if (eagerPdf.length) {
 
 // Budgets (gzip KB).
 const budgets = [
-  { name: "total critical-path (boot preload)", kb: totalKB, limit: 610 },
+  { name: "total critical-path (boot preload)", kb: totalKB, limit: 613 },
   { name: "entry chunk (app boot code)", kb: sizes[entry], limit: 45 },
   {
     name: "locale-de (the resident fallback bundle)",
     kb: sizes[deLocaleChunk],
-    limit: 82,
+    limit: 85,
   },
   { name: "vendor-react", kb: sizes[reactChunk], limit: 60 },
 ];

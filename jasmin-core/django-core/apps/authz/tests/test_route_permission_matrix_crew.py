@@ -518,6 +518,23 @@ CREW_MATRIX: list[tuple[str, str, str, str]] = [
     ("/api/staff/weekly_plan/", "post", "staff", "deny"),
     ("/api/staff/weekly_plan/", "post", "gardener", "deny"),
     ("/api/staff/weekly_plan/", "post", "office", "4xx"),
+    # ------- Absences -------
+    # Without year and week the read is refused only after the role gate.
+    ("/api/staff/absences/week/", "get", "staff", "4xx"),
+    ("/api/staff/absences/week/", "get", "gardener", "4xx"),
+    ("/api/staff/absences/week/", "post", "staff", "deny"),
+    ("/api/staff/absences/week/", "post", "gardener", "deny"),
+    ("/api/staff/absences/week/", "post", "office", "4xx"),
+    ("/api/staff/absences/sync_from_hr_system/", "post", "staff", "deny"),
+    ("/api/staff/absences/sync_from_hr_system/", "post", "gardener", "deny"),
+    ("/api/staff/absences/sync_from_hr_system/", "post", "office", "4xx"),
+    # ------- Saturday shifts -------
+    # Without a year the read is refused only after the role gate.
+    ("/api/staff/saturday_shifts/year/", "get", "staff", "4xx"),
+    ("/api/staff/saturday_shifts/year/", "get", "gardener", "4xx"),
+    ("/api/staff/saturday_shifts/year/", "post", "staff", "deny"),
+    ("/api/staff/saturday_shifts/year/", "post", "gardener", "deny"),
+    ("/api/staff/saturday_shifts/year/", "post", "office", "4xx"),
     # ======= tenants =======
     # ------- Tenant email config (Office read, Admin write) -------
     # The office reads the config but may not repoint the SMTP host; the crew

@@ -12,6 +12,7 @@
   "additional_theoretical_wash_amount": "Diese Menge wird zur errechneten Menge addiert oder subtrahiert.",
   "additional_theoretical_clean_amount": "Diese Menge wird zur errechneten Menge addiert oder subtrahiert.",
   "needed_harvesting_crates": "Hier kann man sehen, wieviele und welche Ernte-Kisten am Feld benötigt werden.",
+  "weekly_plan_absent_employees": "MitarbeiterInnen, die von Montag bis Freitag abwesend sind, erscheinen hier nicht.",
   "still_in_stock_purchase": "Theoretischer Bestand am Montag.",
   "invoice_creation": "Rechnung für diesen Lieferschein. Lieferschein wird finalisiert. Wenn die Rechnung über mehrere Lieferscheine gehen soll, dann unter --> Rechnungen. e-PDF wird mit Zugferd-XML erstellt = elektronische Rechnung.",
   "crates_in_orders": "Bei einer Bestellung werden die benötigten Kisten hier automatisch berechnet, können aber händisch angepasst werden.",

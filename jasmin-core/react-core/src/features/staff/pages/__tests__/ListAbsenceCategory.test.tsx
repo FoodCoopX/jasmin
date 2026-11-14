@@ -75,26 +75,34 @@ import ListAbsenceCategory from "../ListAbsenceCategory";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-// Absences still point at the 2026 vacation category, so it is in use.
-const VACATION_2026: AbsenceCategory = {
-  id: "abs-vacation-2026",
+// The default category stays: the backend marks it undeletable.
+const ABSENCE: AbsenceCategory = {
+  id: "abs-default",
   is_active: true,
-  year: 2026,
+  is_default: true,
+  name: "Abwesenheit",
+  can_be_deleted: false,
+};
+// Absences still point at the vacation category, so it is in use.
+const VACATION: AbsenceCategory = {
+  id: "abs-vacation",
+  is_active: true,
+  is_default: false,
   name: "Vacation",
   can_be_deleted: false,
 };
-const SICK_LEAVE_2026: AbsenceCategory = {
-  id: "abs-sick-2026",
+const TRAINING: AbsenceCategory = {
+  id: "abs-training",
   is_active: true,
-  year: 2026,
-  name: "Sick leave",
+  is_default: false,
+  name: "Training",
   can_be_deleted: true,
 };
-const TRAINING_2025: AbsenceCategory = {
-  id: "abs-training-2025",
+const PARENTAL_LEAVE: AbsenceCategory = {
+  id: "abs-parental",
   is_active: false,
-  year: 2025,
-  name: "Training",
+  is_default: false,
+  name: "Parental leave",
   can_be_deleted: true,
 };
 
@@ -125,19 +133,17 @@ function rowOf(text: string): HTMLElement {
   return row;
 }
 
-/** The inputs of the row being edited inline, in column order: year, name. */
-function editedInputs() {
+function editingRow(): HTMLElement {
   const row = screen
     .getByRole("button", { name: "table.save" })
     .closest("tr");
   if (!row) throw new Error("No row is being edited");
-  const [year, name] = within(row).getAllByRole("textbox");
-  return { year, name };
+  return row;
 }
 
 beforeEach(() => {
   auth.roles = ["office"];
-  serverCategories = [VACATION_2026, SICK_LEAVE_2026, TRAINING_2025];
+  serverCategories = [ABSENCE, VACATION, TRAINING, PARENTAL_LEAVE];
   staffApi.listAbsenceCategories
     .mockReset()
     .mockImplementation(async () => [...serverCategories]);
@@ -146,7 +152,7 @@ beforeEach(() => {
     .mockImplementation(async (payload: AbsenceCategory) => ({
       ...payload,
       id: "abs-new",
-      year: Number(payload.year),
+      is_default: false,
       can_be_deleted: true,
     }));
   staffApi.updateAbsenceCategory
@@ -154,7 +160,6 @@ beforeEach(() => {
     .mockImplementation(async (id: string, payload: AbsenceCategory) => ({
       ...payload,
       id,
-      year: Number(payload.year),
     }));
   staffApi.deleteAbsenceCategory
     .mockReset()
@@ -174,7 +179,7 @@ describe("ListAbsenceCategory", () => {
     expect(staffApi.listAbsenceCategories).toHaveBeenCalledWith(undefined);
   });
 
-  it("shows the title, the description and the column headings", async () => {
+  it("shows the title, the description and the column headings, but no year", async () => {
     renderList();
     await screen.findByText("Vacation");
 
@@ -190,59 +195,61 @@ describe("ListAbsenceCategory", () => {
         name: "staff.absence_categories_description",
       }),
     ).toBeInTheDocument();
-    for (const heading of [/commissioning\.is_active/, "common.year", "staff.name"]) {
+    for (const heading of [/commissioning\.is_active/, "staff.name"]) {
       expect(
         screen.getByRole("columnheader", { name: heading }),
       ).toBeInTheDocument();
     }
     expect(
+      screen.queryByRole("columnheader", { name: "common.year" }),
+    ).not.toBeInTheDocument();
+    expect(
       screen.getByText("explainers.list_absence_categories"),
     ).toBeInTheDocument();
   });
 
-  it("lists each active category with its year and reveals inactive ones when asked", async () => {
+  it("marks the default category, and lists inactive ones when asked", async () => {
     const { user } = renderList();
     await screen.findByText("Vacation");
 
-    expect(within(rowOf("Vacation")).getByText("2026")).toBeInTheDocument();
-    expect(within(rowOf("Sick leave")).getByText("2026")).toBeInTheDocument();
-    expect(screen.queryByText("Training")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("staff.absence_category_default"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Parental leave")).not.toBeInTheDocument();
 
     await user.click(screen.getByText("commissioning.hide_inactive"));
 
-    expect(within(rowOf("Training")).getByText("2025")).toBeInTheDocument();
+    expect(screen.getByText("Parental leave")).toBeInTheDocument();
   });
 
-  it("creates a category for another year under a name an earlier year already has", async () => {
+  it("creates a category by its name", async () => {
     const { user } = renderList();
     await screen.findByText("Vacation");
 
     await user.click(screen.getByRole("button", { name: /table\.add_record/ }));
-    await user.type(editedInputs().year, "2027");
-    await user.type(editedInputs().name, "Vacation");
+    await user.type(within(editingRow()).getByRole("textbox"), "Illness");
     await user.click(screen.getByRole("button", { name: "table.save" }));
 
     await waitFor(() =>
       expect(staffApi.createAbsenceCategory).toHaveBeenCalledTimes(1),
     );
     const [payload] = staffApi.createAbsenceCategory.mock.calls[0];
-    expect(payload).toMatchObject({ is_active: true, name: "Vacation" });
-    expect(Number(payload.year)).toBe(2027);
-    expect(await screen.findByText("2027")).toBeInTheDocument();
+    expect(payload).toMatchObject({ is_active: true, name: "Illness" });
+    expect(payload).not.toHaveProperty("year");
+    expect(await screen.findByText("Illness")).toBeInTheDocument();
   });
 
-  it("refuses a second category with the same name in the same year", async () => {
+  it("refuses a second category with a name already taken", async () => {
     const { user } = renderList();
     await screen.findByText("Vacation");
 
     await user.click(screen.getByRole("button", { name: /table\.add_record/ }));
-    await user.type(editedInputs().year, "2026");
-    await user.type(editedInputs().name, "Vacation");
+    await user.type(within(editingRow()).getByRole("textbox"), "Vacation");
     await user.click(screen.getByRole("button", { name: "table.save" }));
 
     expect(
       await screen.findByText(
-        "staff.absence_category_year_name_unique — table.save_failed_hint",
+        "staff.absence_category_name_unique — table.save_failed_hint",
       ),
     ).toBeInTheDocument();
     expect(staffApi.createAbsenceCategory).not.toHaveBeenCalled();
@@ -253,20 +260,34 @@ describe("ListAbsenceCategory", () => {
     await screen.findByText("Vacation");
 
     await user.click(
-      within(rowOf("Sick leave")).getByRole("button", { name: "table.edit" }),
+      within(rowOf("Training")).getByRole("button", { name: "table.edit" }),
     );
-    await user.clear(editedInputs().name);
-    await user.type(editedInputs().name, "Illness");
+    const name = within(editingRow()).getByRole("textbox");
+    await user.clear(name);
+    await user.type(name, "Course");
     await user.click(screen.getByRole("button", { name: "table.save" }));
 
     await waitFor(() =>
       expect(staffApi.updateAbsenceCategory).toHaveBeenCalledTimes(1),
     );
     const [id, payload] = staffApi.updateAbsenceCategory.mock.calls[0];
-    expect(id).toBe("abs-sick-2026");
-    expect(payload).toMatchObject({ is_active: true, name: "Illness" });
-    expect(Number(payload.year)).toBe(2026);
-    expect(await screen.findByText("Illness")).toBeInTheDocument();
+    expect(id).toBe("abs-training");
+    expect(payload).toMatchObject({ is_active: true, name: "Course" });
+    expect(await screen.findByText("Course")).toBeInTheDocument();
+  });
+
+  it("lets the default category be renamed, but not switched off", async () => {
+    const { user } = renderList();
+    await screen.findByText("Vacation");
+
+    await user.click(
+      within(rowOf("staff.absence_category_default")).getByRole("button", {
+        name: "table.edit",
+      }),
+    );
+
+    expect(within(editingRow()).getByRole("textbox")).toBeEnabled();
+    expect(within(editingRow()).getByRole("checkbox")).toBeDisabled();
   });
 
   it("deletes an unused category after confirmation and reloads the list", async () => {
@@ -274,7 +295,7 @@ describe("ListAbsenceCategory", () => {
     await screen.findByText("Vacation");
 
     await user.click(
-      within(rowOf("Sick leave")).getByRole("button", {
+      within(rowOf("Training")).getByRole("button", {
         name: "table.delete",
       }),
     );
@@ -282,24 +303,26 @@ describe("ListAbsenceCategory", () => {
 
     await waitFor(() =>
       expect(staffApi.deleteAbsenceCategory).toHaveBeenCalledWith(
-        "abs-sick-2026",
+        "abs-training",
       ),
     );
     await waitFor(() =>
       expect(staffApi.listAbsenceCategories).toHaveBeenCalledTimes(2),
     );
-    expect(screen.queryByText("Sick leave")).not.toBeInTheDocument();
+    expect(screen.queryByText("Training")).not.toBeInTheDocument();
   });
 
-  it("offers no delete for a category that absences still use", async () => {
+  it("offers no delete for the default category or one that absences use", async () => {
     renderList();
     await screen.findByText("Vacation");
 
+    for (const name of ["staff.absence_category_default", "Vacation"]) {
+      expect(
+        within(rowOf(name)).queryByRole("button", { name: "table.delete" }),
+      ).not.toBeInTheDocument();
+    }
     expect(
-      within(rowOf("Vacation")).queryByRole("button", { name: "table.delete" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(rowOf("Sick leave")).getByRole("button", {
+      within(rowOf("Training")).getByRole("button", {
         name: "table.delete",
       }),
     ).toBeInTheDocument();
@@ -318,10 +341,10 @@ describe("ListAbsenceCategory role gating", () => {
         screen.getByRole("button", { name: /table\.add_record/ }),
       ).toBeEnabled();
       expect(
-        within(rowOf("Sick leave")).getByRole("button", { name: "table.edit" }),
+        within(rowOf("Training")).getByRole("button", { name: "table.edit" }),
       ).toBeEnabled();
       expect(
-        within(rowOf("Sick leave")).getByRole("button", {
+        within(rowOf("Training")).getByRole("button", {
           name: "table.delete",
         }),
       ).toBeEnabled();
@@ -349,7 +372,7 @@ describe("ListAbsenceCategory role gating", () => {
       expect(editButton).toBeDisabled();
     }
 
-    await user.click(screen.getByText("Sick leave"));
+    await user.click(screen.getByText("Training"));
 
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });

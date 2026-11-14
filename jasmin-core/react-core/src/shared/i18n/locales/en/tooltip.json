@@ -12,6 +12,7 @@
   "additional_theoretical_wash_amount": "This amount will be added or subtracted from the calculated amount.",
   "additional_theoretical_clean_amount": "This amount will be added or subtracted from the calculated amount.",
   "needed_harvesting_crates": "Here you can see how many and which harvest crates are needed in the field.",
+  "weekly_plan_absent_employees": "Staff members absent from Monday to Friday don't appear here.",
   "still_in_stock_purchase": "Theoretical stock on Monday.",
   "invoice_creation": "Creates the invoice for this delivery note and finalizes the delivery note. For an invoice covering several delivery notes, go to Invoices. The e-PDF contains ZUGFeRD XML, which makes it an electronic invoice.",
   "crates_in_orders": "For an order, the required crates are calculated automatically here, but can be adjusted manually.",

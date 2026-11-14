@@ -35,6 +35,9 @@ export interface Employee {
    * @nullable
    */
   employee_number?: string | null;
+  readonly comes_from_hr_system: boolean;
+  /** @nullable */
+  readonly hr_system_id: string | null;
   /** @nullable */
   user?: string | null;
   readonly can_be_deleted: boolean;
