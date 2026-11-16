@@ -22,6 +22,10 @@ export default function ConfigurationSidebar({
     false,
   ) as boolean;
   const offersUserAccounts = useCapability("user_accounts");
+  const sellsToResellers = Boolean(getSetting("sells_to_resellers", true));
+  // With the share amounts imported, the logins kept by the host (as under
+  // Tapir) and no resellers, jasmin sends no email at all.
+  const sendsEmail = !weeklyUpload || offersUserAccounts || sellsToResellers;
 
   const items = [
     {
@@ -45,26 +49,34 @@ export default function ConfigurationSidebar({
             </Link>
           ),
         },
-        {
-          key: "configuration-email",
-          requireRole: "isAdmin",
-          icon: <SettingOutlined />,
-          label: (
-            <Link to="/configuration/email">{t("configuration.email")}</Link>
-          ),
-        },
-        {
-          key: "configuration-email-templates-general",
-          requireRole: "isAdmin",
-          icon: <SettingOutlined />,
-          label: (
-            <Link to="/configuration/email-templates/general">
-              {t("configuration.email_templates")}
-            </Link>
-          ),
-        },
+        ...(sendsEmail
+          ? [
+              {
+                key: "configuration-email",
+                requireRole: "isAdmin",
+                icon: <SettingOutlined />,
+                label: (
+                  <Link to="/configuration/email">
+                    {t("configuration.email")}
+                  </Link>
+                ),
+              },
+            ]
+          : []),
+        // The general templates are the logins' invitation, password reset and
+        // welcome, which a host that keeps the logins sends itself.
         ...(offersUserAccounts
           ? [
+              {
+                key: "configuration-email-templates-general",
+                requireRole: "isAdmin",
+                icon: <SettingOutlined />,
+                label: (
+                  <Link to="/configuration/email-templates/general">
+                    {t("configuration.email_templates")}
+                  </Link>
+                ),
+              },
               {
                 key: "configuration-users",
                 requireRole: "isAdmin",
@@ -204,26 +216,32 @@ export default function ConfigurationSidebar({
               },
             ]),
 
-        {
-          key: "configuration-reseller-documents",
-          requireRole: "isAdmin",
-          icon: <SettingOutlined />,
-          label: (
-            <Link to="/configuration/reseller-documents">
-              {t("configuration.reseller_documents")}
-            </Link>
-          ),
-        },
-        {
-          key: "configuration-email-templates-resellers",
-          requireRole: "isAdmin",
-          icon: <SettingOutlined />,
-          label: (
-            <Link to="/configuration/email-templates/resellers">
-              {t("configuration.email_templates")}
-            </Link>
-          ),
-        },
+        // Offers, delivery notes and invoices, and the emails they go out
+        // with, are for resellers only.
+        ...(sellsToResellers
+          ? [
+              {
+                key: "configuration-reseller-documents",
+                requireRole: "isAdmin",
+                icon: <SettingOutlined />,
+                label: (
+                  <Link to="/configuration/reseller-documents">
+                    {t("configuration.reseller_documents")}
+                  </Link>
+                ),
+              },
+              {
+                key: "configuration-email-templates-resellers",
+                requireRole: "isAdmin",
+                icon: <SettingOutlined />,
+                label: (
+                  <Link to="/configuration/email-templates/resellers">
+                    {t("configuration.email_templates")}
+                  </Link>
+                ),
+              },
+            ]
+          : []),
       ],
     },
   ];

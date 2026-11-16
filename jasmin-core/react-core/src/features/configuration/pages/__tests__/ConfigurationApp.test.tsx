@@ -250,11 +250,77 @@ describe("ConfigurationApp weekly-upload tenants", () => {
   });
 });
 
+describe("ConfigurationApp sales channels", () => {
+  const SELLS_TO_RESELLERS = "settings.commissioning.sells_to_resellers";
+  const MARKETS = "settings.commissioning.has_markets";
+
+  beforeEach(() => {
+    stable.weeklyUpload = undefined;
+    stable.save = null;
+    stable.capabilities = {};
+    delete stable.tenantRow.settings;
+    stable.tenantRow.current_settings = {
+      sells_to_resellers: true,
+      has_markets: false,
+    };
+    vi.mocked(tenantsSettingsUpdateCurrentSettingsUpdate).mockClear();
+    vi.mocked(tenantsTenantsPartialUpdate).mockClear();
+  });
+
+  it("follows the operating mode with the stored channels", () => {
+    render(<ConfigurationApp />);
+
+    expect(cardTitles().slice(0, 2)).toEqual([
+      "settings.operating_mode.title",
+      "settings.commissioning.sales.title",
+    ]);
+    expect(moduleToggle(SELLS_TO_RESELLERS)).toBeChecked();
+    expect(moduleToggle(MARKETS)).not.toBeChecked();
+  });
+
+  it("saves a changed channel with the versioned settings, not on the tenant row", async () => {
+    render(<ConfigurationApp />);
+
+    fireEvent.click(moduleToggle(SELLS_TO_RESELLERS));
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
+      settings: expect.objectContaining({
+        sells_to_resellers: false,
+        has_markets: false,
+      }),
+    });
+    const tenantBody = vi.mocked(tenantsTenantsPartialUpdate).mock.calls[0][1];
+    expect(tenantBody).not.toHaveProperty("sells_to_resellers");
+    expect(tenantBody).not.toHaveProperty("has_markets");
+  });
+
+  it("shows the model's defaults to a tenant without stored settings and saves only the channel changed", async () => {
+    delete stable.tenantRow.current_settings;
+    render(<ConfigurationApp />);
+
+    expect(moduleToggle(SELLS_TO_RESELLERS)).toBeChecked();
+    expect(moduleToggle(MARKETS)).not.toBeChecked();
+
+    fireEvent.click(moduleToggle(MARKETS));
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
+      settings: { has_markets: true },
+    });
+  });
+});
+
 describe("ConfigurationApp HR-system card", () => {
   beforeEach(() => {
     stable.weeklyUpload = undefined;
     stable.save = null;
     stable.capabilities = {};
+    delete stable.tenantRow.current_settings;
     stable.tenantRow.navigation = { show_members: true, show_abos: true };
     delete stable.tenantRow.uses_hr_system;
     delete stable.tenantRow.hr_system_employees_url;
@@ -267,6 +333,7 @@ describe("ConfigurationApp HR-system card", () => {
 
     expect(cardTitles()).toEqual([
       "settings.operating_mode.title",
+      "settings.commissioning.sales.title",
       "settings.general.title",
       "settings.navigation.title",
       "settings.commissioning.planning.title",

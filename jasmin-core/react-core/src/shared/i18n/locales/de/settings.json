@@ -170,6 +170,7 @@
     "packing_mode_mixed": "gemischt (pro Anteilsart wählbar)",
     "packing_mode_locked": "Nicht möglich, solange laufende oder künftige Größen anders gepackt werden: {{sizes}}. In „gemischt“ wird jede Größe so gepackt, wie bei ihr eingetragen.",
     "number_packing_stations": "Anzahl Packstationen",
+    "number_packing_stations_description": "Wie viele Stationen am Hof die Kisten zusammenstellen.",
     "show_size_column": "Gemüse-Größen Spalte anzeigen",
     "show_washing": "Waschen anzeigen",
     "show_washing_description": "Aus: Waschtage, Wasch-Liste und Waschen-Spalten werden ausgeblendet. Die Planung im Hintergrund bleibt gleich.",

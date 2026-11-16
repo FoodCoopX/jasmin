@@ -34,6 +34,15 @@ export default function ConfigurationResellerDocuments() {
             suffix: t("common.days"),
           },
           {
+            key: "crates_should_be_on_documents",
+            label: t("settings.commissioning.crates_should_be_on_documents"),
+            description: t(
+              "settings.commissioning.crates_should_be_on_documents_desc",
+            ),
+            type: "checkbox",
+            defaultValue: true,
+          },
+          {
             key: "order_number_prefix",
             label: t("settings.reseller.order_prefix"),
             description: t("settings.reseller.order_prefix_desc"),

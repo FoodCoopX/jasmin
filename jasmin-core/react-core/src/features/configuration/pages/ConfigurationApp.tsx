@@ -68,6 +68,26 @@ export default function ConfigurationApp() {
             },
           ],
         },
+        // Which pages, settings and documents the farm needs follows from
+        // whom it sells to, so this sits right under the operating mode.
+        {
+          category: "sales",
+          title: t("settings.commissioning.sales.title"),
+          settings: [
+            {
+              key: "sells_to_resellers",
+              label: t("settings.commissioning.sells_to_resellers"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "has_markets",
+              label: t("settings.commissioning.has_markets"),
+              type: "checkbox",
+              defaultValue: false,
+            },
+          ],
+        },
         {
           category: "general",
           title: t("settings.general.title"),

@@ -169,6 +169,7 @@
     "packing_mode_mixed": "Mixed (selectable per share type)",
     "packing_mode_locked": "Not possible while running or upcoming sizes are packed otherwise: {{sizes}}. Under \"mixed\", each size is packed as entered for it.",
     "number_packing_stations": "Number of packing stations",
+    "number_packing_stations_description": "How many stations on the farm put the boxes together.",
     "show_size_column": "Show vegetable sizes column",
     "show_washing": "Show washing",
     "show_washing_description": "Off hides the washing days, the washing list and the washing columns. The planning behind them stays the same.",

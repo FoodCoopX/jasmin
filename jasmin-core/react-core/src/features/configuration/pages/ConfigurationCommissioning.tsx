@@ -46,6 +46,9 @@ export default function ConfigurationCommissioning() {
           {
             key: "number_packing_stations",
             label: t("settings.commissioning.number_packing_stations"),
+            description: t(
+              "settings.commissioning.number_packing_stations_description",
+            ),
             type: "number",
             defaultValue: 1,
             min: 1,
@@ -131,33 +134,6 @@ export default function ConfigurationCommissioning() {
               },
             ],
             defaultValue: "basic",
-          },
-        ],
-      },
-      {
-        category: "sales",
-        title: t("settings.commissioning.sales.title"),
-        settings: [
-          {
-            key: "sells_to_resellers",
-            label: t("settings.commissioning.sells_to_resellers"),
-            type: "checkbox",
-            defaultValue: true,
-          },
-          {
-            key: "has_markets",
-            label: t("settings.commissioning.has_markets"),
-            type: "checkbox",
-            defaultValue: false,
-          },
-          {
-            key: "crates_should_be_on_documents",
-            label: t("settings.commissioning.crates_should_be_on_documents"),
-            type: "checkbox",
-            description: t(
-              "settings.commissioning.crates_should_be_on_documents_desc",
-            ),
-            defaultValue: true,
           },
         ],
       },
