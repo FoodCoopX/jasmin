@@ -143,14 +143,14 @@ describe("ConfigurationApp weekly-upload tenants", () => {
     vi.mocked(tenantsTenantsPartialUpdate).mockClear();
   });
 
-  it("leads the page with the weekly-upload switch", () => {
+  it("puts the weekly-upload switch in its own card after the modules and the sales channels", () => {
     render(<ConfigurationApp />);
 
-    expect(cardTitles()[0]).toBe("settings.operating_mode.title");
+    expect(cardTitles()[2]).toBe("settings.operating_mode.title");
 
-    const firstCard = document.querySelector(".ant-card") as HTMLElement;
+    const card = document.querySelectorAll(".ant-card")[2] as HTMLElement;
     expect(
-      within(firstCard).getByRole("checkbox", { name: WEEKLY_UPLOAD }),
+      within(card).getByRole("checkbox", { name: WEEKLY_UPLOAD }),
     ).toBeInTheDocument();
   });
 
@@ -267,11 +267,11 @@ describe("ConfigurationApp sales channels", () => {
     vi.mocked(tenantsTenantsPartialUpdate).mockClear();
   });
 
-  it("follows the operating mode with the stored channels", () => {
+  it("follows the modules with the stored channels", () => {
     render(<ConfigurationApp />);
 
     expect(cardTitles().slice(0, 2)).toEqual([
-      "settings.operating_mode.title",
+      "settings.navigation.title",
       "settings.commissioning.sales.title",
     ]);
     expect(moduleToggle(SELLS_TO_RESELLERS)).toBeChecked();
@@ -328,14 +328,14 @@ describe("ConfigurationApp HR-system card", () => {
     vi.mocked(tenantsTenantsPartialUpdate).mockClear();
   });
 
-  it("follows the modules and the interfaces, under the general settings", () => {
+  it("comes last, after the interfaces, with the modules on top of the page", () => {
     render(<ConfigurationApp />);
 
     expect(cardTitles()).toEqual([
-      "settings.operating_mode.title",
-      "settings.commissioning.sales.title",
-      "settings.general.title",
       "settings.navigation.title",
+      "settings.commissioning.sales.title",
+      "settings.operating_mode.title",
+      "settings.general.title",
       "settings.commissioning.planning.title",
       "settings.hr_system.title",
     ]);

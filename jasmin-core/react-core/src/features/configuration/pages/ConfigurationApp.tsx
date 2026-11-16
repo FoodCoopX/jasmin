@@ -51,25 +51,62 @@ export default function ConfigurationApp() {
   const settingsConfig = useMemo<SettingsCategory[]>(
     () =>
       [
-        // First card on the page: this one switch decides whether the tenant
-        // runs subscriptions at all, and it gates the module toggles below.
         {
-          category: "operating_mode",
-          title: t("settings.operating_mode.title"),
+          category: "navigation",
+          title: t("settings.navigation.title"),
           settings: [
             {
-              key: "uploads_weekly_share_amount",
-              label: t("settings.commissioning.uploads_weekly_amount"),
-              description: t(
-                "settings.commissioning.uploads_weekly_amount_desc",
-              ),
+              key: "navigation.show_members",
+              label: t("settings.navigation.show_members"),
               type: "checkbox",
-              defaultValue: false,
+              defaultValue: true,
+              disabled: weeklyUpload,
+              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
+              disabledDisplayValue: false,
+            },
+            {
+              key: "navigation.show_abos",
+              label: t("settings.navigation.show_abos"),
+              type: "checkbox",
+              defaultValue: true,
+              disabled: weeklyUpload,
+              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
+              disabledDisplayValue: false,
+            },
+            {
+              key: "navigation.show_commissioning",
+              label: t("settings.navigation.show_commissioning"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_staff",
+              label: t("settings.navigation.show_staff"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_warehouse",
+              label: t("settings.navigation.show_warehouse"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_economics",
+              label: t("settings.navigation.show_economics"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_cultivation",
+              label: t("settings.navigation.show_cultivation"),
+              type: "checkbox",
+              defaultValue: true,
             },
           ],
         },
         // Which pages, settings and documents the farm needs follows from
-        // whom it sells to, so this sits right under the operating mode.
+        // whom it sells to, so this sits right under the modules.
         {
           category: "sales",
           title: t("settings.commissioning.sales.title"),
@@ -83,6 +120,23 @@ export default function ConfigurationApp() {
             {
               key: "has_markets",
               label: t("settings.commissioning.has_markets"),
+              type: "checkbox",
+              defaultValue: false,
+            },
+          ],
+        },
+        // This one switch decides whether the tenant runs subscriptions at
+        // all; switched on, it locks the members and subscriptions modules.
+        {
+          category: "operating_mode",
+          title: t("settings.operating_mode.title"),
+          settings: [
+            {
+              key: "uploads_weekly_share_amount",
+              label: t("settings.commissioning.uploads_weekly_amount"),
+              description: t(
+                "settings.commissioning.uploads_weekly_amount_desc",
+              ),
               type: "checkbox",
               defaultValue: false,
             },
@@ -158,60 +212,6 @@ export default function ConfigurationApp() {
                 { value: "fr-FR", label: "1 234,56" },
               ],
               defaultValue: "de-DE",
-            },
-          ],
-        },
-        {
-          category: "navigation",
-          title: t("settings.navigation.title"),
-          settings: [
-            {
-              key: "navigation.show_members",
-              label: t("settings.navigation.show_members"),
-              type: "checkbox",
-              defaultValue: true,
-              disabled: weeklyUpload,
-              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
-              disabledDisplayValue: false,
-            },
-            {
-              key: "navigation.show_abos",
-              label: t("settings.navigation.show_abos"),
-              type: "checkbox",
-              defaultValue: true,
-              disabled: weeklyUpload,
-              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
-              disabledDisplayValue: false,
-            },
-            {
-              key: "navigation.show_commissioning",
-              label: t("settings.navigation.show_commissioning"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-            {
-              key: "navigation.show_staff",
-              label: t("settings.navigation.show_staff"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-            {
-              key: "navigation.show_warehouse",
-              label: t("settings.navigation.show_warehouse"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-            {
-              key: "navigation.show_economics",
-              label: t("settings.navigation.show_economics"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-            {
-              key: "navigation.show_cultivation",
-              label: t("settings.navigation.show_cultivation"),
-              type: "checkbox",
-              defaultValue: true,
             },
           ],
         },
