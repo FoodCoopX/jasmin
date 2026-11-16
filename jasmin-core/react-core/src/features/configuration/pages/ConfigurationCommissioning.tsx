@@ -3,14 +3,18 @@ import { useTranslation } from "react-i18next";
 
 import { SettingsCategory } from "@features/configuration/components/SettingsRenderer";
 import SettingsPage from "@features/configuration/components/SettingsPage";
-import { useCapability } from "@hooks/index";
+import { useCapability, useTenant } from "@hooks/index";
 import { usePackingModeOptions } from "@features/configuration/hooks/usePackingModeOptions";
 
 export default function ConfigurationCommissioning() {
   const { t } = useTranslation();
+  const { getSetting } = useTenant();
   // Members see their boxes on jasmin's own member pages, which a host
   // without jasmin's logins doesn't have.
   const offersUserAccounts = useCapability("user_accounts");
+  // A farm that imports its share amounts sets no share prices, the only
+  // thing the default share tax rate fills in.
+  const importsShareAmounts = Boolean(getSetting("uploads_weekly_share_amount", false));
   const packingModeOptions = usePackingModeOptions();
 
   const settingsConfig = useMemo<SettingsCategory[]>(
@@ -162,20 +166,24 @@ export default function ConfigurationCommissioning() {
             step: 0.1,
             precision: 2,
           },
-          {
-            key: "default_tax_rate_shares",
-            label: t("settings.commissioning.default_tax_rate_shares"),
-            type: "number",
-            defaultValue: 7,
-            min: 0,
-            max: 100,
-            step: 0.1,
-            precision: 2,
-          },
+          ...(importsShareAmounts
+            ? []
+            : [
+                {
+                  key: "default_tax_rate_shares",
+                  label: t("settings.commissioning.default_tax_rate_shares"),
+                  type: "number" as const,
+                  defaultValue: 7,
+                  min: 0,
+                  max: 100,
+                  step: 0.1,
+                  precision: 2,
+                },
+              ]),
         ],
       },
     ],
-    [t, offersUserAccounts, packingModeOptions],
+    [t, offersUserAccounts, importsShareAmounts, packingModeOptions],
   );
 
   return (

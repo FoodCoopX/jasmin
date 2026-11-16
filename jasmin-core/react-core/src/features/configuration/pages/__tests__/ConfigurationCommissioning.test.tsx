@@ -20,16 +20,21 @@ vi.mock("react-i18next", () => ({
 
 // What the deployment offers, per test; a name left out is offered.
 const capabilities = vi.hoisted(() => ({}) as Record<string, boolean>);
-// The farm's packing mode and its running and upcoming sizes, per test.
+// The farm's packing mode, whether it imports its share amounts, and its
+// running and upcoming sizes, per test.
 const farm = vi.hoisted(() => ({
   packingMode: "BOXES",
+  importsShareAmounts: false,
   sizes: [] as { share_type_name: string; size: string; is_packed_bulk: boolean }[],
 }));
 vi.mock("@hooks/index", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
   const tenant = makeUseTenantMock({
-    getSetting: (key: string, fallback?: unknown) =>
-      key === "packing_mode" ? farm.packingMode : fallback,
+    getSetting: (key: string, fallback?: unknown) => {
+      if (key === "packing_mode") return farm.packingMode;
+      if (key === "uploads_weekly_share_amount") return farm.importsShareAmounts;
+      return fallback;
+    },
   });
   return {
     useCapability: (name: string) => capabilities[name] ?? true,
@@ -64,6 +69,7 @@ beforeEach(() => {
   for (const name of Object.keys(capabilities)) delete capabilities[name];
   shown.settings = [];
   farm.packingMode = "BOXES";
+  farm.importsShareAmounts = false;
   farm.sizes = [];
 });
 
@@ -128,5 +134,29 @@ describe("ConfigurationCommissioning layout", () => {
 
     expect(layoutKeys()).not.toContain(SELLER_NAME);
     expect(layoutKeys()).toContain("show_size_column");
+  });
+});
+
+describe("ConfigurationCommissioning tax rates", () => {
+  const taxRateKeys = () =>
+    shown.settings
+      .find((category) => category.category === "tax_rates")
+      ?.settings.map((setting) => setting.key);
+
+  it("offers a default rate for articles, crates and shares", () => {
+    render(<ConfigurationCommissioning />);
+
+    expect(taxRateKeys()).toEqual([
+      "default_tax_rate_articles",
+      "default_tax_rate_crates",
+      "default_tax_rate_shares",
+    ]);
+  });
+
+  it("leaves out the share rate where the share amounts are imported and shares get no price", () => {
+    farm.importsShareAmounts = true;
+    render(<ConfigurationCommissioning />);
+
+    expect(taxRateKeys()).toEqual(["default_tax_rate_articles", "default_tax_rate_crates"]);
   });
 });
