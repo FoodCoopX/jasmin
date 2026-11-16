@@ -441,7 +441,16 @@ describe("ShareTypeVariationModal loading", () => {
     expect(headers).toMatch(/commissioning\.requires_optin/);
   });
 
-  it("shows a tenant that uploads its weekly share amounts no capacity, trial or prices", async () => {
+  it("gives every saved variation a description and a picture to show where subscriptions are picked", async () => {
+    renderModal();
+    await loaded();
+
+    for (const name of ["commissioning.edit_description", "commissioning.view_picture"]) {
+      expect(screen.getAllByRole("button", { name })).toHaveLength(serverRows.length);
+    }
+  });
+
+  it("shows a tenant that uploads its weekly share amounts no capacity, description, picture, trial or prices", async () => {
     tenantSettings.values = {
       uploads_weekly_share_amount: true,
       allows_trial_subscriptions: true,
@@ -461,12 +470,17 @@ describe("ShareTypeVariationModal loading", () => {
       .map((header) => header.textContent ?? "")
       .join("|");
     expect(headers).not.toMatch(/commissioning\.capacity/);
+    expect(headers).not.toMatch(/commissioning\.description|commissioning\.picture/);
     expect(headers).not.toMatch(
       /commissioning\.allowed_for_trial_subscription/,
     );
-    expect(
-      screen.queryByRole("button", { name: "commissioning.configure_prices" }),
-    ).not.toBeInTheDocument();
+    for (const name of [
+      "commissioning.configure_prices",
+      "commissioning.edit_description",
+      "commissioning.view_picture",
+    ]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
   });
 
   it("hides the opt-in columns for a share type with jokers", async () => {

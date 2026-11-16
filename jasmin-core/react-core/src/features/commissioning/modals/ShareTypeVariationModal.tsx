@@ -117,16 +117,26 @@ function packingColumn(t: TFunction): EditableColumnConfig<ShareTypeVariationRec
   };
 }
 
+interface SubscriptionColumnActions {
+  onOpenPrices: (record: ShareTypeVariationRecord) => void;
+  onOpenDescription: (record: ShareTypeVariationRecord) => void;
+  onOpenPicture: (record: ShareTypeVariationRecord) => void;
+}
+
 /**
- * The columns only subscriptions use: the capacity, whether a trial
+ * The columns only subscriptions use: the capacity, the description and
+ * picture shown where a subscription's variation is picked, whether a trial
  * subscription may take the variation, and the button to its prices. A tenant
- * that uploads its weekly share amounts runs no subscriptions, so it gets none
- * of them.
+ * that uploads its weekly share amounts, as every tenant inside Tapir does,
+ * runs no subscriptions, so it gets none of them.
  */
-function useSubscriptionColumns(
-  onOpenPriceModal: (record: ShareTypeVariationRecord) => void,
-): {
+function useSubscriptionColumns({
+  onOpenPrices,
+  onOpenDescription,
+  onOpenPicture,
+}: SubscriptionColumnActions): {
   capacityColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
+  pickerColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
   trialColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
   priceColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
 } {
@@ -142,7 +152,12 @@ function useSubscriptionColumns(
   ) as boolean;
   return useMemo(() => {
     if (weeklyUpload) {
-      return { capacityColumns: [], trialColumns: [], priceColumns: [] };
+      return {
+        capacityColumns: [],
+        pickerColumns: [],
+        trialColumns: [],
+        priceColumns: [],
+      };
     }
     return {
       capacityColumns: [
@@ -160,6 +175,66 @@ function useSubscriptionColumns(
           inputType: "positive_integer",
           width: "7em",
           align: "center",
+        },
+      ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[],
+      pickerColumns: [
+        {
+          title: t("commissioning.description"),
+          dataIndex: "description",
+          key: "description",
+          width: "9em",
+          align: "center",
+          readOnly: true,
+          disabled: true,
+          render: (_: unknown, record: ShareTypeVariationRecord) => {
+            if (record.key === -1 || !record.id) {
+              return <span className="color-text-tertiary">-</span>;
+            }
+
+            return (
+              <Space>
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => onOpenDescription(record)}
+                  aria-label={t("commissioning.edit_description")}
+                />
+              </Space>
+            );
+          },
+        },
+        {
+          title: t("commissioning.picture"),
+          dataIndex: "picture",
+          key: "picture",
+          width: "5em",
+          align: "center",
+          readOnly: true,
+          disabled: true,
+          render: (_: unknown, record: ShareTypeVariationRecord) => {
+            if (record.key === -1 || !record.id) {
+              return <span className="color-text-tertiary">-</span>;
+            }
+            return (
+              <Button
+                type="link"
+                size="small"
+                aria-label={t("commissioning.view_picture")}
+                onClick={() => onOpenPicture(record)}
+              >
+                {record.picture ? (
+                  <img
+                    src={record.picture}
+                    alt=""
+                    className="table-picture-thumbnail"
+                  />
+                ) : (
+                  <UploadOutlined />
+                )}
+              </Button>
+            );
+          },
         },
       ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[],
       trialColumns: allowsTrialSubscriptions
@@ -197,7 +272,7 @@ function useSubscriptionColumns(
                 <Button
                   type="primary"
                   size="small"
-                  onClick={() => onOpenPriceModal(record)}
+                  onClick={() => onOpenPrices(record)}
                 >
                   {t("commissioning.configure_prices")}
                 </Button>
@@ -207,7 +282,14 @@ function useSubscriptionColumns(
         },
       ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[],
     };
-  }, [weeklyUpload, allowsTrialSubscriptions, onOpenPriceModal, t]);
+  }, [
+    weeklyUpload,
+    allowsTrialSubscriptions,
+    onOpenPrices,
+    onOpenDescription,
+    onOpenPicture,
+    t,
+  ]);
 }
 
 interface ShareTypeVariationModalProps {
@@ -386,8 +468,6 @@ export default function ShareTypeVariationModal({
     },
     [],
   );
-  const { capacityColumns, trialColumns, priceColumns } =
-    useSubscriptionColumns(handleOpenPriceModal);
 
   const handleClosePriceModal = useCallback(() => {
     setPriceModalVisible(false);
@@ -475,6 +555,13 @@ export default function ShareTypeVariationModal({
     onDeleted: handleClosePictureModal,
   });
 
+  const { capacityColumns, pickerColumns, trialColumns, priceColumns } =
+    useSubscriptionColumns({
+      onOpenPrices: handleOpenPriceModal,
+      onOpenDescription: handleOpenDescriptionModal,
+      onOpenPicture: handleOpenPictureModal,
+    });
+
   const columns = useMemo<EditableColumnConfig<ShareTypeVariationRecord>[]>(
     () =>
       [
@@ -560,64 +647,7 @@ export default function ShareTypeVariationModal({
             text ? `${format(parseFloat(text as string), 2)} kg` : null,
         },
         ...capacityColumns,
-        {
-          title: t("commissioning.description"),
-          dataIndex: "description",
-          key: "description",
-          width: "9em",
-          align: "center",
-          readOnly: true,
-          disabled: true,
-          render: (_: unknown, record: ShareTypeVariationRecord) => {
-            if (record.key === -1 || !record.id) {
-              return <span className="color-text-tertiary">-</span>;
-            }
-
-            return (
-              <Space>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => handleOpenDescriptionModal(record)}
-                  aria-label={t("commissioning.edit_description")}
-                />
-              </Space>
-            );
-          },
-        },
-        {
-          title: t("commissioning.picture"),
-          dataIndex: "picture",
-          key: "picture",
-          width: "5em",
-          align: "center",
-          readOnly: true,
-          disabled: true,
-          render: (_: unknown, record: ShareTypeVariationRecord) => {
-            if (record.key === -1 || !record.id) {
-              return <span className="color-text-tertiary">-</span>;
-            }
-            return (
-              <Button
-                type="link"
-                size="small"
-                aria-label={t("commissioning.view_picture")}
-                onClick={() => handleOpenPictureModal(record)}
-              >
-                {record.picture ? (
-                  <img
-                    src={record.picture}
-                    alt=""
-                    className="table-picture-thumbnail"
-                  />
-                ) : (
-                  <UploadOutlined />
-                )}
-              </Button>
-            );
-          },
-        },
+        ...pickerColumns,
         {
           title: <>{t("commissioning.used_crate")}</>,
           dataIndex: "used_crate_name",
@@ -688,8 +718,6 @@ export default function ShareTypeVariationModal({
       getShareTypeVariationSizeLabel,
       activeStatusColumn,
       format,
-      handleOpenDescriptionModal,
-      handleOpenPictureModal,
       priceColumns,
       handleOpenVirtualComponentModal,
       validFromColumn,
@@ -697,6 +725,7 @@ export default function ShareTypeVariationModal({
       packing_mode,
       showOptinColumns,
       capacityColumns,
+      pickerColumns,
       trialColumns,
     ],
   );
