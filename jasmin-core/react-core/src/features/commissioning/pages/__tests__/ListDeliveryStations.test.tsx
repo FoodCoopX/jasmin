@@ -472,6 +472,15 @@ describe("ListDeliveryStations rows", () => {
     expect(flag(rowOf("School"), RESELLER)).not.toBeChecked();
   });
 
+  it("leaves the reseller flag out on a farm that sells to no reseller", async () => {
+    tenantSettings.values = { sells_to_resellers: false };
+    await renderLoaded();
+
+    expect(columnTitles()).toEqual([
+      "table.actions", ACTIVE, NUMBER, SHORT_NAME, DAYS, INFOS, ...CONTACT_TITLES,
+    ]);
+  });
+
   it("gives every station a button to its delivery days and, for the office, its member information and fees", async () => {
     await renderLoaded();
 

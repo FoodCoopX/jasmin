@@ -55,6 +55,13 @@ const ConfigurationDeliveryExceptions = lazy(
   () =>
     import("@/features/configuration/pages/ConfigurationDeliveryExceptions"),
 );
+const ListCrates = lazy(
+  () => import("@features/commissioning/pages/ListCrates"),
+);
+const ListPlots = lazy(() => import("@features/commissioning/pages/ListPlots"));
+const ListStorages = lazy(
+  () => import("@features/commissioning/pages/ListStorages"),
+);
 
 export const configurationRoutes: AppRoute[] = [
   {
@@ -130,6 +137,32 @@ export const configurationRoutes: AppRoute[] = [
     element: (
       <RequireRole flag="isAdmin">
         <ConfigurationShareTypeVariations />
+      </RequireRole>
+    ),
+  },
+  // The menu links these three for admins only, but the staff who keep them
+  // can still open them.
+  {
+    path: "/configuration/crates",
+    element: (
+      <RequireRole flag="isStaff">
+        <ListCrates />
+      </RequireRole>
+    ),
+  },
+  {
+    path: "/configuration/storages",
+    element: (
+      <RequireRole flag="isStaff">
+        <ListStorages />
+      </RequireRole>
+    ),
+  },
+  {
+    path: "/configuration/plots",
+    element: (
+      <RequireRole flag="isStaff">
+        <ListPlots />
       </RequireRole>
     ),
   },

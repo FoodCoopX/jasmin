@@ -7,7 +7,11 @@ from drf_spectacular.utils import extend_schema_field
 from PIL import Image, UnidentifiedImageError
 from rest_framework import serializers
 
-from apps.shared.host_capabilities import host_capabilities, share_demand_is_imported
+from apps.shared.host_capabilities import (
+    host_capabilities,
+    navigation_in_effect,
+    share_demand_is_imported,
+)
 from apps.shared.image_upload import normalize_uploaded_picture, strict_image_decoding
 from apps.shared.languages import LanguageChoices
 from apps.shared.outbound_hosts import address_origin, resolves_to_internal_address
@@ -73,7 +77,8 @@ def _merged_settings_dict(obj: Tenant, current_overlay: dict) -> dict:
         "time_format": obj.time_format,
         "csv_format": obj.csv_format,
         "number_locale": obj.number_locale,
-        "navigation": obj.navigation or {},
+        # The modules in effect, which a host can fix whatever the row stores.
+        "navigation": navigation_in_effect(obj.navigation or {}),
         "ai": obj.ai or {},
         "allow_upload_for_data_lists": obj.allow_upload_for_data_lists,
         "uses_hr_system": obj.uses_hr_system,
@@ -102,6 +107,7 @@ class HostCapabilitiesSerializer(serializers.Serializer):
     manual_share_import = serializers.BooleanField(read_only=True)
     delivery_stations = serializers.BooleanField(read_only=True)
     about = serializers.BooleanField(read_only=True)
+    module_choice = serializers.BooleanField(read_only=True)
 
 
 class _HostCapabilitiesMixin:

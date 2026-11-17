@@ -24,7 +24,7 @@ import {
 } from "@shared/tables";
 import type { TableRecord } from "@shared/tables/BasicEditableTable/types";
 import { ExplainerText, HideInactiveSwitch } from "@shared/ui";
-import { useNoteColumn } from "@hooks/index";
+import { useNoteColumn, useTenant } from "@hooks/index";
 import {
   useIsActiveColumn,
   useShareArticlePriceColumn,
@@ -45,6 +45,9 @@ export default function ListCrates() {
   const { canEdit } = useRoles();
   const { noteColumn } = useNoteColumn();
   const isActiveColumn = useIsActiveColumn();
+  const { getSetting } = useTenant();
+  // A crate's price is charged to resellers only.
+  const sellsToResellers = Boolean(getSetting("sells_to_resellers", true));
   const permissions = useMemo(
     () => permissionsWithDeletable(canEdit),
     [canEdit],
@@ -107,7 +110,7 @@ export default function ListCrates() {
         width: "10em",
         align: "left",
       },
-      priceModalColumn,
+      ...(sellsToResellers ? [priceModalColumn] : []),
       {
         ...noteColumn,
         title: <>{t("resellers.note")}</>,
@@ -116,7 +119,7 @@ export default function ListCrates() {
         align: "left",
       },
     ],
-    [isActiveColumn, t, priceModalColumn, noteColumn],
+    [isActiveColumn, t, priceModalColumn, noteColumn, sellsToResellers],
   );
 
   return (
@@ -124,13 +127,15 @@ export default function ListCrates() {
       <div className="flex-between">
         <h1>{t("commissioning.list_crates")}</h1>
         <Flex gap={8}>
-          <Button
-            className="download-button"
-            icon={<DownloadOutlined />}
-            onClick={() => setPriceExportVisible(true)}
-          >
-            {t("commissioning.export_prices")}
-          </Button>
+          {sellsToResellers && (
+            <Button
+              className="download-button"
+              icon={<DownloadOutlined />}
+              onClick={() => setPriceExportVisible(true)}
+            >
+              {t("commissioning.export_prices")}
+            </Button>
+          )}
           <Button
             className="download-button"
             icon={<DownloadOutlined />}

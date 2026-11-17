@@ -126,6 +126,9 @@ const untouchedGroupEntries = [
   "configuration.commissioning",
   "configuration.share_type_variations",
   "configuration.delivery_days",
+  "commissioning.list_crates",
+  "commissioning.list_storages",
+  "commissioning.list_plots",
   "configuration.reseller_documents",
 ];
 

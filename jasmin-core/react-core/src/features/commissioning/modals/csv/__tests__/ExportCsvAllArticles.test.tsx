@@ -491,6 +491,18 @@ describe("ExportCsvAllArticles file", () => {
     ]);
   });
 
+  it("leaves out the purchased flag on a farm that buys nothing in", async () => {
+    tenantState.settings = { has_purchases: false };
+    const { user } = await renderLoaded();
+
+    const { content } = await download(user);
+
+    const [headers] = parseCsv(content, ";");
+    expect(headers.slice(0, ARTICLE_COLUMNS.length - 1)).toEqual(
+      ARTICLE_COLUMNS.filter((column) => column !== PURCHASED),
+    );
+  });
+
   it("writes one line per article, then one per crate priced on the date", async () => {
     const { user } = await renderLoaded();
 

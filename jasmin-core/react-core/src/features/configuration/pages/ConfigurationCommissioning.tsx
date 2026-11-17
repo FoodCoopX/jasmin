@@ -10,11 +10,19 @@ export default function ConfigurationCommissioning() {
   const { t } = useTranslation();
   const { getSetting } = useTenant();
   // Members see their boxes on jasmin's own member pages, which a host
-  // without jasmin's logins doesn't have.
-  const offersUserAccounts = useCapability("user_accounts");
+  // without jasmin's logins doesn't have, and a seller's name only on what
+  // the farm buys in.
+  const showsSellerNames =
+    useCapability("user_accounts") &&
+    getSetting("has_purchases", true) !== false;
   // A farm that imports its share amounts sets no share prices, the only
   // thing the default share tax rate fills in.
-  const importsShareAmounts = Boolean(getSetting("uploads_weekly_share_amount", false));
+  const importsShareAmounts = Boolean(
+    getSetting("uploads_weekly_share_amount", false),
+  );
+  // Crates are charged to resellers only, the one thing the default crate tax
+  // rate fills in.
+  const sellsToResellers = getSetting("sells_to_resellers", true) !== false;
   const packingModeOptions = usePackingModeOptions();
 
   const settingsConfig = useMemo<SettingsCategory[]>(
@@ -100,7 +108,7 @@ export default function ConfigurationCommissioning() {
             type: "checkbox",
             defaultValue: true,
           },
-          ...(offersUserAccounts
+          ...(showsSellerNames
             ? [
                 {
                   key: "show_seller_name_of_share_article_in_share_for_member_on_page",
@@ -156,16 +164,20 @@ export default function ConfigurationCommissioning() {
             step: 0.1,
             precision: 2,
           },
-          {
-            key: "default_tax_rate_crates",
-            label: t("settings.commissioning.default_tax_rate_crates"),
-            type: "number",
-            defaultValue: 19,
-            min: 0,
-            max: 100,
-            step: 0.1,
-            precision: 2,
-          },
+          ...(sellsToResellers
+            ? [
+                {
+                  key: "default_tax_rate_crates",
+                  label: t("settings.commissioning.default_tax_rate_crates"),
+                  type: "number" as const,
+                  defaultValue: 19,
+                  min: 0,
+                  max: 100,
+                  step: 0.1,
+                  precision: 2,
+                },
+              ]
+            : []),
           ...(importsShareAmounts
             ? []
             : [
@@ -183,7 +195,7 @@ export default function ConfigurationCommissioning() {
         ],
       },
     ],
-    [t, offersUserAccounts, importsShareAmounts, packingModeOptions],
+    [t, showsSellerNames, sellsToResellers, importsShareAmounts, packingModeOptions],
   );
 
   return (

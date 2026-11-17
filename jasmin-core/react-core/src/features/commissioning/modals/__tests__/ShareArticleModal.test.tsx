@@ -3,7 +3,8 @@
  * spot — its name, unit, description, whether it is active and bought in, and
  * which harvest share it goes into. Rendered the way every page hosts it:
  * mounted closed with the page, opened from a button, and closed again by the
- * page when the dialog reports a save or a cancel. The real modal, its form
+ * page when the dialog reports a save or a cancel. A farm that buys nothing in
+ * gets no "bought in" box. The real modal, its form
  * hook and the unit and share-option hooks render; the generated commissioning
  * client is the mocking boundary, its share-option hook a real TanStack query
  * around a spy, and the toasts are recorded.
@@ -18,6 +19,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ActiveShareOptions, ShareArticle } from "@shared/api/generated/models";
+import { TenantContext } from "@shared/contexts/TenantContext";
 import germanErrors from "@shared/i18n/locales/de/errors.json";
 import { makeShareArticle } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders, type ProfileRendersHandle } from "@/test/profileRenders";
@@ -170,7 +172,10 @@ let queryClient: QueryClient;
  */
 async function renderPage(
   defaultValues?: Record<string, unknown>,
-  { waitForShareOptions = true }: { waitForShareOptions?: boolean } = {},
+  {
+    waitForShareOptions = true,
+    buysIn = true,
+  }: { waitForShareOptions?: boolean; buysIn?: boolean } = {},
 ) {
   const user = userEvent.setup();
   const onSuccess = vi.fn();
@@ -179,14 +184,22 @@ async function renderPage(
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   });
+  const page = (
+    <ArticlePage
+      defaultValues={defaultValues}
+      onSuccess={onSuccess}
+      onClose={onClose}
+      profiler={profiler}
+    />
+  );
+  // Without a tenant the dialog offers the purchased flag; a farm that buys
+  // nothing in says so through its settings.
+  const tenant = {
+    getSetting: (key: string, fallback?: unknown) => (key === "has_purchases" ? false : fallback),
+  } as unknown as Parameters<typeof TenantContext.Provider>[0]["value"];
   render(
     <QueryClientProvider client={queryClient}>
-      <ArticlePage
-        defaultValues={defaultValues}
-        onSuccess={onSuccess}
-        onClose={onClose}
-        profiler={profiler}
-      />
+      {buysIn ? page : <TenantContext.Provider value={tenant}>{page}</TenantContext.Provider>}
     </QueryClientProvider>,
   );
   await waitFor(() => expect(api.activeShareOptions).toHaveBeenCalled());
@@ -382,6 +395,19 @@ describe("ShareArticleModal opening", () => {
 
     await waitFor(() => expect(queryClient.isFetching()).toBe(0));
     expect(checkboxBeside(HARVEST_SHARE)).not.toBeChecked();
+  });
+
+  it("offers no purchased flag on a farm that buys nothing in, and saves the article as grown", async () => {
+    const { user } = await renderPage({ is_purchased: true }, { buysIn: false });
+    await openDialog(user);
+
+    expect(shownCheckboxTexts()).toEqual([ACTIVE, HARVEST_SHARE]);
+
+    await fillArticle(user, "Kohlrabi", PIECES);
+    await user.click(saveButton());
+
+    await createdOnce();
+    expect(sentArticle()).toMatchObject({ name: "Kohlrabi", is_purchased: false });
   });
 
   it("settles after opening instead of re-rendering in a loop", async () => {

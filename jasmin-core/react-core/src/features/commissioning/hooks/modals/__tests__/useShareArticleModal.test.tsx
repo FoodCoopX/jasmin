@@ -2,7 +2,8 @@
  * useShareArticleModal: the add-article dialog starts a new article in the
  * vegetable share when the farm runs one (none otherwise, so the office
  * picks), lets the page's own defaults win, and saves the ticked shares as
- * the article's share options with the purchased flag and name in step.
+ * the article's share options with the purchased flag and name in step. A
+ * farm that buys nothing in starts every article as grown.
  */
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -30,6 +31,8 @@ vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
   }),
   commissioningShareArticlesCreate: api.create,
 }));
+
+import { TenantContext } from "@shared/contexts/TenantContext";
 
 import { useShareArticleModal } from "../useShareArticleModal";
 
@@ -125,6 +128,25 @@ describe("useShareArticleModal", () => {
     await userEvent.click(screen.getByRole("button", { name: "save" }));
     await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
     expect(api.create.mock.calls[0][0]).toMatchObject({ is_purchased: true });
+  });
+
+  it("starts a new article as grown on a farm that buys nothing in, whatever the page hands it", () => {
+    const tenant = {
+      getSetting: (key: string, fallback?: unknown) => (key === "has_purchases" ? false : fallback),
+    } as unknown as Parameters<typeof TenantContext.Provider>[0]["value"];
+    render(
+      <TenantContext.Provider value={tenant}>
+        <Harness />
+      </TenantContext.Provider>,
+    );
+    act(() => modal.openModal({ name: "Lemons", is_purchased: true }));
+    expect(modal.hasPurchases).toBe(false);
+    expect(modal.form.getFieldsValue(true)).toMatchObject({ name: "Lemons", is_purchased: false });
+  });
+
+  it("offers the purchased flag where no tenant is loaded", () => {
+    render(<Harness />);
+    expect(modal.hasPurchases).toBe(true);
   });
 
   it("closes and clears the form", () => {

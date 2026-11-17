@@ -8,7 +8,7 @@ import type {
   CrateNetPrice,
   ShareArticle,
 } from "@shared/api/generated/models";
-import { useCurrency } from "@hooks/index";
+import { useCurrency, useTenant } from "@hooks/index";
 import ExportCsvAtDateModal, {
   type ExportCsvColumn,
   type PriceColumn,
@@ -121,6 +121,7 @@ export default function ExportCsvAllArticles({
   // so the per-price labels are identical (`USt., €/kg, €/Stk., €/Bund,
   // €/kg ab N VPE, …`).
   const pricePart = useSharePriceCsvColumns();
+  const hasPurchases = Boolean(useTenant().getSetting("has_purchases", true));
 
   const columns = useMemo<ExportCsvColumn[]>(() => {
     const [yes, no] = yesNo(i18n.language || "de");
@@ -153,11 +154,15 @@ export default function ExportCsvAllArticles({
         label: t("commissioning.is_extra"),
         render: articleOnly(boolToText),
       },
-      {
-        key: "is_purchased",
-        label: t("commissioning.is_purchased"),
-        render: articleOnly(boolToText),
-      },
+      ...(hasPurchases
+        ? [
+            {
+              key: "is_purchased",
+              label: t("commissioning.is_purchased"),
+              render: articleOnly(boolToText),
+            },
+          ]
+        : []),
       {
         key: "is_active",
         label: t("commissioning.is_active"),
@@ -208,7 +213,7 @@ export default function ExportCsvAllArticles({
     ];
 
     return [...articleMeta, ...sharedPrices, ...crateOnly];
-  }, [t, i18n.language, pricePart, currencySymbol]);
+  }, [t, i18n.language, pricePart, currencySymbol, hasPurchases]);
 
   return (
     <ExportCsvAtDateModal

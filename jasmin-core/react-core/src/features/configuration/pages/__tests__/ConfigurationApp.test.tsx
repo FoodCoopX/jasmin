@@ -4,7 +4,8 @@
 // shown OFF because the modules are hidden. The lock is cosmetic: the stored
 // preference stays in form state and in the save payload, so it comes back the
 // moment the flag is cleared. Every other module toggle, and the whole page for
-// a tenant without the flag, stays exactly as it was.
+// a tenant without the flag, stays exactly as it was. A host that fixes the
+// modules leaves their card out and keeps the stored choice in the save.
 
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,6 +25,9 @@ const stable = vi.hoisted(() => ({
   weeklyUpload: undefined as boolean | undefined,
   // What the deployment offers; a name left out is offered.
   capabilities: {} as Record<string, boolean>,
+  // The modules in effect, as the merged settings report them; a module left
+  // out falls through to the caller's default.
+  modulesInEffect: {} as Record<string, boolean>,
   // The tenant row the page reads. ``navigation`` carries the tenant's STORED
   // module preference — both modules on. The weekly-upload lock must never
   // overwrite it.
@@ -59,10 +63,15 @@ vi.mock("@hooks/index", async () => {
     // object, or a missing path segment, yields the CALLER-SUPPLIED default.
     // Flipping the page's ``false`` default to ``true`` therefore changes what
     // these tests see, which is the point.
-    getSetting: (key: string, defaultValue?: unknown) =>
-      key === "uploads_weekly_share_amount" && stable.weeklyUpload !== undefined
-        ? stable.weeklyUpload
-        : defaultValue,
+    getSetting: (key: string, defaultValue?: unknown) => {
+      if (key === "uploads_weekly_share_amount" && stable.weeklyUpload !== undefined) {
+        return stable.weeklyUpload;
+      }
+      const module = key.replace("navigation.", "");
+      return key.startsWith("navigation.") && module in stable.modulesInEffect
+        ? stable.modulesInEffect[module]
+        : defaultValue;
+    },
   });
   return {
     useTenant: () => tenant,
@@ -137,6 +146,7 @@ describe("ConfigurationApp weekly-upload tenants", () => {
     stable.weeklyUpload = undefined;
     stable.save = null;
     stable.capabilities = {};
+    stable.modulesInEffect = {};
     delete stable.tenantRow.settings;
     delete stable.tenantRow.current_settings;
     vi.mocked(tenantsSettingsUpdateCurrentSettingsUpdate).mockClear();
@@ -258,6 +268,7 @@ describe("ConfigurationApp sales channels", () => {
     stable.weeklyUpload = undefined;
     stable.save = null;
     stable.capabilities = {};
+    stable.modulesInEffect = {};
     delete stable.tenantRow.settings;
     stable.tenantRow.current_settings = {
       sells_to_resellers: true,
@@ -313,6 +324,55 @@ describe("ConfigurationApp sales channels", () => {
       settings: { has_markets: true },
     });
   });
+
+  it("buys in by default and saves the switched-off purchases with the versioned settings", async () => {
+    const PURCHASES = "settings.commissioning.has_purchases";
+    delete stable.tenantRow.current_settings;
+    render(<ConfigurationApp />);
+
+    expect(moduleToggle(PURCHASES)).toBeChecked();
+
+    fireEvent.click(moduleToggle(PURCHASES));
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
+      settings: { has_purchases: false },
+    });
+    const tenantBody = vi.mocked(tenantsTenantsPartialUpdate).mock.calls[0][1];
+    expect(tenantBody).not.toHaveProperty("has_purchases");
+  });
+});
+
+describe("ConfigurationApp modules fixed by the host", () => {
+  beforeEach(() => {
+    stable.weeklyUpload = true;
+    stable.save = null;
+    stable.capabilities = { operating_mode_choice: false, module_choice: false };
+    stable.modulesInEffect = {};
+    delete stable.tenantRow.current_settings;
+    stable.tenantRow.navigation = { show_staff: true, show_economics: true };
+    vi.mocked(tenantsTenantsPartialUpdate).mockClear();
+  });
+
+  it("leaves out the modules card, so the page opens with the sales channels", () => {
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()[0]).toBe("settings.commissioning.sales.title");
+    expect(cardTitles()).not.toContain("settings.navigation.title");
+    expect(screen.queryByRole("checkbox", { name: COMMISSIONING })).not.toBeInTheDocument();
+  });
+
+  it("saves the stored module choice back untouched", async () => {
+    render(<ConfigurationApp />);
+
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(savedNavigation()).toEqual({ show_staff: true, show_economics: true });
+  });
 });
 
 describe("ConfigurationApp HR-system card", () => {
@@ -320,6 +380,7 @@ describe("ConfigurationApp HR-system card", () => {
     stable.weeklyUpload = undefined;
     stable.save = null;
     stable.capabilities = {};
+    stable.modulesInEffect = {};
     delete stable.tenantRow.current_settings;
     stable.tenantRow.navigation = { show_members: true, show_abos: true };
     delete stable.tenantRow.uses_hr_system;
@@ -360,6 +421,16 @@ describe("ConfigurationApp HR-system card", () => {
 
     fireEvent.click(moduleToggle(STAFF));
     expect(cardTitles()).toContain("settings.hr_system.title");
+  });
+
+  it("follows the staff module in effect where the host fixes the modules", () => {
+    // The row still stores the staff module on; the host has it off.
+    stable.capabilities = { module_choice: false };
+    stable.tenantRow.navigation = { show_staff: true };
+    stable.modulesInEffect = { show_staff: false };
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()).not.toContain("settings.hr_system.title");
   });
 
   it("leaves the card's fields out of the page's own save", async () => {

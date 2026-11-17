@@ -37666,12 +37666,16 @@ components:
         about:
           type: boolean
           readOnly: true
+        module_choice:
+          type: boolean
+          readOnly: true
       required:
       - about
       - delivery_stations
       - gdpr
       - legal_notice
       - manual_share_import
+      - module_choice
       - operating_mode_choice
       - support_tickets
       - user_accounts
@@ -52077,6 +52081,8 @@ components:
           type: boolean
         sells_to_resellers:
           type: boolean
+        has_purchases:
+          type: boolean
         crates_should_be_on_documents:
           type: boolean
         payment_terms_reseller_in_days:
@@ -52392,6 +52398,8 @@ components:
         has_markets:
           type: boolean
         sells_to_resellers:
+          type: boolean
+        has_purchases:
           type: boolean
         crates_should_be_on_documents:
           type: boolean

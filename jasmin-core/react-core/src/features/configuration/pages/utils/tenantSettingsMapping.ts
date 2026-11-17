@@ -157,6 +157,7 @@ export const TENANT_SETTINGS_OVERLAY_KEYS: readonly string[] = [
   "uploads_weekly_share_amount",
   "sells_to_resellers",
   "has_markets",
+  "has_purchases",
 ];
 
 /**

@@ -103,6 +103,7 @@ export default function ListShareArticles() {
 
   const has_markets = getSetting("has_markets", true) as boolean;
   const sells_to_resellers = getSetting("sells_to_resellers", true) as boolean;
+  const has_purchases = getSetting("has_purchases", true) as boolean;
   const number_packing_stations = getSetting(
     "number_packing_stations",
     1,
@@ -247,6 +248,7 @@ export default function ListShareArticles() {
     activeFilter,
     sells_to_resellers,
     has_markets,
+    has_purchases,
     number_packing_stations,
     packingBulk,
     renderHarvestNumber,

@@ -45,8 +45,10 @@ export default function ConfigurationApp() {
     "uploads_weekly_share_amount",
     false,
   ) as boolean;
-  // A host application that fixes the operating mode leaves nothing to choose.
+  // A host application that fixes the operating mode or the modules leaves
+  // nothing to choose there.
   const offersOperatingModeChoice = useCapability("operating_mode_choice");
+  const offersModuleChoice = useCapability("module_choice");
 
   const settingsConfig = useMemo<SettingsCategory[]>(
     () =>
@@ -106,7 +108,8 @@ export default function ConfigurationApp() {
           ],
         },
         // Which pages, settings and documents the farm needs follows from
-        // whom it sells to, so this sits right under the modules.
+        // whom it sells to and whether it buys in, so this sits right under
+        // the modules.
         {
           category: "sales",
           title: t("settings.commissioning.sales.title"),
@@ -122,6 +125,12 @@ export default function ConfigurationApp() {
               label: t("settings.commissioning.has_markets"),
               type: "checkbox",
               defaultValue: false,
+            },
+            {
+              key: "has_purchases",
+              label: t("settings.commissioning.has_purchases"),
+              type: "checkbox",
+              defaultValue: true,
             },
           ],
         },
@@ -247,9 +256,11 @@ export default function ConfigurationApp() {
         // },
       ].filter(
         (category) =>
-          offersOperatingModeChoice || category.category !== "operating_mode",
+          (offersOperatingModeChoice ||
+            category.category !== "operating_mode") &&
+          (offersModuleChoice || category.category !== "navigation"),
       ),
-    [t, weeklyUpload, offersOperatingModeChoice],
+    [t, weeklyUpload, offersOperatingModeChoice, offersModuleChoice],
   );
 
   // Sync state from tenant data
@@ -443,11 +454,15 @@ export default function ConfigurationApp() {
               </Row>
             </Card>
             {/* Another interface, saved field by field rather than with the
-                page's autosave; it serves the staff module alone. */}
+                page's autosave; it serves the staff module alone. Where the
+                host fixes the modules, the form's stored choice doesn't
+                count, the module in effect does. */}
             {category.category === "planning" &&
-              Boolean(getSettingValue("navigation.show_staff", true)) && (
-                <HrSystemSettingsCard />
-              )}
+              Boolean(
+                offersModuleChoice
+                  ? getSettingValue("navigation.show_staff", true)
+                  : getSetting("navigation.show_staff", true),
+              ) && <HrSystemSettingsCard />}
           </Fragment>
         ))}
       </Space>

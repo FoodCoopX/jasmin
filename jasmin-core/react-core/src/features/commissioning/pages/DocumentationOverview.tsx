@@ -19,7 +19,7 @@ import { ExplainerText } from "@shared/ui";
 import { Select } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useYearWeekState } from "@hooks/index";
+import { useTenant, useYearWeekState } from "@hooks/index";
 
 // The aggregation rows carry no server id (grouped by article/size/unit), so a
 // stable synthetic key is minted per row for the table.
@@ -81,12 +81,13 @@ export default function DocumentationOverview() {
     ...amountUnitSizeColumns,
   ];
 
+  // A farm that buys nothing in has no purchases to look at.
+  const hasPurchases = useTenant().getSetting("has_purchases", true) !== false;
   const sourceOptions = [
     { value: "HARVEST", label: t("commissioning.harvest_select") },
-    {
-      value: "PURCHASE",
-      label: t("commissioning.purchase_select"),
-    },
+    ...(hasPurchases
+      ? [{ value: "PURCHASE", label: t("commissioning.purchase_select") }]
+      : []),
     { value: "WASTE", label: t("commissioning.waste_select") },
   ];
 

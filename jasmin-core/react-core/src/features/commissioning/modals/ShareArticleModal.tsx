@@ -23,6 +23,7 @@ const ShareArticleModal: FC<ShareArticleModalProps> = ({
     form,
     unitOptions,
     fruit_and_veg_shares_are_separate,
+    hasPurchases,
     openModal,
     closeModal,
     saveShareArticle,
@@ -105,9 +106,11 @@ const ShareArticleModal: FC<ShareArticleModalProps> = ({
           <Checkbox>{t("commissioning.is_active")}</Checkbox>
         </Form.Item>
 
-        <Form.Item name="is_purchased" valuePropName="checked">
-          <Checkbox>{t("commissioning.is_purchased")}</Checkbox>
-        </Form.Item>
+        {hasPurchases && (
+          <Form.Item name="is_purchased" valuePropName="checked">
+            <Checkbox>{t("commissioning.is_purchased")}</Checkbox>
+          </Form.Item>
+        )}
 
         {!fruit_and_veg_shares_are_separate && (
           <Form.Item name="harvest_share" valuePropName="checked">

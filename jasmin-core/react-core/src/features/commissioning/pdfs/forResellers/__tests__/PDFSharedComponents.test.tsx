@@ -188,6 +188,17 @@ describe("PDFTenantInfo", () => {
     ]);
   });
 
+  it("prints the tenant's VAT ID below the phone, as the reseller's is printed", () => {
+    const { container } = render(
+      <PDFTenantInfo tenantSettings={{ ...tenantSettings, uid: "ATU12345678" }} />,
+    );
+    expect(
+      Array.from(container.querySelectorAll("[data-pdf='text']")).map(
+        (line) => line.textContent,
+      ).slice(-2),
+    ).toEqual(["+43 1 234", "UID: ATU12345678"]);
+  });
+
   it("prints the orders email instead when there is one, and the extra lines below", () => {
     render(
       <PDFTenantInfo

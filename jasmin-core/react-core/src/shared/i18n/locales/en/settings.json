@@ -178,7 +178,7 @@
     "distribute_forecast_by_weight": "Distribute forecast amount across sizes by weight (prefill empty cells)",
     "show_summary_in_harvest_share_planning_on_top": "Show summary rows at the top of crate planning",
     "sales": {
-      "title": "Sales channels"
+      "title": "Sales and purchasing"
     },
     "default_planning_mode_basic": "by days",
     "default_planning_mode_tours": "by tours",
@@ -187,6 +187,7 @@
     "default_planning_mode_description": "This is only the default setting. It can be changed every week.",
     "has_markets": "Sell at markets",
     "sells_to_resellers": "Sells to resellers",
+    "has_purchases": "Buys produce in",
     "crates_should_be_on_documents": "Crates are charged",
     "crates_should_be_on_documents_desc": "Crates get a price and are listed on orders, delivery notes and invoices.",
     "different_offer_groups": "Different offer groups",

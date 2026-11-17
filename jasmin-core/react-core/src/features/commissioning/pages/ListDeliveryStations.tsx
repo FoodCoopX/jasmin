@@ -78,6 +78,8 @@ export default function ListDeliveryStations() {
   );
   const uploadAllowed =
     (getSetting("allow_upload_for_data_lists", false) as boolean) === true;
+  // A station can be a reseller only on a farm that sells to resellers.
+  const sellsToResellers = getSetting("sells_to_resellers", true) !== false;
 
   const [csvModalVisible, setCsvModalVisible] = useState(false);
   const [
@@ -164,19 +166,23 @@ export default function ListDeliveryStations() {
   const columns: any[] = useMemo(
     () => [
       isActiveColumn,
-      {
-        title: <>{t("delivery_stations.is_also_reseller")}</>,
-        dataIndex: "is_also_reseller",
-        key: "is_also_reseller",
-        inputType: "checkbox",
-        required: false,
-        sortable: true,
-        // Disable unticking when the linked reseller has dependants and can't
-        // be deleted.
-        disabled: (record: TableRecord) =>
-          !!(record.is_also_reseller || record.is_also_seller) &&
-          record.linked_reseller_can_be_deleted === false,
-      },
+      ...(sellsToResellers
+        ? [
+            {
+              title: <>{t("delivery_stations.is_also_reseller")}</>,
+              dataIndex: "is_also_reseller",
+              key: "is_also_reseller",
+              inputType: "checkbox",
+              required: false,
+              sortable: true,
+              // Disable unticking when the linked reseller has dependants and
+              // can't be deleted.
+              disabled: (record: TableRecord) =>
+                !!(record.is_also_reseller || record.is_also_seller) &&
+                record.linked_reseller_can_be_deleted === false,
+            },
+          ]
+        : []),
       {
         title: "#",
         dataIndex: "number",
@@ -261,7 +267,7 @@ export default function ListDeliveryStations() {
       contactColumns.email,
       contactColumns.phone,
     ],
-    [t, isActiveColumn, contactColumns, isOffice],
+    [t, isActiveColumn, contactColumns, isOffice, sellsToResellers],
   );
 
   return (

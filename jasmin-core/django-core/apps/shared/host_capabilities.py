@@ -88,6 +88,9 @@ def host_capabilities() -> dict[str, bool]:
       deleting and setting the validity of the share delivery days. Tapir syncs its pickup
       locations into jasmin, with the delivery days they follow from, knows the
       members at each and handles them itself.
+    * ``module_choice`` — the office's choice of jasmin's modules
+      (``Tenant.navigation``); a host that installs only some of them fixes the
+      choice, see ``navigation_in_effect``.
     """
     standalone = jasmin_host() == STANDALONE
     return {
@@ -100,6 +103,7 @@ def host_capabilities() -> dict[str, bool]:
         "manual_share_import": standalone,
         "delivery_stations": standalone,
         "about": standalone,
+        "module_choice": standalone,
     }
 
 
@@ -108,3 +112,29 @@ def share_demand_is_imported(stored_setting: bool) -> bool:
     from subscriptions: the tenant's ``uploads_weekly_share_amount``, and always
     inside Tapir, whatever is stored."""
     return stored_setting or jasmin_host() == TAPIR
+
+
+# The modules the office switches on and off in ``Tenant.navigation``, and the
+# ones Tapir installs.
+_MODULE_FLAGS = (
+    "show_members",
+    "show_abos",
+    "show_commissioning",
+    "show_staff",
+    "show_warehouse",
+    "show_economics",
+    "show_cultivation",
+)
+_TAPIR_MODULE_FLAGS = ("show_commissioning",)
+
+
+def navigation_in_effect(stored: dict[str, Any]) -> dict[str, Any]:
+    """The tenant's module switches in effect: as ``Tenant.navigation`` stores
+    them, and inside Tapir only commissioning on, whatever is stored. The other
+    modules aren't installed there, and the office has no choice to make."""
+    if jasmin_host() != TAPIR:
+        return stored
+    return {
+        **stored,
+        **{flag: flag in _TAPIR_MODULE_FLAGS for flag in _MODULE_FLAGS},
+    }

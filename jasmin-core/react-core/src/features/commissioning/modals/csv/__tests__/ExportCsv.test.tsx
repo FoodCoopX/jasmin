@@ -6,7 +6,8 @@
  *
  * A grid's columns include buttons and links — a price button, an orders link —
  * that carry a `dataIndex` only because the table needs a key. No row has a
- * field under that key, so they have nothing to export.
+ * field under that key, so they have nothing to export. Nor has a column the
+ * grid hides, as the upload template leaves it out too.
  */
 
 import { render, screen } from "@testing-library/react";
@@ -146,6 +147,18 @@ describe("ExportCsv columns", () => {
 
     const [header] = await downloadedLines();
     expect(header).toBe("Active,Name,Unit,Description");
+  });
+
+  it("neither offers nor downloads a column the grid hides", async () => {
+    const user = userEvent.setup();
+    const columns = [ACTIVE, NAME, { ...DESCRIPTION, hidden: true }];
+    render(<ExportCsv open onClose={() => {}} columns={columns} data={ROWS} filename="Extras" />);
+
+    expect(screen.queryByRole("checkbox", { name: "Description" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /common\.download/ }));
+
+    const [header] = await downloadedLines();
+    expect(header).toBe("Active,Name");
   });
 
   it("leaves out a column the office unticks", async () => {

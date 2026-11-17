@@ -576,9 +576,10 @@ class TenantSettings(JasminModel):
     # ``apps.shared.tenants.onboarding_emails``.
     onboarding_mode = models.BooleanField(default=False)
 
-    # Sales channels
+    # Sales channels, and whether the farm buys produce in to hand out
     has_markets = models.BooleanField(default=False)
     sells_to_resellers = models.BooleanField(default=True)
+    has_purchases = models.BooleanField(default=True, db_default=True)
     crates_should_be_on_documents = models.BooleanField(
         default=True
     )  # defines if crates are priced and put on deliverynote and invoices

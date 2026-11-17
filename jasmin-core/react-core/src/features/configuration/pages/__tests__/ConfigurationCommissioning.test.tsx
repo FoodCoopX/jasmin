@@ -20,11 +20,13 @@ vi.mock("react-i18next", () => ({
 
 // What the deployment offers, per test; a name left out is offered.
 const capabilities = vi.hoisted(() => ({}) as Record<string, boolean>);
-// The farm's packing mode, whether it imports its share amounts, and its
-// running and upcoming sizes, per test.
+// The farm's packing mode, whether it imports its share amounts, buys produce
+// in and sells to resellers, and its running and upcoming sizes, per test.
 const farm = vi.hoisted(() => ({
   packingMode: "BOXES",
   importsShareAmounts: false,
+  hasPurchases: true,
+  sellsToResellers: true,
   sizes: [] as { share_type_name: string; size: string; is_packed_bulk: boolean }[],
 }));
 vi.mock("@hooks/index", async () => {
@@ -33,6 +35,8 @@ vi.mock("@hooks/index", async () => {
     getSetting: (key: string, fallback?: unknown) => {
       if (key === "packing_mode") return farm.packingMode;
       if (key === "uploads_weekly_share_amount") return farm.importsShareAmounts;
+      if (key === "has_purchases") return farm.hasPurchases;
+      if (key === "sells_to_resellers") return farm.sellsToResellers;
       return fallback;
     },
   });
@@ -70,6 +74,8 @@ beforeEach(() => {
   shown.settings = [];
   farm.packingMode = "BOXES";
   farm.importsShareAmounts = false;
+  farm.hasPurchases = true;
+  farm.sellsToResellers = true;
   farm.sizes = [];
 });
 
@@ -135,6 +141,14 @@ describe("ConfigurationCommissioning layout", () => {
     expect(layoutKeys()).not.toContain(SELLER_NAME);
     expect(layoutKeys()).toContain("show_size_column");
   });
+
+  it("leaves it out on a farm that buys nothing in, as there is no seller to name", () => {
+    farm.hasPurchases = false;
+    render(<ConfigurationCommissioning />);
+
+    expect(layoutKeys()).not.toContain(SELLER_NAME);
+    expect(layoutKeys()).toContain("show_size_column");
+  });
 });
 
 describe("ConfigurationCommissioning tax rates", () => {
@@ -153,10 +167,17 @@ describe("ConfigurationCommissioning tax rates", () => {
     ]);
   });
 
-  it("leaves out the share rate where the share amounts are imported and shares get no price", () => {
+  it("leaves out the shares' rate where the share amounts are imported", () => {
     farm.importsShareAmounts = true;
     render(<ConfigurationCommissioning />);
 
     expect(taxRateKeys()).toEqual(["default_tax_rate_articles", "default_tax_rate_crates"]);
+  });
+
+  it("leaves out the crates' rate on a farm that sells to no reseller", () => {
+    farm.sellsToResellers = false;
+    render(<ConfigurationCommissioning />);
+
+    expect(taxRateKeys()).toEqual(["default_tax_rate_articles", "default_tax_rate_shares"]);
   });
 });

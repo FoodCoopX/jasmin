@@ -179,7 +179,7 @@
     "distribute_forecast_by_weight": "Prognosemenge nach Gewicht auf Größen verteilen (leere Zellen vorausfüllen)",
     "show_summary_in_harvest_share_planning_on_top": "Summen-Zeilen in Kistenplanung oben anzeigen", 
     "sales": {
-      "title": "Vertriebskanäle"
+      "title": "Vertrieb und Zukauf"
     },
     "default_planning_mode_basic": "nach Tagen",
     "default_planning_mode_tours": "nach Touren",
@@ -188,6 +188,7 @@
     "default_planning_mode_description": "Das ist nur die Voreinstellung. Kann jede Woche geändert werden.",
     "has_markets": "Verkauf auf Märkten",
     "sells_to_resellers": "Verkauf an Wiederverkäufer",
+    "has_purchases": "Zukauf",
     "crates_should_be_on_documents": "Napfkisten werden verrechnet",
     "crates_should_be_on_documents_desc": "Kisten bekommen einen Preis und stehen auf Bestellungen, Lieferscheinen und Rechnungen.",
     "different_offer_groups": "Verschiedene Angebotsgruppen",

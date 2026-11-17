@@ -110,6 +110,7 @@ export interface TenantSettings {
   onboarding_mode?: boolean;
   has_markets?: boolean;
   sells_to_resellers?: boolean;
+  has_purchases?: boolean;
   crates_should_be_on_documents?: boolean;
   /**
    * @minimum 0
