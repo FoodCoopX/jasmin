@@ -501,9 +501,9 @@ class TenantSettingsViewSet(RolePermissionsMixin, viewsets.GenericViewSet):
     def _validate_packing_mode_switch(
         current_settings: TenantSettings | None, new_settings_data: dict[str, Any]
     ) -> None:
-        """Hand a changed packing mode to the check commissioning registers:
-        a switch may not change how a running or upcoming share size is
-        packed."""
+        """Hand a changed stored packing mode to the check commissioning
+        registers: a stored pure mode may not contradict how a running or
+        upcoming share size is packed."""
         if "packing_mode" not in new_settings_data:
             return
         current_mode = (

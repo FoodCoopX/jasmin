@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { SettingsCategory } from "@features/configuration/components/SettingsRenderer";
 import SettingsPage from "@features/configuration/components/SettingsPage";
 import { useCapability, useTenant } from "@hooks/index";
-import { usePackingModeOptions } from "@features/configuration/hooks/usePackingModeOptions";
 
 export default function ConfigurationCommissioning() {
   const { t } = useTranslation();
@@ -23,23 +22,15 @@ export default function ConfigurationCommissioning() {
   // Crates are charged to resellers only, the one thing the default crate tax
   // rate fills in.
   const sellsToResellers = getSetting("sells_to_resellers", true) !== false;
-  const packingModeOptions = usePackingModeOptions();
 
   const settingsConfig = useMemo<SettingsCategory[]>(
     () => [
       {
         category: "logistics",
         title: t("settings.commissioning.logistics.title"),
+        // No packing mode to pick: it follows from how the share sizes are
+        // packed, which the office sets for each size.
         settings: [
-          {
-            key: "packing_mode",
-            label: t("settings.commissioning.packing_mode"),
-
-            type: "select",
-            defaultValue: "BOXES",
-            options: packingModeOptions,
-          },
-
           {
             key: "percentage_added_to_bulk_packing_list",
             label: t(
@@ -195,7 +186,7 @@ export default function ConfigurationCommissioning() {
         ],
       },
     ],
-    [t, showsSellerNames, sellsToResellers, importsShareAmounts, packingModeOptions],
+    [t, showsSellerNames, sellsToResellers, importsShareAmounts],
   );
 
   return (

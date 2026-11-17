@@ -15163,9 +15163,9 @@ paths:
         name: is_packed_bulk
         schema:
           type: boolean
-        description: Restrict to variations with this is_packed_bulk value. Used in
-          MIXED packing mode to split the list into boxes (False) and bulk (True).
-          Omit to include all.
+        description: Restrict to variations with this is_packed_bulk value. Splits
+          the list into the pre-packed (False) and the loose (True) variations. Omit
+          to include all.
       - in: query
         name: is_past
         schema:
@@ -15277,8 +15277,8 @@ paths:
         name: is_packed_bulk
         schema:
           type: boolean
-        description: Restrict to variations with this is_packed_bulk value. Used in
-          MIXED packing mode to split the matrix into boxes (False) and bulk (True).
+        description: Restrict to variations with this is_packed_bulk value. Splits
+          the matrix into the pre-packed (False) and the loose (True) variations.
           Omit to include all.
       - in: query
         name: is_past
@@ -15564,9 +15564,8 @@ paths:
         name: is_packed_bulk
         schema:
           type: boolean
-        description: Restrict to variations with this is_packed_bulk value. Used in
-          MIXED packing mode to limit the bulk list to variations actually packed
-          in bulk. Omit to include all.
+        description: Restrict to variations with this is_packed_bulk value. Limits
+          the bulk list to the variations packed loose. Omit to include all.
       - in: query
         name: is_past
         schema:
@@ -20198,8 +20197,8 @@ paths:
         name: is_packed_bulk
         schema:
           type: boolean
-        description: Filter by per-variation bulk-packing flag. Only meaningful in
-          MIXED packing mode; omit to return all variations.
+        description: Only the variations packed loose (true) or pre-packed (false);
+          omit to return all variations.
       - in: query
         name: num_weeks
         schema:
@@ -21009,8 +21008,8 @@ paths:
         name: is_packed_bulk
         schema:
           type: boolean
-        description: Only the shares of the variations with this bulk-packing flag.
-          Only meaningful in MIXED packing mode.
+        description: Only the shares of the variations packed loose (true) or pre-packed
+          (false).
       - in: query
         name: physical
         schema:
@@ -41157,8 +41156,7 @@ components:
           type: integer
         is_packed_bulk:
           type: boolean
-          description: The variation's own setting, which decides only in MIXED packing
-            mode.
+          description: Whether the variation is packed loose rather than pre-packed.
       required:
       - is_packed_bulk
       - share_type_id
@@ -41193,8 +41191,8 @@ components:
           type: integer
         base_is_packed_bulk:
           type: boolean
-          description: The base variation's own setting, which decides only in MIXED
-            packing mode; false for a combination without a base.
+          description: Whether the base variation is packed loose rather than pre-packed;
+            false for a combination without a base.
         add_ons:
           type: array
           items:
@@ -50171,8 +50169,8 @@ components:
           type: string
         is_packed_bulk:
           type: boolean
-          description: 'The variation''s own setting, which decides only in MIXED
-            packing mode: in BULK mode every share is loose, in BOXES mode none is.'
+          description: Whether the variation is packed loose rather than pre-packed;
+            the farm's packing mode follows from its variations'.
         items:
           type: array
           items:

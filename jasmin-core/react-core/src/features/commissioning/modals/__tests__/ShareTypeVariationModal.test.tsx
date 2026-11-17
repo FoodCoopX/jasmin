@@ -51,14 +51,18 @@ vi.mock("react-quill-new", () => ({
 // The textarea stands in for Quill, so there is no clipboard to register.
 vi.mock("@shared/quill/SanitizingClipboard", () => ({}));
 
+// The tenant's settings per test, and its reload, which the packing mode the
+// sizes add up to needs after every change.
 const tenantSettings = vi.hoisted(() => ({
   values: {} as Record<string, unknown>,
+  refreshTenant: vi.fn(async () => {}),
 }));
 vi.mock("@hooks/configuration/useTenant", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
   const tenant = makeUseTenantMock({
     getSetting: (key: string, defaultValue?: unknown) =>
       key in tenantSettings.values ? tenantSettings.values[key] : defaultValue,
+    refreshTenant: tenantSettings.refreshTenant,
   });
   return { useTenant: () => tenant };
 });
@@ -150,9 +154,15 @@ vi.mock("../VirtualComponentModal", () => ({
   default: (props: {
     visible: boolean;
     share_type_variation: string | number | null;
+    onSave: () => void;
   }) =>
     props.visible ? (
-      <div data-testid="components-modal">{props.share_type_variation}</div>
+      <div data-testid="components-modal">
+        {props.share_type_variation}
+        <button type="button" onClick={props.onSave}>
+          Save components
+        </button>
+      </div>
     ) : null,
 }));
 
@@ -342,6 +352,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   tenantSettings.values = {};
+  tenantSettings.refreshTenant.mockClear();
   auth.roles = ["office"];
   Object.values(notify).forEach((fn) => fn.mockReset());
   serverRows = [MEDIUM, SMALL_SPRING, SMALL_AUTUMN, LARGE_OLD];
@@ -410,23 +421,36 @@ describe("ShareTypeVariationModal loading", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the trial, bulk-packing and opt-in columns only where they apply", async () => {
+  it("shows the trial and opt-in columns only where they apply, the packing always", async () => {
     renderModal();
     await loaded();
-    const headers = () =>
-      screen
-        .getAllByRole("columnheader")
-        .map((header) => header.textContent ?? "");
+    const headers = screen
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent ?? "")
+      .join("|");
 
-    expect(headers().join("|")).not.toMatch(
-      /allowed_for_trial_subscription|commissioning\.packing|requires_optin/,
-    );
+    expect(headers).not.toMatch(/allowed_for_trial_subscription|requires_optin/);
+    expect(headers).toMatch(/commissioning\.packing/);
+    expect(within(rowWithCapacity(100)).getByText("commissioning.packing_boxed")).toBeInTheDocument();
+  });
+
+  it("leaves the packing of a virtual size to the sizes it is made of", async () => {
+    serverRows = [
+      ...serverRows,
+      variation({ id: "v-mix", size: "XL", sort_order: 5, capacity: 30, variation_type: "virtual", is_packed_bulk: true }),
+    ];
+    renderModal();
+    await loaded();
+    expect(within(rowWithCapacity(30)).getByText("—")).toBeInTheDocument();
+
+    await userEvent.click(within(rowWithCapacity(30)).getByRole("button", { name: "table.edit" }));
+
+    expect(within(editingRow()).queryByRole("combobox", { name: "commissioning.packing" })).toBeNull();
   });
 
   it("offers the optional columns the tenant has switched on", async () => {
     tenantSettings.values = {
       allows_trial_subscriptions: true,
-      packing_mode: "MIXED",
       allows_share_type_variation_optin: true,
     };
     renderModal();
@@ -437,7 +461,6 @@ describe("ShareTypeVariationModal loading", () => {
       .map((header) => header.textContent ?? "")
       .join("|");
     expect(headers).toMatch(/commissioning\.allowed_for_trial_subscription/);
-    expect(headers).toMatch(/commissioning\.packing/);
     expect(headers).toMatch(/commissioning\.requires_optin/);
   });
 
@@ -544,10 +567,13 @@ describe("ShareTypeVariationModal sizes over time", () => {
   });
 
   it.each([
-    ["starts a new size in mixed packing mode as boxed", null, false],
-    ["saves a new size in mixed packing mode as loose when chosen", "commissioning.packing_loose", true],
-  ])("%s", async (_, choice, loose) => {
-    tenantSettings.values = { packing_mode: "MIXED" };
+    ["starts a new size pre-packed where the farm's sizes differ", "MIXED", null, false],
+    ["starts a new size pre-packed where every size is", "BOXES", null, false],
+    ["starts a new size loose where every size is", "BULK", null, true],
+    ["saves a new size loose when chosen", "BOXES", "commissioning.packing_loose", true],
+    ["saves a new size pre-packed when chosen", "BULK", "commissioning.packing_boxed", false],
+  ])("%s, and reloads the packing mode the sizes add up to", async (_, mode, choice, loose) => {
+    tenantSettings.values = { packing_mode: mode };
     renderModal();
     await loaded();
 
@@ -563,6 +589,7 @@ describe("ShareTypeVariationModal sizes over time", () => {
       expect.objectContaining({ size: "L", is_packed_bulk: loose }),
     );
     expect(api.create.mock.calls[0][0]).not.toHaveProperty("packing");
+    await waitFor(() => expect(tenantSettings.refreshTenant).toHaveBeenCalled());
   });
 
   it("brings back a size that has ended, with the sort order it had", async () => {
@@ -717,6 +744,20 @@ describe("ShareTypeVariationModal details", () => {
     expect(screen.getByTestId("components-modal")).toHaveTextContent("v-m");
   });
 
+  it("reloads the packing mode once components turn a size virtual or physical", async () => {
+    renderModal();
+    await loaded();
+    await userEvent.click(
+      within(rowWithCapacity(100)).getByRole("button", {
+        name: "commissioning.configure_virtual_components",
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Save components" }));
+
+    expect(tenantSettings.refreshTenant).toHaveBeenCalled();
+  });
+
   it("saves an edited description and closes the editor", async () => {
     renderModal();
     await loaded();
@@ -794,6 +835,7 @@ describe("ShareTypeVariationModal deleting and roles", () => {
     await waitFor(() =>
       expect(screen.queryByText("28.12.2025")).not.toBeInTheDocument(),
     );
+    expect(tenantSettings.refreshTenant).toHaveBeenCalled();
   });
 
   it("shows the variations read-only to staff without the office role", async () => {

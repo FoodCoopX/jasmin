@@ -23,7 +23,7 @@ delivery_week?: number;
  */
 include_future?: boolean;
 /**
- * Filter by per-variation bulk-packing flag. Only meaningful in MIXED packing mode; omit to return all variations.
+ * Only the variations packed loose (true) or pre-packed (false); omit to return all variations.
  */
 is_packed_bulk?: boolean;
 /**

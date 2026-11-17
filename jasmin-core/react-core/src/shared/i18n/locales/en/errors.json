@@ -277,7 +277,7 @@
     "reference_invalid": "A line must reference exactly one item: either an offer or an article — not both, and not neither."
   },
   "packing_mode": {
-    "switch_changes_packing": "The packing mode can't be switched while these running or upcoming sizes are packed otherwise: {{sizes}}. Under \"mixed\", each size is packed as entered for it."
+    "switch_changes_packing": "The packing mode follows from the sizes; it can't be set to this while these running or upcoming sizes are packed otherwise: {{sizes}}. How a size is packed is entered with the size."
   },
   "packing_list": {
     "amounts_diverge_across_stations": "Packing amounts differ between delivery stations. Select a delivery station (or tour) to view the packing list."

@@ -167,19 +167,33 @@ class TestShareWeightsByWeek:
 
         assert [row["share_type_variation"] for row in rows] == [boxed.pk]
 
-    def test_weighs_every_size_in_the_boxes_mode(self, tenant, share):
-        """A flag a size kept from an earlier mixed time decides nothing."""
-        use_packing_mode(tenant, "BOXES")
-        flagged = ShareTypeVariationFactory(is_packed_bulk=True)
-        share(flagged, Decimal("4.000"))
+    def test_weighs_a_pre_packed_size_whatever_the_stored_mode(self, tenant, share):
+        """The sizes decide the farm's packing, not the stored mode."""
+        use_packing_mode(tenant, "BULK")
+        boxed = ShareTypeVariationFactory(is_packed_bulk=False)
+        share(boxed, Decimal("4.000"))
 
         rows = calculate_share_weights_by_week(WEEK_15_MONDAY, WEEK_16_SUNDAY)
 
-        assert [row["share_type_variation"] for row in rows] == [flagged.pk]
+        assert [row["share_type_variation"] for row in rows] == [boxed.pk]
 
-    def test_weighs_nothing_in_the_bulk_mode(self, tenant, share):
-        use_packing_mode(tenant, "BULK")
-        share(ShareTypeVariationFactory(is_packed_bulk=False), Decimal("2.000"))
+    def test_weighs_a_past_pre_packed_size_once_every_running_one_is_loose(
+        self, tenant, share
+    ):
+        """Each size's own flag decides, a past week's too."""
+        boxed = ShareTypeVariationFactory(
+            is_packed_bulk=False, valid_until=date(2026, 6, 28)
+        )
+        ShareTypeVariationFactory(is_packed_bulk=True)
+        share(boxed, Decimal("2.000"))
+
+        rows = calculate_share_weights_by_week(WEEK_15_MONDAY, WEEK_16_SUNDAY)
+
+        assert [row["share_type_variation"] for row in rows] == [boxed.pk]
+
+    def test_weighs_no_loose_size_whatever_the_stored_mode(self, tenant, share):
+        use_packing_mode(tenant, "BOXES")
+        share(ShareTypeVariationFactory(is_packed_bulk=True), Decimal("2.000"))
 
         assert calculate_share_weights_by_week(WEEK_15_MONDAY, WEEK_16_SUNDAY) == []
 

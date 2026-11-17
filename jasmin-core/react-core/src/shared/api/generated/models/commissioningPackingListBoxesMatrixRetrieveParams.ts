@@ -24,7 +24,7 @@ delivery_station?: string;
  */
 delivery_week: number;
 /**
- * Restrict to variations with this is_packed_bulk value. Used in MIXED packing mode to split the matrix into boxes (False) and bulk (True). Omit to include all.
+ * Restrict to variations with this is_packed_bulk value. Splits the matrix into the pre-packed (False) and the loose (True) variations. Omit to include all.
  */
 is_packed_bulk?: boolean;
 /**

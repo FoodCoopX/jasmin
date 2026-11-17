@@ -65,7 +65,6 @@ export function useStationContentsPages(
   return useMemo(() => {
     if (queries.some((query) => query.isLoading)) return null;
     const labels = {
-      packingMode,
       tints,
       marksOrganic,
       showsSellers,

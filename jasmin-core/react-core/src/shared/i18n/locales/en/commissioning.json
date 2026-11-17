@@ -787,7 +787,7 @@
   "failed_to_create_offers": "Offers could not be created",
   "is_extra": "Additional article",
   "packing": "Packing",
-  "packing_boxed": "Box",
+  "packing_boxed": "Pre-packed",
   "packing_loose": "Loose",
   "requires_optin": "On-off?",
   "optin_deadline_days_before_delivery": "Deadline (days)",

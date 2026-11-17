@@ -254,7 +254,8 @@ export const FRUIT_CARD = {
   shareTypeName: "Fruit",
   // A share type in one size shows no size.
   sizeLabel: "",
-  loose: false,
+  // Its size is packed loose, which the card says whatever the farm's mode.
+  loose: true,
   tint: 1,
   lines: [
     {

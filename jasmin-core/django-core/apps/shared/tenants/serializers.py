@@ -15,6 +15,7 @@ from apps.shared.host_capabilities import (
 from apps.shared.image_upload import normalize_uploaded_picture, strict_image_decoding
 from apps.shared.languages import LanguageChoices
 from apps.shared.outbound_hosts import address_origin, resolves_to_internal_address
+from apps.shared.packing_mode_hooks import packing_mode_in_effect
 
 from .errors import (
     HrSystemAddressesApart,
@@ -27,7 +28,7 @@ from .errors import (
     TenantFeatureFlagsInvalid,
     TenantLogoInvalid,
 )
-from .models import Tenant, TenantEmailConfig, TenantSettings
+from .models import PackingMode, Tenant, TenantEmailConfig, TenantSettings
 
 # ---- Web-app launcher icon (``Tenant.app_icon``) constraints ---------------
 # The stored icon is normalized to exactly one rendition, so the manifest can
@@ -91,6 +92,11 @@ def _merged_settings_dict(obj: Tenant, current_overlay: dict) -> dict:
     # The mode in effect, which a host can fix whatever the row stores.
     merged["uploads_weekly_share_amount"] = share_demand_is_imported(
         bool(current_overlay.get("uploads_weekly_share_amount", False))
+    )
+    # The packing mode the share sizes are packed in; the row's own stands in
+    # only while there are none.
+    merged["packing_mode"] = packing_mode_in_effect(
+        obj, current_overlay.get("packing_mode", PackingMode.BOXES)
     )
     return merged
 

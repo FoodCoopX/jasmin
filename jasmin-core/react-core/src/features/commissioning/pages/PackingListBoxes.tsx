@@ -177,10 +177,6 @@ export default function PackingListBoxes() {
     usePackingBaseColumns();
 
   const showSize = Boolean(getSetting("show_size_column"));
-  const packingMode = getSetting("packing_mode", "BOXES") as
-    | "BOXES"
-    | "BULK"
-    | "MIXED";
   // Import-shares tenants have no ShareDelivery rows, so the box-combination
   // matrix is empty. Fall back to the flat per-variation matrix (member amounts,
   // ShareContent-based) — same {columns, rows} shape, just add_ons-empty columns.
@@ -277,8 +273,8 @@ export default function PackingListBoxes() {
           : undefined,
         tour: effectiveTour,
         is_past: isPast,
-        // In MIXED mode the boxes matrix excludes bulk-packed variations.
-        ...(packingMode === "MIXED" ? { is_packed_bulk: false } : {}),
+        // The boxes matrix leaves out the sizes packed loose.
+        is_packed_bulk: false,
       }),
       [
         selectedYear,
@@ -288,7 +284,6 @@ export default function PackingListBoxes() {
         selectedDeliveryStation,
         effectiveTour,
         isPast,
-        packingMode,
       ],
     );
 

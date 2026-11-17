@@ -7,10 +7,7 @@ import type {
 } from "@shared/api/generated/models";
 import { getShareTypeVariationSizeLabelPure } from "@hooks/useShareTypeVariationSizeOptions";
 import { getShareSizeLabelOrEmpty } from "@features/commissioning/utils/sizeLabel";
-import {
-  isPackedLoose,
-  marksPackingKind,
-} from "@features/commissioning/utils/stationContents";
+import { marksPackingKind } from "@features/commissioning/utils/stationContents";
 
 import {
   comboColumnWidth,
@@ -188,20 +185,13 @@ export interface DeliveryStationDetailsPDFProps {
   t: TFunction;
 }
 
-/** A combination lies loose when its base does; one without a base, when all
- *  its add-ons do. */
-function combinationIsLoose(
-  column: PackingBoxesMatrixColumn,
-  packingMode: PackingModeEnum,
-): boolean {
-  if (column.base_variation_id) {
-    return isPackedLoose(column.base_is_packed_bulk, packingMode);
-  }
+/** A combination lies loose when its base size is packed loose; one without a
+ *  base, when all its add-ons are. */
+function combinationIsLoose(column: PackingBoxesMatrixColumn): boolean {
+  if (column.base_variation_id) return column.base_is_packed_bulk;
   return (
     column.add_ons.length > 0 &&
-    column.add_ons.every((addOn) =>
-      isPackedLoose(addOn.is_packed_bulk, packingMode),
-    )
+    column.add_ons.every((addOn) => addOn.is_packed_bulk)
   );
 }
 
@@ -244,10 +234,7 @@ function ColumnHeader({
       {column.add_ons.map((addOn) => {
         const addOnSize = sizeLabel(addOn.size, t);
         // An add-on that lies loose beside a boxed base says so itself.
-        const addOnLoose =
-          marksKind &&
-          !loose &&
-          isPackedLoose(addOn.is_packed_bulk, packingMode);
+        const addOnLoose = marksKind && !loose && addOn.is_packed_bulk;
         return (
           <Text key={addOn.variation_id} style={styles.addOn}>
             {`+ ${addOn.share_type_short_name}${addOnSize ? ` ${addOnSize}` : ""}${
@@ -303,10 +290,7 @@ function StationPage({
   const groupTint = (groupId: string) =>
     groupId in tints ? shareTint(tints[groupId]) : colors.tableHeader;
   const looseByKey = new Map(
-    columns.map((column) => [
-      column.key,
-      combinationIsLoose(column, packingMode),
-    ]),
+    columns.map((column) => [column.key, combinationIsLoose(column)]),
   );
   const looseKinds = [...looseByKey.values()];
 
