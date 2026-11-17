@@ -32,8 +32,8 @@ class StationContentsShareSerializer(serializers.Serializer):
     share_type_name = serializers.CharField(allow_blank=True)
     is_packed_bulk = serializers.BooleanField(
         help_text=(
-            "The variation's own setting, which decides only in MIXED packing "
-            "mode: in BULK mode every share is loose, in BOXES mode none is."
+            "Whether the variation is packed loose rather than pre-packed; "
+            "the farm's packing mode follows from its variations'."
         )
     )
     items = StationContentsItemSerializer(many=True)

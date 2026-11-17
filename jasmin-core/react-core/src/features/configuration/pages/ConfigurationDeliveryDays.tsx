@@ -49,6 +49,7 @@ import {
   useEarlierStartWindow,
   useWashingCleaningVisibility,
   useInvalidateAfterTableMutation,
+  useTenant,
   useTimeBoundColumns,
 } from "@hooks/index";
 import { isFieldDisabled, toApiDate } from "@shared/utils";
@@ -203,6 +204,10 @@ export default function ConfigurationDeliveryDays() {
   // days with their weekday and validity; only their work days and tours are
   // set here.
   const offersDeliveryStations = useCapability("delivery_stations");
+  // Order days are the resellers' delivery days; a farm that doesn't sell to
+  // resellers has none to set.
+  const { getSetting } = useTenant();
+  const sellsToResellers = Boolean(getSetting("sells_to_resellers", true));
   // A farm that hides washing or cleaning sets no days for them.
   const { showsWashing, showsCleaning } = useWashingCleaningVisibility();
   const isShownColumn = useCallback(
@@ -254,7 +259,9 @@ export default function ConfigurationDeliveryDays() {
   });
 
   const { data: rawOrderData, isLoading: ordersLoading } =
-    useCommissioningOrdersDeliveryDaysList();
+    useCommissioningOrdersDeliveryDaysList({
+      query: { enabled: sellsToResellers },
+    });
   const dataOrders = useMemo(
     () => (rawOrderData ?? []) as OrdersDeliveryDayRecord[],
     [rawOrderData],
@@ -482,23 +489,29 @@ export default function ConfigurationDeliveryDays() {
         className="custom-jasmin-table mb-1em"
       />
       <DateRangeStatusLegend />
-      <h4 className="order-days-heading">
-        {t("configuration.time_manamagent_for_orders")}
-      </h4>
+      {sellsToResellers && (
+        <>
+          <h4 className="order-days-heading">
+            {t("configuration.time_manamagent_for_orders")}
+          </h4>
 
-      <EditableTable
-        key={2}
-        columns={columnsOrderDays}
-        apiFunctions={ordersApiFunctions}
-        focusIndex="day_number"
-        initialData={dataOrders}
-        loading={ordersLoading}
-        uniqueCheck={["day_number"]}
-        uniqueCheckMessage={t("validation.unique.time_management_order_days")}
-        permissions={permissions}
-        onSaveSuccess={onOrdersSaveSuccess}
-        onDeleteSuccess={onOrdersDeleteSuccess}
-      />
+          <EditableTable
+            key={2}
+            columns={columnsOrderDays}
+            apiFunctions={ordersApiFunctions}
+            focusIndex="day_number"
+            initialData={dataOrders}
+            loading={ordersLoading}
+            uniqueCheck={["day_number"]}
+            uniqueCheckMessage={t(
+              "validation.unique.time_management_order_days",
+            )}
+            permissions={permissions}
+            onSaveSuccess={onOrdersSaveSuccess}
+            onDeleteSuccess={onOrdersDeleteSuccess}
+          />
+        </>
+      )}
       <ExplainerText title={t("common.info")}>
         {t("explainers.configuration_time_management")}
       </ExplainerText>

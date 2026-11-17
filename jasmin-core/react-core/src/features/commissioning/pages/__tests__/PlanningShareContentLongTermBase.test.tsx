@@ -425,6 +425,15 @@ describe("PlanningShareContentLongTermBase plan", () => {
     expect(within(rowOf("Apples")).getByText("300 commissioning.units.kg")).toBeInTheDocument();
   });
 
+  it("has no seller column on a farm that buys nothing in", async () => {
+    tenantSettings.values = { has_purchases: false };
+    renderPlanner();
+    await loaded();
+
+    expect(screen.queryByRole("columnheader", { name: SELLER })).not.toBeInTheDocument();
+    expect(within(rowOf("Apples")).queryByText("Orchard Co")).not.toBeInTheDocument();
+  });
+
   it("gives every physical share size of the option its own amount column", async () => {
     renderPlanner();
     await loaded();

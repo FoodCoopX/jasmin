@@ -108,6 +108,9 @@ export function PDFTenantInfo({ tenantSettings, children }: PDFTenantInfoProps) 
         {tenantSettings.email_for_orders || tenantSettings.email}
       </Text>
       <Text style={styles.label}>{tenantSettings.phone_number}</Text>
+      {tenantSettings.uid && (
+        <Text style={styles.label}>UID: {tenantSettings.uid}</Text>
+      )}
       {children}
     </View>
   );

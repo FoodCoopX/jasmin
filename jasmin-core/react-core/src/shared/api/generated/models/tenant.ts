@@ -12,6 +12,8 @@ import type { TenantLanguageEnum } from './tenantLanguageEnum';
 import type { TenantEmail } from './tenantEmail';
 import type { TenantEmailForOrders } from './tenantEmailForOrders';
 import type { TenantWebsite } from './tenantWebsite';
+import type { TenantHrSystemEmployeesUrl } from './tenantHrSystemEmployeesUrl';
+import type { TenantHrSystemAbsencesUrl } from './tenantHrSystemAbsencesUrl';
 
 /**
  * Full tenant payload — staff-only on read, admin-only on write.
@@ -41,6 +43,7 @@ export interface Tenant {
   readonly capabilities: HostCapabilities;
   readonly app_icon_version: string;
   tenant_language?: TenantLanguageEnum;
+  readonly has_hr_system_api_token: boolean;
   readonly schema_name: string;
   /** @maxLength 200 */
   name: string;
@@ -127,6 +130,9 @@ export interface Tenant {
   navigation?: unknown;
   ai?: unknown;
   allow_upload_for_data_lists?: boolean;
+  uses_hr_system?: boolean;
+  hr_system_employees_url?: TenantHrSystemEmployeesUrl;
+  hr_system_absences_url?: TenantHrSystemAbsencesUrl;
   /** @nullable */
   logo?: string | null;
   /** @nullable */

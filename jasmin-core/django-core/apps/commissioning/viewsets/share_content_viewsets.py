@@ -274,8 +274,8 @@ class PackingListViewSet(RolePermissionsMixin, viewsets.ViewSet):
                 "is_packed_bulk",
                 required=False,
                 description="Restrict to variations with this is_packed_bulk value. "
-                "Used in MIXED packing mode to split the list into "
-                "boxes (False) and bulk (True). Omit to include all.",
+                "Splits the list into the pre-packed (False) and the loose "
+                "(True) variations. Omit to include all.",
             ),
         ],
         responses={200: PackingListRowSerializer(many=True)},
@@ -320,8 +320,8 @@ class PackingListViewSet(RolePermissionsMixin, viewsets.ViewSet):
                 "is_packed_bulk",
                 required=False,
                 description="Restrict to variations with this is_packed_bulk value. "
-                "Used in MIXED packing mode to split the matrix into boxes "
-                "(False) and bulk (True). Omit to include all.",
+                "Splits the matrix into the pre-packed (False) and the loose "
+                "(True) variations. Omit to include all.",
             ),
         ],
         responses={200: PackingBoxesMatrixSerializer},
@@ -466,8 +466,8 @@ class PackingListBulkViewSet(RolePermissionsMixin, viewsets.ViewSet):
                 "is_packed_bulk",
                 required=False,
                 description="Restrict to variations with this is_packed_bulk value. "
-                "Used in MIXED packing mode to limit the bulk list to "
-                "variations actually packed in bulk. Omit to include all.",
+                "Limits the bulk list to the variations packed loose. Omit "
+                "to include all.",
             ),
         ],
         responses={

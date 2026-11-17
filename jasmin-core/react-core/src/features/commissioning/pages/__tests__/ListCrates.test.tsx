@@ -721,6 +721,15 @@ describe("ListCrates prices", () => {
 
     await waitFor(() => expect(api.listCrates).toHaveBeenCalledTimes(2));
   });
+
+  it("offers no prices and no price export on a farm that doesn't sell to resellers", async () => {
+    tenantSettings.values = { sells_to_resellers: false };
+    await renderLoaded();
+
+    expect(within(rowOf("Euro crate")).queryByRole("button", { name: PRICES })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /commissioning\.export_prices/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /commissioning\.csv_export_crates/ })).toBeInTheDocument();
+  });
 });
 
 // ── Exports ─────────────────────────────────────────────────────────────────

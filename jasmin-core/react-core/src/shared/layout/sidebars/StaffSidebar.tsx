@@ -26,38 +26,32 @@ export default function StaffSidebar({
       ),
     },
     {
+      key: "staff-absences",
+      icon: <FitbitIcon />,
+      label: <Link to="/staff/absences">{t("staff.absences")}</Link>,
+    },
+    {
       key: "staff-saturday-shifts",
       icon: <FitbitIcon />,
       label: (
         <Link to="/staff/saturday-shifts">{t("staff.saturday_shifts")}</Link>
       ),
     },
+
     {
-      key: "staff-data",
+      key: "staff-employees",
       icon: <BubbleChartIcon />,
-      label: <div className="sidebar-section-header">{t("staff.data")}</div>,
-      children: [
-        {
-          key: "staff-employees",
-          label: <Link to="/staff/employees">{t("staff.employees")}</Link>,
-        },
-        {
-          key: "staff-weekly-plan-categories",
-          label: (
-            <Link to="/staff/weekly-plan-categories">
-              {t("staff.weekly_plan_categories")}
-            </Link>
-          ),
-        },
-        {
-          key: "staff-absence-categories",
-          label: (
-            <Link to="/staff/absence-categories">
-              {t("staff.absence_categories")}
-            </Link>
-          ),
-        },
-      ],
+      label: <Link to="/staff/employees">{t("staff.employees")}</Link>,
+    },
+    {
+      key: "staff-weekly-plan-categories",
+      icon: <BubbleChartIcon />,
+
+      label: (
+        <Link to="/staff/weekly-plan-categories">
+          {t("staff.weekly_plan_categories")}
+        </Link>
+      ),
     },
   ];
 

@@ -3,6 +3,8 @@ copy)."""
 
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
@@ -57,6 +59,20 @@ def test_grid_is_dense(api_client, category, employees):
         "Alice",
         "Bob",
     }
+
+
+def test_grid_carries_each_employees_weekly_hours(api_client, category, employees):
+    alice, _ = employees
+    alice.hours_per_week = 24
+    alice.save()
+
+    response = api_client.get(reverse("weekly_plan-grid"), {"year": YEAR, "week": WEEK})
+
+    hours = {
+        employee["short_name_for_weekly_plan"]: employee["hours_per_week"]
+        for employee in response.data["employees"]
+    }
+    assert hours == {"Alice": 24, "Bob": None}
 
 
 def test_grid_lists_a_deactivated_employee_who_holds_a_shift(
@@ -565,6 +581,55 @@ def test_copy_same_week_is_rejected(api_client, category):
         format="json",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_copy_takes_the_last_week_of_the_year_before(api_client, category, employees):
+    alice, _ = employees
+    WeeklyPlan.objects.create(
+        year=YEAR - 1,
+        week=52,
+        day=0,
+        weekly_plan_category=category,
+        employee=alice,
+        row_index=0,
+    )
+
+    response = api_client.post(
+        reverse("weekly_plan-copy"),
+        {"year": YEAR, "from_year": YEAR - 1, "from_week": 52, "to_week": 1},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert list(
+        WeeklyPlan.objects.filter(year=YEAR, week=1).values_list("employee_id", "day")
+    ) == [(alice.id, 0)]
+
+
+def test_the_same_week_number_of_another_year_may_be_copied(api_client, category):
+    response = api_client.post(
+        reverse("weekly_plan-copy"),
+        {"year": YEAR, "from_year": YEAR - 1, "from_week": WEEK, "to_week": WEEK},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.content
+
+
+def test_copy_and_save_lock_the_week_they_write(api_client, category):
+    with mock.patch("apps.staff.services.weekly_plan.weekly_plan_lock") as lock:
+        api_client.post(
+            reverse("weekly_plan-copy"),
+            {"year": YEAR, "from_week": WEEK, "to_week": WEEK + 1},
+            format="json",
+        )
+        api_client.post(
+            reverse("weekly_plan-list"),
+            {"year": YEAR, "week": WEEK, "assignments": []},
+            format="json",
+        )
+
+    assert lock.call_args_list == [mock.call(YEAR, WEEK + 1), mock.call(YEAR, WEEK)]
 
 
 # --------------------------------------------------------------------------- #

@@ -100,6 +100,28 @@ class TenantFeatureFlagsInvalid(BadRequestError):
     code = "tenant.feature_flags_invalid"
 
 
+class HrSystemTokenInvalid(BadRequestError):
+    """The HR-system API token holds a character a request header can't carry
+    — a space, a line break, a typographic quote, an invisible character."""
+
+    code = "tenant.hr_system_token_invalid"
+
+
+class HrSystemAddressInvalid(BadRequestError):
+    """An HR-system address isn't an ``https`` address of a public server: the
+    token travels with every call, and the backend never calls an internal
+    address on a tenant's behalf."""
+
+    code = "tenant.hr_system_address_invalid"
+
+
+class HrSystemAddressesApart(BadRequestError):
+    """The two HR-system addresses lead to different servers. The token
+    travels to both, so both must lead to the one server it belongs to."""
+
+    code = "tenant.hr_system_addresses_apart"
+
+
 class YearNumberingLocked(BadRequestError):
     """A year-based numbering setting cannot be changed anymore because
     documents of the corresponding type already exist."""
@@ -253,6 +275,9 @@ __all__ = [
     "TenantLogoInvalid",
     "TenantRateLimitsInvalid",
     "TenantFeatureFlagsInvalid",
+    "HrSystemTokenInvalid",
+    "HrSystemAddressInvalid",
+    "HrSystemAddressesApart",
     "YearNumberingLocked",
     "EmptyNumberingPrefix",
     "CoopSharesBoundsInverted",

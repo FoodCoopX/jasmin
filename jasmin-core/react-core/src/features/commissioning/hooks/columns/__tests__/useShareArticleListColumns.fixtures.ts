@@ -52,6 +52,7 @@ export const baseArgs = {
   activeFilter: "all",
   sells_to_resellers: true,
   has_markets: true,
+  has_purchases: true,
   number_packing_stations: 2,
   packingBulk: false,
   renderHarvestNumber: passThroughNumber,

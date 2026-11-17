@@ -482,12 +482,13 @@ describe("DeliveryStationsOverview tours", () => {
     expect(firstTour.columns).toEqual([MEDIUM_WITH_HONEY, SMALL, HONEY_ONLY, MEDIUM]);
   });
 
-  it("boxes every size where the farm packs everything in boxes, whatever its flag", async () => {
+  it("leaves out a size packed loose as it says, also where the farm's other sizes are boxed", async () => {
+    // A past week's loose size, beside a farm now packing everything in boxes.
     tenantSettings.values = { packing_mode: "BOXES" };
     renderPage();
     await screen.findByText("Farm shop");
 
-    expect(headerRowsOf(1)[0]).toContain("Bread");
+    expect(headerRowsOf(1)[0]).not.toContain("Bread");
   });
 
   it("lists no boxes where the farm packs every share loose", async () => {

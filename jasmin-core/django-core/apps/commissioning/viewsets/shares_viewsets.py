@@ -346,9 +346,8 @@ class ShareTypeVariationViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             catalogue_param(
                 "is_packed_bulk",
                 required=False,
-                description="Filter by per-variation bulk-packing flag. "
-                "Only meaningful in MIXED packing mode; omit to "
-                "return all variations.",
+                description="Only the variations packed loose (true) or "
+                "pre-packed (false); omit to return all variations.",
             ),
             # Window for the per-week ``capacity_by_week`` field (same contract
             # as the delivery-station-days endpoint). Omit all three → the field
@@ -1232,8 +1231,8 @@ class ShareViewSet(RolePermissionsMixin, viewsets.ModelViewSet):
             get_share_type_variation_parameter(),
             catalogue_param(
                 "is_packed_bulk",
-                description="Only the shares of the variations with this "
-                "bulk-packing flag. Only meaningful in MIXED packing mode.",
+                description="Only the shares of the variations packed loose "
+                "(true) or pre-packed (false).",
             ),
             catalogue_param(
                 "physical", description="Only the shares of physical variations."

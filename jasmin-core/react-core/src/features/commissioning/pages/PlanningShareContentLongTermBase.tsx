@@ -13,6 +13,7 @@ import {
   useInvalidateAfterTableMutation,
   useNoteColumn,
   useNumberFormat,
+  useTenant,
   useUnitOptions,
 } from "@hooks/index";
 import {
@@ -282,6 +283,8 @@ export default function PlanningShareContentLongTermBase({
   const sellerColumn = useSellerColumn({
     overrides: sellerColumnOverrides,
   });
+  // A farm that buys nothing in has no seller to name.
+  const hasPurchases = useTenant().getSetting("has_purchases", true) !== false;
 
   const listParams = useMemo(
     (): CommissioningDefaultShareContentsBulkListListParams => ({
@@ -692,7 +695,7 @@ export default function PlanningShareContentLongTermBase({
           );
         },
       },
-      sellerColumn,
+      ...(hasPurchases ? [sellerColumn] : []),
 
       {
         title: "",
@@ -717,6 +720,7 @@ export default function PlanningShareContentLongTermBase({
       amountUnitSizeColumns,
       shareTypeVariationColumns,
       sellerColumn,
+      hasPurchases,
       noteColumn,
       t,
       format,

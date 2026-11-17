@@ -328,10 +328,10 @@ class ShareTypeVariationCapacityBelowOccupancy(BadRequestError):
 
 
 class PackingModeSwitchChangesPacking(BadRequestError):
-    """The packing mode can't switch to ``new_mode`` while running or upcoming
-    share sizes would change how they are packed: to "boxes" while some are
-    packed loose, to "bulk" while some are boxed. A switch to "mixed" is
-    always possible; there each size is packed as its own flag says."""
+    """The stored packing mode can't switch to ``new_mode`` while running or
+    upcoming share sizes are packed otherwise: to "boxes" while some are
+    packed loose, to "bulk" while some are pre-packed. A switch to "mixed" is
+    always possible."""
 
     code = "packing_mode.switch_changes_packing"
 

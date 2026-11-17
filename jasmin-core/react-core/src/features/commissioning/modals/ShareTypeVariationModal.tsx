@@ -67,27 +67,35 @@ interface ShareTypeVariationRecord extends TableRecord {
   can_be_deleted?: boolean;
   picture?: string | null;
   is_packed_bulk?: boolean;
-  /** ``is_packed_bulk`` as the "mixed" mode's choice; see ``packingColumn``. */
+  /** ``is_packed_bulk`` as the table's choice; see ``packingColumn``. */
   packing?: Packing;
   [key: string]: unknown;
 }
 
 type Packing = "BOXED" | "LOOSE";
 
-const startBoxed = withNewRowDefaults<ShareTypeVariationRecord>({
+const startPrePacked = withNewRowDefaults<ShareTypeVariationRecord>({
   packing: "BOXED",
 });
+const startLoose = withNewRowDefaults<ShareTypeVariationRecord>({
+  packing: "LOOSE",
+});
 
-/** The table's ``customEdit``: only "mixed" has a packing choice to start. */
+/** The table's ``customEdit``: a new size starts packed like the farm's
+ *  sizes, pre-packed where they differ, as the backend saves one without a
+ *  choice. */
 const newRowStart = (packingMode: string) =>
-  packingMode === "MIXED" ? startBoxed : null;
+  packingMode === "BULK" ? startLoose : startPrePacked;
+
+/** A virtual size is packed as the physical sizes it is made of. */
+const isVirtual = (record: ShareTypeVariationRecord) =>
+  record.variation_type === "virtual";
 
 /**
- * In the "mixed" packing mode the office chooses for every size whether it is
- * packed in a box or loose; a new one starts boxed (``startBoxed``), as the
- * backend saves a size without a choice. The table holds the choice as
- * ``packing``, which the save turns back into ``is_packed_bulk``; in "boxes"
- * or "bulk" the backend sets it.
+ * The office chooses for every physical size whether it is pre-packed or
+ * packed loose, and the farm's packing mode follows from its sizes. The table
+ * holds the choice as ``packing``, which the save turns back into
+ * ``is_packed_bulk``; a virtual size has none to make.
  */
 function packingColumn(t: TFunction): EditableColumnConfig<ShareTypeVariationRecord> {
   const label = (packing: unknown) =>
@@ -111,22 +119,33 @@ function packingColumn(t: TFunction): EditableColumnConfig<ShareTypeVariationRec
       { value: "BOXED", label: label("BOXED") },
       { value: "LOOSE", label: label("LOOSE") },
     ],
-    render: label,
+    render: (packing, record) => (isVirtual(record) ? "—" : label(packing)),
+    disabled: isVirtual,
     width: "7em",
     align: "center",
   };
 }
 
+interface SubscriptionColumnActions {
+  onOpenPrices: (record: ShareTypeVariationRecord) => void;
+  onOpenDescription: (record: ShareTypeVariationRecord) => void;
+  onOpenPicture: (record: ShareTypeVariationRecord) => void;
+}
+
 /**
- * The columns only subscriptions use: the capacity, whether a trial
+ * The columns only subscriptions use: the capacity, the description and
+ * picture shown where a subscription's variation is picked, whether a trial
  * subscription may take the variation, and the button to its prices. A tenant
- * that uploads its weekly share amounts runs no subscriptions, so it gets none
- * of them.
+ * that uploads its weekly share amounts, as every tenant inside Tapir does,
+ * runs no subscriptions, so it gets none of them.
  */
-function useSubscriptionColumns(
-  onOpenPriceModal: (record: ShareTypeVariationRecord) => void,
-): {
+function useSubscriptionColumns({
+  onOpenPrices,
+  onOpenDescription,
+  onOpenPicture,
+}: SubscriptionColumnActions): {
   capacityColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
+  pickerColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
   trialColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
   priceColumns: EditableColumnConfig<ShareTypeVariationRecord>[];
 } {
@@ -142,7 +161,12 @@ function useSubscriptionColumns(
   ) as boolean;
   return useMemo(() => {
     if (weeklyUpload) {
-      return { capacityColumns: [], trialColumns: [], priceColumns: [] };
+      return {
+        capacityColumns: [],
+        pickerColumns: [],
+        trialColumns: [],
+        priceColumns: [],
+      };
     }
     return {
       capacityColumns: [
@@ -160,6 +184,66 @@ function useSubscriptionColumns(
           inputType: "positive_integer",
           width: "7em",
           align: "center",
+        },
+      ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[],
+      pickerColumns: [
+        {
+          title: t("commissioning.description"),
+          dataIndex: "description",
+          key: "description",
+          width: "9em",
+          align: "center",
+          readOnly: true,
+          disabled: true,
+          render: (_: unknown, record: ShareTypeVariationRecord) => {
+            if (record.key === -1 || !record.id) {
+              return <span className="color-text-tertiary">-</span>;
+            }
+
+            return (
+              <Space>
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => onOpenDescription(record)}
+                  aria-label={t("commissioning.edit_description")}
+                />
+              </Space>
+            );
+          },
+        },
+        {
+          title: t("commissioning.picture"),
+          dataIndex: "picture",
+          key: "picture",
+          width: "5em",
+          align: "center",
+          readOnly: true,
+          disabled: true,
+          render: (_: unknown, record: ShareTypeVariationRecord) => {
+            if (record.key === -1 || !record.id) {
+              return <span className="color-text-tertiary">-</span>;
+            }
+            return (
+              <Button
+                type="link"
+                size="small"
+                aria-label={t("commissioning.view_picture")}
+                onClick={() => onOpenPicture(record)}
+              >
+                {record.picture ? (
+                  <img
+                    src={record.picture}
+                    alt=""
+                    className="table-picture-thumbnail"
+                  />
+                ) : (
+                  <UploadOutlined />
+                )}
+              </Button>
+            );
+          },
         },
       ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[],
       trialColumns: allowsTrialSubscriptions
@@ -197,7 +281,7 @@ function useSubscriptionColumns(
                 <Button
                   type="primary"
                   size="small"
-                  onClick={() => onOpenPriceModal(record)}
+                  onClick={() => onOpenPrices(record)}
                 >
                   {t("commissioning.configure_prices")}
                 </Button>
@@ -207,7 +291,14 @@ function useSubscriptionColumns(
         },
       ] satisfies EditableColumnConfig<ShareTypeVariationRecord>[],
     };
-  }, [weeklyUpload, allowsTrialSubscriptions, onOpenPriceModal, t]);
+  }, [
+    weeklyUpload,
+    allowsTrialSubscriptions,
+    onOpenPrices,
+    onOpenDescription,
+    onOpenPicture,
+    t,
+  ]);
 }
 
 interface ShareTypeVariationModalProps {
@@ -265,7 +356,7 @@ export default function ShareTypeVariationModal({
   const { t } = useTranslation();
   const { isOffice } = useRoles();
   const { format } = useNumberFormat();
-  const { getSetting } = useTenant();
+  const { getSetting, refreshTenant } = useTenant();
   const packing_mode = getSetting("packing_mode", "BOXES") as
     "BOXES" | "BULK" | "MIXED";
   // Tenant-wide gate for on-off (per-delivery opt-in) variations.
@@ -365,19 +456,25 @@ export default function ShareTypeVariationModal({
   // skips invalidation so an edited row stays where the office
   // put it (no spring). DELETE always invalidates so the row
   // vanishes. ``EditableTable``'s internal ``recentlyAddedIds`` pin
-  // keeps the just-added row at the top across the create refetch.
+  // keeps the just-added row at the top across the create refetch. The
+  // farm's packing mode follows from its sizes, so every change reloads the
+  // tenant's settings too.
   const handleSaveSuccess = useCallback(
     (_record: TableRecord, action: "create" | "update") => {
       if (action === "create") {
         invalidateData();
       }
+      void refreshTenant();
     },
-    [invalidateData],
+    [invalidateData, refreshTenant],
   );
 
-  const handleDeleteSuccess = useCallback(() => {
+  // A deleted size, or one its components turn virtual or physical, changes
+  // the list and the packing mode alike.
+  const reloadSizes = useCallback(() => {
     invalidateData();
-  }, [invalidateData]);
+    void refreshTenant();
+  }, [invalidateData, refreshTenant]);
 
   const handleOpenPriceModal = useCallback(
     (record: ShareTypeVariationRecord) => {
@@ -386,8 +483,6 @@ export default function ShareTypeVariationModal({
     },
     [],
   );
-  const { capacityColumns, trialColumns, priceColumns } =
-    useSubscriptionColumns(handleOpenPriceModal);
 
   const handleClosePriceModal = useCallback(() => {
     setPriceModalVisible(false);
@@ -440,10 +535,6 @@ export default function ShareTypeVariationModal({
     setSelectedVirtualComponentRecord(null);
   }, []);
 
-  const handleSaveVirtualComponents = useCallback(() => {
-    invalidateData();
-  }, [invalidateData]);
-
   const handleOpenPictureModal = useCallback(
     (record: ShareTypeVariationRecord) => {
       setSelectedPictureRecord(record);
@@ -474,6 +565,13 @@ export default function ShareTypeVariationModal({
     onUploaded: handleClosePictureModal,
     onDeleted: handleClosePictureModal,
   });
+
+  const { capacityColumns, pickerColumns, trialColumns, priceColumns } =
+    useSubscriptionColumns({
+      onOpenPrices: handleOpenPriceModal,
+      onOpenDescription: handleOpenDescriptionModal,
+      onOpenPicture: handleOpenPictureModal,
+    });
 
   const columns = useMemo<EditableColumnConfig<ShareTypeVariationRecord>[]>(
     () =>
@@ -560,64 +658,7 @@ export default function ShareTypeVariationModal({
             text ? `${format(parseFloat(text as string), 2)} kg` : null,
         },
         ...capacityColumns,
-        {
-          title: t("commissioning.description"),
-          dataIndex: "description",
-          key: "description",
-          width: "9em",
-          align: "center",
-          readOnly: true,
-          disabled: true,
-          render: (_: unknown, record: ShareTypeVariationRecord) => {
-            if (record.key === -1 || !record.id) {
-              return <span className="color-text-tertiary">-</span>;
-            }
-
-            return (
-              <Space>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => handleOpenDescriptionModal(record)}
-                  aria-label={t("commissioning.edit_description")}
-                />
-              </Space>
-            );
-          },
-        },
-        {
-          title: t("commissioning.picture"),
-          dataIndex: "picture",
-          key: "picture",
-          width: "5em",
-          align: "center",
-          readOnly: true,
-          disabled: true,
-          render: (_: unknown, record: ShareTypeVariationRecord) => {
-            if (record.key === -1 || !record.id) {
-              return <span className="color-text-tertiary">-</span>;
-            }
-            return (
-              <Button
-                type="link"
-                size="small"
-                aria-label={t("commissioning.view_picture")}
-                onClick={() => handleOpenPictureModal(record)}
-              >
-                {record.picture ? (
-                  <img
-                    src={record.picture}
-                    alt=""
-                    className="table-picture-thumbnail"
-                  />
-                ) : (
-                  <UploadOutlined />
-                )}
-              </Button>
-            );
-          },
-        },
+        ...pickerColumns,
         {
           title: <>{t("commissioning.used_crate")}</>,
           dataIndex: "used_crate_name",
@@ -632,7 +673,7 @@ export default function ShareTypeVariationModal({
           },
         },
         ...trialColumns,
-        ...(packing_mode === "MIXED" ? [packingColumn(t)] : []),
+        packingColumn(t),
         // ---- On-off (per-delivery opt-in) columns ------------------
         // Hidden when the tenant hasn't enabled the feature OR this share type
         // has jokers (jokers and opt-in are mutually exclusive). Backend
@@ -688,15 +729,13 @@ export default function ShareTypeVariationModal({
       getShareTypeVariationSizeLabel,
       activeStatusColumn,
       format,
-      handleOpenDescriptionModal,
-      handleOpenPictureModal,
       priceColumns,
       handleOpenVirtualComponentModal,
       validFromColumn,
       validUntilColumn,
-      packing_mode,
       showOptinColumns,
       capacityColumns,
+      pickerColumns,
       trialColumns,
     ],
   );
@@ -704,10 +743,11 @@ export default function ShareTypeVariationModal({
   const customSave = useCallback(
     (transformedData: Record<string, unknown>, record: TableRecord) => {
       const { packing, ...fields } = transformedData;
+      const choosesPacking = packing && !isVirtual(record);
       const variation: Record<string, unknown> = {
         ...fields,
         share_type,
-        ...(packing ? { is_packed_bulk: packing === "LOOSE" } : {}),
+        ...(choosesPacking ? { is_packed_bulk: packing === "LOOSE" } : {}),
       };
       if (sortOrderTaken(data, variation, record)) {
         const message = t("validation.unique.sort_order");
@@ -763,7 +803,7 @@ export default function ShareTypeVariationModal({
               // produce a refetch storm. The save-success path is
               // the right level of granularity.
               onSaveSuccess={handleSaveSuccess}
-              onDeleteSuccess={handleDeleteSuccess}
+              onDeleteSuccess={reloadSizes}
               permissions={permissions}
               customSave={customSave}
               customEdit={newRowStart(packing_mode)}
@@ -811,7 +851,7 @@ export default function ShareTypeVariationModal({
         share_type_variation_name={getShareTypeVariationSizeLabel(
           selectedVirtualComponentRecord?.size ?? "",
         )}
-        onSave={handleSaveVirtualComponents}
+        onSave={reloadSizes}
       />
 
       <Modal

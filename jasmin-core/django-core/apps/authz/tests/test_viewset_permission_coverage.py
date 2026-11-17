@@ -107,6 +107,7 @@ _EXPECTED_VIEW_MODULES = frozenset(
         "apps.commissioning.viewsets.documentation_viewsets",
         "apps.commissioning.viewsets.imports_viewsets",
         "apps.commissioning.viewsets.logs_viewsets",
+        "apps.commissioning.viewsets.markets_viewsets",
         "apps.commissioning.viewsets.members_viewsets",
         "apps.commissioning.viewsets.offers_viewsets",
         "apps.commissioning.viewsets.resellers_viewsets",
@@ -135,7 +136,9 @@ _EXPECTED_VIEW_MODULES = frozenset(
         "apps.shared.tenants.views",
         "apps.shared.tenants.viewsets",
         "apps.staff.viewsets",
+        "apps.staff.viewsets.absences",
         "apps.staff.viewsets.basics",
+        "apps.staff.viewsets.saturday_shifts",
         "apps.staff.viewsets.weekly_plan",
     }
 )

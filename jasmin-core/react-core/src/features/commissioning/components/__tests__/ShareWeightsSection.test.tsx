@@ -329,8 +329,10 @@ describe("ShareWeightsSection loading", () => {
 
     expect(await screen.findByText(SMALL)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "commissioning.share_weights" })).toBeInTheDocument();
-    // Physical shares only: the boxes packed and weighed.
-    expect(api.shares.mock.calls).toEqual([[{ year: 2026, delivery_week: 41, delivery_day: TUESDAY.id, physical: true }]]);
+    // Physical pre-packed shares only: the boxes packed and weighed.
+    expect(api.shares.mock.calls).toEqual([
+      [{ year: 2026, delivery_week: 41, delivery_day: TUESDAY.id, physical: true, is_packed_bulk: false }],
+    ]);
     // In the server's order.
     expect(screen.getAllByText(/^(Vegetables|Fruit) [SML]$/).map((cell) => cell.textContent)).toEqual([
       SMALL, MEDIUM, FRUIT,
@@ -339,8 +341,8 @@ describe("ShareWeightsSection loading", () => {
     expect(screen.getByRole("button", { name: EXPORT })).toBeEnabled();
   });
 
-  it("leaves out the variations packed in bulk in mixed packing, as the boxes list does", async () => {
-    tenantSettings.values = { packing_mode: "MIXED" };
+  it("leaves out the sizes packed loose whatever the farm's mode, as the boxes list does", async () => {
+    tenantSettings.values = { packing_mode: "BULK" };
     renderSection();
 
     await screen.findByText(SMALL);
@@ -427,7 +429,9 @@ describe("ShareWeightsSection following the packing list's week and day", () => 
     show({ week: 41, deliveryDayId: FRIDAY.id! });
 
     await waitFor(() => expect(weightsOf(SMALL)).toEqual(FRIDAY_SMALL_WEIGHTS));
-    expect(lastSharesRequest()).toEqual({ year: 2026, delivery_week: 41, delivery_day: FRIDAY.id, physical: true });
+    expect(lastSharesRequest()).toEqual({
+      year: 2026, delivery_week: 41, delivery_day: FRIDAY.id, physical: true, is_packed_bulk: false,
+    });
     expect(screen.queryByText(MEDIUM)).not.toBeInTheDocument();
   });
 
@@ -438,7 +442,9 @@ describe("ShareWeightsSection following the packing list's week and day", () => 
     show({ week: 42, deliveryDayId: TUESDAY.id! });
 
     await waitFor(() =>
-      expect(lastSharesRequest()).toEqual({ year: 2026, delivery_week: 42, delivery_day: TUESDAY.id, physical: true }),
+      expect(lastSharesRequest()).toEqual({
+        year: 2026, delivery_week: 42, delivery_day: TUESDAY.id, physical: true, is_packed_bulk: false,
+      }),
     );
     await waitFor(() => expect(bodyRows()).toHaveLength(1));
     expect(weightsOf(SMALL)).toEqual(["2,500 kg", "", "", "", "", ""]);

@@ -13,6 +13,10 @@ export interface DndGridProps {
   onPlace: (payload: DndDragPayload, to: GridPos) => void;
   /** Optional cell-clear handler; enables the remove affordance on filled cells. */
   onRemove?: (pos: GridPos) => void;
+  /** Whether a chip may go to a cell. A cell that refuses the chip being
+   *  dragged or picked up shows as refused, and a placement there never
+   *  reaches ``onPlace``. Every cell may take every chip when omitted. */
+  canPlace?: (payload: DndDragPayload, to: GridPos) => boolean;
   /** Override the react-dnd item type (only needed if two grids coexist). */
   itemType?: string;
   children: ReactNode;
@@ -28,22 +32,33 @@ export interface DndGridProps {
 export default function DndGrid({
   onPlace,
   onRemove,
+  canPlace,
   itemType = DND_CHIP_TYPE,
   children,
 }: DndGridProps) {
   const [selected, setSelected] = useState<DndDragPayload | null>(null);
 
+  // A refused keyboard placement keeps the chip picked up, so another cell
+  // can still take it.
   const place = useCallback(
     (payload: DndDragPayload, to: GridPos) => {
+      if (canPlace && !canPlace(payload, to)) return;
       onPlace(payload, to);
       setSelected(null); // a placement always ends the keyboard "pick up"
     },
-    [onPlace],
+    [onPlace, canPlace],
   );
 
   const value = useMemo(
-    () => ({ place, remove: onRemove, itemType, selected, select: setSelected }),
-    [place, onRemove, itemType, selected],
+    () => ({
+      place,
+      remove: onRemove,
+      canPlace,
+      itemType,
+      selected,
+      select: setSelected,
+    }),
+    [place, onRemove, canPlace, itemType, selected],
   );
 
   return (

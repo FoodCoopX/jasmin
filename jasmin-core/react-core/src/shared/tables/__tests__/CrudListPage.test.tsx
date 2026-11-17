@@ -130,6 +130,22 @@ describe("CrudListPage", () => {
     expect(customEdit(existing, { setFieldsValue })).toBe(existing);
   });
 
+  it("puts the toolbar under the title, outside the title row", () => {
+    renderPage({
+      headerActions: <span>Export</span>,
+      toolbar: <button>Sync</button>,
+    });
+
+    // The header actions share the title's row; the toolbar sits below it.
+    const title = screen.getByRole("heading", { level: 1, name: "title" });
+    expect(title.parentElement).toHaveTextContent("Export");
+    const sync = screen.getByRole("button", { name: "Sync" });
+    expect(title.parentElement).not.toContainElement(sync);
+    expect(
+      title.compareDocumentPosition(sync) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("withHideInactive=false renders no switch and applies no filter", () => {
     renderPage({ withHideInactive: false });
     expect(screen.queryByTestId("hide-inactive")).toBeNull();

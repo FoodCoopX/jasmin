@@ -8,6 +8,8 @@ export interface DndGridContextValue {
   place: (payload: DndDragPayload, to: GridPos) => void;
   /** Clear a cell, if the consumer supports removal. */
   remove?: (pos: GridPos) => void;
+  /** Whether a chip may go to a cell; every cell takes every chip when unset. */
+  canPlace?: (payload: DndDragPayload, to: GridPos) => boolean;
   /** react-dnd item type shared by every chip/cell in this grid. */
   itemType: string;
   /** The chip currently "picked up" for keyboard/click placement (or null). */

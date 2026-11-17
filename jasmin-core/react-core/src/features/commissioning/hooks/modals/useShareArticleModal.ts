@@ -1,8 +1,9 @@
 import { Form } from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { commissioningShareArticlesCreate } from "@shared/api/generated/commissioning/commissioning";
 import type { ShareArticle } from "@shared/api/generated/models";
+import { TenantContext } from "@shared/contexts/TenantContext";
 import { useModalMutation } from "@shared/modals/shared";
 import { syncPurchasedName } from "@shared/utils";
 import { useActiveShareOptions } from "@hooks/useActiveShareOptions";
@@ -23,6 +24,11 @@ export const useShareArticleModal = () => {
 
   const fruit_and_veg_shares_are_separate =
     activeShareOptions.fruit_and_veg_shares_are_separate ?? false;
+  // A farm that buys nothing in gets no "bought in" box, whatever the page
+  // starts it with. Read like ``useTenantLanguageT`` does, so the dialog also
+  // opens where no tenant is loaded.
+  const hasPurchases =
+    useContext(TenantContext)?.getSetting("has_purchases", true) !== false;
 
   // The dialog has no list filter, so a new article starts where the article
   // list starts one under "All".
@@ -36,9 +42,14 @@ export const useShareArticleModal = () => {
   const openModal = useCallback((customDefaults: Record<string, unknown> = {}) => {
     form.resetFields();
     customDefaultsRef.current = customDefaults;
-    form.setFieldsValue({ ...shareDefaults, is_active: true, ...customDefaults });
+    form.setFieldsValue({
+      ...shareDefaults,
+      is_active: true,
+      ...customDefaults,
+      ...(hasPurchases ? {} : { is_purchased: false }),
+    });
     setIsVisible(true);
-  }, [form, shareDefaults]);
+  }, [form, shareDefaults, hasPurchases]);
 
   // The share options may arrive after the dialog opened: seed the shares
   // again then, unless the page set them or the office already changed them.
@@ -111,6 +122,7 @@ export const useShareArticleModal = () => {
     form,
     unitOptions,
     fruit_and_veg_shares_are_separate,
+    hasPurchases,
     openModal,
     closeModal,
     saveShareArticle,

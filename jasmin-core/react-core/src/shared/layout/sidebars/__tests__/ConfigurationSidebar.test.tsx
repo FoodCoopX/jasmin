@@ -1,6 +1,7 @@
 /**
  * ConfigurationSidebar — the members group and the delivery exceptions entry
- * are gated on the tenant setting ``uploads_weekly_share_amount``.
+ * are gated on the tenant setting ``uploads_weekly_share_amount``, the
+ * reseller documents on ``sells_to_resellers``.
  *
  * A tenant that uploads aggregate weekly share amounts keeps no member records
  * and runs no subscriptions, so the whole members group (data protection and
@@ -45,6 +46,7 @@ vi.mock("react-i18next", () => ({
 // default, which is what the real ``getSetting`` does for a missing key.
 const settings = vi.hoisted(() => ({
   weeklyUpload: false as boolean | undefined,
+  sellsToResellers: undefined as boolean | undefined,
 }));
 
 // What the deployment offers; a name left out is offered, as with a payload
@@ -54,11 +56,13 @@ const capabilities = vi.hoisted(() => ({}) as Record<string, boolean>);
 vi.mock("@hooks/index", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
   const tenant = makeUseTenantMock({
-    getSetting: (key: string, defaultValue?: unknown) =>
-      key === "uploads_weekly_share_amount" &&
-      settings.weeklyUpload !== undefined
-        ? settings.weeklyUpload
-        : defaultValue,
+    getSetting: (key: string, defaultValue?: unknown) => {
+      const value = {
+        uploads_weekly_share_amount: settings.weeklyUpload,
+        sells_to_resellers: settings.sellsToResellers,
+      }[key];
+      return value !== undefined ? value : defaultValue;
+    },
   });
   return {
     useTenant: () => tenant,
@@ -122,6 +126,9 @@ const untouchedGroupEntries = [
   "configuration.commissioning",
   "configuration.share_type_variations",
   "configuration.delivery_days",
+  "commissioning.list_crates",
+  "commissioning.list_storages",
+  "commissioning.list_plots",
   "configuration.reseller_documents",
 ];
 
@@ -161,6 +168,7 @@ function expectEveryGroupRendered() {
 describe("ConfigurationSidebar", () => {
   beforeEach(() => {
     settings.weeklyUpload = false;
+    settings.sellsToResellers = undefined;
   });
 
   it("renders all three groups when uploads_weekly_share_amount is off", () => {
@@ -217,9 +225,86 @@ describe("ConfigurationSidebar", () => {
   });
 });
 
+describe("ConfigurationSidebar reseller documents", () => {
+  beforeEach(() => {
+    settings.weeklyUpload = false;
+    settings.sellsToResellers = undefined;
+  });
+
+  it("links the documents and their email templates where the farm sells to resellers", () => {
+    settings.sellsToResellers = true;
+    renderSidebar();
+
+    expect(
+      document.querySelector('a[href="/configuration/reseller-documents"]'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('a[href="/configuration/email-templates/resellers"]'),
+    ).not.toBeNull();
+  });
+
+  it("drops both where the farm sells to no reseller", () => {
+    settings.sellsToResellers = false;
+    renderSidebar();
+
+    expect(
+      screen.queryByText("configuration.reseller_documents"),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('a[href="/configuration/reseller-documents"]'),
+    ).toBeNull();
+    expect(
+      document.querySelector('a[href="/configuration/email-templates/resellers"]'),
+    ).toBeNull();
+    expect(screen.getAllByText("configuration.email_templates")).toHaveLength(2);
+    expect(screen.getByText("configuration.delivery_days")).toBeInTheDocument();
+  });
+});
+
+describe("ConfigurationSidebar email server", () => {
+  const emailLink = () => document.querySelector('a[href="/configuration/email"]');
+
+  beforeEach(() => {
+    settings.weeklyUpload = true;
+    settings.sellsToResellers = false;
+    delete capabilities.user_accounts;
+  });
+
+  it("is dropped where the shares are imported, the host keeps the logins and no reseller buys", () => {
+    capabilities.user_accounts = false;
+    renderSidebar();
+
+    expect(emailLink()).toBeNull();
+    expect(screen.getByText("configuration.general")).toBeInTheDocument();
+  });
+
+  it("stays while the farm sells to resellers", () => {
+    capabilities.user_accounts = false;
+    settings.sellsToResellers = true;
+    renderSidebar();
+
+    expect(emailLink()).not.toBeNull();
+  });
+
+  it("stays where the farm invites its own logins", () => {
+    renderSidebar();
+
+    expect(emailLink()).not.toBeNull();
+  });
+
+  it("stays where the farm keeps its members' shares itself", () => {
+    capabilities.user_accounts = false;
+    settings.weeklyUpload = false;
+    renderSidebar();
+
+    expect(emailLink()).not.toBeNull();
+  });
+});
+
 describe("ConfigurationSidebar users page", () => {
   beforeEach(() => {
     settings.weeklyUpload = false;
+    settings.sellsToResellers = undefined;
     delete capabilities.user_accounts;
   });
 
@@ -239,5 +324,20 @@ describe("ConfigurationSidebar users page", () => {
     expect(screen.queryByText("users.title")).not.toBeInTheDocument();
     expect(document.querySelector('a[href="/configuration/users"]')).toBeNull();
     expect(screen.getByText("configuration.general")).toBeInTheDocument();
+  });
+
+  it("drops the logins' email templates there too, and keeps the others", () => {
+    capabilities.user_accounts = false;
+    renderSidebar();
+
+    expect(
+      document.querySelector('a[href="/configuration/email-templates/general"]'),
+    ).toBeNull();
+    expect(
+      document.querySelector('a[href="/configuration/email-templates/members"]'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('a[href="/configuration/email-templates/resellers"]'),
+    ).not.toBeNull();
   });
 });

@@ -7,7 +7,7 @@ freely when a new failure mode appears.
 
 from __future__ import annotations
 
-from core.errors import BadRequestError, ConflictError, NotFoundError
+from core.errors import BadRequestError, ConflictError, JasminError, NotFoundError
 
 
 class StaffError(BadRequestError):
@@ -87,16 +87,15 @@ class WeeklyPlanCategorySortOrderTaken(BadRequestError):
 
 
 class AbsenceCategoryNameTaken(BadRequestError):
-    """Another absence category — active or not — already has this name in this
-    year."""
+    """Another absence category — active or not — already has this name."""
 
     code = "staff.absence_category_name_taken"
 
 
 class EmployeeInUse(ConflictError):
-    """An employee cannot be deleted while weekly-plan cells, absences or
-    employments still reference them — a delete would CASCADE all of those
-    away. Deactivate the employee instead."""
+    """An employee cannot be deleted while weekly-plan cells or absences still
+    reference them — a delete would CASCADE all of those away. Deactivate the
+    employee instead."""
 
     code = "staff.employee_in_use"
 
@@ -115,6 +114,85 @@ class AbsenceCategoryInUse(ConflictError):
     code = "staff.absence_category_in_use"
 
 
+class AbsenceCategoryDefaultLocked(ConflictError):
+    """The default absence category takes every absence no other category
+    claims, so it stays: it can be renamed, but not deleted or switched off."""
+
+    code = "staff.absence_category_default_locked"
+
+
+class AbsenceCategoryNotFound(NotFoundError):
+    """An absence referenced a category id that does not exist."""
+
+    code = "staff.absence_category_not_found"
+
+
+class AbsencesFromHrSystem(ConflictError):
+    """The absences of an employee from the HR system come from there; the
+    next sync would overwrite any entered here."""
+
+    code = "staff.absences_from_hr_system"
+
+
+class EmployeeAbsent(ConflictError):
+    """An employee can't be planned on a day they are absent. A shift planned
+    before the absence was entered stays and shows as a conflict; only new ones
+    are refused."""
+
+    code = "staff.employee_absent"
+
+
+class EmployeeInactive(ConflictError):
+    """A deactivated employee gets no new shift; one they still hold can be
+    taken away."""
+
+    code = "staff.employee_inactive"
+
+
+class SaturdayShiftNoPlace(ConflictError):
+    """A Saturday shift takes a row in the weekly plan, and no active category
+    has one free on that Saturday."""
+
+    code = "staff.saturday_shift_no_place"
+
+
+class HrSystemNotSetUp(ConflictError):
+    """The HR-system sync needs the tenant setting switched on, the address it
+    reads from, and an API token."""
+
+    code = "staff.hr_system_not_set_up"
+
+
+class HrSystemTokenRejected(ConflictError):
+    """The HR system refuses the stored token: it is mistyped or revoked, or the
+    account bars it, e.g. by an IP restriction."""
+
+    code = "staff.hr_system_token_rejected"
+
+
+class HrSystemAddressNotAllowed(ConflictError):
+    """The sync won't call the HR system's addresses: one isn't ``https`` or
+    leads into an internal network, or the two lead to different servers. The
+    token travels with every call."""
+
+    code = "staff.hr_system_address_not_allowed"
+
+
+class HrSystemMassDeactivation(ConflictError):
+    """The sync would deactivate more than half of the employees it keeps — the
+    mark of a list cut short, such as one read with a token that sees only one
+    team. ``details["employees"]`` names them; the office confirms to go on."""
+
+    code = "staff.hr_system_mass_deactivation"
+
+
+class HrSystemUnavailable(JasminError):
+    """The HR system could not be reached or gave no usable answer."""
+
+    code = "staff.hr_system_unavailable"
+    http_status = 502
+
+
 __all__ = [
     "StaffError",
     "EmployeeNotFound",
@@ -130,4 +208,15 @@ __all__ = [
     "EmployeeInUse",
     "WeeklyPlanCategoryInUse",
     "AbsenceCategoryInUse",
+    "AbsenceCategoryDefaultLocked",
+    "AbsenceCategoryNotFound",
+    "AbsencesFromHrSystem",
+    "EmployeeAbsent",
+    "EmployeeInactive",
+    "SaturdayShiftNoPlace",
+    "HrSystemNotSetUp",
+    "HrSystemTokenRejected",
+    "HrSystemAddressNotAllowed",
+    "HrSystemMassDeactivation",
+    "HrSystemUnavailable",
 ]

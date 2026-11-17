@@ -44,6 +44,13 @@
   min-width: 0;
 }
 
+/* Small note before the count (opt-in via the chip's ``note`` prop). */
+.dnd-chip-note {
+  flex: none;
+  font-size: 0.72em;
+  white-space: nowrap;
+}
+
 /* Small trailing usage-count badge (opt-in via the chip's ``count`` prop).
    Bordered pill so it stays legible on any per-chip pastel tint, in both themes. */
 .dnd-chip-count {
@@ -96,6 +103,30 @@
 .dnd-cell--selected {
   outline: 2px solid var(--color-future-blue);
   outline-offset: 1px;
+}
+
+/* A cell that refuses the chip being moved (DndGrid's ``canPlace``): greyed
+   out and hatched, so the refusal doesn't rest on the colour alone. */
+.dnd-cell--refused {
+  border-style: dashed;
+  border-color: var(--color-border-soft);
+  background-color: var(--color-bg-subtle);
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    var(--color-border-soft) 6px 7px
+  );
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* A flagged cell: red, with a stripe on its left as a mark besides the
+   colour. */
+.dnd-cell--flagged {
+  border-style: solid;
+  border-color: var(--color-error-border);
+  background-color: var(--color-error-bg);
+  box-shadow: inset 4px 0 0 var(--color-error);
 }
 
 .dnd-cell:focus-visible {

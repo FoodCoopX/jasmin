@@ -1,5 +1,6 @@
 import { RequireCapability, RequireRole } from "@shared/auth";
 import { lazy } from "react";
+import { Navigate } from "react-router-dom";
 import type { AppRoute } from "../types";
 
 // Lazy load all commissioning components - only loaded when the specific route is accessed
@@ -51,9 +52,6 @@ const PlanningShareContentPage = lazy(
 );
 const Invoices = lazy(() => import("@features/commissioning/pages/Invoices"));
 
-const ListCrates = lazy(
-  () => import("@features/commissioning/pages/ListCrates"),
-);
 const ListDeliveryStations = lazy(
   () => import("@features/commissioning/pages/ListDeliveryStations"),
 );
@@ -69,21 +67,26 @@ const ListShareArticles = lazy(
 const DefaultShareArticlesInShare = lazy(
   () => import("@features/commissioning/pages/DefaultShareArticlesInShare"),
 );
-const ListMarkets = lazy(
-  () => import("@features/commissioning/pages/ListMarkets"),
+const ListMarketArticles = lazy(
+  () => import("@features/commissioning/pages/ListMarketArticles"),
+);
+const ListMarketProductGroups = lazy(
+  () => import("@features/commissioning/pages/ListMarketProductGroups"),
+);
+const ListScaleTaxCodes = lazy(
+  () => import("@features/commissioning/pages/ListScaleTaxCodes"),
+);
+const MarketPrices = lazy(
+  () => import("@features/commissioning/pages/MarketPrices"),
 );
 const ListOfferGroups = lazy(
   () => import("@features/commissioning/pages/ListOfferGroups"),
 );
-const ListPlots = lazy(() => import("@features/commissioning/pages/ListPlots"));
 const ListResellers = lazy(
   () => import("@features/commissioning/pages/ListResellers"),
 );
 const ListSellers = lazy(
   () => import("@features/commissioning/pages/ListSellers"),
-);
-const ListStorages = lazy(
-  () => import("@features/commissioning/pages/ListStorages"),
 );
 const Offers = lazy(() => import("@features/commissioning/pages/Offers"));
 const PaymentsResellers = lazy(
@@ -186,22 +189,15 @@ export const commissioningRoutes: AppRoute[] = [
       </RequireRole>
     ),
   },
+  // The plots, stores and crates are configuration pages; these addresses
+  // forward there so that bookmarks of them keep working.
   {
     path: "/commissioning/list-plots",
-    element: (
-      <RequireRole flag="isStaff">
-        <ListPlots />
-      </RequireRole>
-    ),
+    element: <Navigate to="/configuration/plots" replace />,
   },
-
   {
     path: "/commissioning/list-storages",
-    element: (
-      <RequireRole flag="isStaff">
-        <ListStorages />
-      </RequireRole>
-    ),
+    element: <Navigate to="/configuration/storages" replace />,
   },
   {
     // One data-driven planning route per view. ``:slug`` selects the share
@@ -384,11 +380,7 @@ export const commissioningRoutes: AppRoute[] = [
   },
   {
     path: "/commissioning/list-crates",
-    element: (
-      <RequireRole flag="isStaff">
-        <ListCrates />
-      </RequireRole>
-    ),
+    element: <Navigate to="/configuration/crates" replace />,
   },
   {
     path: "/commissioning/list-delivery-stations",
@@ -439,10 +431,34 @@ export const commissioningRoutes: AppRoute[] = [
     ),
   },
   {
-    path: "/commissioning/list-markets",
+    path: "/commissioning/list-market-articles",
     element: (
       <RequireRole flag="isStaff">
-        <ListMarkets />
+        <ListMarketArticles />
+      </RequireRole>
+    ),
+  },
+  {
+    path: "/commissioning/list-market-product-groups",
+    element: (
+      <RequireRole flag="isStaff">
+        <ListMarketProductGroups />
+      </RequireRole>
+    ),
+  },
+  {
+    path: "/commissioning/list-scale-tax-codes",
+    element: (
+      <RequireRole flag="isStaff">
+        <ListScaleTaxCodes />
+      </RequireRole>
+    ),
+  },
+  {
+    path: "/commissioning/market-prices",
+    element: (
+      <RequireRole flag="isStaff">
+        <MarketPrices />
       </RequireRole>
     ),
   },

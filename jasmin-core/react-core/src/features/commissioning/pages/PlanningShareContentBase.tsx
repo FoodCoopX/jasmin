@@ -134,6 +134,7 @@ export default function PlanningShareContentBase({
     defaultPlanningGranularity,
     numberPackingStations: number_packing_stations,
     showSummaryOnTop: showSummaryInHarvestSharePlanningOnTop,
+    hasPurchases,
   } = usePlanningTenantSettings();
 
   // Seed ``planningMode`` from ``TenantSettings.default_planning_granularity``.
@@ -563,13 +564,17 @@ export default function PlanningShareContentBase({
 
   const customSave = useCallback(
     (transformedData: Record<string, unknown>) => {
-      // Validate seller_name for purchased items
+      // A purchased item names its seller, where the farm buys in at all and
+      // so has the seller column.
       const shareArticle = vegetables_and_fruits.find(
         (article: ShareArticleOption) =>
           article.id === transformedData.share_article,
       );
 
-      if (hasPurchasedSuffix((shareArticle?.name as string) ?? "", tenantT)) {
+      if (
+        hasPurchases &&
+        hasPurchasedSuffix((shareArticle?.name as string) ?? "", tenantT)
+      ) {
         if (!transformedData.seller_name && !transformedData.seller) {
           throw new Error(t("commissioning.seller_required_for_purchase"));
         }
@@ -638,6 +643,7 @@ export default function PlanningShareContentBase({
       t,
       tenantT,
       vegetables_and_fruits,
+      hasPurchases,
     ],
   );
 
@@ -901,6 +907,7 @@ export default function PlanningShareContentBase({
     dataHasNotes,
     calculateStillFree,
     number_packing_stations,
+    hasPurchases,
     formatCurrency,
     getUnitLabel,
     setIsBackupModalOpen,

@@ -9,6 +9,8 @@ import type { TenantLanguageEnum } from './tenantLanguageEnum';
 import type { PatchedTenantRequestEmail } from './patchedTenantRequestEmail';
 import type { PatchedTenantRequestEmailForOrders } from './patchedTenantRequestEmailForOrders';
 import type { PatchedTenantRequestWebsite } from './patchedTenantRequestWebsite';
+import type { PatchedTenantRequestHrSystemEmployeesUrl } from './patchedTenantRequestHrSystemEmployeesUrl';
+import type { PatchedTenantRequestHrSystemAbsencesUrl } from './patchedTenantRequestHrSystemAbsencesUrl';
 
 /**
  * Full tenant payload — staff-only on read, admin-only on write.
@@ -33,6 +35,11 @@ operational config.
  */
 export interface PatchedTenantRequest {
   tenant_language?: TenantLanguageEnum;
+  /**
+   * @maxLength 500
+   * @nullable
+   */
+  hr_system_api_token?: string | null;
   /**
    * @minLength 1
    * @maxLength 200
@@ -134,6 +141,9 @@ export interface PatchedTenantRequest {
   navigation?: unknown;
   ai?: unknown;
   allow_upload_for_data_lists?: boolean;
+  uses_hr_system?: boolean;
+  hr_system_employees_url?: PatchedTenantRequestHrSystemEmployeesUrl;
+  hr_system_absences_url?: PatchedTenantRequestHrSystemAbsencesUrl;
   /** @nullable */
   logo?: Blob | null;
   /** @nullable */

@@ -384,6 +384,7 @@ describe("PackingListBulk loading", () => {
       day_number: TUESDAY,
       is_past: false,
       delivery_station: FARM_SHOP.id,
+      is_packed_bulk: true,
     });
     expect(screen.getByText("explainers.packing_list_bulk")).toBeInTheDocument();
   });
@@ -458,24 +459,20 @@ describe("PackingListBulk packing rows", () => {
     expect(within(rowOf("Lettuce")).getByText("commissioning.large")).toBeInTheDocument();
   });
 
-  it("counts only the share sizes packed in bulk when the farm packs the rest in boxes", async () => {
-    tenantSettings.values = { packing_mode: "MIXED" };
-    renderPage();
-    await screen.findByText("Carrots");
+  it.each(["BULK", "MIXED"])(
+    "counts only the share sizes packed loose, as each says, in the farm's %s mode",
+    async (mode) => {
+      tenantSettings.values = { packing_mode: mode };
+      renderPage();
+      await screen.findByText("Carrots");
 
-    expect(lastListRequest()).toMatchObject({
-      delivery_station: FARM_SHOP.id,
-      is_packed_bulk: true,
-    });
-  });
+      expect(lastListRequest()).toMatchObject({
+        delivery_station: FARM_SHOP.id,
+        is_packed_bulk: true,
+      });
+    },
+  );
 
-  it("counts every share size when the farm packs everything in bulk", async () => {
-    tenantSettings.values = { packing_mode: "BULK" };
-    renderPage();
-    await screen.findByText("Carrots");
-
-    expect(lastListRequest()).not.toHaveProperty("is_packed_bulk");
-  });
 });
 
 // ── Week, day and station ───────────────────────────────────────────────────
@@ -582,6 +579,7 @@ describe("PackingListBulk choosing the week, day and station", () => {
         day_number: TUESDAY,
         is_past: false,
         delivery_station: FARM_SHOP.id,
+        is_packed_bulk: true,
       }),
     );
   });

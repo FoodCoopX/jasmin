@@ -181,6 +181,30 @@ describe("useShareArticleListColumns column set", () => {
     expect(findColumn(columns, "for_markets").hidden).toBe(false);
   });
 
+  const purchaseColumns = [
+    "is_purchased",
+    "default_kg_per_pu_purchase",
+    "default_pieces_per_pu_purchase",
+    "default_bunches_per_pu_purchase",
+  ];
+
+  it("hides the purchased flag and the purchase PU columns on a farm that buys nothing in", () => {
+    const columns = buildColumns({ has_purchases: false });
+
+    for (const key of purchaseColumns) {
+      expect(findColumn(columns, key).hidden, key).toBe(true);
+    }
+    expect(findColumn(columns, "default_kg_per_pu_harvest").hidden).toBeFalsy();
+  });
+
+  it("shows them on a farm that buys in", () => {
+    const columns = buildColumns();
+
+    for (const key of purchaseColumns) {
+      expect(findColumn(columns, key).hidden, key).toBe(false);
+    }
+  });
+
   it("requires only the name and the movement unit", () => {
     const required = buildColumns()
       .filter((column) => column.required)

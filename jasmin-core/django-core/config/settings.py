@@ -862,6 +862,8 @@ REST_FRAMEWORK = {
         # capped. Keyed per authenticated user (nanoid), namespaced by schema.
         "support_ticket_create": "10/hour",
         "support_ticket_reply": "30/hour",
+        # Each sync calls the HR system with its admin's token: don't hammer it.
+        "hr_system_sync": "20/hour",
         # Tenant-detection bootstrap (``CurrentTenantView``) is ``AllowAny`` and
         # fires once on SPA load / refresh. Anti-flood only, keyed by IP;
         # generous since many users behind one shared egress IP all bootstrap.

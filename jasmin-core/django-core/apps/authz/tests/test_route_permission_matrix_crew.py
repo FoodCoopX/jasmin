@@ -139,6 +139,61 @@ CREW_MATRIX: list[tuple[str, str, str, str]] = [
     ("/api/commissioning/member_loans/", "post", "staff", "deny"),
     ("/api/commissioning/member_loans/", "post", "gardener", "deny"),
     ("/api/commissioning/member_loans/", "post", "office", "4xx"),
+    # ======= commissioning: markets =======
+    # ------- Market product groups (Staff read, Office write) -------
+    ("/api/commissioning/market_product_groups/", "get", "staff", "ok"),
+    ("/api/commissioning/market_product_groups/", "get", "gardener", "ok"),
+    ("/api/commissioning/market_product_groups/", "post", "staff", "deny"),
+    ("/api/commissioning/market_product_groups/", "post", "gardener", "deny"),
+    ("/api/commissioning/market_product_groups/", "post", "office", "4xx"),
+    # ------- PLUs (Staff read, Office write) -------
+    ("/api/commissioning/market_articles/", "get", "staff", "ok"),
+    ("/api/commissioning/market_articles/", "get", "gardener", "ok"),
+    ("/api/commissioning/market_articles/", "post", "staff", "deny"),
+    ("/api/commissioning/market_articles/", "post", "gardener", "deny"),
+    ("/api/commissioning/market_articles/", "post", "office", "4xx"),
+    # ------- Scale VAT codes (Staff read, Office write) -------
+    ("/api/commissioning/scale_tax_codes/", "get", "staff", "ok"),
+    ("/api/commissioning/scale_tax_codes/", "get", "gardener", "ok"),
+    ("/api/commissioning/scale_tax_codes/", "post", "staff", "deny"),
+    ("/api/commissioning/scale_tax_codes/", "post", "gardener", "deny"),
+    ("/api/commissioning/scale_tax_codes/", "post", "office", "4xx"),
+    # ------- Market prices (Staff read, Office write) -------
+    (f"/api/commissioning/market_prices/?{WEEK}", "get", "staff", "ok"),
+    (f"/api/commissioning/market_prices/?{WEEK}", "get", "gardener", "ok"),
+    ("/api/commissioning/market_prices/", "post", "staff", "deny"),
+    ("/api/commissioning/market_prices/", "post", "gardener", "deny"),
+    ("/api/commissioning/market_prices/", "post", "office", "4xx"),
+    (
+        "/api/commissioning/market_prices/bulk_copy_to_next_week/",
+        "post",
+        "staff",
+        "deny",
+    ),
+    (
+        "/api/commissioning/market_prices/bulk_copy_to_next_week/",
+        "post",
+        "gardener",
+        "deny",
+    ),
+    (
+        "/api/commissioning/market_prices/bulk_copy_to_next_week/",
+        "post",
+        "office",
+        "4xx",
+    ),
+    ("/api/commissioning/market_prices/bulk_set_active/", "post", "staff", "deny"),
+    ("/api/commissioning/market_prices/bulk_set_active/", "post", "gardener", "deny"),
+    ("/api/commissioning/market_prices/bulk_set_active/", "post", "office", "4xx"),
+    # The scale export is a GET custom action, so it takes the write gate.
+    (f"/api/commissioning/market_prices/scale_export/?{WEEK}", "get", "staff", "deny"),
+    (
+        f"/api/commissioning/market_prices/scale_export/?{WEEK}",
+        "get",
+        "gardener",
+        "deny",
+    ),
+    (f"/api/commissioning/market_prices/scale_export/?{WEEK}", "get", "office", "ok"),
     # ======= commissioning: resellers =======
     # ------- Offers (StaffOrCustomer read, Office write) -------
     (f"/api/commissioning/offers/?{WEEK}", "get", "staff", "ok"),
@@ -463,6 +518,23 @@ CREW_MATRIX: list[tuple[str, str, str, str]] = [
     ("/api/staff/weekly_plan/", "post", "staff", "deny"),
     ("/api/staff/weekly_plan/", "post", "gardener", "deny"),
     ("/api/staff/weekly_plan/", "post", "office", "4xx"),
+    # ------- Absences -------
+    # Without year and week the read is refused only after the role gate.
+    ("/api/staff/absences/week/", "get", "staff", "4xx"),
+    ("/api/staff/absences/week/", "get", "gardener", "4xx"),
+    ("/api/staff/absences/week/", "post", "staff", "deny"),
+    ("/api/staff/absences/week/", "post", "gardener", "deny"),
+    ("/api/staff/absences/week/", "post", "office", "4xx"),
+    ("/api/staff/absences/sync_from_hr_system/", "post", "staff", "deny"),
+    ("/api/staff/absences/sync_from_hr_system/", "post", "gardener", "deny"),
+    ("/api/staff/absences/sync_from_hr_system/", "post", "office", "4xx"),
+    # ------- Saturday shifts -------
+    # Without a year the read is refused only after the role gate.
+    ("/api/staff/saturday_shifts/year/", "get", "staff", "4xx"),
+    ("/api/staff/saturday_shifts/year/", "get", "gardener", "4xx"),
+    ("/api/staff/saturday_shifts/year/", "post", "staff", "deny"),
+    ("/api/staff/saturday_shifts/year/", "post", "gardener", "deny"),
+    ("/api/staff/saturday_shifts/year/", "post", "office", "4xx"),
     # ======= tenants =======
     # ------- Tenant email config (Office read, Admin write) -------
     # The office reads the config but may not repoint the SMTP host; the crew

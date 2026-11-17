@@ -1,0 +1,26 @@
+/* Absence page. Theme-aware via CSS variables. */
+
+/* The small tag beside an employee from the external time-tracking system. */
+.hr-system-tag {
+  margin-inline: 0.5em 0;
+  padding-inline: 4px;
+  font-size: 0.7em;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+/* A cross no one may change here (it comes from the time-tracking system, or
+   the viewer may only read) stays greyed out, but its tick and frame are red,
+   so the absence still stands out. The text red keeps more than 3:1 against
+   the grey box, in both themes. */
+.absence-locked.ant-checkbox-wrapper
+  .ant-checkbox-disabled.ant-checkbox-checked
+  .ant-checkbox-inner {
+  border-color: var(--color-error-text);
+}
+
+.absence-locked.ant-checkbox-wrapper
+  .ant-checkbox-disabled.ant-checkbox-checked
+  .ant-checkbox-inner::after {
+  border-color: var(--color-error-text);
+}

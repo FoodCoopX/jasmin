@@ -27,14 +27,23 @@ import type {
 import type {
   AbsenceCategory,
   AbsenceCategoryRequest,
+  AbsenceSyncResult,
+  AbsenceWeek,
+  AbsenceWeekReplaceRequest,
   Employee,
   EmployeeRequest,
   ErrorResponse,
+  HrSystemSyncRequest,
+  HrSystemSyncResult,
   PatchedAbsenceCategoryRequest,
   PatchedEmployeeRequest,
   PatchedWeeklyPlanCategoryRequest,
+  SaturdayShiftSetRequest,
+  SaturdayShiftYear,
   StaffAbsenceCategoriesListParams,
+  StaffAbsencesWeekRetrieveParams,
   StaffEmployeesListParams,
+  StaffSaturdayShiftsYearRetrieveParams,
   StaffWeeklyPlanCategoriesListParams,
   StaffWeeklyPlanGridRetrieveParams,
   WeeklyPlanCategory,
@@ -451,6 +460,224 @@ const {mutation: mutationOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
+    /**
+ * The absences of one ISO week: an employee per row, a weekday per cell.
+The office enters those of the employees entered in Jasmin; those of the
+HR system's employees come from the HR system.
+ */
+export const staffAbsencesSyncFromHrSystemCreate = (
+    hrSystemSyncRequest: HrSystemSyncRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<AbsenceSyncResult>(
+      {url: `/api/staff/absences/sync_from_hr_system/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: hrSystemSyncRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getStaffAbsencesSyncFromHrSystemCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsencesSyncFromHrSystemCreate>>, TError,{data: HrSystemSyncRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffAbsencesSyncFromHrSystemCreate>>, TError,{data: HrSystemSyncRequest}, TContext> => {
+
+const mutationKey = ['staffAbsencesSyncFromHrSystemCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffAbsencesSyncFromHrSystemCreate>>, {data: HrSystemSyncRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  staffAbsencesSyncFromHrSystemCreate(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StaffAbsencesSyncFromHrSystemCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffAbsencesSyncFromHrSystemCreate>>>
+    export type StaffAbsencesSyncFromHrSystemCreateMutationBody = HrSystemSyncRequest
+    export type StaffAbsencesSyncFromHrSystemCreateMutationError = ErrorResponse
+
+    export const useStaffAbsencesSyncFromHrSystemCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsencesSyncFromHrSystemCreate>>, TError,{data: HrSystemSyncRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof staffAbsencesSyncFromHrSystemCreate>>,
+        TError,
+        {data: HrSystemSyncRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getStaffAbsencesSyncFromHrSystemCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * The absences of one ISO week: an employee per row, a weekday per cell.
+The office enters those of the employees entered in Jasmin; those of the
+HR system's employees come from the HR system.
+ */
+export const staffAbsencesWeekRetrieve = (
+    params: StaffAbsencesWeekRetrieveParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<AbsenceWeek>(
+      {url: `/api/staff/absences/week/`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getStaffAbsencesWeekRetrieveQueryKey = (params?: StaffAbsencesWeekRetrieveParams,) => {
+    return [
+    `/api/staff/absences/week/`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getStaffAbsencesWeekRetrieveQueryOptions = <TData = Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError = ErrorResponse>(params: StaffAbsencesWeekRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStaffAbsencesWeekRetrieveQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>> = ({ signal }) => staffAbsencesWeekRetrieve(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type StaffAbsencesWeekRetrieveQueryResult = NonNullable<Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>>
+export type StaffAbsencesWeekRetrieveQueryError = ErrorResponse
+
+
+export function useStaffAbsencesWeekRetrieve<TData = Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError = ErrorResponse>(
+ params: StaffAbsencesWeekRetrieveParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStaffAbsencesWeekRetrieve<TData = Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError = ErrorResponse>(
+ params: StaffAbsencesWeekRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStaffAbsencesWeekRetrieve<TData = Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError = ErrorResponse>(
+ params: StaffAbsencesWeekRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useStaffAbsencesWeekRetrieve<TData = Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError = ErrorResponse>(
+ params: StaffAbsencesWeekRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffAbsencesWeekRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getStaffAbsencesWeekRetrieveQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * The absences of one ISO week: an employee per row, a weekday per cell.
+The office enters those of the employees entered in Jasmin; those of the
+HR system's employees come from the HR system.
+ */
+export const staffAbsencesWeekCreate = (
+    absenceWeekReplaceRequest: AbsenceWeekReplaceRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<AbsenceWeek>(
+      {url: `/api/staff/absences/week/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: absenceWeekReplaceRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getStaffAbsencesWeekCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsencesWeekCreate>>, TError,{data: AbsenceWeekReplaceRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffAbsencesWeekCreate>>, TError,{data: AbsenceWeekReplaceRequest}, TContext> => {
+
+const mutationKey = ['staffAbsencesWeekCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffAbsencesWeekCreate>>, {data: AbsenceWeekReplaceRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  staffAbsencesWeekCreate(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StaffAbsencesWeekCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffAbsencesWeekCreate>>>
+    export type StaffAbsencesWeekCreateMutationBody = AbsenceWeekReplaceRequest
+    export type StaffAbsencesWeekCreateMutationError = ErrorResponse
+
+    export const useStaffAbsencesWeekCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffAbsencesWeekCreate>>, TError,{data: AbsenceWeekReplaceRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof staffAbsencesWeekCreate>>,
+        TError,
+        {data: AbsenceWeekReplaceRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getStaffAbsencesWeekCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
     export const staffEmployeesList = (
     params?: StaffEmployeesListParams,
  signal?: AbortSignal
@@ -850,6 +1077,217 @@ const {mutation: mutationOptions} = options ?
       > => {
 
       const mutationOptions = getStaffEmployeesDestroyMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    export const staffEmployeesSyncFromHrSystemCreate = (
+    hrSystemSyncRequest: HrSystemSyncRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<HrSystemSyncResult>(
+      {url: `/api/staff/employees/sync_from_hr_system/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: hrSystemSyncRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getStaffEmployeesSyncFromHrSystemCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesSyncFromHrSystemCreate>>, TError,{data: HrSystemSyncRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesSyncFromHrSystemCreate>>, TError,{data: HrSystemSyncRequest}, TContext> => {
+
+const mutationKey = ['staffEmployeesSyncFromHrSystemCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffEmployeesSyncFromHrSystemCreate>>, {data: HrSystemSyncRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  staffEmployeesSyncFromHrSystemCreate(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StaffEmployeesSyncFromHrSystemCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffEmployeesSyncFromHrSystemCreate>>>
+    export type StaffEmployeesSyncFromHrSystemCreateMutationBody = HrSystemSyncRequest
+    export type StaffEmployeesSyncFromHrSystemCreateMutationError = ErrorResponse
+
+    export const useStaffEmployeesSyncFromHrSystemCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffEmployeesSyncFromHrSystemCreate>>, TError,{data: HrSystemSyncRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof staffEmployeesSyncFromHrSystemCreate>>,
+        TError,
+        {data: HrSystemSyncRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getStaffEmployeesSyncFromHrSystemCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * The Saturday shifts of one year: an employee per row, an ISO week per
+cell. A shift is the employee's Saturday row in the weekly plan.
+ */
+export const staffSaturdayShiftsYearRetrieve = (
+    params: StaffSaturdayShiftsYearRetrieveParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<SaturdayShiftYear>(
+      {url: `/api/staff/saturday_shifts/year/`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getStaffSaturdayShiftsYearRetrieveQueryKey = (params?: StaffSaturdayShiftsYearRetrieveParams,) => {
+    return [
+    `/api/staff/saturday_shifts/year/`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getStaffSaturdayShiftsYearRetrieveQueryOptions = <TData = Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError = ErrorResponse>(params: StaffSaturdayShiftsYearRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStaffSaturdayShiftsYearRetrieveQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>> = ({ signal }) => staffSaturdayShiftsYearRetrieve(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type StaffSaturdayShiftsYearRetrieveQueryResult = NonNullable<Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>>
+export type StaffSaturdayShiftsYearRetrieveQueryError = ErrorResponse
+
+
+export function useStaffSaturdayShiftsYearRetrieve<TData = Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError = ErrorResponse>(
+ params: StaffSaturdayShiftsYearRetrieveParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStaffSaturdayShiftsYearRetrieve<TData = Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError = ErrorResponse>(
+ params: StaffSaturdayShiftsYearRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>,
+          TError,
+          Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStaffSaturdayShiftsYearRetrieve<TData = Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError = ErrorResponse>(
+ params: StaffSaturdayShiftsYearRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useStaffSaturdayShiftsYearRetrieve<TData = Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError = ErrorResponse>(
+ params: StaffSaturdayShiftsYearRetrieveParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearRetrieve>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getStaffSaturdayShiftsYearRetrieveQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * The Saturday shifts of one year: an employee per row, an ISO week per
+cell. A shift is the employee's Saturday row in the weekly plan.
+ */
+export const staffSaturdayShiftsYearCreate = (
+    saturdayShiftSetRequest: SaturdayShiftSetRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return axiosService<SaturdayShiftYear>(
+      {url: `/api/staff/saturday_shifts/year/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: saturdayShiftSetRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getStaffSaturdayShiftsYearCreateMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearCreate>>, TError,{data: SaturdayShiftSetRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearCreate>>, TError,{data: SaturdayShiftSetRequest}, TContext> => {
+
+const mutationKey = ['staffSaturdayShiftsYearCreate'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof staffSaturdayShiftsYearCreate>>, {data: SaturdayShiftSetRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  staffSaturdayShiftsYearCreate(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StaffSaturdayShiftsYearCreateMutationResult = NonNullable<Awaited<ReturnType<typeof staffSaturdayShiftsYearCreate>>>
+    export type StaffSaturdayShiftsYearCreateMutationBody = SaturdayShiftSetRequest
+    export type StaffSaturdayShiftsYearCreateMutationError = ErrorResponse
+
+    export const useStaffSaturdayShiftsYearCreate = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof staffSaturdayShiftsYearCreate>>, TError,{data: SaturdayShiftSetRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof staffSaturdayShiftsYearCreate>>,
+        TError,
+        {data: SaturdayShiftSetRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getStaffSaturdayShiftsYearCreateMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

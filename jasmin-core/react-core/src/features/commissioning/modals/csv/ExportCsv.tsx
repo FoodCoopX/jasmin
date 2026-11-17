@@ -76,11 +76,13 @@ export default function ExportCsv({
   // button, an orders link) that carries a `dataIndex` only as the table's
   // key: no row has a field under it, so it has nothing to export. A data
   // column the grid merely formats keeps its field in the rows, even when the
-  // field is empty.
+  // field is empty. A column the grid hides, as the upload template does,
+  // belongs to something the farm doesn't do.
   const exportableColumns = useMemo(() => {
     const flatCols: ColumnDef[] = [];
     const flatten = (cols: ColumnDef[]) => {
       for (const col of cols) {
+        if (col.hidden === true) continue;
         if (col.children) {
           flatten(col.children);
         } else if (col.dataIndex) {

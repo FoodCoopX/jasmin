@@ -30,12 +30,18 @@ const absenceCategoriesResource: CrudResource<AbsenceCategoryRow> = {
   getListQueryKey: getStaffAbsenceCategoriesListQueryKey,
 };
 
+// The default category takes every absence without a category of its own, so
+// it stays switched on; the backend refuses otherwise.
+const IS_DEFAULT_LOCKED = {
+  disabled: (record: TableRecord) => Boolean(record.is_default),
+};
+
 export default function ListAbsenceCategory() {
   const { t } = useTranslation();
   // Writes here are office-only on the backend (AbsenceCategoryViewSet,
   // IsOffice); `canEdit` would offer gardener/staff a save the API refuses.
   const { isOffice } = useRoles();
-  const isActiveColumn = useIsActiveColumn();
+  const isActiveColumn = useIsActiveColumn(IS_DEFAULT_LOCKED);
   const permissions = useMemo(
     () => permissionsWithDeletable(isOffice),
     [isOffice],
@@ -45,15 +51,6 @@ export default function ListAbsenceCategory() {
     () => [
       isActiveColumn,
       {
-        title: <>{t("common.year")}</>,
-        dataIndex: "year",
-        key: "year",
-        inputType: "positive_integer",
-        required: true,
-        width: "7em",
-        align: "right",
-      },
-      {
         title: <>{t("staff.name")}</>,
         dataIndex: "name",
         key: "name",
@@ -61,6 +58,10 @@ export default function ListAbsenceCategory() {
         required: true,
         width: "18em",
         align: "left",
+        render: (value, record) =>
+          record.is_default
+            ? t("staff.absence_category_default", { name: value })
+            : (value as string),
       },
     ],
     [isActiveColumn, t],
@@ -74,8 +75,8 @@ export default function ListAbsenceCategory() {
       resource={absenceCategoriesResource}
       permissions={permissions}
       columns={columns}
-      uniqueCheck={["year", "name"]}
-      uniqueCheckMessage={t("staff.absence_category_year_name_unique")}
+      uniqueCheck={["name"]}
+      uniqueCheckMessage={t("staff.absence_category_name_unique")}
       focusIndex="name"
       className="w-max custom-jasmin-table"
     />

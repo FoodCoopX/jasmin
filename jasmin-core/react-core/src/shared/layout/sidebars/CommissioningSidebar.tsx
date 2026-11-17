@@ -4,8 +4,10 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import SidebarShell from "./SidebarShell";
 import { useDeliveryStationNavItems } from "./useDeliveryStationNavItems";
+import { useMarketNavItems } from "./useMarketNavItems";
 import { usePackingListVisibility } from "./usePackingListVisibility";
 import { usePlanningNavItems } from "./usePlanningNavItems";
+import { usePurchaseNavItems } from "./usePurchaseNavItems";
 import { useWorkListNavItems } from "./useWorkListNavItems";
 
 import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
@@ -14,7 +16,6 @@ import EggIcon from "@mui/icons-material/Egg";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import GrainIcon from "@mui/icons-material/Grain";
 import HdrWeakIcon from "@mui/icons-material/HdrWeak";
-import StorefrontIcon from "@mui/icons-material/Storefront";
 interface CommissioningSidebarProps {
   openKeys?: string[];
   onOpenChange?: (keys: string[]) => void;
@@ -31,7 +32,6 @@ export default function CommissioningSidebar({
   const { planningComplexItems, planningLongTermItems, additionalLongTermItems } =
     usePlanningNavItems();
 
-  const has_markets = getSetting("has_markets", true);
   const sells_to_resellers = getSetting("sells_to_resellers", true);
   const weekly_upload = getSetting("uploads_weekly_share_amount", false);
   const offersManualShareImport = useCapability("manual_share_import");
@@ -44,6 +44,8 @@ export default function CommissioningSidebar({
   } = usePackingListVisibility();
   const { deliveryStationSection, deliveryStationListItems } =
     useDeliveryStationNavItems();
+  const marketSection = useMarketNavItems();
+  const purchaseItems = usePurchaseNavItems();
 
   const baseMenuItems = [
     {
@@ -85,16 +87,7 @@ export default function CommissioningSidebar({
             </Link>
           ),
         },
-        {
-          key: "commissioning-documentation-purchase",
-
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/documentation-purchase">
-              {t("commissioning.documentation_purchase")}
-            </Link>
-          ),
-        },
+        ...purchaseItems.documentationItems,
         {
           key: "commissioning-documentation-waste",
 
@@ -178,26 +171,7 @@ export default function CommissioningSidebar({
         // Complex (per-week) planning links first, then the long-term links —
         // one pair per complex-planned share option.
         ...planningComplexItems,
-        {
-          key: "commissioning-purchase-list",
-
-          requireRole: "isOffice",
-          label: (
-            <Link to="/commissioning/purchase-list">
-              {t("commissioning.purchase_list")}
-            </Link>
-          ),
-        },
-        {
-          key: "commissioning-statistics-purchase",
-
-          requireRole: "isOffice",
-          label: (
-            <Link to="/commissioning/statistics-purchase">
-              {t("commissioning.statistics_purchase")}
-            </Link>
-          ),
-        },
+        ...purchaseItems.planningItems,
         ...(showWeightStatistics
           ? [
               {
@@ -301,22 +275,7 @@ export default function CommissioningSidebar({
           },
         ]
       : []),
-    ...(has_markets
-      ? [
-          {
-            key: "commissioning-markets",
-
-            requireRole: "isStaff",
-            icon: <StorefrontIcon />,
-            label: (
-              <div className="sidebar-section-header">
-                {t("commissioning.markets")}
-              </div>
-            ),
-            children: [],
-          },
-        ]
-      : []),
+    ...marketSection,
     {
       key: "commissioning-harvesting-packing",
 
@@ -432,37 +391,21 @@ export default function CommissioningSidebar({
             </Link>
           ),
         },
-        {
-          key: "commissioning-list-crates",
+        // Extra articles are sold to resellers only.
+        ...(sells_to_resellers
+          ? [
+              {
+                key: "commissioning-list-extra-articles",
 
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/list-crates">
-              {t("commissioning.list_crates")}
-            </Link>
-          ),
-        },
-        {
-          key: "commissioning-list-extra-articles",
-
-          requireRole: "isOffice",
-          label: (
-            <Link to="/commissioning/list-extra-articles">
-              {t("commissioning.list_extra_articles")}
-            </Link>
-          ),
-        },
-
-        {
-          key: "commissioning-list-storages",
-
-          requireRole: "isOffice",
-          label: (
-            <Link to="/commissioning/list-storages">
-              {t("commissioning.list_storages")}
-            </Link>
-          ),
-        },
+                requireRole: "isOffice",
+                label: (
+                  <Link to="/commissioning/list-extra-articles">
+                    {t("commissioning.list_extra_articles")}
+                  </Link>
+                ),
+              },
+            ]
+          : []),
         ...deliveryStationListItems,
 
         ...(sells_to_resellers
@@ -489,39 +432,7 @@ export default function CommissioningSidebar({
               },
             ]
           : []),
-        {
-          key: "commissioning-list-sellers",
-
-          requireRole: "isOffice",
-          label: (
-            <Link to="/commissioning/list-sellers">
-              {t("commissioning.list_sellers")}
-            </Link>
-          ),
-        },
-        ...(has_markets
-          ? [
-              {
-                key: "commissioning-list-markets",
-
-                requireRole: "isOffice",
-                label: (
-                  <Link to="/commissioning/list-markets">
-                    {t("commissioning.list_markets")}
-                  </Link>
-                ),
-              },
-            ]
-          : []),
-        {
-          key: "commissioning-list-plots",
-          requireRole: "isStaff",
-          label: (
-            <Link to="/commissioning/list-plots">
-              {t("commissioning.list_plots")}
-            </Link>
-          ),
-        },
+        ...purchaseItems.dataItems,
       ],
     },
   ];

@@ -29,10 +29,9 @@ Then fill in:
   its language and the start of its fiscal year.
 - **`/configuration/email`** — the tenant's mail server (section 7). No
   invitation, invoice or offer goes out without it, and no login can be created.
-- **`/configuration/commissioning`** — above all the *Packing mode*: crates
-  packed for the stations, members packing their own crates at the stations, or
-  mixed. *Mixed* adds a *Packed in bulk* column to each share type's sizes in
-  step 1, so set it first.
+- **`/configuration/commissioning`** — the packing lists' settings, the layout
+  and the default tax rates. How shares are packed isn't set here but per size
+  in step 1.
 
 ## 1. Share types and their sizes
 
@@ -40,7 +39,9 @@ Then fill in:
 variations*)
 
 Define every share type the CSA offers (e.g. harvest share, bread share) along
-with its size variations (e.g. S / M / L).
+with its size variations (e.g. S / M / L). For each size, *Packing* says
+whether the share reaches the station pre-packed or members put it together
+there loose; which packing lists the farm gets follows from that.
 
 These are the products members subscribe to, and everything downstream —
 forecasts, planning, packing, invoicing — is built on top of them, so they come
