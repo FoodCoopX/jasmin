@@ -46,7 +46,6 @@ export interface StationContentsPage {
 }
 
 interface CardLabels {
-  packingMode: PackingModeEnum;
   tints: Record<string, number>;
   /** Whether the farm is certified to mark articles organic. */
   marksOrganic: boolean;
@@ -61,18 +60,11 @@ interface CardLabels {
 }
 
 /** Whether the station sheets say which shares are boxed and which loose:
- *  only where the farm packs both ways, as otherwise every share is the same. */
+ *  only where the farm packs both ways, as otherwise every share is the same.
+ *  Whether a share lies loose is its own size's ``is_packed_bulk``, a past
+ *  week's too. */
 export const marksPackingKind = (packingMode: PackingModeEnum): boolean =>
   packingMode === "MIXED";
-
-/** Whether a share lies loose at the station: in BULK mode every share does,
- *  in BOXES mode none; in MIXED mode its variation's ``is_packed_bulk``
- *  decides. */
-export const isPackedLoose = (
-  isPackedBulk: boolean,
-  packingMode: PackingModeEnum,
-): boolean =>
-  packingMode === "BULK" || (packingMode === "MIXED" && isPackedBulk);
 
 /** One card per share, in the order the station contents list them. */
 export function buildStationContentsCards(
@@ -83,7 +75,7 @@ export function buildStationContentsCards(
     key: share.variation_id,
     shareTypeName: share.share_type_name,
     sizeLabel: getShareSizeLabelOrEmpty(share.size, labels.shareSizeLabel),
-    loose: isPackedLoose(share.is_packed_bulk, labels.packingMode),
+    loose: share.is_packed_bulk,
     tint: labels.tints[share.share_type_id] ?? 0,
     lines: share.items.map((item) => {
       const { amount, unit } = formatMemberAmount(

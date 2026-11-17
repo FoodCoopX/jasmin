@@ -243,16 +243,14 @@ export default function DeliveryStationsOverview() {
     [responseData?.variations],
   );
 
-  // Loose-packed variations belong on the bulk packing list, not the tour /
-  // delivery box lists — hide them here: the flagged ones in "mixed", none in
-  // "boxes" (whatever flag a size kept), and every box in "bulk", where no
-  // share is boxed. The tour metadata carries no ``is_packed_bulk`` flag, so
-  // in "mixed" it comes from the variations list.
+  // Loose-packed sizes belong on the bulk packing list, not the tour /
+  // delivery box lists, so the ones flagged loose are left out here, a past
+  // week's too; a farm whose sizes are all loose ("bulk") has no tours. The
+  // tour metadata carries no ``is_packed_bulk`` flag, so it comes from the
+  // variations list.
   const packingMode = getSetting("packing_mode", "BOXES") as PackingModeEnum;
   const { shareTypeVariations: bulkVariations, loading: bulkLoading } =
-    useShareTypeVariations(
-      packingMode === "MIXED" ? { is_packed_bulk: true } : null,
-    );
+    useShareTypeVariations({ is_packed_bulk: true });
   const bulkVariationIds = useMemo(
     () => new Set(bulkVariations.map((variation) => String(variation.id))),
     [bulkVariations],

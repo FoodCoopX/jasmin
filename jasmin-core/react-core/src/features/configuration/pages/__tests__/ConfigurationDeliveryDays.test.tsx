@@ -54,6 +54,7 @@ vi.mock("@shared/contexts/ModalContext", () => ({
 
 const api = vi.hoisted(() => ({
   listShareDays: vi.fn(),
+  listOrderDays: vi.fn(),
   createShareDay: vi.fn(),
 }));
 
@@ -69,8 +70,12 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
     getCommissioningOrdersDeliveryDaysListQueryKey: orderDaysKey,
     useCommissioningSharesDeliveryDaysList: (params?: unknown) =>
       useQuery({ queryKey: shareDaysKey(params), queryFn: () => api.listShareDays(params) }),
-    useCommissioningOrdersDeliveryDaysList: () =>
-      useQuery({ queryKey: orderDaysKey(), queryFn: async () => [] }),
+    useCommissioningOrdersDeliveryDaysList: (options?: { query?: { enabled?: boolean } }) =>
+      useQuery({
+        queryKey: orderDaysKey(),
+        queryFn: () => api.listOrderDays(),
+        enabled: options?.query?.enabled,
+      }),
     commissioningSharesDeliveryDaysCreate: (day: unknown) => api.createShareDay(day),
     commissioningSharesDeliveryDaysPartialUpdate: vi.fn(),
     commissioningSharesDeliveryDaysDestroy: vi.fn(),
@@ -158,6 +163,7 @@ beforeEach(() => {
   deployment.capabilities = {};
   tenantSettings.values = {};
   api.listShareDays.mockReset().mockResolvedValue([WEDNESDAY, FRIDAY]);
+  api.listOrderDays.mockReset().mockResolvedValue([]);
   api.createShareDay.mockReset().mockImplementation(async (day: SharesDeliveryDay) => ({
     ...day,
     id: "day-new",
@@ -211,6 +217,29 @@ describe("ConfigurationDeliveryDays where the host brings the delivery days", ()
     expect(within(row).queryByLabelText("configuration.valid_until")).not.toBeInTheDocument();
     expect(within(row).queryByLabelText("configuration.delivery_day")).not.toBeInTheDocument();
     expect(within(row).getByLabelText(TOURS)).toBeEnabled();
+  });
+});
+
+describe("ConfigurationDeliveryDays order days", () => {
+  const ORDER_DAYS = "configuration.time_manamagent_for_orders";
+
+  it("lists the order days where the farm sells to resellers", async () => {
+    renderPage();
+    await screen.findAllByText("configuration.acronym_wednesday");
+
+    expect(screen.getByText(ORDER_DAYS)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /table\.add_record/ })).toHaveLength(2);
+    expect(api.listOrderDays).toHaveBeenCalled();
+  });
+
+  it("leaves them out, unloaded, where the farm sells to no reseller", async () => {
+    tenantSettings.values = { sells_to_resellers: false };
+    renderPage();
+    await screen.findAllByText("configuration.acronym_wednesday");
+
+    expect(screen.queryByText(ORDER_DAYS)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /table\.add_record/ })).toHaveLength(1);
+    expect(api.listOrderDays).not.toHaveBeenCalled();
   });
 });
 

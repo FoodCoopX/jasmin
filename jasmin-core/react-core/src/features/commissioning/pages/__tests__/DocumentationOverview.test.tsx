@@ -2,7 +2,8 @@
  * The documentation overview filters by weekday through ``day_number``.
  * ``delivery_day`` is only a backward-compatible alias the backend still
  * accepts for bundles shipped before the rename, so this page must send the
- * canonical name — and must send the day as a number, not a string.
+ * canonical name — and must send the day as a number, not a string. It offers
+ * purchases as a source only on a farm that buys in.
  */
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -19,14 +20,29 @@ vi.mock("react-i18next", () => ({
 }));
 
 // The only antd Select on the page is the source picker; the stub exposes its
-// onChange so a test can switch to the week-scoped PURCHASE source.
+// onChange so a test can switch to the week-scoped PURCHASE source, and the
+// sources it offers.
 vi.mock("antd", () => ({
-  Select: ({ onChange }: { onChange?: (value: string) => void }) => (
-    <button data-testid="pick-purchase" onClick={() => onChange?.("PURCHASE")}>
+  Select: ({
+    onChange,
+    options,
+  }: {
+    onChange?: (value: string) => void;
+    options?: { value: string }[];
+  }) => (
+    <button
+      data-testid="pick-purchase"
+      data-sources={(options ?? []).map((option) => option.value).join(",")}
+      onClick={() => onChange?.("PURCHASE")}
+    >
       pick-purchase
     </button>
   ),
 }));
+
+// The tenant's settings, per test; a key left out falls through to the
+// caller's default.
+const settings = vi.hoisted(() => ({}) as Record<string, unknown>);
 
 const overviewHookMock = vi.fn();
 vi.mock("@shared/api/generated/commissioning/commissioning", () => ({
@@ -42,6 +58,10 @@ vi.mock("@hooks/index", async () => {
   const actual = await import("@hooks/useYearWeekState");
   return {
     useYearWeekState: actual.useYearWeekState,
+    useTenant: () => ({
+      getSetting: (key: string, fallback?: unknown) =>
+        key in settings ? settings[key] : fallback,
+    }),
   };
 });
 
@@ -100,6 +120,7 @@ vi.mock("@shared/ui", () => ({
 import DocumentationOverview from "../DocumentationOverview";
 
 beforeEach(() => {
+  for (const key of Object.keys(settings)) delete settings[key];
   overviewHookMock.mockReset().mockReturnValue({
     data: [{ share_article_name: "Karotten", amount: 3 }],
     isFetching: false,
@@ -148,5 +169,22 @@ describe("DocumentationOverview — day filter", () => {
     render(<DocumentationOverview />);
     const [, opts] = overviewHookMock.mock.calls[0];
     expect((opts as { query: { enabled: boolean } }).query.enabled).toBe(false);
+  });
+});
+
+describe("DocumentationOverview — sources", () => {
+  const sources = () => screen.getByTestId("pick-purchase").dataset.sources;
+
+  it("offers harvest, purchase and waste", () => {
+    render(<DocumentationOverview />);
+
+    expect(sources()).toBe("HARVEST,PURCHASE,WASTE");
+  });
+
+  it("offers no purchases on a farm that buys nothing in", () => {
+    settings.has_purchases = false;
+    render(<DocumentationOverview />);
+
+    expect(sources()).toBe("HARVEST,WASTE");
   });
 });

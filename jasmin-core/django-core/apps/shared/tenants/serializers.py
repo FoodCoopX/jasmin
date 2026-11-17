@@ -1,15 +1,26 @@
+import re
 from io import BytesIO
+from urllib.parse import urlsplit
 
 from django.core.files.base import ContentFile
 from drf_spectacular.utils import extend_schema_field
 from PIL import Image, UnidentifiedImageError
 from rest_framework import serializers
 
-from apps.shared.host_capabilities import host_capabilities, share_demand_is_imported
+from apps.shared.host_capabilities import (
+    host_capabilities,
+    navigation_in_effect,
+    share_demand_is_imported,
+)
 from apps.shared.image_upload import normalize_uploaded_picture, strict_image_decoding
 from apps.shared.languages import LanguageChoices
+from apps.shared.outbound_hosts import address_origin, resolves_to_internal_address
+from apps.shared.packing_mode_hooks import packing_mode_in_effect
 
 from .errors import (
+    HrSystemAddressesApart,
+    HrSystemAddressInvalid,
+    HrSystemTokenInvalid,
     SmtpHostNotAllowed,
     SmtpPortInvalid,
     SmtpTlsSslConflict,
@@ -17,7 +28,7 @@ from .errors import (
     TenantFeatureFlagsInvalid,
     TenantLogoInvalid,
 )
-from .models import Tenant, TenantEmailConfig, TenantSettings
+from .models import PackingMode, Tenant, TenantEmailConfig, TenantSettings
 
 # ---- Web-app launcher icon (``Tenant.app_icon``) constraints ---------------
 # The stored icon is normalized to exactly one rendition, so the manifest can
@@ -39,6 +50,9 @@ _APP_ICON_FORMATS = frozenset({"PNG", "JPEG", "WEBP"})
 # reports a corrupt chunk (bad CRC) as ``SyntaxError``; a corrupt or truncated
 # compressed pixel stream surfaces as ``OSError``, and only once it is decoded.
 _UNREADABLE_IMAGE_ERRORS = (UnidentifiedImageError, OSError, ValueError, SyntaxError)
+# What a bearer token in a request header may hold: visible ASCII, no spaces.
+_HR_SYSTEM_TOKEN = re.compile(r"[\x21-\x7e]+")
+_HR_SYSTEM_ADDRESSES = ("hr_system_employees_url", "hr_system_absences_url")
 
 
 def _current_settings_dict(obj: Tenant) -> dict:
@@ -64,9 +78,11 @@ def _merged_settings_dict(obj: Tenant, current_overlay: dict) -> dict:
         "time_format": obj.time_format,
         "csv_format": obj.csv_format,
         "number_locale": obj.number_locale,
-        "navigation": obj.navigation or {},
+        # The modules in effect, which a host can fix whatever the row stores.
+        "navigation": navigation_in_effect(obj.navigation or {}),
         "ai": obj.ai or {},
         "allow_upload_for_data_lists": obj.allow_upload_for_data_lists,
+        "uses_hr_system": obj.uses_hr_system,
         # Tenant identity scalar — surfaced here so ``getSetting`` can gate the
         # ListSellers organic-certificate columns on whether the tenant is itself
         # organic-certified (also exposed top-level for the public Impressum).
@@ -76,6 +92,11 @@ def _merged_settings_dict(obj: Tenant, current_overlay: dict) -> dict:
     # The mode in effect, which a host can fix whatever the row stores.
     merged["uploads_weekly_share_amount"] = share_demand_is_imported(
         bool(current_overlay.get("uploads_weekly_share_amount", False))
+    )
+    # The packing mode the share sizes are packed in; the row's own stands in
+    # only while there are none.
+    merged["packing_mode"] = packing_mode_in_effect(
+        obj, current_overlay.get("packing_mode", PackingMode.BOXES)
     )
     return merged
 
@@ -92,6 +113,7 @@ class HostCapabilitiesSerializer(serializers.Serializer):
     manual_share_import = serializers.BooleanField(read_only=True)
     delivery_stations = serializers.BooleanField(read_only=True)
     about = serializers.BooleanField(read_only=True)
+    module_choice = serializers.BooleanField(read_only=True)
 
 
 class _HostCapabilitiesMixin:
@@ -169,6 +191,17 @@ class TenantSerializer(
     tenant_language = serializers.ChoiceField(
         choices=LanguageChoices.choices, required=False, allow_blank=True
     )
+    # Write-only, as the SMTP password: the browser only learns whether one is
+    # stored. A blank value leaves the stored token alone (see ``validate``),
+    # ``null`` removes it.
+    hr_system_api_token = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=500,
+    )
+    has_hr_system_api_token = serializers.SerializerMethodField()
 
     class Meta:
         model = Tenant
@@ -196,6 +229,82 @@ class TenantSerializer(
             "updated_at",
             "action_rate_limit_overrides",
         )
+
+    def get_has_hr_system_api_token(self, obj: Tenant) -> bool:
+        return bool(obj.hr_system_api_token)
+
+    def validate_hr_system_api_token(self, value):
+        if value and not _HR_SYSTEM_TOKEN.fullmatch(value):
+            raise HrSystemTokenInvalid(
+                "The token may hold visible ASCII characters only, no spaces.",
+                field="hr_system_api_token",
+            )
+        return value
+
+    def validate_hr_system_employees_url(self, value):
+        return self._hr_system_address(value, "hr_system_employees_url")
+
+    def validate_hr_system_absences_url(self, value):
+        return self._hr_system_address(value, "hr_system_absences_url")
+
+    def _hr_system_address(self, value: str, field: str) -> str:
+        """An HR-system address: blank, or ``https`` on a public host. A stored
+        one sent back unchanged isn't looked up again; the sync checks the host
+        each time it calls anyway, as DNS can change in between."""
+        if not value or (self.instance and value == getattr(self.instance, field)):
+            return value
+        address = urlsplit(value)
+        if address.scheme != "https" or resolves_to_internal_address(address.hostname):
+            raise HrSystemAddressInvalid(
+                "An HR-system address must be an https address of a public server.",
+                field=field,
+            )
+        return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if attrs.get("hr_system_api_token") == "":
+            del attrs["hr_system_api_token"]
+        self._keep_hr_system_token_with_its_server(attrs)
+        return attrs
+
+    def _keep_hr_system_token_with_its_server(self, attrs: dict) -> None:
+        """The token travels to the HR system's server with every sync, so it
+        stays with that one server: the one the stored addresses lead to. Both
+        addresses must lead to the same server. An address changed to lead
+        anywhere else, or cleared, drops a stored token the same request
+        doesn't replace, and so does the first address given to a token stored
+        before any: whoever may change the addresses can't have the stored
+        token sent to a server of their own. Filling in the second address on
+        the first one's server keeps it."""
+        stored = {
+            field: getattr(self.instance, field, "") if self.instance else ""
+            for field in _HR_SYSTEM_ADDRESSES
+        }
+        final = {field: attrs.get(field, stored[field]) for field in stored}
+        if len({address_origin(a) for a in final.values() if a}) > 1:
+            changed = [field for field in _HR_SYSTEM_ADDRESSES if field in attrs]
+            raise HrSystemAddressesApart(
+                "Both HR-system addresses must lead to the same server.",
+                field=(changed or ["hr_system_absences_url"])[0],
+            )
+        token_server = next(
+            (address_origin(address) for address in stored.values() if address),
+            None,
+        )
+        moved = any(
+            final[field] != stored[field]
+            and (token_server is None or address_origin(final[field]) != token_server)
+            for field in _HR_SYSTEM_ADDRESSES
+            if field in attrs
+        )
+        if (
+            moved
+            and "hr_system_api_token" not in attrs
+            and self.instance is not None
+            and self.instance.hr_system_api_token
+        ):
+            attrs["hr_system_api_token"] = None
 
     def validate_logo(self, value):
         """Accept only a raster picture, and store a re-encode of it.

@@ -48,6 +48,7 @@ from apps.commissioning.tests.factories.basics import ContactEntityFactory
 from apps.commissioning.tests.factories.members import MemberFactory
 from apps.payments.constants import PaymentMethodOptions
 from apps.payments.models import BillingProfile
+from apps.shared.tenants.models import Tenant
 
 # Valid German IBAN from the SEPA spec's worked example — synthetic,
 # not a real account.
@@ -151,6 +152,20 @@ class TestReEncryptsContactEntity:
 
         assert raw_after != raw_before
         assert entity.iban == SAMPLE_IBAN
+
+
+@pytest.mark.django_db
+class TestReEncryptsTenantToken:
+    def test_hr_system_token_re_encrypted(self, tenant):
+        tenant.hr_system_api_token = "hr-secret"
+        tenant.save()
+        raw_before = _raw("public.tenants_tenant", "hr_system_api_token", tenant.pk)
+
+        _run_command()
+
+        raw_after = _raw("public.tenants_tenant", "hr_system_api_token", tenant.pk)
+        assert raw_after != raw_before
+        assert Tenant.objects.get(pk=tenant.pk).hr_system_api_token == "hr-secret"
 
 
 @pytest.mark.django_db

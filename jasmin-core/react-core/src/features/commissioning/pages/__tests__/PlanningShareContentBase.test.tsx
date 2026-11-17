@@ -36,9 +36,14 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
+// Per-test tenant settings; anything unset falls back to the caller's default.
+const tenantSettings = vi.hoisted(() => ({ values: {} as Record<string, unknown> }));
 vi.mock("@hooks/configuration/useTenant", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
-  const tenant = makeUseTenantMock();
+  const tenant = makeUseTenantMock({
+    getSetting: (key: string, defaultValue?: unknown) =>
+      key in tenantSettings.values ? tenantSettings.values[key] : defaultValue,
+  });
   return { useTenant: () => tenant };
 });
 
@@ -279,6 +284,7 @@ function grid(): EditableTableProps {
 beforeEach(() => {
   table.props = null;
   week.tourPlanned = false;
+  tenantSettings.values = {};
   api.refetchGranularity.mockReset();
   api.variationsList.mockReset().mockReturnValue(settled(VARIATIONS));
   const planningResult = settled(PLANNING_ROWS);
@@ -430,6 +436,16 @@ describe("PlanningShareContentBase", () => {
         { key: -1 },
       ),
     ).toMatchObject({ seller: "seller-1", year: YEAR });
+  });
+
+  it("saves a purchased article without a seller on a farm that buys nothing in", () => {
+    // Such a farm has no seller column to pick one in.
+    tenantSettings.values = { has_purchases: false };
+    renderPage();
+
+    expect(
+      grid().customSave!({ share_article: "art-apple" }, { key: -1 }),
+    ).toMatchObject({ share_article: "art-apple", year: YEAR });
   });
 
   it("patches a saved row into the cached list without refetching it", () => {

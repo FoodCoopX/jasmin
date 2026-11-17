@@ -78,8 +78,9 @@ const totalAmountText = (
     ? ""
     : formatAmountForUnit(Number(amount), unit as string | null, format);
 
-// Bulk endpoint accepts ``delivery_station`` and ``is_packed_bulk`` (MIXED-mode
-// split); ``share_type`` is optional — omitting it sums every share_type.
+// Bulk endpoint accepts ``delivery_station`` and ``is_packed_bulk`` (only the
+// sizes packed loose); ``share_type`` is optional — omitting it sums every
+// share_type.
 type BulkParams = CommissioningPackingListBulkListParams & {
   delivery_station?: string;
   is_packed_bulk?: boolean;
@@ -102,10 +103,6 @@ export default function PackingListBulk() {
   const { getVegetableSizeLabel } = useVegetableSizeOptions();
   const { noteColumn } = useNoteColumn();
   const { getSetting } = useTenant();
-  const packing_mode = getSetting("packing_mode", "BOXES") as
-    | "BOXES"
-    | "BULK"
-    | "MIXED";
   const showSize = Boolean(getSetting("show_size_column"));
 
   const {
@@ -322,9 +319,8 @@ export default function PackingListBulk() {
         day_number: selectedDeliveryDay ?? undefined,
         is_past: isPast,
         delivery_station: selectedDeliveryStation ?? undefined,
-        // In MIXED mode only sum variations actually packed in bulk; BULK mode
-        // already implies every variation is bulk, so the filter is a no-op.
-        ...(packing_mode === "MIXED" ? { is_packed_bulk: true } : {}),
+        // Only the sizes packed loose, a past week's as they were.
+        is_packed_bulk: true,
       }) as BulkParams,
     [
       selectedYear,
@@ -332,7 +328,6 @@ export default function PackingListBulk() {
       selectedDeliveryDay,
       isPast,
       selectedDeliveryStation,
-      packing_mode,
     ],
   );
 

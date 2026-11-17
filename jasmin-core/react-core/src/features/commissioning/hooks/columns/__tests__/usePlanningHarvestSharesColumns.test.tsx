@@ -83,6 +83,7 @@ const baseArgs = (): Args => ({
   dataHasNotes: { hasForecastNote: false, hasStockNote: false },
   calculateStillFree: () => 0,
   number_packing_stations: 1,
+  hasPurchases: true,
   formatCurrency: (amount) => `€ ${Number(amount).toFixed(2)}`,
   getUnitLabel: (unit) => `[${unit}]`,
   ...setters,
@@ -244,6 +245,13 @@ describe("usePlanningHarvestSharesColumns column set", () => {
       valueField: "seller",
       displayField: "seller_name",
     });
+  });
+
+  it("leaves the seller column out on a farm that buys nothing in", () => {
+    const ids = build({ hasPurchases: false }).map((col) => col.key);
+
+    expect(ids).not.toContain("seller_name");
+    expect(ids).toContain("note");
   });
 
   it("titles the note for the planning grid, keeping the page's note field", () => {

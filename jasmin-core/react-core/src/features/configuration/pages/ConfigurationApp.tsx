@@ -1,5 +1,12 @@
 import { Card, Col, Row, Space, Spin } from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { useTranslation } from "react-i18next";
 import {
@@ -9,6 +16,7 @@ import {
 import { AutoSaveIndicator } from "@shared/ui";
 import { useAutoSave, useCapability, useTenant } from "@hooks/index";
 import { notify } from "@shared/utils";
+import HrSystemSettingsCard from "@features/configuration/components/HrSystemSettingsCard";
 import {
   SettingsCategory,
   SettingsRenderer,
@@ -37,14 +45,97 @@ export default function ConfigurationApp() {
     "uploads_weekly_share_amount",
     false,
   ) as boolean;
-  // A host application that fixes the operating mode leaves nothing to choose.
+  // A host application that fixes the operating mode or the modules leaves
+  // nothing to choose there.
   const offersOperatingModeChoice = useCapability("operating_mode_choice");
+  const offersModuleChoice = useCapability("module_choice");
 
   const settingsConfig = useMemo<SettingsCategory[]>(
     () =>
       [
-        // First card on the page: this one switch decides whether the tenant
-        // runs subscriptions at all, and it gates the module toggles below.
+        {
+          category: "navigation",
+          title: t("settings.navigation.title"),
+          settings: [
+            {
+              key: "navigation.show_members",
+              label: t("settings.navigation.show_members"),
+              type: "checkbox",
+              defaultValue: true,
+              disabled: weeklyUpload,
+              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
+              disabledDisplayValue: false,
+            },
+            {
+              key: "navigation.show_abos",
+              label: t("settings.navigation.show_abos"),
+              type: "checkbox",
+              defaultValue: true,
+              disabled: weeklyUpload,
+              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
+              disabledDisplayValue: false,
+            },
+            {
+              key: "navigation.show_commissioning",
+              label: t("settings.navigation.show_commissioning"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_staff",
+              label: t("settings.navigation.show_staff"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_warehouse",
+              label: t("settings.navigation.show_warehouse"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_economics",
+              label: t("settings.navigation.show_economics"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "navigation.show_cultivation",
+              label: t("settings.navigation.show_cultivation"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+          ],
+        },
+        // Which pages, settings and documents the farm needs follows from
+        // whom it sells to and whether it buys in, so this sits right under
+        // the modules.
+        {
+          category: "sales",
+          title: t("settings.commissioning.sales.title"),
+          settings: [
+            {
+              key: "sells_to_resellers",
+              label: t("settings.commissioning.sells_to_resellers"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+            {
+              key: "has_markets",
+              label: t("settings.commissioning.has_markets"),
+              type: "checkbox",
+              defaultValue: false,
+            },
+            {
+              key: "has_purchases",
+              label: t("settings.commissioning.has_purchases"),
+              type: "checkbox",
+              defaultValue: true,
+            },
+          ],
+        },
+        // This one switch decides whether the tenant runs subscriptions at
+        // all; switched on, it locks the members and subscriptions modules.
         {
           category: "operating_mode",
           title: t("settings.operating_mode.title"),
@@ -149,60 +240,6 @@ export default function ConfigurationApp() {
             },
           ],
         },
-        {
-          category: "navigation",
-          title: t("settings.navigation.title"),
-          settings: [
-            {
-              key: "navigation.show_members",
-              label: t("settings.navigation.show_members"),
-              type: "checkbox",
-              defaultValue: true,
-              disabled: weeklyUpload,
-              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
-              disabledDisplayValue: false,
-            },
-            {
-              key: "navigation.show_abos",
-              label: t("settings.navigation.show_abos"),
-              type: "checkbox",
-              defaultValue: true,
-              disabled: weeklyUpload,
-              disabledTooltip: t("settings.navigation.locked_by_weekly_upload"),
-              disabledDisplayValue: false,
-            },
-            {
-              key: "navigation.show_commissioning",
-              label: t("settings.navigation.show_commissioning"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-            {
-              key: "navigation.show_staff",
-              label: t("settings.navigation.show_staff"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-            {
-              key: "navigation.show_warehouse",
-              label: t("settings.navigation.show_warehouse"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-            {
-              key: "navigation.show_economics",
-              label: t("settings.navigation.show_economics"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-            {
-              key: "navigation.show_cultivation",
-              label: t("settings.navigation.show_cultivation"),
-              type: "checkbox",
-              defaultValue: true,
-            },
-          ],
-        },
 
         // {
         //   category: "ai",
@@ -219,9 +256,11 @@ export default function ConfigurationApp() {
         // },
       ].filter(
         (category) =>
-          offersOperatingModeChoice || category.category !== "operating_mode",
+          (offersOperatingModeChoice ||
+            category.category !== "operating_mode") &&
+          (offersModuleChoice || category.category !== "navigation"),
       ),
-    [t, weeklyUpload, offersOperatingModeChoice],
+    [t, weeklyUpload, offersOperatingModeChoice, offersModuleChoice],
   );
 
   // Sync state from tenant data
@@ -389,31 +428,42 @@ export default function ConfigurationApp() {
 
       <Space direction="vertical" size="middle" className="w-full">
         {settingsConfig.map((category) => (
-          <Card
-            key={category.category}
-            title={category.title}
-            className="settings-card-header page-narrow"
-            styles={{ body: { padding: "16px" } }}
-          >
-            <Row gutter={[12, 12]}>
-              {category.settings.map((setting) => (
-                <Col
-                  span={SettingsRenderer.getColumnSpan(setting)}
-                  key={setting.key}
-                >
-                  <div className="settings-item">
-                    {SettingsRenderer.renderInput(
-                      setting,
-                      getSettingValue(setting.key, setting.defaultValue),
-                      (value) =>
-                        handleSettingChange(setting.key, value, setting.type),
-                    )}
-                    {SettingsRenderer.renderDescription(setting)}
-                  </div>
-                </Col>
-              ))}
-            </Row>
-          </Card>
+          <Fragment key={category.category}>
+            <Card
+              title={category.title}
+              className="settings-card-header page-narrow"
+              styles={{ body: { padding: "16px" } }}
+            >
+              <Row gutter={[12, 12]}>
+                {category.settings.map((setting) => (
+                  <Col
+                    span={SettingsRenderer.getColumnSpan(setting)}
+                    key={setting.key}
+                  >
+                    <div className="settings-item">
+                      {SettingsRenderer.renderInput(
+                        setting,
+                        getSettingValue(setting.key, setting.defaultValue),
+                        (value) =>
+                          handleSettingChange(setting.key, value, setting.type),
+                      )}
+                      {SettingsRenderer.renderDescription(setting)}
+                    </div>
+                  </Col>
+                ))}
+              </Row>
+            </Card>
+            {/* Another interface, saved field by field rather than with the
+                page's autosave; it serves the staff module alone. Where the
+                host fixes the modules, the form's stored choice doesn't
+                count, the module in effect does. */}
+            {category.category === "planning" &&
+              Boolean(
+                offersModuleChoice
+                  ? getSettingValue("navigation.show_staff", true)
+                  : getSetting("navigation.show_staff", true),
+              ) && <HrSystemSettingsCard />}
+          </Fragment>
         ))}
       </Space>
     </div>

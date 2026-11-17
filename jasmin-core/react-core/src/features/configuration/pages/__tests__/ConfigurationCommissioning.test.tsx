@@ -20,28 +20,28 @@ vi.mock("react-i18next", () => ({
 
 // What the deployment offers, per test; a name left out is offered.
 const capabilities = vi.hoisted(() => ({}) as Record<string, boolean>);
-// The farm's packing mode and its running and upcoming sizes, per test.
+// Whether the farm imports its share amounts, buys produce in and sells to
+// resellers, per test.
 const farm = vi.hoisted(() => ({
-  packingMode: "BOXES",
-  sizes: [] as { share_type_name: string; size: string; is_packed_bulk: boolean }[],
+  importsShareAmounts: false,
+  hasPurchases: true,
+  sellsToResellers: true,
 }));
 vi.mock("@hooks/index", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
   const tenant = makeUseTenantMock({
-    getSetting: (key: string, fallback?: unknown) =>
-      key === "packing_mode" ? farm.packingMode : fallback,
+    getSetting: (key: string, fallback?: unknown) => {
+      if (key === "uploads_weekly_share_amount") return farm.importsShareAmounts;
+      if (key === "has_purchases") return farm.hasPurchases;
+      if (key === "sells_to_resellers") return farm.sellsToResellers;
+      return fallback;
+    },
   });
   return {
     useCapability: (name: string) => capabilities[name] ?? true,
     useTenant: () => tenant,
-    useShareTypeVariationSizeOptions: () => ({
-      getShareTypeVariationSizeLabel: (size: string) => size,
-    }),
   };
 });
-vi.mock("@features/commissioning/hooks", () => ({
-  useShareTypeVariations: () => ({ shareTypeVariations: farm.sizes }),
-}));
 
 const shown = vi.hoisted(() => ({ settings: [] as SettingsCategory[] }));
 vi.mock("@features/configuration/components/SettingsPage", () => ({
@@ -63,49 +63,20 @@ const SELLER_NAME = "show_seller_name_of_share_article_in_share_for_member_on_pa
 beforeEach(() => {
   for (const name of Object.keys(capabilities)) delete capabilities[name];
   shown.settings = [];
-  farm.packingMode = "BOXES";
-  farm.sizes = [];
+  farm.importsShareAmounts = false;
+  farm.hasPurchases = true;
+  farm.sellsToResellers = true;
 });
 
-/** The packing mode's options that can't be picked, with their reasons. */
-const lockedPackingModes = () =>
-  Object.fromEntries(
-    (
-      shown.settings
-        .find((category) => category.category === "logistics")
-        ?.settings.find((setting) => setting.key === "packing_mode")?.options ?? []
-    )
-      .filter((option) => option.disabled)
-      .map((option) => [option.value, option.disabledReason]),
-  );
-
-describe("ConfigurationCommissioning packing mode", () => {
-  it("keeps every option open without running sizes", () => {
+describe("ConfigurationCommissioning logistics", () => {
+  it("offers no packing mode, as it follows from how each share size is packed", () => {
     render(<ConfigurationCommissioning />);
 
-    expect(lockedPackingModes()).toEqual({});
-  });
-
-  it("locks the switch from boxes to bulk while sizes run, whatever flag they kept", () => {
-    farm.sizes = [{ share_type_name: "Gemüse", size: "M", is_packed_bulk: true }];
-    render(<ConfigurationCommissioning />);
-
-    expect(lockedPackingModes()).toEqual({
-      BULK: "settings.commissioning.packing_mode_locked",
-    });
-  });
-
-  it("locks boxes in mixed mode while a size is packed loose, never mixed", () => {
-    farm.packingMode = "MIXED";
-    farm.sizes = [
-      { share_type_name: "Gemüse", size: "M", is_packed_bulk: true },
-      { share_type_name: "Gemüse", size: "L", is_packed_bulk: true },
-    ];
-    render(<ConfigurationCommissioning />);
-
-    expect(lockedPackingModes()).toEqual({
-      BOXES: "settings.commissioning.packing_mode_locked",
-    });
+    const logisticsKeys = shown.settings
+      .find((category) => category.category === "logistics")
+      ?.settings.map((setting) => setting.key);
+    expect(logisticsKeys).not.toContain("packing_mode");
+    expect(logisticsKeys).toContain("number_packing_stations");
   });
 });
 
@@ -128,5 +99,44 @@ describe("ConfigurationCommissioning layout", () => {
 
     expect(layoutKeys()).not.toContain(SELLER_NAME);
     expect(layoutKeys()).toContain("show_size_column");
+  });
+
+  it("leaves it out on a farm that buys nothing in, as there is no seller to name", () => {
+    farm.hasPurchases = false;
+    render(<ConfigurationCommissioning />);
+
+    expect(layoutKeys()).not.toContain(SELLER_NAME);
+    expect(layoutKeys()).toContain("show_size_column");
+  });
+});
+
+describe("ConfigurationCommissioning tax rates", () => {
+  const taxRateKeys = () =>
+    shown.settings
+      .find((category) => category.category === "tax_rates")
+      ?.settings.map((setting) => setting.key);
+
+  it("offers a default rate for articles, crates and shares", () => {
+    render(<ConfigurationCommissioning />);
+
+    expect(taxRateKeys()).toEqual([
+      "default_tax_rate_articles",
+      "default_tax_rate_crates",
+      "default_tax_rate_shares",
+    ]);
+  });
+
+  it("leaves out the shares' rate where the share amounts are imported", () => {
+    farm.importsShareAmounts = true;
+    render(<ConfigurationCommissioning />);
+
+    expect(taxRateKeys()).toEqual(["default_tax_rate_articles", "default_tax_rate_crates"]);
+  });
+
+  it("leaves out the crates' rate on a farm that sells to no reseller", () => {
+    farm.sellsToResellers = false;
+    render(<ConfigurationCommissioning />);
+
+    expect(taxRateKeys()).toEqual(["default_tax_rate_articles", "default_tax_rate_shares"]);
   });
 });

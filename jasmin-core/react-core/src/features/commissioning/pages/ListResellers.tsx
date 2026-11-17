@@ -148,6 +148,8 @@ export default function ListResellers() {
     useOfferGroups();
   const hasDifferentOfferGroups = offerGroupsCount > 0;
   const offersDeliveryStations = useCapability("delivery_stations");
+  // A farm that buys nothing in has no supplier among its resellers.
+  const hasPurchases = getSetting("has_purchases", true) !== false;
 
   const {
     isUserInfoModalOpen,
@@ -369,6 +371,7 @@ export default function ListResellers() {
         inputType: "checkbox",
         required: false,
         sortable: true,
+        hidden: !hasPurchases,
       },
       contactColumns.companyName,
       contactColumns.firstName,
@@ -423,6 +426,7 @@ export default function ListResellers() {
       getUserStatusSorter,
       handleOpenUserInfoModal,
       hasDifferentOfferGroups,
+      hasPurchases,
       noteColumn,
       offerGroups,
       offersDeliveryStations,

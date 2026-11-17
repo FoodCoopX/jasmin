@@ -19,6 +19,7 @@ export {
 } from './summaryRowStyle';
 export { default as ReadOnlyReportTable } from './ReadOnlyReportTable';
 export type { ReadOnlyReportTableProps } from './ReadOnlyReportTable';
+export type { TotalsRow } from './totalsRowContext';
 export { useCrudListPage } from './useCrudListPage';
 export { withNewRowDefaults } from './newRowDefaults';
 export type {

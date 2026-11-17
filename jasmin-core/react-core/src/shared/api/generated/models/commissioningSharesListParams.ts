@@ -18,7 +18,7 @@ delivery_day?: string;
  */
 delivery_week?: number;
 /**
- * Only the shares of the variations with this bulk-packing flag. Only meaningful in MIXED packing mode.
+ * Only the shares of the variations packed loose (true) or pre-packed (false).
  */
 is_packed_bulk?: boolean;
 /**

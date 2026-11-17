@@ -29,7 +29,6 @@ import {
   useIsMobile,
   useNumberFormat,
   useShareTypeVariationSizeOptions,
-  useTenant,
 } from "@hooks/index";
 
 type ShareRow = Share & TableRecord;
@@ -66,20 +65,18 @@ export default function ShareWeightsSection({
     [isOffice],
   );
   const [csvExportVisible, setCsvExportVisible] = useState(false);
-  const { getSetting } = useTenant();
-  const packingMode = getSetting("packing_mode", "BOXES");
 
   // Only boxes are weighed, as the boxes list above packs them: physical
-  // variations, and in mixed packing not the ones packed in bulk.
+  // sizes that are pre-packed.
   const listParams = useMemo<CommissioningSharesListParams>(
     () => ({
       year,
       delivery_week: week,
       delivery_day: deliveryDayId ?? "",
       physical: true,
-      ...(packingMode === "MIXED" ? { is_packed_bulk: false } : {}),
+      is_packed_bulk: false,
     }),
-    [year, week, deliveryDayId, packingMode],
+    [year, week, deliveryDayId],
   );
   const queryClient = useQueryClient();
 

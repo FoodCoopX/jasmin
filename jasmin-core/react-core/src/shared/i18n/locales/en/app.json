@@ -4,6 +4,7 @@
     "routes": {
         "staff_dashboard": "Staff dashboard",
         "weekly_staff_plan": "Weekly staff plan",
+        "absences": "Absences",
         "saturday_shifts": "Saturday shifts",
         "weekly_plan_categories": "Weekly plan categories",
         "employees": "Employees",

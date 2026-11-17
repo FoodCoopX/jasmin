@@ -65,7 +65,7 @@ class TestBlockedRanges:
     @override_settings(SMTP_ALLOW_PRIVATE_HOSTS=False)
     def test_hostname_resolving_to_private_is_blocked(self):
         with patch(
-            "apps.shared.smtp_host_validator.socket.getaddrinfo",
+            "apps.shared.outbound_hosts.socket.getaddrinfo",
             return_value=[(socket.AF_INET, 1, 6, "", ("10.1.2.3", 0))],
         ):
             assert smtp_host_is_blocked("smtp.evil.test") is True
@@ -73,7 +73,7 @@ class TestBlockedRanges:
     @override_settings(SMTP_ALLOW_PRIVATE_HOSTS=False)
     def test_hostname_resolving_to_public_is_allowed(self):
         with patch(
-            "apps.shared.smtp_host_validator.socket.getaddrinfo",
+            "apps.shared.outbound_hosts.socket.getaddrinfo",
             return_value=[(socket.AF_INET, 1, 6, "", ("93.184.216.34", 0))],
         ):
             assert smtp_host_is_blocked("smtp.example.test") is False
@@ -82,7 +82,7 @@ class TestBlockedRanges:
     def test_mixed_records_block_when_any_is_private(self):
         # A round-robin DNS answer must not let a single private A record by.
         with patch(
-            "apps.shared.smtp_host_validator.socket.getaddrinfo",
+            "apps.shared.outbound_hosts.socket.getaddrinfo",
             return_value=[
                 (socket.AF_INET, 1, 6, "", ("93.184.216.34", 0)),
                 (socket.AF_INET, 1, 6, "", ("127.0.0.1", 0)),
@@ -95,7 +95,7 @@ class TestBlockedRanges:
         # ``2130706433`` == 127.0.0.1. ``ipaddress`` rejects it, so it falls
         # to getaddrinfo, which normalises to the dotted-quad we then block.
         with patch(
-            "apps.shared.smtp_host_validator.socket.getaddrinfo",
+            "apps.shared.outbound_hosts.socket.getaddrinfo",
             return_value=[(socket.AF_INET, 1, 6, "", ("127.0.0.1", 0))],
         ):
             assert smtp_host_is_blocked("2130706433") is True
@@ -105,7 +105,7 @@ class TestBlockedRanges:
         # Can't prove it's internal; the real SMTP connect (with timeout)
         # surfaces the DNS error instead of a false-positive rejection.
         with patch(
-            "apps.shared.smtp_host_validator.socket.getaddrinfo",
+            "apps.shared.outbound_hosts.socket.getaddrinfo",
             side_effect=socket.gaierror("name resolution failed"),
         ):
             assert smtp_host_is_blocked("does-not-exist.test") is False

@@ -1,0 +1,61 @@
+/* Saturday-shift page: a year of crosses, an ISO week per column. Theme-aware
+   via CSS variables. */
+
+/* The current week's column, so the year opens with today findable. The
+   header cell needs the longer selector to outrank the table's header
+   background. */
+.saturday-shifts-current-week,
+.saturday-shifts-table .ant-table-thead > tr > th.saturday-shifts-current-week {
+  background-color: var(--color-success-bg);
+}
+
+/* Not by colour alone: the current week's heading is underlined too. */
+.saturday-shifts-current-week .ant-table-column-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The totals row's cell of the current week, over the row's own background. */
+.ant-table-wrapper .report-table-totals > td.saturday-shifts-current-week {
+  background-color: var(--color-success-bg);
+}
+
+/* "KW 15" stays on one line beside its sort arrows. */
+.saturday-shifts-table .ant-table-column-title {
+  white-space: nowrap;
+}
+
+/* A year of weeks is far wider than the screen. Overlay scrollbars (macOS)
+   hide the sideways scroll until it is used, so the table would seem to end;
+   a styled scrollbar stays visible. */
+.saturday-shifts-table .ant-table-content::-webkit-scrollbar {
+  height: 10px;
+}
+
+.saturday-shifts-table .ant-table-content::-webkit-scrollbar-thumb {
+  border-radius: 5px;
+  background-color: var(--color-border);
+}
+
+.saturday-shifts-table .ant-table-content::-webkit-scrollbar-track {
+  background-color: var(--color-bg-subtle);
+}
+
+/* A shift set before the employee's absence on that Saturday: red, as the
+   weekly plan shows the same conflict — on hover too, which the checkbox's
+   own hover colour would otherwise take over. */
+.saturday-shift-conflict .ant-checkbox-checked .ant-checkbox-inner,
+.saturday-shifts-table
+  .saturday-shift-conflict.ant-checkbox-wrapper:hover
+  .ant-checkbox-checked:not(.ant-checkbox-disabled)
+  .ant-checkbox-inner {
+  border-color: var(--color-error);
+  background-color: var(--color-error);
+}
+
+/* Not by colour alone: a dashed ring marks the conflict as well. */
+.saturday-shift-conflict .ant-checkbox-checked {
+  outline: 2px dashed var(--color-error-text);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

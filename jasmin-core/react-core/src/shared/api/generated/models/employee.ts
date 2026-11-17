@@ -35,6 +35,15 @@ export interface Employee {
    * @nullable
    */
   employee_number?: string | null;
+  readonly comes_from_hr_system: boolean;
+  /** @nullable */
+  readonly hr_system_id: string | null;
+  /**
+   * @minimum 0
+   * @maximum 32767
+   * @nullable
+   */
+  hours_per_week?: number | null;
   /** @nullable */
   user?: string | null;
   readonly can_be_deleted: boolean;

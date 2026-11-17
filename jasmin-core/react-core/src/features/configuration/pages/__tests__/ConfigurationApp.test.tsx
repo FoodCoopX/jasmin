@@ -4,11 +4,18 @@
 // shown OFF because the modules are hidden. The lock is cosmetic: the stored
 // preference stays in form state and in the save payload, so it comes back the
 // moment the flag is cleared. Every other module toggle, and the whole page for
-// a tenant without the flag, stays exactly as it was.
+// a tenant without the flag, stays exactly as it was. A host that fixes the
+// modules leaves their card out and keeps the stored choice in the save.
 
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 
 const stable = vi.hoisted(() => ({
   // Mutated per test. ``undefined`` models the key being ABSENT from the
@@ -18,6 +25,9 @@ const stable = vi.hoisted(() => ({
   weeklyUpload: undefined as boolean | undefined,
   // What the deployment offers; a name left out is offered.
   capabilities: {} as Record<string, boolean>,
+  // The modules in effect, as the merged settings report them; a module left
+  // out falls through to the caller's default.
+  modulesInEffect: {} as Record<string, boolean>,
   // The tenant row the page reads. ``navigation`` carries the tenant's STORED
   // module preference — both modules on. The weekly-upload lock must never
   // overwrite it.
@@ -53,10 +63,15 @@ vi.mock("@hooks/index", async () => {
     // object, or a missing path segment, yields the CALLER-SUPPLIED default.
     // Flipping the page's ``false`` default to ``true`` therefore changes what
     // these tests see, which is the point.
-    getSetting: (key: string, defaultValue?: unknown) =>
-      key === "uploads_weekly_share_amount" && stable.weeklyUpload !== undefined
-        ? stable.weeklyUpload
-        : defaultValue,
+    getSetting: (key: string, defaultValue?: unknown) => {
+      if (key === "uploads_weekly_share_amount" && stable.weeklyUpload !== undefined) {
+        return stable.weeklyUpload;
+      }
+      const module = key.replace("navigation.", "");
+      return key.startsWith("navigation.") && module in stable.modulesInEffect
+        ? stable.modulesInEffect[module]
+        : defaultValue;
+    },
   });
   return {
     useTenant: () => tenant,
@@ -71,6 +86,8 @@ vi.mock("@hooks/index", async () => {
 vi.mock("@shared/api/generated/tenants/tenants", () => ({
   tenantsTenantsPartialUpdate: vi.fn(),
   tenantsSettingsUpdateCurrentSettingsUpdate: vi.fn(),
+  // The HR-system card's own save; its tests live with the card.
+  useTenantsTenantsPartialUpdate: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@shared/ui", () => ({
@@ -129,20 +146,21 @@ describe("ConfigurationApp weekly-upload tenants", () => {
     stable.weeklyUpload = undefined;
     stable.save = null;
     stable.capabilities = {};
+    stable.modulesInEffect = {};
     delete stable.tenantRow.settings;
     delete stable.tenantRow.current_settings;
     vi.mocked(tenantsSettingsUpdateCurrentSettingsUpdate).mockClear();
     vi.mocked(tenantsTenantsPartialUpdate).mockClear();
   });
 
-  it("leads the page with the weekly-upload switch", () => {
+  it("puts the weekly-upload switch in its own card after the modules and the sales channels", () => {
     render(<ConfigurationApp />);
 
-    expect(cardTitles()[0]).toBe("settings.operating_mode.title");
+    expect(cardTitles()[2]).toBe("settings.operating_mode.title");
 
-    const firstCard = document.querySelector(".ant-card") as HTMLElement;
+    const card = document.querySelectorAll(".ant-card")[2] as HTMLElement;
     expect(
-      within(firstCard).getByRole("checkbox", { name: WEEKLY_UPLOAD }),
+      within(card).getByRole("checkbox", { name: WEEKLY_UPLOAD }),
     ).toBeInTheDocument();
   });
 
@@ -239,6 +257,202 @@ describe("ConfigurationApp weekly-upload tenants", () => {
     expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
       settings: { uploads_weekly_share_amount: false },
     });
+  });
+});
+
+describe("ConfigurationApp sales channels", () => {
+  const SELLS_TO_RESELLERS = "settings.commissioning.sells_to_resellers";
+  const MARKETS = "settings.commissioning.has_markets";
+
+  beforeEach(() => {
+    stable.weeklyUpload = undefined;
+    stable.save = null;
+    stable.capabilities = {};
+    stable.modulesInEffect = {};
+    delete stable.tenantRow.settings;
+    stable.tenantRow.current_settings = {
+      sells_to_resellers: true,
+      has_markets: false,
+    };
+    vi.mocked(tenantsSettingsUpdateCurrentSettingsUpdate).mockClear();
+    vi.mocked(tenantsTenantsPartialUpdate).mockClear();
+  });
+
+  it("follows the modules with the stored channels", () => {
+    render(<ConfigurationApp />);
+
+    expect(cardTitles().slice(0, 2)).toEqual([
+      "settings.navigation.title",
+      "settings.commissioning.sales.title",
+    ]);
+    expect(moduleToggle(SELLS_TO_RESELLERS)).toBeChecked();
+    expect(moduleToggle(MARKETS)).not.toBeChecked();
+  });
+
+  it("saves a changed channel with the versioned settings, not on the tenant row", async () => {
+    render(<ConfigurationApp />);
+
+    fireEvent.click(moduleToggle(SELLS_TO_RESELLERS));
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
+      settings: expect.objectContaining({
+        sells_to_resellers: false,
+        has_markets: false,
+      }),
+    });
+    const tenantBody = vi.mocked(tenantsTenantsPartialUpdate).mock.calls[0][1];
+    expect(tenantBody).not.toHaveProperty("sells_to_resellers");
+    expect(tenantBody).not.toHaveProperty("has_markets");
+  });
+
+  it("shows the model's defaults to a tenant without stored settings and saves only the channel changed", async () => {
+    delete stable.tenantRow.current_settings;
+    render(<ConfigurationApp />);
+
+    expect(moduleToggle(SELLS_TO_RESELLERS)).toBeChecked();
+    expect(moduleToggle(MARKETS)).not.toBeChecked();
+
+    fireEvent.click(moduleToggle(MARKETS));
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
+      settings: { has_markets: true },
+    });
+  });
+
+  it("buys in by default and saves the switched-off purchases with the versioned settings", async () => {
+    const PURCHASES = "settings.commissioning.has_purchases";
+    delete stable.tenantRow.current_settings;
+    render(<ConfigurationApp />);
+
+    expect(moduleToggle(PURCHASES)).toBeChecked();
+
+    fireEvent.click(moduleToggle(PURCHASES));
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(tenantsSettingsUpdateCurrentSettingsUpdate).toHaveBeenCalledWith({
+      settings: { has_purchases: false },
+    });
+    const tenantBody = vi.mocked(tenantsTenantsPartialUpdate).mock.calls[0][1];
+    expect(tenantBody).not.toHaveProperty("has_purchases");
+  });
+});
+
+describe("ConfigurationApp modules fixed by the host", () => {
+  beforeEach(() => {
+    stable.weeklyUpload = true;
+    stable.save = null;
+    stable.capabilities = { operating_mode_choice: false, module_choice: false };
+    stable.modulesInEffect = {};
+    delete stable.tenantRow.current_settings;
+    stable.tenantRow.navigation = { show_staff: true, show_economics: true };
+    vi.mocked(tenantsTenantsPartialUpdate).mockClear();
+  });
+
+  it("leaves out the modules card, so the page opens with the sales channels", () => {
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()[0]).toBe("settings.commissioning.sales.title");
+    expect(cardTitles()).not.toContain("settings.navigation.title");
+    expect(screen.queryByRole("checkbox", { name: COMMISSIONING })).not.toBeInTheDocument();
+  });
+
+  it("saves the stored module choice back untouched", async () => {
+    render(<ConfigurationApp />);
+
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    expect(savedNavigation()).toEqual({ show_staff: true, show_economics: true });
+  });
+});
+
+describe("ConfigurationApp HR-system card", () => {
+  beforeEach(() => {
+    stable.weeklyUpload = undefined;
+    stable.save = null;
+    stable.capabilities = {};
+    stable.modulesInEffect = {};
+    delete stable.tenantRow.current_settings;
+    stable.tenantRow.navigation = { show_members: true, show_abos: true };
+    delete stable.tenantRow.uses_hr_system;
+    delete stable.tenantRow.hr_system_employees_url;
+    delete stable.tenantRow.has_hr_system_api_token;
+    vi.mocked(tenantsTenantsPartialUpdate).mockClear();
+  });
+
+  it("comes last, after the interfaces, with the modules on top of the page", () => {
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()).toEqual([
+      "settings.navigation.title",
+      "settings.commissioning.sales.title",
+      "settings.operating_mode.title",
+      "settings.general.title",
+      "settings.commissioning.planning.title",
+      "settings.hr_system.title",
+    ]);
+  });
+
+  it("is left out while the staff module is off", () => {
+    stable.tenantRow.navigation = {
+      show_members: true,
+      show_abos: true,
+      show_staff: false,
+    };
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()).not.toContain("settings.hr_system.title");
+  });
+
+  it("comes and goes with the staff module's toggle", () => {
+    render(<ConfigurationApp />);
+
+    fireEvent.click(moduleToggle(STAFF));
+    expect(cardTitles()).not.toContain("settings.hr_system.title");
+
+    fireEvent.click(moduleToggle(STAFF));
+    expect(cardTitles()).toContain("settings.hr_system.title");
+  });
+
+  it("follows the staff module in effect where the host fixes the modules", () => {
+    // The row still stores the staff module on; the host has it off.
+    stable.capabilities = { module_choice: false };
+    stable.tenantRow.navigation = { show_staff: true };
+    stable.modulesInEffect = { show_staff: false };
+    render(<ConfigurationApp />);
+
+    expect(cardTitles()).not.toContain("settings.hr_system.title");
+  });
+
+  it("leaves the card's fields out of the page's own save", async () => {
+    stable.tenantRow.uses_hr_system = true;
+    stable.tenantRow.hr_system_employees_url = "https://hr.example.com/staff";
+    stable.tenantRow.has_hr_system_api_token = true;
+    render(<ConfigurationApp />);
+
+    await act(async () => {
+      await stable.save?.();
+    });
+
+    const body = vi.mocked(tenantsTenantsPartialUpdate).mock.calls[0][1];
+    for (const field of [
+      "uses_hr_system",
+      "hr_system_employees_url",
+      "hr_system_absences_url",
+      "has_hr_system_api_token",
+      "hr_system_api_token",
+    ]) {
+      expect(body).not.toHaveProperty(field);
+    }
   });
 });
 

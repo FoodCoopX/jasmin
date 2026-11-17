@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StationContentsShare } from "@shared/api/generated/models";
-import {
-  buildStationContentsCards,
-  isPackedLoose,
-  marksPackingKind,
-} from "../stationContents";
+import { buildStationContentsCards, marksPackingKind } from "../stationContents";
 
 const share = (
   overrides: Partial<StationContentsShare> = {},
@@ -53,7 +49,6 @@ const share = (
 });
 
 const labels = (overrides = {}) => ({
-  packingMode: "MIXED" as const,
   tints: { "st-veg": 2 },
   marksOrganic: true,
   showsSellers: true,
@@ -111,16 +106,15 @@ describe("buildStationContentsCards", () => {
 });
 
 describe("packing kind", () => {
-  it.each([
-    ["BOXES", true, false],
-    ["BOXES", false, false],
-    ["BULK", false, true],
-    ["MIXED", true, true],
-    ["MIXED", false, false],
-  ] as const)(
-    "in %s mode a share flagged loose=%s lies loose: %s",
-    (mode, flag, loose) => {
-      expect(isPackedLoose(flag, mode)).toBe(loose);
+  it.each([true, false])(
+    "lays a share loose as its own size says (loose=%s), a past week's too",
+    (flag) => {
+      const [card] = buildStationContentsCards(
+        [share({ is_packed_bulk: flag })],
+        labels(),
+      );
+
+      expect(card.loose).toBe(flag);
     },
   );
 

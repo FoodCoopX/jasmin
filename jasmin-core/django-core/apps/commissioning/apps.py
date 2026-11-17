@@ -122,10 +122,18 @@ class CommissioningConfig(AppConfig):
         auditlog.register(ConsentDocument, exclude_fields=["body_sha256"])
         auditlog.register(ConsentRecord)
 
-        # The tenant settings refuse a packing mode switch that would change
-        # how a running or upcoming share size is packed.
-        from apps.shared.packing_mode_hooks import set_packing_mode_switch_guard
+        # The tenant payload reports the packing mode the share sizes are
+        # packed in, and the tenant settings refuse a stored pure mode that a
+        # running or upcoming size contradicts.
+        from apps.shared.packing_mode_hooks import (
+            set_packing_mode_source,
+            set_packing_mode_switch_guard,
+        )
 
-        from .services.packing_mode import refuse_packing_mode_switch
+        from .services.packing_mode import (
+            packing_mode_of_tenant,
+            refuse_packing_mode_switch,
+        )
 
+        set_packing_mode_source(packing_mode_of_tenant)
         set_packing_mode_switch_guard(refuse_packing_mode_switch)

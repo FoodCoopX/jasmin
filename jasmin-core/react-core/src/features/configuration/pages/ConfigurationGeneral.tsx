@@ -17,6 +17,7 @@ import { notify } from "@shared/utils";
 import { checkBic, checkIban } from "@shared/utils/iban";
 import { withoutTenantFileFields } from "./utils/tenantSettingsMapping";
 import { Card, Col, Row, Space, Typography } from "antd";
+import type { TFunction } from "i18next";
 import {
   Fragment,
   useCallback,
@@ -51,6 +52,30 @@ const TENANT_LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((language) => ({
   label: `${language.name} (${language.code.toUpperCase()})`,
 }));
 
+/** The twelve months, numbered from 1, as the fiscal year's start. */
+const monthOptions = (t: TFunction) => [
+  { value: 1, label: t("settings.months.january") },
+  { value: 2, label: t("settings.months.february") },
+  { value: 3, label: t("settings.months.march") },
+  { value: 4, label: t("settings.months.april") },
+  { value: 5, label: t("settings.months.may") },
+  { value: 6, label: t("settings.months.june") },
+  { value: 7, label: t("settings.months.july") },
+  { value: 8, label: t("settings.months.august") },
+  { value: 9, label: t("settings.months.september") },
+  { value: 10, label: t("settings.months.october") },
+  { value: 11, label: t("settings.months.november") },
+  { value: 12, label: t("settings.months.december") },
+];
+
+/** The farm's postal address, as its documents and legal pages print it. */
+const addressFields = (t: TFunction): SettingsCategory["settings"] => [
+  { key: "address", label: t("tenant.address.address"), type: "input", defaultValue: "" },
+  { key: "zip_code", label: t("tenant.address.zip_code"), type: "input", defaultValue: "" },
+  { key: "city", label: t("tenant.address.city"), type: "input", defaultValue: "" },
+  { key: "country", label: t("tenant.address.country"), type: "input", defaultValue: "" },
+];
+
 function resolveMediaUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   return value.startsWith("http")
@@ -64,10 +89,18 @@ export default function ConfigurationGeneral() {
   const [loading, setLoading] = useState(true);
 
   const { t } = useTranslation();
-  const { tenant, refreshTenant } = useTenant();
+  const { tenant, refreshTenant, getSetting } = useTenant();
   // A host application isn't installed as jasmin's app, so the icon and short
   // name have nothing to do there.
   const offersWebApp = useCapability("web_app");
+  // Orders come from resellers only.
+  const sellsToResellers = Boolean(getSetting("sells_to_resellers", true));
+  // The farm's address and VAT ID go on the reseller documents, the legal
+  // notice and the data-protection pages; a host that publishes the latter
+  // two itself needs them for resellers alone.
+  const offersLegalNotice = useCapability("legal_notice");
+  const offersGdpr = useCapability("gdpr");
+  const namesTheFarm = sellsToResellers || offersLegalNotice || offersGdpr;
 
   // Branding uploads (logo + organic logo) go through the shared multipart
   // picture-upload hook — a separate, immediate PATCH decoupled from the JSON
@@ -123,49 +156,23 @@ export default function ConfigurationGeneral() {
             required: true,
             defaultValue: "",
           },
-          {
-            key: "description",
-            label: t("tenant.basic_info.description"),
-            type: "textarea",
-            defaultValue: "",
-          },
-          {
-            key: "address",
-            label: t("tenant.address.address"),
-            type: "input",
-            defaultValue: "",
-          },
-          {
-            key: "zip_code",
-            label: t("tenant.address.zip_code"),
-            type: "input",
-            defaultValue: "",
-          },
-          {
-            key: "city",
-            label: t("tenant.address.city"),
-            type: "input",
-            defaultValue: "",
-          },
-          {
-            key: "country",
-            label: t("tenant.address.country"),
-            type: "input",
-            defaultValue: "",
-          },
+          ...(namesTheFarm ? addressFields(t) : []),
           {
             key: "email",
             label: t("tenant.email"),
             type: "input",
             defaultValue: "",
           },
-          {
-            key: "email_for_orders",
-            label: t("tenant.email_for_orders"),
-            type: "input",
-            defaultValue: "",
-          },
-
+          ...(sellsToResellers
+            ? [
+                {
+                  key: "email_for_orders",
+                  label: t("tenant.email_for_orders"),
+                  type: "input" as const,
+                  defaultValue: "",
+                },
+              ]
+            : []),
           {
             key: "phone_number",
             label: t("tenant.phone_number"),
@@ -201,27 +208,18 @@ export default function ConfigurationGeneral() {
             key: "fiscal_year_start_month",
             label: t("tenant.organization.fiscal_year_start_month"),
             type: "select",
-            options: [
-              { value: 1, label: t("settings.months.january") },
-              { value: 2, label: t("settings.months.february") },
-              { value: 3, label: t("settings.months.march") },
-              { value: 4, label: t("settings.months.april") },
-              { value: 5, label: t("settings.months.may") },
-              { value: 6, label: t("settings.months.june") },
-              { value: 7, label: t("settings.months.july") },
-              { value: 8, label: t("settings.months.august") },
-              { value: 9, label: t("settings.months.september") },
-              { value: 10, label: t("settings.months.october") },
-              { value: 11, label: t("settings.months.november") },
-              { value: 12, label: t("months.december") },
-            ],
+            options: monthOptions(t),
             defaultValue: 1,
           },
-          {
-            key: "uid",
-            label: t("tenant.organization.uid"),
-            type: "input",
-          },
+          ...(namesTheFarm
+            ? [
+                {
+                  key: "uid",
+                  label: t("tenant.organization.uid"),
+                  type: "input" as const,
+                },
+              ]
+            : []),
         ],
       },
 
@@ -319,10 +317,10 @@ export default function ConfigurationGeneral() {
         ],
       },
     ],
-    [t],
+    [t, sellsToResellers, namesTheFarm],
   );
   // A host application publishes its own legal notice.
-  const shownCategories = useCapability("legal_notice")
+  const shownCategories = offersLegalNotice
     ? tenantFieldsConfig
     : tenantFieldsConfig.filter((c) => c.category !== "legal_notice");
 
@@ -344,7 +342,6 @@ export default function ConfigurationGeneral() {
     // and must not ride along on the PATCH payload.
     const currentTenantData: TenantFormState = {
       name: tenant.name || "",
-      description: tenant.description || "",
       address: tenant.address || "",
       zip_code: tenant.zip_code || "",
       city: tenant.city || "",

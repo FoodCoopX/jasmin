@@ -11,6 +11,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   Employee,
   StaffEmployeesListParams,
+  HrSystemSyncRequest,
+  HrSystemSyncResult,
 } from "@shared/api/generated/models";
 
 vi.mock("react-i18next", () => ({
@@ -34,9 +36,14 @@ vi.mock("@shared/contexts/ModalContext", () => ({
   useModal: () => ({ isModalMode: false }),
 }));
 
+// Whether the tenant takes its employees from the HR system.
+const tenantSettings = vi.hoisted(() => ({ usesHrSystem: false }));
 vi.mock("@hooks/configuration/useTenant", async () => {
   const { makeUseTenantMock } = await import("@/test/tenantMock");
-  const tenant = makeUseTenantMock();
+  const tenant = makeUseTenantMock({
+    getSetting: (key: string, defaultValue?: unknown) =>
+      key === "uses_hr_system" ? tenantSettings.usesHrSystem : defaultValue,
+  });
   return { useTenant: () => tenant };
 });
 
@@ -45,18 +52,33 @@ const staffApi = vi.hoisted(() => ({
   createEmployee: vi.fn(),
   updateEmployee: vi.fn(),
   deleteEmployee: vi.fn(),
+  syncFromHrSystem: vi.fn(),
 }));
 
 vi.mock("@shared/api/generated/staff/staff", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@shared/api/generated/staff/staff")>();
-  const { useQuery } = await import("@tanstack/react-query");
+  const { useMutation, useQuery } = await import("@tanstack/react-query");
   return {
     ...actual,
     useStaffEmployeesList: (params?: StaffEmployeesListParams) =>
       useQuery({
         queryKey: actual.getStaffEmployeesListQueryKey(params),
         queryFn: (): Promise<Employee[]> => staffApi.listEmployees(params),
+      }),
+    useStaffEmployeesSyncFromHrSystemCreate: (options?: {
+      mutation?: {
+        onSuccess?: (result: HrSystemSyncResult) => void;
+        onError?: (error: unknown) => void;
+      };
+    }) =>
+      useMutation({
+        mutationFn: (variables: {
+          data: HrSystemSyncRequest;
+        }): Promise<HrSystemSyncResult> =>
+          staffApi.syncFromHrSystem(variables.data),
+        onSuccess: (result) => options?.mutation?.onSuccess?.(result),
+        onError: (error) => options?.mutation?.onError?.(error),
       }),
     staffEmployeesCreate: (employee: Employee) =>
       staffApi.createEmployee(employee),
@@ -77,6 +99,8 @@ function employee(overrides: Partial<Employee> & { id: string }): Employee {
     first_name: null,
     last_name: null,
     employee_number: null,
+    comes_from_hr_system: false,
+    hr_system_id: null,
     user: null,
     can_be_deleted: true,
     ...overrides,
@@ -125,6 +149,9 @@ function rowOf(text: string): HTMLElement {
   return row;
 }
 
+/** The accessible name of the weekly-plan name's input. */
+const NAME = "staff.short_name_for_weekly_plan";
+
 /** The row being edited inline — the one offering a save button. */
 function editingRow(): HTMLElement {
   const row = screen
@@ -136,6 +163,7 @@ function editingRow(): HTMLElement {
 
 beforeEach(() => {
   auth.roles = ["office"];
+  tenantSettings.usesHrSystem = false;
   serverEmployees = [ANNA, BEN, CARLA];
   staffApi.listEmployees
     .mockReset()
@@ -156,6 +184,7 @@ beforeEach(() => {
   staffApi.deleteEmployee.mockReset().mockImplementation(async (id: string) => {
     serverEmployees = serverEmployees.filter((row) => row.id !== id);
   });
+  staffApi.syncFromHrSystem.mockReset();
 });
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -167,6 +196,17 @@ describe("ListEmployees", () => {
     await screen.findByText("Anna");
     expect(staffApi.listEmployees).toHaveBeenCalledTimes(1);
     expect(staffApi.listEmployees).toHaveBeenCalledWith(undefined);
+  });
+
+  it("shows the weekly hours where they are set", async () => {
+    serverEmployees = [{ ...ANNA, hours_per_week: 24 }, BEN];
+    renderList();
+    await screen.findByText("Anna");
+
+    expect(within(rowOf("Anna")).getByText("staff.hours_value")).toBeVisible();
+    expect(
+      within(rowOf("Ben")).queryByText("staff.hours_value"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a spinner over the table while the employees load", async () => {
@@ -225,7 +265,7 @@ describe("ListEmployees", () => {
     await screen.findByText("Anna");
 
     await user.click(screen.getByRole("button", { name: /table\.add_record/ }));
-    await user.type(within(editingRow()).getByRole("textbox"), "Dora");
+    await user.type(within(editingRow()).getByRole("textbox", { name: NAME }), "Dora");
     await user.click(screen.getByRole("button", { name: "table.save" }));
 
     await waitFor(() => expect(staffApi.createEmployee).toHaveBeenCalledTimes(1));
@@ -245,7 +285,7 @@ describe("ListEmployees", () => {
     await user.click(
       within(rowOf("Ben")).getByRole("button", { name: "table.edit" }),
     );
-    const nameInput = within(editingRow()).getByRole("textbox");
+    const nameInput = within(editingRow()).getByRole("textbox", { name: NAME });
     await user.clear(nameInput);
     await user.type(nameInput, "Benno");
     await user.click(screen.getByRole("button", { name: "table.save" }));
@@ -287,7 +327,7 @@ describe("ListEmployees", () => {
     await user.click(
       within(rowOf("Ben")).getByRole("button", { name: "table.edit" }),
     );
-    const nameInput = within(editingRow()).getByRole("textbox");
+    const nameInput = within(editingRow()).getByRole("textbox", { name: NAME });
     await user.clear(nameInput);
     await user.type(nameInput, "Anna");
     await user.click(screen.getByRole("button", { name: "table.save" }));
@@ -325,6 +365,215 @@ describe("ListEmployees", () => {
     ).toBeEnabled();
     expect(
       within(annaRow).queryByRole("button", { name: "table.delete" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("ListEmployees with the HR system", () => {
+  // Dora came from the HR system; Anna and Ben were entered here.
+  const DORA = employee({
+    id: "emp-dora",
+    short_name_for_weekly_plan: "Dora",
+    first_name: "Dora",
+    last_name: "Lang",
+    comes_from_hr_system: true,
+    hr_system_id: "hr-4",
+  });
+
+  beforeEach(() => {
+    tenantSettings.usesHrSystem = true;
+    serverEmployees = [ANNA, BEN, DORA];
+  });
+
+  it("shows neither the HR-system column nor the sync without the setting", async () => {
+    tenantSettings.usesHrSystem = false;
+    renderList();
+    await screen.findByText("Anna");
+
+    expect(
+      screen.queryByRole("columnheader", { name: "staff.comes_from_hr_system" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /staff\.sync_from_hr_system/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("explainers.list_employees")).toBeInTheDocument();
+  });
+
+  it("shows which employees come from the HR system", async () => {
+    renderList();
+    await screen.findByText("Dora");
+
+    expect(
+      screen.getByRole("columnheader", { name: "staff.comes_from_hr_system" }),
+    ).toBeInTheDocument();
+    // Each row shows "active" first, then "from the HR system".
+    const fromHrSystem = (name: string) =>
+      within(rowOf(name)).getAllByRole("checkbox")[1];
+    expect(fromHrSystem("Dora")).toBeChecked();
+    expect(fromHrSystem("Ben")).not.toBeChecked();
+    expect(
+      screen.getByText("explainers.list_employees_hr_system"),
+    ).toBeInTheDocument();
+  });
+
+  it("offers the sync as a magenta button", async () => {
+    renderList();
+    await screen.findByText("Ben");
+
+    expect(
+      screen.getByRole("button", { name: /staff\.sync_from_hr_system/ }),
+    ).toHaveClass("ant-btn-color-magenta", "ant-btn-variant-solid");
+  });
+
+  it("syncs with the HR system, reports the counts and reloads the list", async () => {
+    staffApi.syncFromHrSystem.mockImplementation(async () => {
+      serverEmployees = [
+        ...serverEmployees,
+        employee({
+          id: "emp-emil",
+          short_name_for_weekly_plan: "Emil",
+          comes_from_hr_system: true,
+          hr_system_id: "hr-5",
+        }),
+      ];
+      return { created: 1, updated: 0, deactivated: 0 };
+    });
+    const { user } = renderList();
+    await screen.findByText("Ben");
+
+    await user.click(
+      screen.getByRole("button", { name: /staff\.sync_from_hr_system/ }),
+    );
+
+    expect(await screen.findByText("Emil")).toBeInTheDocument();
+    expect(staffApi.syncFromHrSystem).toHaveBeenCalledTimes(1);
+    expect(staffApi.syncFromHrSystem).toHaveBeenCalledWith({});
+    expect(staffApi.listEmployees).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByText("staff.hr_system_synced"),
+    ).toBeInTheDocument();
+  });
+
+  it("asks before deactivating more than half, and syncs once confirmed", async () => {
+    staffApi.syncFromHrSystem
+      .mockRejectedValueOnce({
+        isAxiosError: true,
+        response: {
+          status: 409,
+          data: {
+            code: "staff.hr_system_mass_deactivation",
+            message: "The sync would deactivate 2 of the 3 active employees.",
+            details: { employees: ["Anna", "Ben"] },
+          },
+        },
+      })
+      .mockResolvedValueOnce({ created: 0, updated: 0, deactivated: 2 });
+    const { user } = renderList();
+    await screen.findByText("Ben");
+
+    await user.click(
+      screen.getByRole("button", { name: /staff\.sync_from_hr_system/ }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText("staff.hr_system_mass_deactivation_text"),
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("button", { name: "staff.hr_system_deactivate" }),
+    );
+
+    await waitFor(() =>
+      expect(staffApi.syncFromHrSystem).toHaveBeenLastCalledWith({
+        confirm_deactivations: true,
+      }),
+    );
+    expect(
+      await screen.findByText("staff.hr_system_synced"),
+    ).toBeInTheDocument();
+  });
+
+  it("deactivates nobody when the question is cancelled", async () => {
+    staffApi.syncFromHrSystem.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 409,
+        data: {
+          code: "staff.hr_system_mass_deactivation",
+          message: "The sync would deactivate 2 of the 3 active employees.",
+          details: { employees: ["Anna", "Ben"] },
+        },
+      },
+    });
+    const { user } = renderList();
+    await screen.findByText("Ben");
+
+    await user.click(
+      screen.getByRole("button", { name: /staff\.sync_from_hr_system/ }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "common.cancel" }),
+    );
+
+    expect(staffApi.syncFromHrSystem).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no delete for a synced employee, whom the next sync would add back", async () => {
+    renderList();
+    await screen.findByText("Dora");
+
+    expect(
+      within(rowOf("Dora")).queryByRole("button", { name: "table.delete" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(rowOf("Ben")).getByRole("button", { name: "table.delete" }),
+    ).toBeEnabled();
+  });
+
+  it("keeps the name and the active flag of a synced employee from edits, not its hours", async () => {
+    const { user } = renderList();
+    await screen.findByText("Dora");
+
+    await user.click(
+      within(rowOf("Dora")).getByRole("button", { name: "table.edit" }),
+    );
+
+    // A locked cell shows its value instead of an input.
+    expect(
+      within(editingRow()).queryByRole("textbox", { name: NAME }),
+    ).not.toBeInTheDocument();
+    expect(within(editingRow()).getByText("Dora")).toBeInTheDocument();
+    for (const checkbox of within(editingRow()).getAllByRole("checkbox")) {
+      expect(checkbox).toBeDisabled();
+    }
+    expect(
+      within(editingRow()).getByRole("textbox", { name: "staff.weekly_hours" }),
+    ).toBeEnabled();
+  });
+
+  it("lets an employee entered here be edited, but not marked as from the HR system", async () => {
+    const { user } = renderList();
+    await screen.findByText("Ben");
+
+    await user.click(
+      within(rowOf("Ben")).getByRole("button", { name: "table.edit" }),
+    );
+
+    expect(within(editingRow()).getByRole("textbox", { name: NAME })).toBeEnabled();
+    const [isActive, fromHrSystem] = within(editingRow()).getAllByRole(
+      "checkbox",
+    );
+    expect(isActive).toBeEnabled();
+    expect(fromHrSystem).toBeDisabled();
+  });
+
+  it("offers the sync only to the office", async () => {
+    auth.roles = ["gardener"];
+    renderList();
+    await screen.findByText("Ben");
+
+    expect(
+      screen.queryByRole("button", { name: /staff\.sync_from_hr_system/ }),
     ).not.toBeInTheDocument();
   });
 });

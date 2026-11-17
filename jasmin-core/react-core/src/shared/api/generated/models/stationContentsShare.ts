@@ -15,7 +15,7 @@ export interface StationContentsShare {
   size: string;
   share_type_id: string;
   share_type_name: string;
-  /** The variation's own setting, which decides only in MIXED packing mode: in BULK mode every share is loose, in BOXES mode none is. */
+  /** Whether the variation is packed loose rather than pre-packed; the farm's packing mode follows from its variations'. */
   is_packed_bulk: boolean;
   items: StationContentsItem[];
 }

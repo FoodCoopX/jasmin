@@ -21,15 +21,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CommissioningStorageLoggingListParams,
   CommissioningTheoreticalHarvestsListParams,
-  DayNumberEnum,
   ShareArticle,
   Storage,
   StorageLoggingEntry,
   TheoreticalHarvest,
 } from "@shared/api/generated/models";
-import { makeShareArticle, makeStorage } from "@/test/modelFixtures";
 import { flushMicrotasks, profileRenders } from "@/test/profileRenders";
 import { makeUseTenantMock, type UseTenantMockShape } from "@/test/tenantMock";
+
+import {
+  CARROTS,
+  CELLAR,
+  CELLAR_LEDGER,
+  CLEAN_AMOUNTS,
+  COLD_ROOM,
+  COLD_ROOM_LEDGER,
+  HARVESTS,
+  LEEK,
+  movement,
+  PURCHASE_AMOUNTS,
+  WASH_AMOUNTS,
+} from "./LoggingStorage.fixtures";
 
 const NOW = new Date(2026, 9, 5, 12, 0);
 
@@ -93,103 +105,6 @@ vi.mock("@shared/api/generated/commissioning/commissioning", async () => {
 });
 
 import LoggingStorage from "../LoggingStorage";
-
-// ── Fixtures ────────────────────────────────────────────────────────────────
-
-const CELLAR: Storage = makeStorage({ id: "storage-cellar", name: "Cellar", is_active: true });
-const COLD_ROOM: Storage = makeStorage({ id: "storage-cold-room", name: "Cold room", is_active: true });
-
-const CARROTS: ShareArticle = makeShareArticle({ id: "sa-carrots", name: "Carrots", default_movement_unit: "KG" });
-const LEEK: ShareArticle = makeShareArticle({ id: "sa-leek", name: "Leek", default_movement_unit: "PCS" });
-
-/** The ISO year, week and backend day number (0 = Monday) of a date. */
-function isoDay(isoDate: string) {
-  const date = dayjs(isoDate);
-  return {
-    year: date.isoWeekYear(),
-    delivery_week: date.isoWeek(),
-    day_number: (date.isoWeekday() - 1) as DayNumberEnum,
-  };
-}
-
-/** One ledger row as the backend reports it: the movement's delta and the
- *  balance of its article in this storage after it. */
-function movement(
-  id: string,
-  type: string,
-  isoDate: string,
-  article: ShareArticle,
-  amount: number,
-  runningBalance: number,
-  storage: Storage = CELLAR,
-): StorageLoggingEntry {
-  return {
-    id,
-    date: `${isoDate}T12:00:00+02:00`,
-    type,
-    share_article: article.id!,
-    share_article_name: article.name,
-    amount,
-    unit: article.default_movement_unit,
-    size: "M",
-    ...isoDay(isoDate),
-    storage_name: storage.name,
-    running_balance: runningBalance,
-  };
-}
-
-// The cellar's ledger, oldest first. Carrots: harvested, a zero-amount waste
-// booking, packed into shares, counted (a correction of -2.5) and sold to a
-// reseller beyond what was in stock. Leek: bought in.
-const CELLAR_LEDGER: StorageLoggingEntry[] = [
-  movement("mv-harvest", "HARVEST", "2026-09-28", CARROTS, 25, 25),
-  movement("mv-purchase", "PURCHASE", "2026-09-29", LEEK, 40, 40),
-  movement("mv-waste", "WASTE", "2026-09-30", CARROTS, 0, 25),
-  movement("mv-shares", "SHARECONTENT", "2026-10-01", CARROTS, -10, 15),
-  movement("mv-count", "INVENTORY", "2026-10-02", CARROTS, -2.5, 12.5),
-  movement("mv-order", "ORDERCONTENT", "2026-10-05", CARROTS, -14, -1.5),
-];
-
-const COLD_ROOM_LEDGER: StorageLoggingEntry[] = [
-  movement("mv-cold-harvest", "HARVEST", "2026-09-30", LEEK, 8, 8, COLD_ROOM),
-];
-
-/** One theoretical amount; the four workflow sources share this shape. */
-function theoretical(
-  id: string,
-  isoDate: string,
-  article: ShareArticle,
-  amount: string | null,
-  links: Partial<Pick<TheoreticalHarvest, "share_content" | "order_content">> = {},
-): TheoreticalHarvest {
-  return {
-    id,
-    created_at: `${isoDate}T08:00:00Z`,
-    created_by: null,
-    forecast: null,
-    ...isoDay(isoDate),
-    amount,
-    unit: article.default_movement_unit,
-    size: "M",
-    share_article: article.id!,
-    share_article_name: article.name,
-    storage: CELLAR.id!,
-    share_content: null,
-    order_content: null,
-    ...links,
-  };
-}
-
-const HARVESTS: TheoreticalHarvest[] = [
-  theoretical("th-carrots", "2026-09-29", CARROTS, "25.00", { share_content: "sc-1" }),
-  theoretical("th-leek", "2026-10-05", LEEK, "40.00", { order_content: "oc-1" }),
-  theoretical("th-zero", "2026-09-23", CARROTS, "0.00"),
-  theoretical("th-open", "2026-09-17", CARROTS, null),
-  theoretical("th-next-year", "2027-01-11", LEEK, "12.00"),
-];
-const CLEAN_AMOUNTS = [theoretical("tc-carrots", "2026-09-30", CARROTS, "18.00")];
-const WASH_AMOUNTS = [theoretical("tw-carrots", "2026-10-01", CARROTS, "7.50")];
-const PURCHASE_AMOUNTS = [theoretical("tp-leek", "2026-10-06", LEEK, "30.00")];
 
 // What the server currently holds; the list requests answer from it.
 let server: {
@@ -840,6 +755,23 @@ describe("LoggingStorage internal workflow", () => {
     expect(shown("commissioning.theoretical_wash_amounts")).not.toBeInTheDocument();
     expect(shown("commissioning.theoretical_clean_amounts")).not.toBeInTheDocument();
     expect(shown("commissioning.theoretical_purchase_amounts")).toBeInTheDocument();
+  });
+
+  it("offers no purchase amounts and no purchase filter on a farm that buys nothing in", async () => {
+    setTenant({ has_purchases: false });
+    renderPage();
+    await harvestsShown();
+
+    expect(
+      screen.queryByRole("button", { name: "commissioning.theoretical_purchase_amounts" }),
+    ).not.toBeInTheDocument();
+    expect(sourceButton("commissioning.theoretical_wash_amounts")).toBeInTheDocument();
+
+    await cellarLedgerShown();
+    await userEvent.click(within(ledgerTable()).getByRole("button", { name: "filter" }));
+    const offered = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+    expect(offered).not.toContain("common.purchase");
+    expect(offered).toContain("common.harvest");
   });
 
   it("opens on the year of the day the page is opened, not the day the app was loaded", async () => {

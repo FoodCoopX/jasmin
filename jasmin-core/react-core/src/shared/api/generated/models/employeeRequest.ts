@@ -38,6 +38,12 @@ export interface EmployeeRequest {
    */
   employee_number?: string | null;
   /**
+   * @minimum 0
+   * @maximum 32767
+   * @nullable
+   */
+  hours_per_week?: number | null;
+  /**
    * @minLength 1
    * @nullable
    */

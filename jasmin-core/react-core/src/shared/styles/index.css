@@ -20,6 +20,7 @@
 
 /* 3. Components (reusable building blocks) */
 @import './components/about-modal.css';
+@import './components/absences.css';
 @import './components/admin-confirmation.css';
 @import './components/alerts.css';
 @import './components/app-shell.css';
@@ -45,6 +46,7 @@
 @import './components/import-shares.css';
 @import './components/info-card.css';
 @import './components/invoices.css';
+@import './components/market-prices.css';
 @import './components/member-cards.css';
 @import './components/menu.css';
 @import './components/new-subscription-modal.css';
@@ -57,6 +59,7 @@
 @import './components/popconfirm.css';
 @import './components/public-card.css';
 @import './components/rich-text-editor.css';
+@import './components/saturday-shifts.css';
 @import './components/selectors.css';
 @import './components/cultivation-planner.css';
 @import './components/subscriptions.css';

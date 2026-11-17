@@ -42,6 +42,9 @@ export interface CrudListPageProps<
   /** Extra actions shown next to the title. Static node or a render-prop
    *  receiving the list state (for a CSV export needing `data`/`columns`). */
   headerActions?: CrudSlot<TRow>;
+  /** Content under the title, on the left above the table — for the page's
+   *  main action. Static node or a render-prop receiving the list state. */
+  toolbar?: CrudSlot<TRow>;
   /** Trailing content after the table (modals, CSV template/upload). Static
    *  node or a render-prop receiving the list state (for `invalidate`, …). */
   children?: CrudSlot<TRow>;
@@ -77,12 +80,14 @@ export function CrudListPage<TRow extends TableRecord>({
   pagination,
   deleteContext,
   headerActions,
+  toolbar,
   children,
   ...crudOptions
 }: CrudListPageProps<TRow>) {
   const { t } = useTranslation();
   const list = useCrudListPage<TRow>(crudOptions);
   const resolvedHeader = renderSlot(headerActions, list);
+  const resolvedToolbar = renderSlot(toolbar, list);
   const resolvedChildren = renderSlot(children, list);
 
   return (
@@ -96,6 +101,7 @@ export function CrudListPage<TRow extends TableRecord>({
         <h1>{t(titleKey)}</h1>
       )}
       {descriptionKey && <h5>{t(descriptionKey)}</h5>}
+      {resolvedToolbar && <div className="mb-12">{resolvedToolbar}</div>}
 
       {list.showHideInactive && (
         <HideInactiveSwitch

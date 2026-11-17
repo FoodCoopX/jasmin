@@ -53,6 +53,12 @@ const TENANT_FIELDS_TO_IGNORE = new Set<string>([
   ...TENANT_FILE_FIELDS,
   // Read-only stamp derived from the icon + updated_at; not a setting.
   "app_icon_version",
+  // The HR-system card saves these itself, one field at a time; echoed in
+  // this form's PATCH, an older copy would undo the card's edit.
+  "uses_hr_system",
+  "hr_system_employees_url",
+  "hr_system_absences_url",
+  "has_hr_system_api_token",
   "domains",
   "features",
   "is_active",
@@ -149,6 +155,9 @@ export function tenantToSaveablePayload(
  */
 export const TENANT_SETTINGS_OVERLAY_KEYS: readonly string[] = [
   "uploads_weekly_share_amount",
+  "sells_to_resellers",
+  "has_markets",
+  "has_purchases",
 ];
 
 /**

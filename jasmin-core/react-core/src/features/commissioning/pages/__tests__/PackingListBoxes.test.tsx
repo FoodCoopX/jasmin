@@ -220,6 +220,7 @@ const requestFor = (dayNumber: number, scoped: Record<string, unknown> = {}) => 
   delivery_week: 41,
   day_number: dayNumber,
   is_past: false,
+  is_packed_bulk: false,
   ...scoped,
 });
 
@@ -483,12 +484,11 @@ describe("PackingListBoxes matrix", () => {
     expect(printed.documents[0].props).toMatchObject({ showSize: true });
   });
 
-  it("leaves out the share sizes packed in bulk when the farm packs the rest in boxes", async () => {
-    tenantSettings.values = { packing_mode: "MIXED" };
+  it("leaves out the share sizes packed loose, as each says, whatever the farm's mode", async () => {
     renderPage();
     await screen.findByText("Carrots");
 
-    expect(lastBoxesRequest()).toEqual(requestFor(TUESDAY, { is_packed_bulk: false }));
+    expect(lastBoxesRequest()).toMatchObject({ is_packed_bulk: false });
   });
 
   it("offers no way to add, edit or delete an article", async () => {
@@ -539,12 +539,11 @@ describe("PackingListBoxes for a farm that uploads its weekly share amounts", ()
     expect(countRow()).toEqual([]);
   });
 
-  it("leaves out the share sizes packed in bulk when the farm packs the rest in boxes", async () => {
-    tenantSettings.values = { uploads_weekly_share_amount: true, packing_mode: "MIXED" };
+  it("leaves out the share sizes packed loose, as each says", async () => {
     renderPage();
     await screen.findByText("Lettuce");
 
-    expect(lastMemberAmountsRequest()).toEqual(requestFor(TUESDAY, { is_packed_bulk: false }));
+    expect(lastMemberAmountsRequest()).toMatchObject({ is_packed_bulk: false });
   });
 
   it("prints the amounts without a box-count row", async () => {

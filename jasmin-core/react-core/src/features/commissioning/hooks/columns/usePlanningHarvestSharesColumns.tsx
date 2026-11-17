@@ -37,6 +37,8 @@ interface UsePlanningHarvestSharesColumnsArgs {
   dataHasNotes: DataHasNotes;
   calculateStillFree: (record: TableRecord) => number;
   number_packing_stations: number;
+  /** Without purchases there is no seller to name. */
+  hasPurchases: boolean;
   formatCurrency: (amount: number | null | undefined) => string;
   getUnitLabel: (unit: string) => string;
   setIsBackupModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -57,6 +59,7 @@ export function usePlanningHarvestSharesColumns(
     dataHasNotes,
     calculateStillFree,
     number_packing_stations,
+    hasPurchases,
     formatCurrency,
     getUnitLabel,
     setIsBackupModalOpen,
@@ -304,7 +307,7 @@ export function usePlanningHarvestSharesColumns(
             },
           ] satisfies EditableColumnConfig<TableRecord>[])
         : []),
-      sellerColumn,
+      ...(hasPurchases ? [sellerColumn] : []),
       {
         title: <div className="backup-title">{t("commissioning.backup")}</div>,
         key: "backup",
@@ -376,6 +379,7 @@ export function usePlanningHarvestSharesColumns(
     calculateStillFree,
     number_packing_stations,
     sellerColumn,
+    hasPurchases,
     formatCurrency,
     getUnitLabel,
     setIsBackupModalOpen,

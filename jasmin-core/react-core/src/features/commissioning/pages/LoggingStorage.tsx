@@ -7,6 +7,7 @@ import {
   useDateFormat,
   useDateRangePresets,
   useNumberFormat,
+  useTenant,
   useWashingCleaningVisibility,
 } from "@hooks/index";
 import {
@@ -69,6 +70,8 @@ export default function LoggingStorage() {
     useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState("HARVEST");
   const shownWorkDays = useWashingCleaningVisibility();
+  // A farm that buys nothing in has no purchases in its stores.
+  const hasPurchases = useTenant().getSetting("has_purchases", true) !== false;
 
   // Hide rows with amount = 0 (default on). One toggle per table — independent.
   const [hideInactiveStorage, setHideInactiveStorage] = useState(true);
@@ -275,7 +278,7 @@ export default function LoggingStorage() {
       filters: [
         { text: t("common.inventory"), value: "INVENTORY" },
         { text: t("common.harvest"), value: "HARVEST" },
-        { text: t("common.purchase"), value: "PURCHASE" },
+        ...(hasPurchases ? [{ text: t("common.purchase"), value: "PURCHASE" }] : []),
         { text: t("common.share_content"), value: "SHARECONTENT" },
         { text: t("common.order_content"), value: "ORDERCONTENT" },
         { text: t("common.waste"), value: "WASTE" },
@@ -390,7 +393,8 @@ export default function LoggingStorage() {
   const sourceOptions = WORKFLOW_SOURCES.filter(
     ({ value }) =>
       (shownWorkDays.showsCleaning || value !== "CLEAN") &&
-      (shownWorkDays.showsWashing || value !== "WASH"),
+      (shownWorkDays.showsWashing || value !== "WASH") &&
+      (hasPurchases || value !== "PURCHASE"),
   );
 
   const [pageSize, setPageSize] = useState(10);

@@ -8,6 +8,21 @@
   "save_success": "Settings saved successfully",
   "unsaved_changes_warning": "You have unsaved changes. Are you sure you want to leave this page? Your changes will be lost.",
   "unsaved_changes_title": "Unsaved changes",
+  "secret_stored": "Stored – enter a new one to replace it",
+  "secret_missing": "Not stored yet",
+  "secret_saving": "Saving …",
+  "secret_remove": "Remove",
+  "hr_system": {
+    "title": "External time-tracking system",
+    "uses_hr_system": "Take staff members from the external time-tracking system",
+    "uses_hr_system_desc": "The staff list and the absences each get a button that syncs them with the external time-tracking system.",
+    "hr_system_employees_url": "Staff address",
+    "hr_system_absences_url": "Absences address",
+    "hr_system_employees_url_placeholder": "e.g. https://…/api/v2/employees",
+    "hr_system_absences_url_placeholder": "e.g. https://…/api/v2/absence-requests/team",
+    "api_token": "API token",
+    "format": "Jasmin calls the addresses over https and sends the token as \"Authorization: Bearer …\"; it is stored encrypted and never shown again. It belongs to the addresses' server: both addresses must lead to the same server, and when an address moves to another server or is cleared, Jasmin deletes the token, so enter the addresses before the token. The token has to see every staff member, an admin account's, say, or absences go missing. It expects JSON: for the staff a list with id, firstName, lastName and active, for the absences one with employeeId, startDate, endDate and status. Jasmin reads only on which days someone is away, not the type of absence, so no sickness data arrives."
+  },
   "operating_mode": {
     "title": "Operating mode"
   },
@@ -147,13 +162,8 @@
     "allow_upload_for_data_lists_desc": "To load larger amounts of data into the data lists (e.g. vegetables for shares), CSV files can be used for upload.",
     "uploads_weekly_amount_desc": "Via a CSV file",
     "show_seller_name_in_share": "Show the supplier name for bought-in items in crates to members.",
-    "packing_mode": "Packing mode",
-    "packing_mode_description": "How members receive their shares. Boxes: all shares pre-packed per delivery station. Bulk: members pick from bulk crates. Mixed: per share-type variation choice.",
-    "packing_mode_boxes": "Crates are pre-packed / ready-made crates are delivered to the delivery stations",
-    "packing_mode_bulk": "Members pack their own crates at the delivery stations",
-    "packing_mode_mixed": "Mixed (selectable per share type)",
-    "packing_mode_locked": "Not possible while running or upcoming sizes are packed otherwise: {{sizes}}. Under \"mixed\", each size is packed as entered for it.",
-    "number_packing_stations": "Number of packing stations",
+    "number_packing_stations": "Number of packing stations (only relevant where shares are pre-packed)",
+    "number_packing_stations_description": "How many stations on the farm put the boxes together.",
     "show_size_column": "Show vegetable sizes column",
     "show_washing": "Show washing",
     "show_washing_description": "Off hides the washing days, the washing list and the washing columns. The planning behind them stays the same.",
@@ -162,7 +172,7 @@
     "distribute_forecast_by_weight": "Distribute forecast amount across sizes by weight (prefill empty cells)",
     "show_summary_in_harvest_share_planning_on_top": "Show summary rows at the top of crate planning",
     "sales": {
-      "title": "Sales channels"
+      "title": "Sales and purchasing"
     },
     "default_planning_mode_basic": "by days",
     "default_planning_mode_tours": "by tours",
@@ -171,6 +181,7 @@
     "default_planning_mode_description": "This is only the default setting. It can be changed every week.",
     "has_markets": "Sell at markets",
     "sells_to_resellers": "Sells to resellers",
+    "has_purchases": "Buys produce in",
     "crates_should_be_on_documents": "Crates are charged",
     "crates_should_be_on_documents_desc": "Crates get a price and are listed on orders, delivery notes and invoices.",
     "different_offer_groups": "Different offer groups",

@@ -183,6 +183,9 @@
     "no_context": "Diese Anfrage enthält keinen Mandanten-Kontext. Bitte die Seite über die Adresse des Mandanten erneut aufrufen.",
     "logo_invalid": "Das Logo muss ein PNG-, JPEG-, WEBP- oder GIF-Bild sein und die Größen- und Auflösungsgrenzen einhalten.",
     "feature_flags_invalid": "Die Einstellungen für Navigation und KI müssen als Objekt mit An-/Aus-Werten übermittelt werden.",
+    "hr_system_token_invalid": "Das Token enthält Zeichen, die sich nicht mitschicken lassen, etwa Leerzeichen, Zeilenumbrüche oder typografische Anführungszeichen. Bitte das Token erneut kopieren und einfügen.",
+    "hr_system_address_invalid": "Bitte eine https-Adresse eines öffentlich erreichbaren Servers angeben. Interne Adressen sind nicht erlaubt.",
+    "hr_system_addresses_apart": "Beide Adressen müssen zum selben Server führen, denn das Token geht an beide. Zum Wechsel des Systems zuerst die andere Adresse leeren.",
     "rate_limits_invalid": "Die Obergrenzen müssen bekannten Aktionen ganze Zahlen von 1 bis 100000 für „weekly“ und „per_minute“ zuordnen."
   },
   "tenant_settings": {
@@ -252,7 +255,9 @@
     "day_missing_harvesting_day": "Für diese Bestellung fehlt der Erntetag, und für diesen Liefertag ist kein Standard-Erntetag hinterlegt. Bitte einen Erntetag auswählen. Die Standardtage für Bestellungen werden unter Konfiguration → Liefertage festgelegt.",
     "day_missing_washing_day": "Für diese Bestellung fehlt der Waschtag, und für diesen Liefertag ist kein Standard-Waschtag hinterlegt. Bitte einen Waschtag auswählen. Die Standardtage für Bestellungen werden unter Konfiguration → Liefertage festgelegt.",
     "day_missing_cleaning_day": "Für diese Bestellung fehlt der Putztag, und für diesen Liefertag ist kein Standard-Putztag hinterlegt. Bitte einen Putztag auswählen. Die Standardtage für Bestellungen werden unter Konfiguration → Liefertage festgelegt.",
-    "day_missing_packing_day": "Für diese Bestellung fehlt der Kommissionierungstag, und für diesen Liefertag ist kein Standard-Kommissionierungstag hinterlegt. Bitte einen Kommissionierungstag auswählen. Die Standardtage für Bestellungen werden unter Konfiguration → Liefertage festgelegt."
+    "day_missing_packing_day": "Für diese Bestellung fehlt der Kommissionierungstag, und für diesen Liefertag ist kein Standard-Kommissionierungstag hinterlegt. Bitte einen Kommissionierungstag auswählen. Die Standardtage für Bestellungen werden unter Konfiguration → Liefertage festgelegt.",
+    "day_not_offered": "An diesem Tag werden keine Bestellungen geliefert.",
+    "ordering_deadline_passed": "Die Bestellfrist für diesen Liefertag ist abgelaufen."
   },
   "order_content": {
     "not_found": "Bestellposition nicht gefunden.",
@@ -265,13 +270,14 @@
     "offer_week_mismatch": "Dieses Angebot gilt für eine andere Woche als die Bestellung.",
     "item_change_forbidden": "Das Angebot einer Bestellposition lässt sich nicht ändern, den Artikel nur das Büro.",
     "offer_change_refused": "Das Angebot einer Bestellposition lässt sich nicht ändern: die Position löschen und mit dem anderen Angebot neu anlegen.",
-    "amount_negative": "Die bestellte Menge darf nicht negativ sein."
+    "amount_negative": "Die bestellte Menge darf nicht negativ sein.",
+    "office_only": "Diese Bestellposition kann nur das Büro ändern."
   },
   "orderable_item": {
     "reference_invalid": "Eine Position muss genau eine Sache enthalten: entweder ein Angebot oder einen Artikel — nicht beides und nicht nichts."
   },
   "packing_mode": {
-    "switch_changes_packing": "Der Pack-Modus kann nicht gewechselt werden, solange diese laufenden oder künftigen Größen anders gepackt werden: {{sizes}}. In „gemischt“ wird jede Größe so gepackt, wie bei ihr eingetragen."
+    "switch_changes_packing": "Der Pack-Modus ergibt sich aus den Größen und kann nicht so gesetzt werden, solange diese laufenden oder künftigen Größen anders gepackt werden: {{sizes}}. Wie eine Größe gepackt wird, wird bei der Größe eingetragen."
   },
   "packing_list": {
     "amounts_diverge_across_stations": "Die Packmengen unterscheiden sich je nach Verteilstation. Bitte eine Verteilstation (oder Tour) auswählen, um die Packliste anzuzeigen."
@@ -286,6 +292,19 @@
   "storage": {
     "not_found": "Lager nicht gefunden.",
     "in_use": "Dieses Lager wird noch verwendet (etwa von Prognosen oder Dokumentationseinträgen) und kann nicht gelöscht werden."
+  },
+  "market_product_group": {
+    "in_use": "Dieser Warengruppe sind noch PLUs zugeordnet, deshalb kann sie nicht gelöscht werden."
+  },
+  "market_article": {
+    "in_use": "Diese PLU hat Preise und kann nicht gelöscht werden. Wird sie nicht mehr verkauft, wird sie auf inaktiv gesetzt."
+  },
+  "scale_tax_code": {
+    "missing": "Für den Steuersatz {{tax_rate}} % gibt es noch keinen Code der Waage. Bitte einen Code wählen oder für diesen Satz einen anlegen.",
+    "in_use": "Unter diesem Code werden noch PLUs verkauft, deshalb kann er nicht gelöscht werden."
+  },
+  "scale_unit": {
+    "unsupported": "PLU {{plu_numbers}} hat eine Einheit, in der die Waage nicht verkaufen kann: Die Waage wiegt nach kg oder zählt Stück und Bund."
   },
   "offer": {
     "amount_changed": "Die verfügbare Menge dieses Angebots hat sich inzwischen geändert — bitte die Seite neu laden und die Menge erneut eintragen.",
@@ -596,7 +615,7 @@
     "weekly_plan_category_not_found": "Wochenplan-Kategorie nicht gefunden.",
     "invalid_weekly_plan_assignment": "Ungültige Zuordnung im Wochenplan.",
     "weekly_plan_copy_target_not_empty": "Die Zielwoche enthält bereits einen Wochenplan. Kopieren ist nur in eine leere Woche möglich.",
-    "employee_in_use": "Diese MitarbeiterIn kann nicht gelöscht werden, weil noch Wochenplan-Einträge, Abwesenheiten oder Anstellungen auf sie verweisen. Stattdessen deaktivieren.",
+    "employee_in_use": "Diese MitarbeiterIn kann nicht gelöscht werden, weil noch Wochenplan-Einträge oder Abwesenheiten auf sie verweisen. Stattdessen deaktivieren.",
     "weekly_plan_category_in_use": "Diese Wochenplan-Kategorie kann nicht gelöscht werden, weil sie im Wochenplan verwendet wird. Stattdessen deaktivieren.",
     "absence_category_in_use": "Diese Abwesenheits-Kategorie kann nicht gelöscht werden, weil noch Abwesenheiten auf sie verweisen. Stattdessen deaktivieren.",
     "weekly_plan_category_shrink_blocked": "Die Zeilenzahl kann nicht verringert werden, weil in den wegfallenden Zeilen noch Einträge stehen. Bitte diese Einträge zuerst entfernen.",
@@ -604,7 +623,18 @@
     "weekly_plan_copy_source_category_inactive": "Die Quellwoche enthält Einträge in Kategorien, die deaktiviert sind. Der Wochenplan zeigt nur aktive Kategorien; kopiert würden diese Einträge unsichtbar mitwandern und beim nächsten Speichern der Zielwoche gelöscht. Bitte die Kategorie wieder aktivieren oder die betroffenen Einträge in der Quellwoche entfernen.",
     "employee_short_name_taken": "Eine andere MitarbeiterIn hat bereits diesen Namen für den Wochenplan, auch wenn sie deaktiviert ist.",
     "weekly_plan_category_sort_order_taken": "Eine andere Wochenplan-Kategorie hat bereits diese Reihenfolge, auch wenn sie deaktiviert ist.",
-    "absence_category_name_taken": "Eine andere Abwesenheits-Kategorie hat in diesem Jahr bereits diese Bezeichnung, auch wenn sie deaktiviert ist."
+    "absence_category_name_taken": "Eine andere Abwesenheits-Kategorie hat bereits diese Bezeichnung, auch wenn sie deaktiviert ist.",
+    "absence_category_default_locked": "Die Standard-Kategorie nimmt alle Abwesenheiten auf, für die es keine eigene Kategorie gibt. Sie lässt sich umbenennen, aber nicht löschen oder deaktivieren.",
+    "absence_category_not_found": "Abwesenheits-Kategorie nicht gefunden.",
+    "absences_from_hr_system": "Die Abwesenheiten dieser MitarbeiterIn kommen aus dem externen Zeiterfassungssystem und werden dort eingetragen.",
+    "employee_absent": "Diese MitarbeiterIn ist an dem Tag abwesend und kann dort nicht eingeplant werden.",
+    "employee_inactive": "Diese MitarbeiterIn ist deaktiviert und kann nicht neu eingeplant werden.",
+    "saturday_shift_no_place": "Am Samstag dieser Woche ist im Wochenplan keine Zeile mehr frei. Bitte einer Kategorie eine Zeile mehr geben oder am Samstag jemanden herausnehmen.",
+    "hr_system_not_set_up": "Der Abgleich mit dem externen Zeiterfassungssystem ist nicht eingerichtet. Bitte unter Konfiguration → App → Externes Zeiterfassungssystem einschalten und Adresse und API-Token hinterlegen.",
+    "hr_system_token_rejected": "Das externe Zeiterfassungssystem nimmt das hinterlegte API-Token nicht an. Bitte ein gültiges Token unter Konfiguration → App → Externes Zeiterfassungssystem eintragen.",
+    "hr_system_address_not_allowed": "Die Adressen des externen Zeiterfassungssystems lassen sich so nicht aufrufen: Beide müssen https-Adressen desselben öffentlichen Servers sein. Bitte unter Konfiguration → App prüfen.",
+    "hr_system_mass_deactivation": "Der Abgleich würde mehr als die Hälfte der MitarbeiterInnen aus dem externen Zeiterfassungssystem deaktivieren.",
+    "hr_system_unavailable": "Das externe Zeiterfassungssystem ist gerade nicht erreichbar oder hat keine lesbare Antwort geschickt. Bitte später erneut versuchen."
   },
   "email_config": {
     "test_recipient_missing": "Bitte eine Empfängeradresse für die Test-E-Mail angeben.",

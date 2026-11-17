@@ -43,11 +43,12 @@ processes a model+field at a time in chunks; each chunk is its own
 transaction so a crash mid-run leaves the DB in a consistent state
 (re-running picks up where it left off — every row is idempotent).
 
-What gets touched (6 fields, 4 models)
+What gets touched (7 fields, 5 models)
 ---------------------------------------
 
 Public schema:
   * ``shared.tenants.TenantEmailConfig.smtp_password``
+  * ``shared.tenants.Tenant.hr_system_api_token``
 
 Tenant schemas (iterated per tenant via ``schema_context``):
   * ``commissioning.Member.account_owner``
@@ -82,6 +83,7 @@ logger = logging.getLogger("super_admin")
 # Order intentional: lighter rows first so dry-run feedback is fast.
 PUBLIC_SCHEMA_TARGETS: list[tuple[str, str, list[str]]] = [
     ("tenants", "TenantEmailConfig", ["smtp_password"]),
+    ("tenants", "Tenant", ["hr_system_api_token"]),
 ]
 
 TENANT_SCHEMA_TARGETS: list[tuple[str, str, list[str]]] = [
@@ -126,7 +128,7 @@ class Command(BaseCommand):
         total_rows = 0
         total_models = 0
 
-        # Public-schema models (TenantEmailConfig).
+        # Public-schema models (TenantEmailConfig, Tenant).
         with schema_context("public"):
             for app_label, model_name, field_names in PUBLIC_SCHEMA_TARGETS:
                 rows = self._rotate_model(

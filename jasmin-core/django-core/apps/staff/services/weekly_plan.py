@@ -9,6 +9,7 @@ The grid is a dense matrix the client stays dumb about: for each active
 
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping
 from datetime import date
 from typing import Any
@@ -18,8 +19,10 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from apps.shared.iso_week_filters import iso_week_bound
+from core.db_locks import acquire_advisory_xact_lock
 
 from ..errors import (
+    EmployeeAbsent,
     EmployeeNotFound,
     InvalidWeeklyPlanAssignment,
     WeeklyPlanCategoryNotFound,
@@ -27,18 +30,28 @@ from ..errors import (
     WeeklyPlanCopySourceRowsOutOfRange,
     WeeklyPlanCopyTargetNotEmpty,
 )
-from ..models import Employee, WeeklyPlan, WeeklyPlanCategory
+from ..models import Absence, Employee, WeeklyPlan, WeeklyPlanCategory
 
 # Mon(0) .. Sun(6) — decided for the weekly plan (the model allows 0..6).
 WEEKDAYS = range(7)
+# The Saturday rows are the Saturday shifts (``saturday_shifts``): a copy
+# leaves them out, and a week holding nothing else counts as empty.
+SATURDAY = 5
+
+
+def weekly_plan_lock(year: int, week: int) -> None:
+    """Serialise the writes to one week of the weekly plan — a whole-week save,
+    a copy into it, a Saturday shift — so two never claim the same row at once,
+    and a copy's empty-week check still holds when it writes."""
+    acquire_advisory_xact_lock(f"weekly_plan:{year}:{week}")
 
 
 def build_week_grid(year: int, week: int) -> dict[str, Any]:
     """Materialize the dense grid for one ISO week.
 
-    Three queries total (categories, filled cells, employees) — no N+1. Cells
-    hold the employee **id** (or ``None``); the ``employees`` list carries the
-    full row so the client resolves id → label once.
+    Four queries total (categories, filled cells, employees, absences) — no
+    N+1. Cells hold the employee **id** (or ``None``); the ``employees`` list
+    carries the full row so the client resolves id → label once.
     """
     categories = list(
         WeeklyPlanCategory.objects.filter(is_active=True).order_by("sort_order", "name")
@@ -76,13 +89,31 @@ def build_week_grid(year: int, week: int) -> dict[str, Any]:
     # The active employees make up the palette. An inactive one who still holds
     # a shift this week comes along, flagged, so the office sees that shift —
     # every save re-sends it — and can remove it.
-    employees = list(
+    employee_rows = (
         Employee.objects.filter(Q(is_active=True) | Q(id__in=set(placed.values())))
         .order_by("short_name_for_weekly_plan")
         .values(
-            "id", "short_name_for_weekly_plan", "first_name", "last_name", "is_active"
+            "id",
+            "short_name_for_weekly_plan",
+            "first_name",
+            "last_name",
+            "is_active",
+            "hours_per_week",
         )
     )
+    # The days each employee is absent: not to be planned on, and a shift
+    # planned there before the absence came shows as a conflict.
+    absent_days: dict[str, list[int]] = defaultdict(list)
+    for employee_id, day in (
+        Absence.objects.filter(year=year, week=week)
+        .order_by("day")
+        .values_list("employee_id", "day")
+    ):
+        absent_days[employee_id].append(day)
+    employees = [
+        {**employee, "absent_days": absent_days[employee["id"]]}
+        for employee in employee_rows
+    ]
 
     return {
         "year": year,
@@ -99,8 +130,15 @@ def replace_week(year: int, week: int, assignments: list[dict[str, Any]]) -> Non
     Whole-week last-write-wins: the client sends the full grid state, so the
     week is wiped and rebuilt in one transaction. Each assignment is validated
     (category + employee exist, ``row_index`` within the category's ``max_lines``,
-    no two assignments on the same cell) before anything is written.
+    no two assignments on the same cell, the employee not absent that day)
+    before anything is written.
+
+    An employee planned on a day before an absence was entered there stays
+    planned: the grid shows the conflict, and the week has to stay saveable
+    until the office resolves it. On an absent day the employee keeps at most
+    as many cells as the week held; one more is refused.
     """
+    weekly_plan_lock(year, week)
     category_ids = {a["category_id"] for a in assignments}
     employee_ids = {a["employee_id"] for a in assignments}
 
@@ -110,8 +148,19 @@ def replace_week(year: int, week: int, assignments: list[dict[str, Any]]) -> Non
     valid_employee_ids = set(
         Employee.objects.filter(id__in=employee_ids).values_list("id", flat=True)
     )
+    planned_before = Counter(
+        WeeklyPlan.objects.filter(year=year, week=week).values_list(
+            "employee_id", "day"
+        )
+    )
+    absent = set(
+        Absence.objects.filter(
+            year=year, week=week, employee_id__in=employee_ids
+        ).values_list("employee_id", "day")
+    )
 
     seen_cells: set[tuple[str, int, int]] = set()
+    planned: Counter[tuple[str, int]] = Counter()
     rows_to_create: list[WeeklyPlan] = []
     for assignment in assignments:
         category = categories.get(assignment["category_id"])
@@ -151,6 +200,21 @@ def replace_week(year: int, week: int, assignments: list[dict[str, Any]]) -> Non
                 field="assignments",
             )
         seen_cells.add(cell)
+        employee_day = (assignment["employee_id"], assignment["day"])
+        planned[employee_day] += 1
+        if (
+            employee_day in absent
+            and planned[employee_day] > planned_before[employee_day]
+        ):
+            raise EmployeeAbsent(
+                f"Employee {assignment['employee_id']} is absent on day "
+                f"{assignment['day']}.",
+                field="assignments",
+                details={
+                    "employee_id": assignment["employee_id"],
+                    "day": assignment["day"],
+                },
+            )
         rows_to_create.append(
             WeeklyPlan(
                 year=year,
@@ -237,7 +301,8 @@ def rows_in_inactive_categories(year: int, week: int) -> list[dict[str, Any]]:
     deactivated category sits at no position the grid shows, whatever its
     ``row_index`` — the category's ``max_lines`` says nothing about those rows
     and is left out of the answer. A NULL ``row_index`` occupies no grid
-    position under any category, so it is left out here as everywhere else.
+    position under any category, so it is left out here as everywhere else, and
+    so is the Saturday, which a copy never carries.
     """
     hidden = (
         WeeklyPlan.objects.filter(
@@ -246,6 +311,7 @@ def rows_in_inactive_categories(year: int, week: int) -> list[dict[str, Any]]:
             weekly_plan_category__is_active=False,
             row_index__isnull=False,
         )
+        .exclude(day=SATURDAY)
         .values(
             "weekly_plan_category_id",
             "weekly_plan_category__name",
@@ -269,11 +335,13 @@ def rows_beyond_category_rows(year: int, week: int) -> list[dict[str, Any]]:
     it and it never matches. A deactivated category is out of scope: no count
     gives its rows a position either, and :func:`rows_in_inactive_categories`
     names them under that reason instead, so no category is reported by both.
+    The Saturday is left out, as a copy never carries it.
     """
     offending = (
         WeeklyPlan.objects.filter(
             year=year, week=week, weekly_plan_category__is_active=True
         )
+        .exclude(day=SATURDAY)
         .filter(row_index__gte=F("weekly_plan_category__max_lines"))
         .values(
             "weekly_plan_category_id",
@@ -289,12 +357,17 @@ def rows_beyond_category_rows(year: int, week: int) -> list[dict[str, Any]]:
 
 
 @transaction.atomic
-def copy_week(year: int, from_week: int, to_week: int) -> int:
-    """Copy every cell of ``from_week`` into an EMPTY ``to_week`` (same year).
+def copy_week(
+    year: int, from_week: int, to_week: int, *, from_year: int | None = None
+) -> int:
+    """Copy every cell of ``from_week`` of ``from_year`` into an EMPTY
+    ``to_week`` of ``year``, leaving out each employee's days of absence in
+    ``to_week``, and the Saturday: its rows are the Saturday shifts, kept on
+    their own page. ``from_year`` is ``year`` when not given; the year before
+    lets week 1 take the old year's last week.
 
-    Refuses if the target week already holds rows (would silently merge). The
-    reference's "skip Saturday / skip absent employees" refinement is deferred
-    until the Saturday-shift and absence surfaces exist. Returns the copied count.
+    Refuses if the target week already holds rows other than Saturday ones
+    (would silently merge). Returns the copied count.
 
     Refuses too while the source week holds a row past its category's current
     ``max_lines``. Lowering that count is allowed over weeks nobody edits any
@@ -312,16 +385,22 @@ def copy_week(year: int, from_week: int, to_week: int) -> int:
     target week either — under its own code, because the remedy differs:
     switch the category back on, rather than give it more rows.
     """
-    if from_week == to_week:
+    source_year = year if from_year is None else from_year
+    if (source_year, from_week) == (year, to_week):
         raise InvalidWeeklyPlanAssignment(
             "from_week and to_week must differ", field="to_week"
         )
-    if WeeklyPlan.objects.filter(year=year, week=to_week).exists():
+    weekly_plan_lock(year, to_week)
+    if (
+        WeeklyPlan.objects.filter(year=year, week=to_week)
+        .exclude(day=SATURDAY)
+        .exists()
+    ):
         raise WeeklyPlanCopyTargetNotEmpty(
             f"Week {to_week} already has a weekly plan", field="to_week"
         )
 
-    hidden = rows_in_inactive_categories(year, from_week)
+    hidden = rows_in_inactive_categories(source_year, from_week)
     if hidden:
         listed = "; ".join(
             "'{name}' rows {rows}".format(
@@ -337,7 +416,7 @@ def copy_week(year: int, from_week: int, to_week: int) -> int:
             details={"categories": hidden},
         )
 
-    blocking = rows_beyond_category_rows(year, from_week)
+    blocking = rows_beyond_category_rows(source_year, from_week)
     if blocking:
         listed = "; ".join(
             "'{name}' rows {rows} (max_lines {max_lines})".format(
@@ -354,6 +433,11 @@ def copy_week(year: int, from_week: int, to_week: int) -> int:
             details={"categories": blocking},
         )
 
+    absent = set(
+        Absence.objects.filter(year=year, week=to_week).values_list(
+            "employee_id", "day"
+        )
+    )
     copies = [
         WeeklyPlan(
             year=year,
@@ -363,7 +447,10 @@ def copy_week(year: int, from_week: int, to_week: int) -> int:
             employee_id=row.employee_id,
             row_index=row.row_index,
         )
-        for row in WeeklyPlan.objects.filter(year=year, week=from_week)
+        for row in WeeklyPlan.objects.filter(year=source_year, week=from_week).exclude(
+            day=SATURDAY
+        )
+        if (row.employee_id, row.day) not in absent
     ]
     WeeklyPlan.objects.bulk_create(copies)
     return len(copies)

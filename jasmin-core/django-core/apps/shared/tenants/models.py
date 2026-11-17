@@ -185,6 +185,24 @@ class Tenant(TenantMixin, JasminModel):
     ai = models.JSONField(default=dict, blank=True)
     allow_upload_for_data_lists = models.BooleanField(default=True)
 
+    # The staff list can take its employees and their absences from the
+    # tenant's HR system (``apps.staff.services.hr_system``), read from the
+    # addresses below with the bearer token. The addresses aren't secret; the
+    # token must never be sent back: a ``fields = "__all__"`` serializer would
+    # send it decrypted, even with ``editable=False`` (which only makes it
+    # read-only there), so every Tenant serializer has to declare it
+    # write-only, as ``TenantSerializer`` does.
+    uses_hr_system = models.BooleanField(default=False, db_default=False)
+    hr_system_employees_url = models.URLField(
+        max_length=500, blank=True, default="", db_default=""
+    )
+    hr_system_absences_url = models.URLField(
+        max_length=500, blank=True, default="", db_default=""
+    )
+    hr_system_api_token = EncryptedCharField(
+        max_length=500, blank=True, null=True, editable=False
+    )
+
     logo = models.ImageField(upload_to="logos/", blank=True, null=True)
     bio_logo = models.ImageField(upload_to="bio_logos/", blank=True, null=True)
     # Square launcher icon for the installable web app (home-screen / PWA).
@@ -558,9 +576,10 @@ class TenantSettings(JasminModel):
     # ``apps.shared.tenants.onboarding_emails``.
     onboarding_mode = models.BooleanField(default=False)
 
-    # Sales channels
+    # Sales channels, and whether the farm buys produce in to hand out
     has_markets = models.BooleanField(default=False)
     sells_to_resellers = models.BooleanField(default=True)
+    has_purchases = models.BooleanField(default=True, db_default=True)
     crates_should_be_on_documents = models.BooleanField(
         default=True
     )  # defines if crates are priced and put on deliverynote and invoices

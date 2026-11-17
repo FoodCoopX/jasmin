@@ -30,6 +30,16 @@ const findColumnConfig = <T extends TableRecord>(
   return null;
 };
 
+// Programmatic accessible name for the inline-edit control: a SR user tabbing
+// into the cell otherwise hears an unlabeled "edit text" with no column
+// context. The column's own name first, then its title's text, and the
+// dataIndex only for a title without any text.
+const inputAriaLabel = <T extends TableRecord>(
+  columnConfig: EditableColumnConfig<T> | null,
+  dataIndex: string,
+): string =>
+  columnConfig?.ariaLabel || nodeText(columnConfig?.title) || dataIndex;
+
 const isUnsavedRowKey = (record: TableRecord | undefined): boolean =>
   // A not-yet-saved row (the new-row placeholder, or any row without an id)
   // gets a marker class so action buttons / links inside its cells are
@@ -273,10 +283,7 @@ const EditingCell = <T extends TableRecord = TableRecord>({
     return fieldError || customError;
   };
 
-  // Programmatic accessible name for the inline-edit control: a SR user tabbing
-  // into the cell otherwise hears an unlabeled "edit text" with no column
-  // context. Falls back to dataIndex only for a title without any text.
-  const ariaLabel = nodeText(columnConfig?.title) || dataIndex;
+  const ariaLabel = inputAriaLabel(columnConfig, dataIndex);
 
   // Expose validation errors to assistive tech without changing the borderless
   // visual. AntD's Form.Item points the control's `aria-describedby` at its own

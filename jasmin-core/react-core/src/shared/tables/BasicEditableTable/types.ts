@@ -44,6 +44,9 @@ export interface ForeignKeyConfig {
 // ─── Column Definition ──────────────────────────────────────────────────────
 export interface EditableColumnConfig<T extends Record<string, unknown> = Record<string, unknown>> {
   title: ReactNode;
+  /** The accessible name of the cell's input where the title alone says too
+   *  little, e.g. a unit as the title. The title's text otherwise. */
+  ariaLabel?: string;
   dataIndex: string;
   key?: string;
   inputType?: InputType;

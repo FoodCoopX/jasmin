@@ -510,6 +510,14 @@ describe("ListResellers columns", () => {
     expect(exported).not.toContain("is_also_delivery_station");
     expect(exported).toContain("is_seller");
   });
+
+  it("hides the supplier flag on a farm that buys nothing in", async () => {
+    tenantSettings.values = { has_purchases: false };
+    await renderLoaded();
+
+    expect(columnTitles()).not.toContain("resellers.is_seller");
+    expect(columnTitles()).toContain("resellers.company_name");
+  });
 });
 
 // ── Filters ─────────────────────────────────────────────────────────────────

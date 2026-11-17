@@ -10,5 +10,6 @@ export function usePlanningTenantSettings() {
     showSummaryOnTop:
       getSetting("show_summary_in_harvest_share_planning_on_top", true) ??
       true,
+    hasPurchases: getSetting("has_purchases", true) !== false,
   };
 }

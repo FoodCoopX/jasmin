@@ -9,6 +9,8 @@ import type { TenantLanguageEnum } from './tenantLanguageEnum';
 import type { TenantRequestEmail } from './tenantRequestEmail';
 import type { TenantRequestEmailForOrders } from './tenantRequestEmailForOrders';
 import type { TenantRequestWebsite } from './tenantRequestWebsite';
+import type { TenantRequestHrSystemEmployeesUrl } from './tenantRequestHrSystemEmployeesUrl';
+import type { TenantRequestHrSystemAbsencesUrl } from './tenantRequestHrSystemAbsencesUrl';
 
 /**
  * Full tenant payload — staff-only on read, admin-only on write.
@@ -33,6 +35,11 @@ operational config.
  */
 export interface TenantRequest {
   tenant_language?: TenantLanguageEnum;
+  /**
+   * @maxLength 500
+   * @nullable
+   */
+  hr_system_api_token?: string | null;
   /**
    * @minLength 1
    * @maxLength 200
@@ -134,6 +141,9 @@ export interface TenantRequest {
   navigation?: unknown;
   ai?: unknown;
   allow_upload_for_data_lists?: boolean;
+  uses_hr_system?: boolean;
+  hr_system_employees_url?: TenantRequestHrSystemEmployeesUrl;
+  hr_system_absences_url?: TenantRequestHrSystemAbsencesUrl;
   /** @nullable */
   logo?: Blob | null;
   /** @nullable */

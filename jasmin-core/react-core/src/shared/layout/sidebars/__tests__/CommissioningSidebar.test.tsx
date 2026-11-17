@@ -2,12 +2,14 @@
  * CommissioningSidebar — the entries that depend on a tenant setting or on what
  * the host offers rather than on the viewer's role: the share import (the
  * import-shares mode, unless a host imports the amounts itself), the
- * resellers' commissioning list (a farm that sells to resellers), the
+ * resellers' commissioning list and the extra articles (a farm that sells to
+ * resellers), the
  * delivery-station pages (unless a host keeps its pickup locations itself),
  * among them the station-fee billing (a station that charges a fee), the bulk
  * packing list (bulk packing, or mixed packing with a variation that is packed
- * in bulk) and the weight statistics (box packing, or mixed packing with a
- * variation that is packed in boxes, as only boxes are weighed).
+ * in bulk), the weight statistics (box packing, or mixed packing with a
+ * variation that is packed in boxes, as only boxes are weighed) and the market
+ * pages (a farm with markets).
  *
  * Each route is asserted on both sides of its condition: "no link with this
  * href" only proves something once the same href is proven to exist.
@@ -108,12 +110,20 @@ const sections = [
   "commissioning-resellers",
   "commissioning-harvesting-packing",
   "commissioning-delivery-stations",
+  "commissioning-markets",
   "commissioning-data",
 ];
 
 const shareImport = "/commissioning/import-shares";
 const bulkPackingList = "/commissioning/packing-list-bulk";
 const resellersCommissioningList = "/commissioning/commissioning-list-resellers";
+const extraArticles = "/commissioning/list-extra-articles";
+const purchasePages = [
+  "/commissioning/documentation-purchase",
+  "/commissioning/purchase-list",
+  "/commissioning/statistics-purchase",
+  "/commissioning/list-sellers",
+];
 const deliveryStationPages = [
   "/commissioning/delivery-stations-overview",
   "/commissioning/delivery-stations-details",
@@ -145,6 +155,12 @@ beforeEach(() => {
   stations.list = [];
 });
 
+const marketPages = [
+  "/commissioning/market-prices",
+  "/commissioning/list-market-articles",
+  "/commissioning/list-market-product-groups",
+  "/commissioning/list-scale-tax-codes",
+];
 const stationFees = "/commissioning/delivery-station-fees";
 const weightStatistics = "/commissioning/statistics-share-weights";
 const packedInBulk = { id: "v-bulk", is_packed_bulk: true };
@@ -156,23 +172,45 @@ const chargingStation = {
 };
 
 describe("CommissioningSidebar", () => {
-  it("links the resellers' commissioning list and the delivery-station pages, but no share import, by default", () => {
+  it("links the resellers' commissioning list, the extra articles and the delivery-station pages, but no share import, by default", () => {
     const routes = linkedRoutes();
 
     expect(routes.has(resellersCommissioningList)).toBe(true);
+    expect(routes.has(extraArticles)).toBe(true);
     for (const route of deliveryStationPages) {
       expect(routes.has(route), route).toBe(true);
     }
     expect(routes.has(shareImport)).toBe(false);
   });
 
-  it("drops the resellers' commissioning list on a farm that doesn't sell to resellers", () => {
+  it("drops the resellers' commissioning list and the extra articles on a farm that doesn't sell to resellers", () => {
     settings.sells_to_resellers = false;
 
     const routes = linkedRoutes();
 
     expect(routes.has(resellersCommissioningList)).toBe(false);
+    expect(routes.has(extraArticles)).toBe(false);
+    expect(routes.has("/commissioning/list-sellers")).toBe(true);
     expect(routes.has("/commissioning/commissioning-list-packing")).toBe(true);
+  });
+
+  it("links the purchase documentation, order list, statistics and suppliers by default", () => {
+    const routes = linkedRoutes();
+
+    for (const route of purchasePages) {
+      expect(routes.has(route), route).toBe(true);
+    }
+  });
+
+  it("drops every purchase page on a farm that buys nothing in", () => {
+    settings.has_purchases = false;
+
+    const routes = linkedRoutes();
+
+    for (const route of purchasePages) {
+      expect(routes.has(route), route).toBe(false);
+    }
+    expect(routes.has("/commissioning/documentation-harvest")).toBe(true);
   });
 
   it("drops the washing and cleaning lists on a farm that hides them", () => {
@@ -184,6 +222,25 @@ describe("CommissioningSidebar", () => {
     expect(routes.has("/commissioning/washing-list")).toBe(false);
     expect(routes.has("/commissioning/cleaning-list")).toBe(false);
     expect(routes.has("/commissioning/harvesting-list")).toBe(true);
+  });
+
+  it("links the market prices and the market data on a farm with markets", () => {
+    const routes = linkedRoutes();
+
+    for (const route of marketPages) {
+      expect(routes.has(route), route).toBe(true);
+    }
+  });
+
+  it("drops every market page on a farm without markets", () => {
+    settings.has_markets = false;
+
+    const routes = linkedRoutes();
+
+    for (const route of marketPages) {
+      expect(routes.has(route), route).toBe(false);
+    }
+    expect(routes.has("/commissioning/list-sellers")).toBe(true);
   });
 
   it("offers the share import in the import-shares mode", () => {
@@ -208,7 +265,7 @@ describe("CommissioningSidebar", () => {
       expect(routes.has(route), route).toBe(false);
     }
     expect(routes.has("/commissioning/station-notices")).toBe(true);
-    expect(routes.has("/commissioning/list-storages")).toBe(true);
+    expect(routes.has("/commissioning/list-sellers")).toBe(true);
   });
 
   it("gives the members' notices a page of their own where the farm imports its share amounts", () => {

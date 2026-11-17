@@ -48,6 +48,8 @@ interface UseShareArticleListColumnsArgs {
   activeFilter: string;
   sells_to_resellers: boolean;
   has_markets: boolean;
+  /** Without purchases, the purchased flag and the purchase PU columns go. */
+  has_purchases: boolean;
   number_packing_stations: number;
   packingBulk: boolean;
   renderHarvestNumber: (
@@ -67,6 +69,7 @@ export function useShareArticleListColumns({
   activeFilter,
   sells_to_resellers,
   has_markets,
+  has_purchases,
   number_packing_stations,
   packingBulk,
   renderHarvestNumber,
@@ -136,6 +139,7 @@ export function useShareArticleListColumns({
           inputType: "checkbox",
           required: false,
           fixed: true,
+          hidden: !has_purchases,
           disabled: isFieldDisabled,
           sortable: true,
         },
@@ -511,6 +515,7 @@ export function useShareArticleListColumns({
           align: "center",
           width: "6em",
           className: "column-group-start",
+          hidden: !has_purchases,
           disabled: isPurchaseDisabled,
           render: renderPurchaseNumber(3),
         },
@@ -526,6 +531,7 @@ export function useShareArticleListColumns({
           required: false,
           align: "center",
           width: "6.5em",
+          hidden: !has_purchases,
           disabled: isPurchaseDisabled,
           render: renderPurchaseNumber(0),
         },
@@ -541,6 +547,7 @@ export function useShareArticleListColumns({
           required: false,
           align: "center",
           width: "7em",
+          hidden: !has_purchases,
           disabled: isPurchaseDisabled,
           render: renderPurchaseNumber(0),
         },
@@ -558,6 +565,7 @@ export function useShareArticleListColumns({
       renderHarvestNumber,
       renderPurchaseNumber,
       sells_to_resellers,
+      has_purchases,
       t,
       unitOptions,
       visibleShareOptions,

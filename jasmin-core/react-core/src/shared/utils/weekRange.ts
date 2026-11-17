@@ -31,6 +31,24 @@ export function nextIsoWeek(
 }
 
 /**
+ * The ISO week before `week` of ISO year `year`: week 1's is the last week of
+ * the year before.
+ */
+export function previousIsoWeek(
+  year: number,
+  week: number,
+): { year: number; week: number } {
+  const monday = mondayOfIsoWeek(year, week).subtract(1, "week");
+  return { year: monday.isoWeekYear(), week: monday.isoWeek() };
+}
+
+/** How many ISO weeks `year` has, 52 or 53: 28 December always lies in its
+ *  ISO year's last week. */
+export function weeksInIsoYear(year: number): number {
+  return dayjs(`${year}-12-28`).isoWeek();
+}
+
+/**
  * Is the selected ISO week more than one week in the past (i.e. read-only)?
  *
  * A week counts as "past" once it is >1 week behind the current week.

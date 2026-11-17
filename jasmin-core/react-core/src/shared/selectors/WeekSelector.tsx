@@ -1,16 +1,9 @@
 import { Select, Space } from "antd";
-import dayjs from "dayjs";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useTenantYearOptions } from "@hooks/index";
+import { weeksInIsoYear } from "@shared/utils/weekRange";
 import SteppedSelect from "./SteppedSelect";
-
-/** 52 or 53: December 31 sits in the year's last ISO week unless that week
- * already belongs to the next year. */
-const getWeeksInYear = (year: number) => {
-  const lastWeek = dayjs(`${year}-12-31`).isoWeek();
-  return lastWeek === 1 ? 52 : lastWeek;
-};
 
 /**
  * Only with ``include_null_option`` ("all weeks") can the week be ``null``;
@@ -49,7 +42,7 @@ const WeekSelector = (props: WeekSelectorProps) => {
       // Week 53 exists only in a 53-week year. Without this the selection
       // survives the year change and the page asks the API for a week the new
       // year does not have, which the backend refuses.
-      const weeksInNewYear = getWeeksInYear(value);
+      const weeksInNewYear = weeksInIsoYear(value);
       if (selectedWeek !== null && selectedWeek > weeksInNewYear) {
         setSelectedWeek(weeksInNewYear);
       }
@@ -73,7 +66,7 @@ const WeekSelector = (props: WeekSelectorProps) => {
       return;
     }
 
-    const weeksInCurrentYear = getWeeksInYear(selectedYear);
+    const weeksInCurrentYear = weeksInIsoYear(selectedYear);
 
     if (selectedWeek < weeksInCurrentYear) {
       setSelectedWeek(selectedWeek + 1);
@@ -100,7 +93,7 @@ const WeekSelector = (props: WeekSelectorProps) => {
         return;
       }
 
-      const weeksInPrevYear = getWeeksInYear(prevYear);
+      const weeksInPrevYear = weeksInIsoYear(prevYear);
 
       setSelectedYear(prevYear);
       setSelectedWeek(weeksInPrevYear);
@@ -113,7 +106,7 @@ const WeekSelector = (props: WeekSelectorProps) => {
     tenantCreationYear,
   ]);
 
-  const weeksInYear = getWeeksInYear(selectedYear);
+  const weeksInYear = weeksInIsoYear(selectedYear);
 
   const weekOptions = useMemo(() => {
     const options: { label: string; value: number | null }[] = [];

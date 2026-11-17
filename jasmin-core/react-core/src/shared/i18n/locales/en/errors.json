@@ -183,6 +183,9 @@
     "no_context": "This request carries no tenant context. Please open the page via the tenant's own address.",
     "logo_invalid": "The logo must be a PNG, JPEG, WEBP or GIF image within the size and resolution limits.",
     "feature_flags_invalid": "The navigation and AI settings must be sent as an object of on/off values.",
+    "hr_system_token_invalid": "The token holds characters that can't be sent along, such as spaces, line breaks or typographic quotes. Copy and paste the token again.",
+    "hr_system_address_invalid": "Enter an https address of a publicly reachable server. Internal addresses aren't allowed.",
+    "hr_system_addresses_apart": "Both addresses must lead to the same server, as the token goes to both. To switch systems, clear the other address first.",
     "rate_limits_invalid": "The caps must map known actions to whole numbers from 1 to 100000 for weekly and per_minute."
   },
   "tenant_settings": {
@@ -252,7 +255,9 @@
     "day_missing_harvesting_day": "This order has no harvest day, and no default harvest day is set for this delivery day. Pick a harvest day. The default order days are set under Configuration → Delivery days.",
     "day_missing_washing_day": "This order has no washing day, and no default washing day is set for this delivery day. Pick a washing day. The default order days are set under Configuration → Delivery days.",
     "day_missing_cleaning_day": "This order has no cleaning day, and no default cleaning day is set for this delivery day. Pick a cleaning day. The default order days are set under Configuration → Delivery days.",
-    "day_missing_packing_day": "This order has no commissioning day, and no default commissioning day is set for this delivery day. Pick a commissioning day. The default order days are set under Configuration → Delivery days."
+    "day_missing_packing_day": "This order has no commissioning day, and no default commissioning day is set for this delivery day. Pick a commissioning day. The default order days are set under Configuration → Delivery days.",
+    "day_not_offered": "Orders aren't delivered on this day.",
+    "ordering_deadline_passed": "The ordering deadline for this delivery day has passed."
   },
   "order_content": {
     "not_found": "Order line not found.",
@@ -265,13 +270,14 @@
     "offer_week_mismatch": "This offer is for a different week than the order.",
     "item_change_forbidden": "An order line's offer can't be changed, and only office staff can change its article.",
     "offer_change_refused": "An order line's offer can't be changed: delete the line and add it again with the other offer.",
-    "amount_negative": "The ordered amount cannot be negative."
+    "amount_negative": "The ordered amount cannot be negative.",
+    "office_only": "Only the office can change this order line."
   },
   "orderable_item": {
     "reference_invalid": "A line must reference exactly one item: either an offer or an article — not both, and not neither."
   },
   "packing_mode": {
-    "switch_changes_packing": "The packing mode can't be switched while these running or upcoming sizes are packed otherwise: {{sizes}}. Under \"mixed\", each size is packed as entered for it."
+    "switch_changes_packing": "The packing mode follows from the sizes; it can't be set to this while these running or upcoming sizes are packed otherwise: {{sizes}}. How a size is packed is entered with the size."
   },
   "packing_list": {
     "amounts_diverge_across_stations": "Packing amounts differ between delivery stations. Select a delivery station (or tour) to view the packing list."
@@ -286,6 +292,19 @@
   "storage": {
     "not_found": "Storage not found.",
     "in_use": "This storage is still in use (by forecasts or documentation entries, say) and can't be deleted."
+  },
+  "market_product_group": {
+    "in_use": "PLUs still belong to this product group, so it can't be deleted."
+  },
+  "market_article": {
+    "in_use": "This PLU has prices and can't be deleted. Set it inactive if it's no longer sold."
+  },
+  "scale_tax_code": {
+    "missing": "The scale has no code for the {{tax_rate}} % VAT rate yet. Pick a code, or add one for this rate.",
+    "in_use": "PLUs are still sold under this code, so it can't be deleted."
+  },
+  "scale_unit": {
+    "unsupported": "The scale can't sell PLU {{plu_numbers}} in its unit: it weighs by the kg or counts pieces and bunches."
   },
   "offer": {
     "amount_changed": "The available amount of this offer has changed in the meantime — please reload the page and enter the amount again.",
@@ -596,7 +615,7 @@
     "weekly_plan_category_not_found": "Weekly plan category not found.",
     "invalid_weekly_plan_assignment": "Invalid weekly plan assignment.",
     "weekly_plan_copy_target_not_empty": "The target week already has a weekly plan. Copy is only possible into an empty week.",
-    "employee_in_use": "This staff member can't be deleted because weekly plan entries, absences or employments still reference them. Deactivate them instead.",
+    "employee_in_use": "This staff member can't be deleted because weekly plan entries or absences still reference them. Deactivate them instead.",
     "weekly_plan_category_in_use": "This weekly plan category can't be deleted because it is used in the weekly plan. Deactivate it instead.",
     "absence_category_in_use": "This absence category can't be deleted because absences still reference it. Deactivate it instead.",
     "weekly_plan_category_shrink_blocked": "The number of rows can't be reduced because the rows that would disappear still hold entries. Please clear those entries first.",
@@ -604,7 +623,18 @@
     "weekly_plan_copy_source_category_inactive": "The source week holds entries in categories that are deactivated. The weekly plan only shows active categories, so copied over, those entries would travel along invisibly and be deleted the next time the target week is saved. Please reactivate the category, or clear the affected entries in the source week.",
     "employee_short_name_taken": "Another staff member already has this weekly-plan name, even if they are deactivated.",
     "weekly_plan_category_sort_order_taken": "Another weekly plan category already has this order, even if it is deactivated.",
-    "absence_category_name_taken": "Another absence category already has this name in this year, even if it is deactivated."
+    "absence_category_name_taken": "Another absence category already has this name, even if it is deactivated.",
+    "absence_category_default_locked": "The default category takes every absence that has no category of its own. It can be renamed, but not deleted or deactivated.",
+    "absence_category_not_found": "Absence category not found.",
+    "absences_from_hr_system": "This staff member's absences come from the external time-tracking system and are entered there.",
+    "employee_absent": "This staff member is absent that day and can't be planned there.",
+    "employee_inactive": "This staff member is deactivated and can't be given a new shift.",
+    "saturday_shift_no_place": "The weekly plan has no free row left on that Saturday. Give a category another row, or take someone out on that Saturday.",
+    "hr_system_not_set_up": "The sync with the external time-tracking system isn't set up. Switch it on and store its address and API token under Configuration → App → External time-tracking system.",
+    "hr_system_token_rejected": "The external time-tracking system doesn't accept the stored API token. Enter a valid token under Configuration → App → External time-tracking system.",
+    "hr_system_address_not_allowed": "The external time-tracking system's addresses can't be called like this: both must be https addresses of the same public server. Check them under Configuration → App.",
+    "hr_system_mass_deactivation": "The sync would deactivate more than half of the staff members from the external time-tracking system.",
+    "hr_system_unavailable": "The external time-tracking system can't be reached right now or sent no readable answer. Please try again later."
   },
   "email_config": {
     "test_recipient_missing": "Please enter a recipient address for the test email.",
